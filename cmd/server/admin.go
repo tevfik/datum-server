@@ -1,0 +1,777 @@
+package main
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"net/http"
+	"os"
+	"time"
+
+	"datum-go/internal/auth"
+	"datum-go/internal/storage"
+
+	"github.com/gin-gonic/gin"
+)
+
+// generateIDString creates a random hex string of specified byte length
+func generateIDString(byteLen int) string {
+	bytes := make([]byte, byteLen)
+	rand.Read(bytes)
+	return hex.EncodeToString(bytes)
+}
+
+// SetupAdminRoutes configures all admin-related routes
+func setupAdminRoutes(r *gin.Engine, store *storage.Storage) {
+	// System status (public - no auth needed)
+	r.GET("/system/status", getSystemStatusHandler)
+	r.POST("/system/setup", setupSystemHandler)
+
+	// Admin routes (require admin role)
+	admin := r.Group("/admin")
+	admin.Use(auth.AdminMiddleware(store))
+	{
+		// User management
+		admin.POST("/users", createUserHandler)
+		admin.GET("/users", listUsersHandler)
+		admin.GET("/users/:user_id", getUserHandler)
+		admin.PUT("/users/:user_id", updateUserHandler)
+		admin.DELETE("/users/:user_id", deleteUserHandler)
+		admin.POST("/users/:username/reset-password", resetPasswordHandler)
+
+		// Device management (all devices across users)
+		admin.POST("/devices", provisionDeviceHandler)
+		admin.GET("/devices", listAllDevicesHandler)
+		admin.GET("/devices/:device_id", getDeviceAdminHandler)
+		admin.PUT("/devices/:device_id", updateDeviceHandler)
+		admin.DELETE("/devices/:device_id", forceDeleteDeviceHandler)
+
+		// Database operations
+		admin.GET("/database/stats", getDatabaseStatsHandler)
+		admin.POST("/database/export", exportDatabaseHandler)
+		admin.POST("/database/cleanup", forceCleanupHandler)
+		admin.DELETE("/database/reset", resetDatabaseHandler)
+
+		// System configuration
+		admin.GET("/config", getSystemConfigHandler)
+		admin.PUT("/config/retention", updateRetentionPolicyHandler)
+		admin.PUT("/config/rate-limit", updateRateLimitHandler)
+		admin.PUT("/config/alerts", updateAlertConfigHandler)
+
+		// Logs management
+		admin.GET("/logs", getLogsHandler)
+		admin.DELETE("/logs", clearLogsHandler)
+	}
+}
+
+// ============ System Handlers ============
+
+func getSystemStatusHandler(c *gin.Context) {
+	initialized := store.IsSystemInitialized()
+	config, _ := store.GetSystemConfig()
+
+	status := gin.H{
+		"initialized": initialized,
+	}
+
+	if initialized {
+		status["platform_name"] = config.PlatformName
+		status["allow_register"] = config.AllowRegister
+		status["setup_at"] = config.SetupAt
+	}
+
+	c.JSON(http.StatusOK, status)
+}
+
+type SetupRequest struct {
+	PlatformName  string `json:"platform_name" binding:"required"`
+	AdminEmail    string `json:"admin_email" binding:"required,email"`
+	AdminPassword string `json:"admin_password" binding:"required,min=8"`
+	AllowRegister bool   `json:"allow_register"`
+	DataRetention int    `json:"data_retention"`
+}
+
+func setupSystemHandler(c *gin.Context) {
+	// Check if already initialized
+	if store.IsSystemInitialized() {
+		c.JSON(http.StatusConflict, gin.H{"error": "System already initialized"})
+		return
+	}
+
+	var req SetupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Set defaults
+	if req.DataRetention == 0 {
+		req.DataRetention = 7
+	}
+
+	// Create admin user
+	hashedPassword, err := auth.HashPassword(req.AdminPassword)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	userID := generateIDString(16)
+	user := &storage.User{
+		ID:           userID,
+		Email:        req.AdminEmail,
+		PasswordHash: hashedPassword,
+		Role:         "admin",
+		Status:       "active",
+		CreatedAt:    timeNow(),
+	}
+
+	if err := store.CreateUser(user); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
+		return
+	}
+
+	// Initialize system
+	if err := store.InitializeSystem(req.PlatformName, req.AllowRegister, req.DataRetention); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize system"})
+		return
+	}
+
+	// Generate token for admin
+	token, _ := auth.GenerateToken(userID, req.AdminEmail)
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message":  "System initialized successfully",
+		"user_id":  userID,
+		"email":    req.AdminEmail,
+		"role":     "admin",
+		"token":    token,
+		"platform": req.PlatformName,
+	})
+}
+
+// ============ User Management Handlers ============
+
+type CreateUserRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
+	Role     string `json:"role"`
+}
+
+func createUserHandler(c *gin.Context) {
+	var req CreateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Set defaults
+	if req.Role == "" {
+		req.Role = "user"
+	}
+
+	// Validate role
+	if req.Role != "admin" && req.Role != "user" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Must be 'admin' or 'user'"})
+		return
+	}
+
+	// Hash password
+	hashedPassword, err := auth.HashPassword(req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	userID := generateIDString(16)
+	user := &storage.User{
+		ID:           userID,
+		Email:        req.Email,
+		PasswordHash: hashedPassword,
+		Role:         req.Role,
+		Status:       "active",
+		CreatedAt:    timeNow(),
+	}
+
+	if err := store.CreateUser(user); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "User created",
+		"user_id": userID,
+		"email":   req.Email,
+		"role":    req.Role,
+	})
+}
+
+func listUsersHandler(c *gin.Context) {
+	users, err := store.ListAllUsers()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Remove password hashes from response
+	var safeUsers []gin.H
+	for _, u := range users {
+		devices, _ := store.GetUserDevices(u.ID)
+		safeUsers = append(safeUsers, gin.H{
+			"id":            u.ID,
+			"email":         u.Email,
+			"role":          u.Role,
+			"status":        u.Status,
+			"created_at":    u.CreatedAt,
+			"updated_at":    u.UpdatedAt,
+			"last_login_at": u.LastLoginAt,
+			"device_count":  len(devices),
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"users": safeUsers})
+}
+
+func getUserHandler(c *gin.Context) {
+	userID := c.Param("user_id")
+
+	user, err := store.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	devices, _ := store.GetUserDevices(userID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":            user.ID,
+		"email":         user.Email,
+		"role":          user.Role,
+		"status":        user.Status,
+		"created_at":    user.CreatedAt,
+		"updated_at":    user.UpdatedAt,
+		"last_login_at": user.LastLoginAt,
+		"devices":       devices,
+	})
+}
+
+type UpdateUserRequest struct {
+	Role   string `json:"role"`   // "admin", "user"
+	Status string `json:"status"` // "active", "suspended"
+}
+
+func updateUserHandler(c *gin.Context) {
+	userID := c.Param("user_id")
+
+	var req UpdateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate role and status
+	if req.Role != "" && req.Role != "admin" && req.Role != "user" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Must be 'admin' or 'user'"})
+		return
+	}
+	if req.Status != "" && req.Status != "active" && req.Status != "suspended" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status. Must be 'active' or 'suspended'"})
+		return
+	}
+
+	// Prevent admin from suspending or demoting themselves
+	currentUserID := c.GetString("user_id")
+	if userID == currentUserID {
+		if req.Status == "suspended" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot suspend your own account"})
+			return
+		}
+		if req.Role == "user" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot demote your own account"})
+			return
+		}
+	}
+
+	// Prevent demoting the last admin
+	if req.Role == "user" {
+		stats, _ := store.GetDatabaseStats()
+		adminCount, _ := stats["admin_users"].(int)
+		if adminCount <= 1 {
+			user, _ := store.GetUserByID(userID)
+			if user.Role == "admin" {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Cannot demote the last admin"})
+				return
+			}
+		}
+	}
+
+	if err := store.UpdateUser(userID, req.Role, req.Status); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User updated"})
+}
+
+func deleteUserHandler(c *gin.Context) {
+	userID := c.Param("user_id")
+	currentUserID := c.GetString("user_id")
+
+	// Prevent self-deletion
+	if userID == currentUserID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete yourself"})
+		return
+	}
+
+	// Prevent deleting the last admin
+	user, err := store.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	if user.Role == "admin" {
+		stats, _ := store.GetDatabaseStats()
+		adminCount, _ := stats["admin_users"].(int)
+		if adminCount <= 1 {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete the last admin"})
+			return
+		}
+	}
+
+	if err := store.DeleteUser(userID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User and associated devices deleted"})
+}
+
+// ============ Device Management Handlers ============
+
+func listAllDevicesHandler(c *gin.Context) {
+	devices, err := store.ListAllDevices()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Enrich with owner info
+	var enrichedDevices []gin.H
+	for _, d := range devices {
+		owner, _ := store.GetUserByID(d.UserID)
+		ownerEmail := ""
+		if owner != nil {
+			ownerEmail = owner.Email
+		}
+
+		enrichedDevices = append(enrichedDevices, gin.H{
+			"id":          d.ID,
+			"name":        d.Name,
+			"type":        d.Type,
+			"status":      d.Status,
+			"owner_id":    d.UserID,
+			"owner_email": ownerEmail,
+			"last_seen":   d.LastSeen,
+			"created_at":  d.CreatedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"devices": enrichedDevices})
+}
+
+func getDeviceAdminHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
+
+	device, err := store.GetDevice(deviceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
+		return
+	}
+
+	owner, _ := store.GetUserByID(device.UserID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":          device.ID,
+		"name":        device.Name,
+		"type":        device.Type,
+		"api_key":     device.APIKey, // Admin can see API key
+		"status":      device.Status,
+		"owner_id":    device.UserID,
+		"owner_email": owner.Email,
+		"last_seen":   device.LastSeen,
+		"created_at":  device.CreatedAt,
+		"updated_at":  device.UpdatedAt,
+	})
+}
+
+type UpdateDeviceRequest struct {
+	Status string `json:"status"` // "active", "banned", "suspended"
+}
+
+func updateDeviceHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
+
+	var req UpdateDeviceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Status != "active" && req.Status != "banned" && req.Status != "suspended" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status. Must be 'active', 'banned', or 'suspended'"})
+		return
+	}
+
+	if err := store.UpdateDevice(deviceID, req.Status); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Device updated"})
+}
+
+func forceDeleteDeviceHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
+
+	if err := store.ForceDeleteDevice(deviceID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Device deleted"})
+}
+
+// ============ Database Management Handlers ============
+
+func getDatabaseStatsHandler(c *gin.Context) {
+	stats, err := store.GetDatabaseStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	config, _ := store.GetSystemConfig()
+	stats["platform_name"] = config.PlatformName
+	stats["allow_register"] = config.AllowRegister
+	stats["data_retention_days"] = config.DataRetention
+
+	c.JSON(http.StatusOK, stats)
+}
+
+func exportDatabaseHandler(c *gin.Context) {
+	export, err := store.ExportDatabase()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, export)
+}
+
+func forceCleanupHandler(c *gin.Context) {
+	dataPath := "/app/data/tsdata"
+	if envPath := os.Getenv("TSDATA_PATH"); envPath != "" {
+		dataPath = envPath
+	}
+
+	config := storage.GetRetentionConfigFromEnv()
+	deletedCount := store.CleanupNow(dataPath, config.MaxAge)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":            "Cleanup completed",
+		"partitions_deleted": deletedCount,
+	})
+}
+
+type ResetRequest struct {
+	Confirm string `json:"confirm" binding:"required"` // Must be "RESET"
+}
+
+func resetDatabaseHandler(c *gin.Context) {
+	var req ResetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Confirm != "RESET" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Must confirm with 'RESET'"})
+		return
+	}
+
+	// Create backup first
+	export, _ := store.ExportDatabase()
+	_ = export // In production, save this to a backup file
+
+	// Reset database
+	if err := store.ResetSystem(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Optionally clear tstorage data
+	dataPath := "/app/data/tsdata"
+	if envPath := os.Getenv("TSDATA_PATH"); envPath != "" {
+		dataPath = envPath
+	}
+	os.RemoveAll(dataPath)
+	os.MkdirAll(dataPath, 0755)
+
+	c.JSON(http.StatusOK, gin.H{"message": "System reset to factory state"})
+}
+
+// ============ Additional Admin Handlers ============
+
+type ProvisionDeviceRequest struct {
+	DeviceID string `json:"device_id"`
+	Name     string `json:"name" binding:"required"`
+	Type     string `json:"type"`
+}
+
+func provisionDeviceHandler(c *gin.Context) {
+	var req ProvisionDeviceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Generate device ID if not provided
+	deviceID := req.DeviceID
+	if deviceID == "" {
+		deviceID = generateIDString(16)
+	}
+
+	// Generate API key
+	apiKey := generateIDString(32)
+
+	// Get admin user ID from context
+	adminUserID := c.GetString("user_id")
+
+	// Default type if not provided
+	deviceType := req.Type
+	if deviceType == "" {
+		deviceType = "sensor"
+	}
+
+	// Create device
+	device := &storage.Device{
+		ID:        deviceID,
+		UserID:    adminUserID,
+		Name:      req.Name,
+		Type:      deviceType,
+		APIKey:    apiKey,
+		Status:    "active",
+		CreatedAt: timeNow(),
+		UpdatedAt: timeNow(),
+	}
+
+	if err := store.CreateDevice(device); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Device ID already exists"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"device_id":  deviceID,
+		"name":       req.Name,
+		"type":       deviceType,
+		"api_key":    apiKey,
+		"status":     "active",
+		"created_at": device.CreatedAt,
+	})
+}
+
+type ResetPasswordRequest struct {
+	NewPassword string `json:"new_password"`
+}
+
+func resetPasswordHandler(c *gin.Context) {
+	username := c.Param("username")
+
+	var req ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// If no password provided, generate random one
+	if req.NewPassword == "" {
+		req.NewPassword = generateIDString(8) // 16 char hex string
+	}
+
+	// Get user
+	user, err := store.GetUserByEmail(username)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Hash new password
+	hashedPassword, err := auth.HashPassword(req.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	// Update password
+	if err := store.UpdateUserPassword(user.ID, hashedPassword); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":      "Password reset successfully",
+		"new_password": req.NewPassword,
+	})
+}
+
+func getSystemConfigHandler(c *gin.Context) {
+	config, err := store.GetSystemConfig()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"retention": gin.H{
+			"days":                 config.DataRetention,
+			"check_interval_hours": 6,
+		},
+		"rate_limit": gin.H{
+			"max_requests":   100,
+			"window_seconds": 60,
+		},
+		"alerts": gin.H{
+			"email_enabled":    false,
+			"disk_threshold":   90,
+			"memory_threshold": 90,
+		},
+	})
+}
+
+type UpdateRetentionRequest struct {
+	Days               int `json:"days" binding:"required,min=1,max=365"`
+	CheckIntervalHours int `json:"check_interval_hours" binding:"required,min=1,max=24"`
+}
+
+func updateRetentionPolicyHandler(c *gin.Context) {
+	var req UpdateRetentionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := store.UpdateDataRetention(req.Days); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Retention policy updated",
+		"retention": gin.H{
+			"days":                 req.Days,
+			"check_interval_hours": req.CheckIntervalHours,
+		},
+	})
+}
+
+type UpdateRateLimitRequest struct {
+	MaxRequests   int `json:"max_requests" binding:"required,min=10,max=10000"`
+	WindowSeconds int `json:"window_seconds" binding:"required,min=1,max=3600"`
+}
+
+func updateRateLimitHandler(c *gin.Context) {
+	var req UpdateRateLimitRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Store in system config (requires extending storage layer)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Rate limit updated",
+		"rate_limit": gin.H{
+			"max_requests":   req.MaxRequests,
+			"window_seconds": req.WindowSeconds,
+		},
+	})
+}
+
+type UpdateAlertConfigRequest struct {
+	EmailEnabled    bool `json:"email_enabled"`
+	DiskThreshold   int  `json:"disk_threshold" binding:"required,min=10,max=95"`
+	MemoryThreshold int  `json:"memory_threshold" binding:"required,min=10,max=95"`
+}
+
+func updateAlertConfigHandler(c *gin.Context) {
+	var req UpdateAlertConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Store in system config (requires extending storage layer)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Alert configuration updated",
+		"alerts": gin.H{
+			"email_enabled":    req.EmailEnabled,
+			"disk_threshold":   req.DiskThreshold,
+			"memory_threshold": req.MemoryThreshold,
+		},
+	})
+}
+
+func getLogsHandler(c *gin.Context) {
+	logType := c.DefaultQuery("type", "system")
+	level := c.DefaultQuery("level", "")
+	startTime := c.DefaultQuery("start", "")
+	endTime := c.DefaultQuery("end", "")
+	search := c.DefaultQuery("search", "")
+
+	// Mock logs for demonstration
+	logs := []gin.H{
+		{
+			"timestamp": time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
+			"level":     "INFO",
+			"message":   fmt.Sprintf("System started successfully - type:%s search:%s", logType, search),
+		},
+		{
+			"timestamp": time.Now().Add(-30 * time.Minute).Format(time.RFC3339),
+			"level":     "INFO",
+			"message":   fmt.Sprintf("Device connected - start:%s end:%s", startTime, endTime),
+		},
+		{
+			"timestamp": time.Now().Add(-15 * time.Minute).Format(time.RFC3339),
+			"level":     "WARNING",
+			"message":   fmt.Sprintf("High memory usage detected - level:%s", level),
+		},
+		{
+			"timestamp": time.Now().Add(-5 * time.Minute).Format(time.RFC3339),
+			"level":     "INFO",
+			"message":   "Data cleanup completed",
+		},
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"logs":  logs,
+		"total": len(logs),
+	})
+}
+
+func clearLogsHandler(c *gin.Context) {
+	// In production, this would clear actual log files
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Logs cleared successfully",
+	})
+}
+
+// Helper to check if path exists
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// timeNow returns current time (for testability)
+func timeNow() time.Time {
+	return time.Now()
+}

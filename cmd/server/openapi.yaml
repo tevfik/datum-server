@@ -1,0 +1,862 @@
+openapi: 3.0.3
+info:
+  title: Datumpy IoT Platform API
+  description: |
+    High-performance IoT data ingestion and device management platform.
+    
+    ## Authentication
+    - **User Auth**: JWT token in `Authorization: Bearer {token}` header
+    - **Device Auth**: API key in `Authorization: Bearer {api_key}` header
+    
+    ## Quick Start
+    1. Register user: `POST /auth/register`
+    2. Create device: `POST /devices`
+    3. Send data: `POST /data/{device_id}`
+  version: 1.0.0
+  contact:
+    name: API Support
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8007
+    description: Local development
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: User JWT token
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      description: Device API key
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user_id:
+          type: string
+
+    DeviceCreateRequest:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [temperature, humidity, weather, actuator, sensor]
+
+    DeviceResponse:
+      type: object
+      properties:
+        device_id:
+          type: string
+        api_key:
+          type: string
+
+    DataPayload:
+      type: object
+      additionalProperties: true
+      example:
+        temperature: 25.5
+        humidity: 60
+
+    CommandRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+        params:
+          type: object
+
+paths:
+  /:
+    get:
+      summary: API Info
+      tags: [System]
+      responses:
+        '200':
+          description: API information
+
+  /auth/register:
+    post:
+      summary: Register new user
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '409':
+          description: User already exists
+
+  /auth/login:
+    post:
+      summary: Login user
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+
+  /devices:
+    post:
+      summary: Create device
+      tags: [Devices]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceCreateRequest'
+      responses:
+        '201':
+          description: Device created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+    get:
+      summary: List devices
+      tags: [Devices]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of devices
+
+  /devices/{device_id}:
+    delete:
+      summary: Delete device
+      tags: [Devices]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Device deleted
+
+  /devices/{device_id}/commands:
+    post:
+      summary: Send command to device
+      tags: [Commands]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommandRequest'
+      responses:
+        '201':
+          description: Command queued
+
+  /device/{device_id}/commands:
+    get:
+      summary: Poll for commands (device)
+      tags: [Commands]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pending commands
+
+  /device/{device_id}/commands/poll:
+    get:
+      summary: Long poll for commands
+      tags: [Commands]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: wait
+          in: query
+          schema:
+            type: integer
+            default: 30
+            maximum: 60
+          description: Seconds to wait for commands
+      responses:
+        '200':
+          description: Commands or timeout
+
+  /device/{device_id}/commands/{command_id}/ack:
+    post:
+      summary: Acknowledge command execution
+      tags: [Commands]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: command_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Command acknowledged
+
+  /device/{device_id}/push:
+    get:
+      summary: Push data via GET (for constrained devices)
+      description: |
+        Allows constrained IoT devices (like ESP8266, Arduino with limited HTTP libraries) 
+        to submit sensor data via simple GET request with query parameters.
+        This is an alternative to POST /data/{device_id} for devices that cannot easily 
+        construct POST requests with JSON bodies.
+      tags: [Data]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Device ID
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Device API key (sk_live_XXX format)
+        - name: temp
+          in: query
+          schema:
+            type: number
+          description: Temperature (example sensor value)
+        - name: humidity
+          in: query
+          schema:
+            type: number
+          description: Humidity (example sensor value)
+      responses:
+        '200':
+          description: Data stored successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                  fields_stored:
+                    type: integer
+                    description: Number of sensor values stored
+                  commands_pending:
+                    type: integer
+        '400':
+          description: No data parameters provided
+        '401':
+          description: Invalid device credentials
+        '403':
+          description: Device is banned
+
+  /data/{device_id}:
+    post:
+      summary: Send data (device)
+      tags: [Data]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataPayload'
+      responses:
+        '200':
+          description: Data received
+    get:
+      summary: Get latest data
+      tags: [Data]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Latest data point
+
+  /data/{device_id}/history:
+    get:
+      summary: Get data history with time range filtering
+      description: |
+        Query historical time-series data with flexible time range options.
+        
+        **Time Range Options (mutually exclusive):**
+        - `range`: Duration backwards from now (e.g., `1h`, `24h`, `7d`, `30d`)
+        - `start` + `stop`: Unix timestamp (ms) with duration
+        - `start_rfc` + `end_rfc`: RFC3339 formatted timestamps
+        
+        **Aggregation:**
+        Use `int` parameter to aggregate data into buckets (e.g., `1m`, `1h`, `1d`)
+      tags: [Data]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum number of data points to return
+          schema:
+            type: integer
+            default: 100
+        - name: range
+          in: query
+          description: Duration backwards from now (e.g., 1h, 24h, 7d, 30d)
+          schema:
+            type: string
+          examples:
+            oneHour:
+              value: "1h"
+              summary: Last 1 hour
+            oneDay:
+              value: "24h"
+              summary: Last 24 hours
+            oneWeek:
+              value: "7d"
+              summary: Last 7 days
+        - name: start
+          in: query
+          description: Start time as Unix timestamp in milliseconds
+          schema:
+            type: integer
+            format: int64
+        - name: stop
+          in: query
+          description: Duration from start (e.g., 1h, 1d, 1m, 1s)
+          schema:
+            type: string
+        - name: start_rfc
+          in: query
+          description: Start time in RFC3339 format (e.g., 2024-01-01T00:00:00Z)
+          schema:
+            type: string
+            format: date-time
+        - name: end_rfc
+          in: query
+          description: End time in RFC3339 format (e.g., 2024-01-02T00:00:00Z)
+          schema:
+            type: string
+            format: date-time
+        - name: int
+          in: query
+          description: Aggregation interval for averaging data (e.g., 1m, 1h, 1d)
+          schema:
+            type: string
+          examples:
+            oneMinute:
+              value: "1m"
+              summary: Aggregate per minute
+            oneHour:
+              value: "1h"
+              summary: Aggregate per hour
+            oneDay:
+              value: "1d"
+              summary: Aggregate per day
+      responses:
+        '200':
+          description: Historical data points
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device_id:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp:
+                          type: string
+                          format: date-time
+                        timestamp_ms:
+                          type: integer
+                          format: int64
+                        values:
+                          type: object
+                          additionalProperties:
+                            type: number
+                        count:
+                          type: integer
+                          description: Number of aggregated points (when using int parameter)
+
+  /public/data/{device_id}:
+    post:
+      summary: Send public data (no auth)
+      tags: [Public]
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataPayload'
+      responses:
+        '200':
+          description: Data received
+    get:
+      summary: Get public data (no auth)
+      tags: [Public]
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Latest data
+
+  /public/data/{device_id}/history:
+    get:
+      summary: Get public history with time range filtering (no auth)
+      description: |
+        Query historical time-series data without authentication.
+        Same time range and aggregation options as authenticated endpoint.
+      tags: [Public]
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum number of data points
+          schema:
+            type: integer
+            default: 100
+        - name: range
+          in: query
+          description: Duration backwards from now (e.g., 1h, 24h, 7d)
+          schema:
+            type: string
+        - name: start
+          in: query
+          description: Start time as Unix timestamp in milliseconds
+          schema:
+            type: integer
+            format: int64
+        - name: stop
+          in: query
+          description: Duration from start (e.g., 1h, 1d)
+          schema:
+            type: string
+        - name: int
+          in: query
+          description: Aggregation interval (e.g., 1m, 1h, 1d)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Historical data points
+
+  /device/{device_id}/commands/stream:
+    get:
+      summary: SSE stream for real-time commands
+      description: |
+        Server-Sent Events (SSE) endpoint for real-time command delivery.
+        Keeps connection open and pushes commands as they arrive.
+        Battery-optimized for IoT devices.
+        
+        **Event Types:**
+        - `command`: New command received
+        - `ping`: Keep-alive (every 30s)
+      tags: [Commands]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: |
+                event: command
+                data: {"id":"cmd123","action":"reboot","params":{}}
+                
+                event: ping
+                data: {"time":"2024-01-01T12:00:00Z"}
+
+  # ============ System Endpoints ============
+  /system/status:
+    get:
+      summary: Check system initialization status
+      description: Returns whether the system has been initialized with an admin user.
+      tags: [System]
+      responses:
+        '200':
+          description: System status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  initialized:
+                    type: boolean
+                  platform_name:
+                    type: string
+                  allow_register:
+                    type: boolean
+
+  /system/setup:
+    post:
+      summary: Initialize system (first-time setup)
+      description: |
+        Creates the first admin user and initializes the platform.
+        Only available when system is not yet initialized.
+      tags: [System]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [platform_name, admin_email, admin_password]
+              properties:
+                platform_name:
+                  type: string
+                admin_email:
+                  type: string
+                  format: email
+                admin_password:
+                  type: string
+                  minLength: 8
+                allow_register:
+                  type: boolean
+                  default: false
+      responses:
+        '201':
+          description: System initialized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user_id:
+                    type: string
+                  token:
+                    type: string
+        '409':
+          description: System already initialized
+
+  # ============ Admin Endpoints ============
+  /admin/users:
+    get:
+      summary: List all users (admin only)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of users with device counts
+        '403':
+          description: Admin access required
+
+  /admin/users/{user_id}:
+    get:
+      summary: Get user details
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User details with devices
+    put:
+      summary: Update user (role/status)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [admin, user]
+                status:
+                  type: string
+                  enum: [active, suspended]
+      responses:
+        '200':
+          description: User updated
+    delete:
+      summary: Delete user and all devices
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User deleted
+
+  /admin/devices:
+    get:
+      summary: List all devices (across all users)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of all platform devices
+
+  /admin/devices/{device_id}:
+    get:
+      summary: Get device details (including API key)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Device details
+    put:
+      summary: Update device status (ban/unban)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [active, banned, suspended]
+      responses:
+        '200':
+          description: Device updated
+    delete:
+      summary: Force delete device
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Device deleted
+
+  /admin/database/stats:
+    get:
+      summary: Get database statistics
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Platform statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_users:
+                    type: integer
+                  active_users:
+                    type: integer
+                  suspended_users:
+                    type: integer
+                  total_devices:
+                    type: integer
+                  banned_devices:
+                    type: integer
+
+  /admin/database/export:
+    post:
+      summary: Export database as JSON
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Database export
+
+  /admin/database/cleanup:
+    post:
+      summary: Force retention cleanup
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Cleanup completed
+
+  /admin/database/reset:
+    delete:
+      summary: Factory reset system
+      description: |
+        Deletes ALL data and returns to uninitialized state.
+        Requires confirmation by sending {"confirm": "RESET"}.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirm]
+              properties:
+                confirm:
+                  type: string
+                  example: "RESET"
+      responses:
+        '200':
+          description: System reset
+        '400':
+          description: Invalid confirmation

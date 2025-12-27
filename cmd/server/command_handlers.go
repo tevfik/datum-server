@@ -1,0 +1,168 @@
+package main
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"net/http"
+	"time"
+
+	"datum-go/internal/auth"
+	"datum-go/internal/storage"
+
+	"github.com/gin-gonic/gin"
+)
+
+// Command handlers
+
+type SendCommandRequest struct {
+	Action string                 `json:"action" binding:"required"`
+	Params map[string]interface{} `json:"params"`
+}
+
+func sendCommandHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
+	userID, _ := auth.GetUserID(c)
+
+	// Verify device ownership
+	device, err := store.GetDevice(deviceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
+		return
+	}
+	if device.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	var req SendCommandRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Create command
+	cmdID := generateCommandID()
+	cmd := &storage.Command{
+		ID:        cmdID,
+		DeviceID:  deviceID,
+		Action:    req.Action,
+		Params:    req.Params,
+		Status:    "pending",
+		CreatedAt: time.Now(),
+	}
+
+	if err := store.CreateCommand(cmd); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"command_id": cmdID,
+		"status":     "pending",
+		"message":    "Command queued for device",
+	})
+}
+
+func listCommandsHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
+	userID, _ := auth.GetUserID(c)
+
+	// Verify device ownership
+	device, err := store.GetDevice(deviceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
+		return
+	}
+	if device.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	commands, _ := store.GetPendingCommands(deviceID)
+	c.JSON(http.StatusOK, gin.H{"commands": commands})
+}
+
+func pollCommandsHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
+	apiKey, _ := c.Get("api_key")
+
+	// Verify device
+	device, err := store.GetDeviceByAPIKey(apiKey.(string))
+	if err != nil || device.ID != deviceID {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid device credentials"})
+		return
+	}
+
+	commands, _ := store.GetPendingCommands(deviceID)
+
+	// Mark commands as delivered
+	var cmdList []gin.H
+	for _, cmd := range commands {
+		cmdList = append(cmdList, gin.H{
+			"command_id": cmd.ID,
+			"action":     cmd.Action,
+			"params":     cmd.Params,
+			"created_at": cmd.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"commands": cmdList})
+}
+
+type AckCommandRequest struct {
+	Status string                 `json:"status" binding:"required"`
+	Result map[string]interface{} `json:"result"`
+}
+
+func ackCommandHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
+	commandID := c.Param("command_id")
+	apiKey, _ := c.Get("api_key")
+
+	// Verify device
+	device, err := store.GetDeviceByAPIKey(apiKey.(string))
+	if err != nil || device.ID != deviceID {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid device credentials"})
+		return
+	}
+
+	var req AckCommandRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := store.AcknowledgeCommand(commandID, req.Result); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "acknowledged",
+		"message": "Command execution confirmed",
+	})
+}
+
+func deleteDeviceHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
+	userID, _ := auth.GetUserID(c)
+
+	if err := store.DeleteDevice(deviceID, userID); err != nil {
+		if err.Error() == "device not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		} else if err.Error() == "access denied" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+func generateCommandID() string {
+	bytes := make([]byte, 8)
+	rand.Read(bytes)
+	return "cmd_" + hex.EncodeToString(bytes)
+}

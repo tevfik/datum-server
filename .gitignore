@@ -1,0 +1,54 @@
+# Ignore build outputs
+/datum-server
+/bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# Data directories
+/data/
+/backups/
+*.db
+*.db-shm
+*.db-wal
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Air live reload
+.air.toml.local
+tmp/
+
+# Docker volumes
+docker-data/

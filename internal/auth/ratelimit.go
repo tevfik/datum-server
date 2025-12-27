@@ -1,0 +1,148 @@
+package auth
+
+import (
+	"net/http"
+	"os"
+	"strconv"
+	"sync"
+	"time"
+
+	"github.com/gin-gonic/gin"
+)
+
+// RateLimiter implements a simple token bucket rate limiter
+type RateLimiter struct {
+	visitors map[string]*visitor
+	mu       sync.RWMutex
+	rate     int
+	window   time.Duration
+}
+
+type visitor struct {
+	limiter  *tokenBucket
+	lastSeen time.Time
+}
+
+type tokenBucket struct {
+	tokens    int
+	maxTokens int
+	refillAt  time.Time
+	mu        sync.Mutex
+}
+
+func newTokenBucket(maxTokens int, window time.Duration) *tokenBucket {
+	return &tokenBucket{
+		tokens:    maxTokens,
+		maxTokens: maxTokens,
+		refillAt:  time.Now().Add(window),
+	}
+}
+
+func (tb *tokenBucket) allow() bool {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+
+	now := time.Now()
+	if now.After(tb.refillAt) {
+		tb.tokens = tb.maxTokens
+		tb.refillAt = now.Add(time.Minute)
+	}
+
+	if tb.tokens > 0 {
+		tb.tokens--
+		return true
+	}
+
+	return false
+}
+
+// NewRateLimiter creates a new rate limiter with configuration from environment
+func NewRateLimiter() *RateLimiter {
+	rate := 100                // default: 100 requests
+	window := 60 * time.Second // default: per minute
+
+	if envRate := os.Getenv("RATE_LIMIT_REQUESTS"); envRate != "" {
+		if r, err := strconv.Atoi(envRate); err == nil {
+			rate = r
+		}
+	}
+
+	if envWindow := os.Getenv("RATE_LIMIT_WINDOW_SECONDS"); envWindow != "" {
+		if w, err := strconv.Atoi(envWindow); err == nil {
+			window = time.Duration(w) * time.Second
+		}
+	}
+
+	rl := &RateLimiter{
+		visitors: make(map[string]*visitor),
+		rate:     rate,
+		window:   window,
+	}
+
+	// Cleanup old visitors every 5 minutes
+	go rl.cleanupLoop()
+
+	return rl
+}
+
+func (rl *RateLimiter) getVisitor(ip string) *visitor {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	v, exists := rl.visitors[ip]
+	if !exists {
+		v = &visitor{
+			limiter:  newTokenBucket(rl.rate, rl.window),
+			lastSeen: time.Now(),
+		}
+		rl.visitors[ip] = v
+	}
+
+	v.lastSeen = time.Now()
+	return v
+}
+
+func (rl *RateLimiter) cleanupLoop() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		rl.cleanup()
+	}
+}
+
+func (rl *RateLimiter) cleanup() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	threshold := time.Now().Add(-10 * time.Minute)
+	for ip, v := range rl.visitors {
+		if v.lastSeen.Before(threshold) {
+			delete(rl.visitors, ip)
+		}
+	}
+}
+
+// RateLimitMiddleware returns a Gin middleware for rate limiting
+func RateLimitMiddleware() gin.HandlerFunc {
+	limiter := NewRateLimiter()
+
+	return func(c *gin.Context) {
+		ip := c.ClientIP()
+		visitor := limiter.getVisitor(ip)
+
+		if !visitor.limiter.allow() {
+			c.Header("X-RateLimit-Limit", strconv.Itoa(limiter.rate))
+			c.Header("X-RateLimit-Remaining", "0")
+			c.Header("Retry-After", "60")
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error": "Rate limit exceeded. Please try again later.",
+			})
+			c.Abort()
+			return
+		}
+
+		c.Header("X-RateLimit-Limit", strconv.Itoa(limiter.rate))
+		c.Next()
+	}
+}
