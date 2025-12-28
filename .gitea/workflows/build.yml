@@ -120,16 +120,18 @@ jobs:
               exit 1
             fi
             
-            # Try localhost first
-            if curl -f http://localhost:8081/health 2>/dev/null; then
+            # Try localhost first (use 127.0.0.1 to avoid IPv6 issues)
+            if curl -v http://127.0.0.1:8081/health; then
               echo "✅ Server is ready (localhost)!"
               break
             fi
             
             # Try container IP directly (fallback for DinD)
-            if [ ! -z "$CONTAINER_IP" ] && curl -f http://$CONTAINER_IP:8000/health 2>/dev/null; then
-              echo "✅ Server is ready (container IP)!"
-              break
+            if [ ! -z "$CONTAINER_IP" ]; then
+                if curl -v http://$CONTAINER_IP:8000/health; then
+                    echo "✅ Server is ready (container IP)!"
+                    break
+                fi
             fi
             
             if [ $i -eq 30 ]; then
