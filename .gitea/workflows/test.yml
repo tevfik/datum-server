@@ -61,6 +61,9 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Verify dependencies
+        run: go mod tidy && go mod verify
+
       - name: Run tests with coverage
         run: |
           go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
@@ -106,6 +109,12 @@ jobs:
         with:
           go-version: '1.23'
 
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod tidy && go mod verify
+
       - name: Build datum-server
         env:
           GOOS: ${{ matrix.target.os }}
@@ -142,6 +151,9 @@ jobs:
 
       - name: Download dependencies
         run: go mod download
+
+      - name: Verify dependencies
+        run: go mod tidy && go mod verify
 
       - name: Build datum-server
         run: |
