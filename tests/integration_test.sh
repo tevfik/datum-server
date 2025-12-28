@@ -39,7 +39,7 @@ pass_test "Binaries found"
 
 # Test datumctl version
 info "Testing datumctl..."
-./datumctl --version > /dev/null 2>&1 || fail_test "datumctl --version failed"
+./datumctl version > /dev/null 2>&1 || fail_test "datumctl version failed"
 pass_test "datumctl works"
 
 # Start server in background
