@@ -5,7 +5,6 @@ WORKDIR /app
 
 # Copy go mod files
 COPY go.mod ./
-COPY go.sum* ./
 RUN go mod download && go mod tidy
 
 # Copy source code
