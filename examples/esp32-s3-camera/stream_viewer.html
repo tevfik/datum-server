@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Camera Stream Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .status.connected {
+            background: #10b981;
+        }
+
+        .status.disconnected {
+            background: #ef4444;
+        }
+
+        .controls {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        label {
+            font-weight: 500;
+        }
+
+        input, select, button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+        }
+
+        input, select {
+            background: #3a3a3a;
+            color: #fff;
+        }
+
+        button {
+            background: #3b82f6;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #2563eb;
+        }
+
+        button:disabled {
+            background: #4a4a4a;
+            cursor: not-allowed;
+        }
+
+        .stream-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stream-box {
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .stream-box h2 {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stream-box h2 .badge {
+            font-size: 0.7em;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #3b82f6;
+        }
+
+        .video-wrapper {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 4/3;
+        }
+
+        img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        .stats {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 12px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-item {
+            background: #3a3a3a;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: 700;
+        }
+
+        .log {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .stream-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📹 ESP32 Camera Stream Viewer</h1>
+            <div id="status" class="status disconnected">Disconnected</div>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Server:</label>
+                <input type="text" id="serverURL" value="http://localhost:8080" placeholder="http://localhost:8080">
+            </div>
+            <div class="control-group">
+                <label>Device ID:</label>
+                <input type="text" id="deviceID" value="esp32-cam-01" placeholder="device-id">
+            </div>
+            <div class="control-group">
+                <label>Token:</label>
+                <input type="password" id="token" placeholder="JWT token">
+            </div>
+            <div class="control-group">
+                <label>Protocol:</label>
+                <select id="protocol">
+                    <option value="mjpeg">MJPEG (SSE-like)</option>
+                    <option value="ws" selected>WebSocket</option>
+                </select>
+            </div>
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+        </div>
+
+        <div class="stream-container">
+            <div class="stream-box">
+                <h2>
+                    Live Stream
+                    <span class="badge" id="protocolBadge">WebSocket</span>
+                </h2>
+                <div class="video-wrapper">
+                    <img id="streamImage" src="" alt="No stream">
+                    <div class="overlay" id="fps">0 FPS</div>
+                </div>
+            </div>
+
+            <div class="stream-box">
+                <h2>Stream Information</h2>
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-label">Frame Rate</div>
+                        <div class="stat-value" id="fpsValue">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Frame Size</div>
+                        <div class="stat-value" id="frameSizeValue">0 KB</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Total Frames</div>
+                        <div class="stat-value" id="frameCountValue">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Bandwidth</div>
+                        <div class="stat-value" id="bandwidthValue">0 KB/s</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="log" id="log"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let mjpegImg = null;
+        let frameCount = 0;
+        let lastFrameTime = Date.now();
+        let fpsCounter = 0;
+        let fpsInterval = null;
+        let totalBytes = 0;
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.insertBefore(entry, logDiv.firstChild);
+            
+            // Keep only last 50 entries
+            while (logDiv.children.length > 50) {
+                logDiv.removeChild(logDiv.lastChild);
+            }
+        }
+
+        function updateStatus(connected) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status ' + (connected ? 'connected' : 'disconnected');
+            statusDiv.textContent = connected ? 'Connected' : 'Disconnected';
+            
+            document.getElementById('connectBtn').disabled = connected;
+            document.getElementById('disconnectBtn').disabled = !connected;
+        }
+
+        function updateStats(frameSize) {
+            frameCount++;
+            totalBytes += frameSize;
+            fpsCounter++;
+            
+            const now = Date.now();
+            const elapsed = (now - lastFrameTime) / 1000;
+            
+            if (elapsed >= 1) {
+                const fps = fpsCounter / elapsed;
+                const bandwidth = (totalBytes / elapsed) / 1024;
+                
+                document.getElementById('fpsValue').textContent = fps.toFixed(1);
+                document.getElementById('fps').textContent = fps.toFixed(1) + ' FPS';
+                document.getElementById('bandwidthValue').textContent = bandwidth.toFixed(1) + ' KB/s';
+                
+                fpsCounter = 0;
+                totalBytes = 0;
+                lastFrameTime = now;
+            }
+            
+            document.getElementById('frameCountValue').textContent = frameCount.toLocaleString();
+            document.getElementById('frameSizeValue').textContent = (frameSize / 1024).toFixed(1) + ' KB';
+        }
+
+        function connectWebSocket() {
+            const serverURL = document.getElementById('serverURL').value;
+            const deviceID = document.getElementById('deviceID').value;
+            const token = document.getElementById('token').value;
+            
+            const wsURL = serverURL.replace('http://', 'ws://').replace('https://', 'wss://');
+            const url = `${wsURL}/devices/${deviceID}/stream/ws?token=${token}`;
+            
+            log(`Connecting to WebSocket: ${url}`);
+            
+            ws = new WebSocket(url);
+            ws.binaryType = 'arraybuffer';
+            
+            ws.onopen = () => {
+                log('WebSocket connected');
+                updateStatus(true);
+            };
+            
+            ws.onmessage = (event) => {
+                if (typeof event.data === 'string') {
+                    // Text message (metadata)
+                    log('Metadata: ' + event.data);
+                } else {
+                    // Binary message (JPEG frame)
+                    const blob = new Blob([event.data], { type: 'image/jpeg' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const img = document.getElementById('streamImage');
+                    const oldURL = img.src;
+                    img.src = url;
+                    
+                    // Cleanup old blob URL
+                    if (oldURL.startsWith('blob:')) {
+                        URL.revokeObjectURL(oldURL);
+                    }
+                    
+                    updateStats(event.data.byteLength);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                log('WebSocket error: ' + error);
+                updateStatus(false);
+            };
+            
+            ws.onclose = () => {
+                log('WebSocket disconnected');
+                updateStatus(false);
+                ws = null;
+            };
+        }
+
+        function connectMJPEG() {
+            const serverURL = document.getElementById('serverURL').value;
+            const deviceID = document.getElementById('deviceID').value;
+            const token = document.getElementById('token').value;
+            
+            const url = `${serverURL}/devices/${deviceID}/stream/mjpeg?token=${token}`;
+            
+            log(`Connecting to MJPEG: ${url}`);
+            
+            const img = document.getElementById('streamImage');
+            img.src = url;
+            
+            img.onload = () => {
+                if (frameCount === 0) {
+                    log('MJPEG stream started');
+                    updateStatus(true);
+                }
+                updateStats(0); // Size unknown for MJPEG
+            };
+            
+            img.onerror = () => {
+                log('MJPEG stream error');
+                updateStatus(false);
+            };
+            
+            mjpegImg = img;
+        }
+
+        function connect() {
+            const protocol = document.getElementById('protocol').value;
+            document.getElementById('protocolBadge').textContent = 
+                protocol === 'ws' ? 'WebSocket' : 'MJPEG';
+            
+            frameCount = 0;
+            fpsCounter = 0;
+            totalBytes = 0;
+            lastFrameTime = Date.now();
+            
+            if (protocol === 'ws') {
+                connectWebSocket();
+            } else {
+                connectMJPEG();
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            
+            if (mjpegImg) {
+                mjpegImg.src = '';
+                mjpegImg = null;
+            }
+            
+            document.getElementById('streamImage').src = '';
+            updateStatus(false);
+            log('Disconnected');
+        }
+
+        // Auto-connect on load (optional)
+        // window.onload = () => setTimeout(connect, 1000);
+    </script>
+</body>
+</html>

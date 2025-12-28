@@ -181,6 +181,9 @@ func main() {
 		deviceCommandGroup.GET("/:device_id/commands/poll", webhookPollHandler)   // HTTP long polling
 		deviceCommandGroup.POST("/:device_id/commands/:command_id/ack", ackCommandHandler)
 		deviceCommandGroup.GET("/:device_id/push", pushDataViaGetHandler) // For constrained devices (GET data push)
+
+		// Video streaming upload (device uploads frames)
+		deviceCommandGroup.POST("/:device_id/stream/frame", uploadFrameHandler)
 	}
 
 	// Data routes (require device auth)
@@ -194,6 +197,15 @@ func main() {
 	dataQueryGroup := r.Group("/data")
 	dataQueryGroup.Use(auth.AuthMiddleware())
 	{
+
+		// Video streaming routes (require user auth)
+		streamGroup := r.Group("/devices")
+		streamGroup.Use(auth.AuthMiddleware())
+		{
+			streamGroup.GET("/:device_id/stream/mjpeg", mjpegStreamHandler)  // MJPEG over HTTP (SSE-like)
+			streamGroup.GET("/:device_id/stream/ws", websocketStreamHandler) // WebSocket binary stream
+			streamGroup.GET("/:device_id/stream/info", streamInfoHandler)    // Stream metadata
+		}
 		dataQueryGroup.GET("/:device_id", getLatestDataHandler)
 		dataQueryGroup.GET("/:device_id/history", getDataHistoryHandler)
 	}

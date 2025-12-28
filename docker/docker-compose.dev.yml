@@ -2,30 +2,43 @@
 # Use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 services:
-  api:
+  # Disable Traefik in development (direct access)
+  traefik:
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--log.level=DEBUG"
+    ports:
+      - "80:80"
+      - "8080:8080"
+
+  datum-server:
     build:
-      context: ./backend/go
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: docker/Dockerfile.dev
     volumes:
-      - ./backend/go:/app
-      - ./data:/app/data
+      - ..:/app
+      - datum-data-dev:/root/data
     environment:
       - PORT=8000
-      - RETENTION_MAX_DAYS=7
+      - JWT_SECRET=dev-secret-key-not-for-production-use-only
+      - RETENTION_MAX_DAYS=1
       - RETENTION_CHECK_HOURS=1
-      - LOG_LEVEL=debug
-      - GIN_MODE=debug
+      - LOG_LEVEL=DEBUG
+      - CORS_ORIGINS=*
+      - RATE_LIMIT_REQUESTS=10000
+    # Direct port exposure for development
+    ports:
+      - "8000:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.datum-server.rule=Host(`localhost`)"
+      - "traefik.http.routers.datum-server.entrypoints=web"
+      - "traefik.http.services.datum-server.loadbalancer.server.port=8000"
     command: |
-      sh -c "go run ./cmd/server"
+      sh -c "cd /app && go run ./cmd/server"
 
-  analytics:
-    build:
-      context: ./backend/python
-      dockerfile: Dockerfile.dev
-    volumes:
-      - ./backend/python:/app
-    environment:
-      - GO_API_URL=http://api:8000
-      - LOG_LEVEL=debug
-    command: |
-      uvicorn analytics.api:app --host 0.0.0.0 --port 8001 --reload
+volumes:
+  datum-data-dev:

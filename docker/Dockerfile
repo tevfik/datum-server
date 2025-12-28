@@ -10,19 +10,21 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build binary
+# Build both server and datumctl binaries
 RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -o datumctl ./cmd/datumctl
 
 # Run Stage
 FROM alpine:latest
 
 WORKDIR /root/
 
-# Install wget for healthchecks
-RUN apk --no-cache add wget
+# Install ca-certificates and wget for healthchecks
+RUN apk --no-cache add ca-certificates wget
 
-# Copy binary from builder
+# Copy binaries from builder
 COPY --from=builder /app/server .
+COPY --from=builder /app/datumctl /usr/local/bin/datumctl
 
 EXPOSE 8000
 
