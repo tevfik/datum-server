@@ -318,7 +318,7 @@ func runDeleteUser(cmd *cobra.Command, args []string) error {
 	}
 
 	// Confirm deletion
-	if !adminForceReset {
+	if !adminForceDelete {
 		var confirm bool
 		if err := survey.AskOne(&survey.Confirm{
 			Message: fmt.Sprintf("Delete user '%s'?", email),
