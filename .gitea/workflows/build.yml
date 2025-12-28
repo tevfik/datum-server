@@ -98,7 +98,8 @@ jobs:
           docker rm -f datum-server-test 2>/dev/null || true
           
           # Run container (without --rm so we can get logs if it fails)
-          docker run -d --name datum-server-test -p 8000:8000 datum-server:test
+          # Use port 8081 on host to avoid conflicts with other services
+          docker run -d --name datum-server-test -p 8081:8000 datum-server:test
           
           # Wait for container to be ready (with timeout)
           echo "Waiting for server to start..."
@@ -107,12 +108,14 @@ jobs:
             # Check if container is still running
             if ! docker ps | grep -q datum-server-test; then
               echo "❌ Container stopped unexpectedly"
+              echo "Container status:"
+              docker ps -a --filter name=datum-server-test
               echo "Container logs:"
               docker logs datum-server-test 2>&1 || echo "No logs available"
               exit 1
             fi
             
-            if curl -f http://localhost:8000/health 2>/dev/null; then
+            if curl -f http://localhost:8081/health 2>/dev/null; then
               echo "✅ Server is ready!"
               break
             fi

@@ -42,6 +42,14 @@ func securityHeadersMiddleware() gin.HandlerFunc {
 }
 
 func main() {
+	// Ensure we log if main exits unexpectedly
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "PANIC: %v\n", r)
+		}
+		fmt.Fprintf(os.Stderr, "DEBUG: Main function exiting\n")
+	}()
+
 	// Command-line flags
 	port := flag.String("port", "", "Server port (default: 8000 or PORT env var)")
 	dataDir := flag.String("data-dir", "", "Data directory path (default: ./data or DATA_DIR env var)")
@@ -230,6 +238,7 @@ func main() {
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fmt.Fprintf(os.Stderr, "CRITICAL ERROR: Server failed to start: %v\n", err)
 			log.Fatal().Err(err).Msg("Server failed to start")
 		}
 	}()
