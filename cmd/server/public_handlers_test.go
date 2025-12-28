@@ -179,3 +179,42 @@ func TestGetPublicDataHistoryHandlerWithLimit(t *testing.T) {
 	data := response["data"].([]interface{})
 	assert.LessOrEqual(t, len(data), 3)
 }
+
+// TestGenerateIDString tests helper function
+func TestGenerateIDStringHelper(t *testing.T) {
+	id1 := generateIDString(8)
+	id2 := generateIDString(8)
+
+	assert.NotEqual(t, id1, id2, "IDs should be unique")
+	assert.Greater(t, len(id1), 10)
+}
+
+// TestGenerateCommandID tests command ID generation
+func TestGenerateCommandIDHelper(t *testing.T) {
+	id1 := generateCommandID()
+	id2 := generateCommandID()
+
+	assert.NotEqual(t, id1, id2, "Command IDs should be unique")
+	assert.Contains(t, id1, "cmd_")
+}
+
+// TestSecurityHeadersMiddleware tests security headers
+func TestSecurityHeadersMiddlewareApplied(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(securityHeadersMiddleware())
+	r.GET("/test", func(c *gin.Context) {
+		c.String(http.StatusOK, "OK")
+	})
+
+	req, _ := http.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "DENY", w.Header().Get("X-Frame-Options"))
+	assert.Equal(t, "nosniff", w.Header().Get("X-Content-Type-Options"))
+	assert.Equal(t, "1; mode=block", w.Header().Get("X-XSS-Protection"))
+	assert.NotEmpty(t, w.Header().Get("Referrer-Policy"))
+	assert.NotEmpty(t, w.Header().Get("Content-Security-Policy"))
+}

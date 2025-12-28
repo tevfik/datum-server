@@ -369,3 +369,5 @@ func TestGenerateCommandID(t *testing.T) {
 	assert.Contains(t, id1, "cmd_")
 	assert.Greater(t, len(id1), 10)
 }
+
+// Additional command handler tests for coverage

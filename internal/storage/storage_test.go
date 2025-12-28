@@ -836,3 +836,597 @@ func TestMemoryUsageUnderLoad(t *testing.T) {
 
 	t.Log("Memory test completed successfully")
 }
+
+// ============ Provisioning Tests ============
+
+func TestCreateProvisioningRequest(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	// Create user first
+	user := &User{
+		ID:           "usr_prov_001",
+		Email:        "prov@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	err := storage.CreateUser(user)
+	require.NoError(t, err)
+
+	// Create provisioning request
+	req := &ProvisioningRequest{
+		ID:         "prov_test_001",
+		DeviceUID:  "AABBCCDDEEFF",
+		UserID:     "usr_prov_001",
+		DeviceName: "Test Device",
+		DeviceType: "ESP32",
+		Status:     "pending",
+		DeviceID:   "dev_test_001",
+		APIKey:     "dk_test_key",
+		ServerURL:  "http://localhost:8000",
+		WiFiSSID:   "TestWiFi",
+		WiFiPass:   "password123",
+		ExpiresAt:  time.Now().Add(15 * time.Minute),
+		CreatedAt:  time.Now(),
+	}
+
+	err = storage.CreateProvisioningRequest(req)
+	assert.NoError(t, err)
+}
+
+func TestCreateProvisioningRequestDuplicateUID(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	user := &User{
+		ID:           "usr_prov_002",
+		Email:        "prov2@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	err := storage.CreateUser(user)
+	require.NoError(t, err)
+
+	// Create first request
+	req1 := &ProvisioningRequest{
+		ID:         "prov_test_002",
+		DeviceUID:  "AABBCCDDEEFF",
+		UserID:     "usr_prov_002",
+		DeviceName: "Device 1",
+		Status:     "pending",
+		DeviceID:   "dev_test_002",
+		APIKey:     "dk_test_key_2",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(15 * time.Minute),
+		CreatedAt:  time.Now(),
+	}
+	err = storage.CreateProvisioningRequest(req1)
+	require.NoError(t, err)
+
+	// Try to create another request with same UID
+	req2 := &ProvisioningRequest{
+		ID:         "prov_test_003",
+		DeviceUID:  "AABBCCDDEEFF", // Same UID
+		UserID:     "usr_prov_002",
+		DeviceName: "Device 2",
+		Status:     "pending",
+		DeviceID:   "dev_test_003",
+		APIKey:     "dk_test_key_3",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(15 * time.Minute),
+		CreatedAt:  time.Now(),
+	}
+	err = storage.CreateProvisioningRequest(req2)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "already exists")
+}
+
+func TestCreateProvisioningRequestAlreadyRegisteredDevice(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	user := &User{
+		ID:           "usr_prov_003",
+		Email:        "prov3@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	err := storage.CreateUser(user)
+	require.NoError(t, err)
+
+	// Create and complete a provisioning request
+	req := &ProvisioningRequest{
+		ID:         "prov_test_004",
+		DeviceUID:  "112233445566",
+		UserID:     "usr_prov_003",
+		DeviceName: "Existing Device",
+		Status:     "pending",
+		DeviceID:   "dev_test_004",
+		APIKey:     "dk_test_key_4",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(15 * time.Minute),
+		CreatedAt:  time.Now(),
+	}
+	err = storage.CreateProvisioningRequest(req)
+	require.NoError(t, err)
+
+	// Complete provisioning
+	_, err = storage.CompleteProvisioningRequest("prov_test_004")
+	require.NoError(t, err)
+
+	// Try to create new request with same UID
+	req2 := &ProvisioningRequest{
+		ID:         "prov_test_005",
+		DeviceUID:  "112233445566", // Same UID as registered device
+		UserID:     "usr_prov_003",
+		DeviceName: "Another Device",
+		Status:     "pending",
+		DeviceID:   "dev_test_005",
+		APIKey:     "dk_test_key_5",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(15 * time.Minute),
+		CreatedAt:  time.Now(),
+	}
+	err = storage.CreateProvisioningRequest(req2)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "already registered")
+}
+
+func TestGetProvisioningRequestByUID(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	user := &User{
+		ID:           "usr_prov_004",
+		Email:        "prov4@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	err := storage.CreateUser(user)
+	require.NoError(t, err)
+
+	req := &ProvisioningRequest{
+		ID:         "prov_test_006",
+		DeviceUID:  "FFEEDDCCBBAA",
+		UserID:     "usr_prov_004",
+		DeviceName: "UID Test Device",
+		Status:     "pending",
+		DeviceID:   "dev_test_006",
+		APIKey:     "dk_test_key_6",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(15 * time.Minute),
+		CreatedAt:  time.Now(),
+	}
+	err = storage.CreateProvisioningRequest(req)
+	require.NoError(t, err)
+
+	// Retrieve by UID
+	retrieved, err := storage.GetProvisioningRequestByUID("FFEEDDCCBBAA")
+	assert.NoError(t, err)
+	assert.Equal(t, req.ID, retrieved.ID)
+	assert.Equal(t, req.DeviceUID, retrieved.DeviceUID)
+	assert.Equal(t, req.DeviceName, retrieved.DeviceName)
+}
+
+func TestGetProvisioningRequestByUIDNotFound(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	_, err := storage.GetProvisioningRequestByUID("NONEXISTENT")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no provisioning request found")
+}
+
+func TestGetProvisioningRequest(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	user := &User{
+		ID:           "usr_prov_005",
+		Email:        "prov5@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	err := storage.CreateUser(user)
+	require.NoError(t, err)
+
+	req := &ProvisioningRequest{
+		ID:         "prov_test_007",
+		DeviceUID:  "123456789ABC",
+		UserID:     "usr_prov_005",
+		DeviceName: "ID Test Device",
+		Status:     "pending",
+		DeviceID:   "dev_test_007",
+		APIKey:     "dk_test_key_7",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(15 * time.Minute),
+		CreatedAt:  time.Now(),
+	}
+	err = storage.CreateProvisioningRequest(req)
+	require.NoError(t, err)
+
+	// Retrieve by ID
+	retrieved, err := storage.GetProvisioningRequest("prov_test_007")
+	assert.NoError(t, err)
+	assert.Equal(t, req.DeviceUID, retrieved.DeviceUID)
+	assert.Equal(t, req.UserID, retrieved.UserID)
+}
+
+func TestCompleteProvisioningRequest(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	user := &User{
+		ID:           "usr_prov_006",
+		Email:        "prov6@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	err := storage.CreateUser(user)
+	require.NoError(t, err)
+
+	req := &ProvisioningRequest{
+		ID:         "prov_test_008",
+		DeviceUID:  "ABCDEF123456",
+		UserID:     "usr_prov_006",
+		DeviceName: "Complete Test Device",
+		DeviceType: "ESP32",
+		Status:     "pending",
+		DeviceID:   "dev_test_008",
+		APIKey:     "dk_test_key_8",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(15 * time.Minute),
+		CreatedAt:  time.Now(),
+	}
+	err = storage.CreateProvisioningRequest(req)
+	require.NoError(t, err)
+
+	// Complete the request
+	device, err := storage.CompleteProvisioningRequest("prov_test_008")
+	assert.NoError(t, err)
+	assert.NotNil(t, device)
+	assert.Equal(t, "dev_test_008", device.ID)
+	assert.Equal(t, "usr_prov_006", device.UserID)
+	assert.Equal(t, "Complete Test Device", device.Name)
+	assert.Equal(t, "ESP32", device.Type)
+	assert.Equal(t, "dk_test_key_8", device.APIKey)
+	assert.Equal(t, "active", device.Status)
+
+	// Verify request status updated
+	updated, err := storage.GetProvisioningRequest("prov_test_008")
+	assert.NoError(t, err)
+	assert.Equal(t, "completed", updated.Status)
+
+	// Verify device created
+	createdDevice, err := storage.GetDevice("dev_test_008")
+	assert.NoError(t, err)
+	assert.Equal(t, device.Name, createdDevice.Name)
+
+	// Verify UID is now registered
+	registered, deviceID, err := storage.IsDeviceUIDRegistered("ABCDEF123456")
+	assert.NoError(t, err)
+	assert.True(t, registered)
+	assert.Equal(t, "dev_test_008", deviceID)
+}
+
+func TestCompleteProvisioningRequestExpired(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	user := &User{
+		ID:           "usr_prov_007",
+		Email:        "prov7@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	err := storage.CreateUser(user)
+	require.NoError(t, err)
+
+	// Create expired request
+	req := &ProvisioningRequest{
+		ID:         "prov_test_009",
+		DeviceUID:  "EXPIRED123456",
+		UserID:     "usr_prov_007",
+		DeviceName: "Expired Device",
+		Status:     "pending",
+		DeviceID:   "dev_test_009",
+		APIKey:     "dk_test_key_9",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(-1 * time.Hour), // Expired
+		CreatedAt:  time.Now().Add(-2 * time.Hour),
+	}
+	err = storage.CreateProvisioningRequest(req)
+	require.NoError(t, err)
+
+	// Try to complete expired request
+	_, err = storage.CompleteProvisioningRequest("prov_test_009")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "expired")
+}
+
+func TestCompleteProvisioningRequestAlreadyCompleted(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	user := &User{
+		ID:           "usr_prov_008",
+		Email:        "prov8@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	err := storage.CreateUser(user)
+	require.NoError(t, err)
+
+	req := &ProvisioningRequest{
+		ID:         "prov_test_010",
+		DeviceUID:  "COMPLETED123",
+		UserID:     "usr_prov_008",
+		DeviceName: "Already Completed",
+		Status:     "pending",
+		DeviceID:   "dev_test_010",
+		APIKey:     "dk_test_key_10",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(15 * time.Minute),
+		CreatedAt:  time.Now(),
+	}
+	err = storage.CreateProvisioningRequest(req)
+	require.NoError(t, err)
+
+	// Complete once
+	_, err = storage.CompleteProvisioningRequest("prov_test_010")
+	assert.NoError(t, err)
+
+	// Try to complete again
+	_, err = storage.CompleteProvisioningRequest("prov_test_010")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not pending")
+}
+
+func TestCancelProvisioningRequest(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	user := &User{
+		ID:           "usr_prov_009",
+		Email:        "prov9@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	err := storage.CreateUser(user)
+	require.NoError(t, err)
+
+	req := &ProvisioningRequest{
+		ID:         "prov_test_011",
+		DeviceUID:  "CANCEL123456",
+		UserID:     "usr_prov_009",
+		DeviceName: "Cancel Test",
+		Status:     "pending",
+		DeviceID:   "dev_test_011",
+		APIKey:     "dk_test_key_11",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(15 * time.Minute),
+		CreatedAt:  time.Now(),
+	}
+	err = storage.CreateProvisioningRequest(req)
+	require.NoError(t, err)
+
+	// Cancel the request
+	err = storage.CancelProvisioningRequest("prov_test_011")
+	assert.NoError(t, err)
+
+	// Verify status updated
+	updated, err := storage.GetProvisioningRequest("prov_test_011")
+	assert.NoError(t, err)
+	assert.Equal(t, "cancelled", updated.Status)
+
+	// Verify UID is not registered
+	registered, _, _ := storage.IsDeviceUIDRegistered("CANCEL123456")
+	assert.False(t, registered)
+}
+
+func TestCancelProvisioningRequestAlreadyCompleted(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	user := &User{
+		ID:           "usr_prov_010",
+		Email:        "prov10@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	err := storage.CreateUser(user)
+	require.NoError(t, err)
+
+	req := &ProvisioningRequest{
+		ID:         "prov_test_012",
+		DeviceUID:  "CANCELCOMP123",
+		UserID:     "usr_prov_010",
+		DeviceName: "Cancel Completed Test",
+		Status:     "pending",
+		DeviceID:   "dev_test_012",
+		APIKey:     "dk_test_key_12",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(15 * time.Minute),
+		CreatedAt:  time.Now(),
+	}
+	err = storage.CreateProvisioningRequest(req)
+	require.NoError(t, err)
+
+	// Complete the request
+	_, err = storage.CompleteProvisioningRequest("prov_test_012")
+	assert.NoError(t, err)
+
+	// Try to cancel completed request
+	err = storage.CancelProvisioningRequest("prov_test_012")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "can only cancel pending")
+}
+
+func TestGetUserProvisioningRequests(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	user := &User{
+		ID:           "usr_prov_011",
+		Email:        "prov11@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	err := storage.CreateUser(user)
+	require.NoError(t, err)
+
+	// Create multiple requests
+	for i := 1; i <= 3; i++ {
+		req := &ProvisioningRequest{
+			ID:         fmt.Sprintf("prov_test_01%d", i+2),
+			DeviceUID:  fmt.Sprintf("UID%d", i),
+			UserID:     "usr_prov_011",
+			DeviceName: fmt.Sprintf("Device %d", i),
+			Status:     "pending",
+			DeviceID:   fmt.Sprintf("dev_test_01%d", i+2),
+			APIKey:     fmt.Sprintf("dk_test_key_1%d", i+2),
+			ServerURL:  "http://localhost:8000",
+			ExpiresAt:  time.Now().Add(15 * time.Minute),
+			CreatedAt:  time.Now(),
+		}
+		err = storage.CreateProvisioningRequest(req)
+		require.NoError(t, err)
+	}
+
+	// Get all user requests
+	requests, err := storage.GetUserProvisioningRequests("usr_prov_011")
+	assert.NoError(t, err)
+	assert.Len(t, requests, 3)
+}
+
+func TestIsDeviceUIDRegistered(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	// Check unregistered UID
+	registered, deviceID, err := storage.IsDeviceUIDRegistered("NOTREGISTERED")
+	assert.NoError(t, err)
+	assert.False(t, registered)
+	assert.Empty(t, deviceID)
+
+	// Create and complete provisioning
+	user := &User{
+		ID:           "usr_prov_012",
+		Email:        "prov12@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	err = storage.CreateUser(user)
+	require.NoError(t, err)
+
+	req := &ProvisioningRequest{
+		ID:         "prov_test_016",
+		DeviceUID:  "REGISTERED123",
+		UserID:     "usr_prov_012",
+		DeviceName: "Registered Device",
+		Status:     "pending",
+		DeviceID:   "dev_test_016",
+		APIKey:     "dk_test_key_16",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(15 * time.Minute),
+		CreatedAt:  time.Now(),
+	}
+	err = storage.CreateProvisioningRequest(req)
+	require.NoError(t, err)
+
+	_, err = storage.CompleteProvisioningRequest("prov_test_016")
+	assert.NoError(t, err)
+
+	// Check registered UID
+	registered, deviceID, err = storage.IsDeviceUIDRegistered("REGISTERED123")
+	assert.NoError(t, err)
+	assert.True(t, registered)
+	assert.Equal(t, "dev_test_016", deviceID)
+}
+
+func TestCleanupExpiredProvisioningRequests(t *testing.T) {
+	storage, cleanup := createTestStorage(t)
+	defer cleanup()
+
+	user := &User{
+		ID:           "usr_prov_013",
+		Email:        "prov13@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	err := storage.CreateUser(user)
+	require.NoError(t, err)
+
+	// Create expired request
+	expiredReq := &ProvisioningRequest{
+		ID:         "prov_expired_001",
+		DeviceUID:  "EXPIRED001",
+		UserID:     "usr_prov_013",
+		DeviceName: "Expired 1",
+		Status:     "pending",
+		DeviceID:   "dev_expired_001",
+		APIKey:     "dk_expired_001",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(-1 * time.Hour),
+		CreatedAt:  time.Now().Add(-2 * time.Hour),
+	}
+	err = storage.CreateProvisioningRequest(expiredReq)
+	require.NoError(t, err)
+
+	// Create valid request
+	validReq := &ProvisioningRequest{
+		ID:         "prov_valid_001",
+		DeviceUID:  "VALID001",
+		UserID:     "usr_prov_013",
+		DeviceName: "Valid 1",
+		Status:     "pending",
+		DeviceID:   "dev_valid_001",
+		APIKey:     "dk_valid_001",
+		ServerURL:  "http://localhost:8000",
+		ExpiresAt:  time.Now().Add(15 * time.Minute),
+		CreatedAt:  time.Now(),
+	}
+	err = storage.CreateProvisioningRequest(validReq)
+	require.NoError(t, err)
+
+	// Cleanup expired
+	cleaned, err := storage.CleanupExpiredProvisioningRequests()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, cleaned)
+
+	// Verify expired is marked expired
+	expired, err := storage.GetProvisioningRequest("prov_expired_001")
+	assert.NoError(t, err)
+	assert.Equal(t, "expired", expired.Status)
+
+	// Verify valid is still pending
+	valid, err := storage.GetProvisioningRequest("prov_valid_001")
+	assert.NoError(t, err)
+	assert.Equal(t, "pending", valid.Status)
+}
