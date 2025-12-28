@@ -105,8 +105,8 @@ jobs:
           echo "Waiting for server to start..."
           sleep 5 # Give it a moment to initialize
           for i in {1..60}; do
-            # Check if container is still running
-            if ! docker ps | grep -q datum-server-test; then
+            # Check if container is still running using inspect which is more reliable than ps | grep
+            if [ "$(docker inspect -f '{{.State.Running}}' datum-server-test 2>/dev/null)" != "true" ]; then
               echo "❌ Container stopped unexpectedly"
               echo "Container status:"
               docker ps -a --filter name=datum-server-test
