@@ -204,10 +204,6 @@ func main() {
 	r.GET("/public/data/:device_id", getPublicDataHandler)
 	r.GET("/public/data/:device_id/history", getPublicDataHistoryHandler)
 
-	// Provisioning endpoints (device-side, NO authentication - called by unconfigured devices)
-	r.POST("/provisioning/activate/:request_id", deviceActivateHandler)
-	r.GET("/provisioning/check/:uid", deviceCheckHandler)
-
 	// Swagger UI documentation
 	setupSwagger(r)
 
