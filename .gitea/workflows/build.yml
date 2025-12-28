@@ -105,10 +105,6 @@ jobs:
           echo "Waiting for server to start..."
           sleep 5 # Give it a moment to initialize
           
-          # Get container IP for direct access if localhost fails (common in DinD)
-          CONTAINER_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' datum-server-test)
-          echo "Container IP: $CONTAINER_IP"
-          
           for i in {1..60}; do
             # Check if container is still running using inspect which is more reliable than ps | grep
             if [ "$(docker inspect -f '{{.State.Running}}' datum-server-test 2>/dev/null)" != "true" ]; then
@@ -120,18 +116,11 @@ jobs:
               exit 1
             fi
             
-            # Try localhost first (use 127.0.0.1 to avoid IPv6 issues)
-            if curl -v http://127.0.0.1:8081/health; then
-              echo "✅ Server is ready (localhost)!"
+            # Check health using wget INSIDE the container
+            # This avoids network issues between runner and container (DinD/DooD)
+            if docker exec datum-server-test wget -q -O - http://localhost:8000/health >/dev/null 2>&1; then
+              echo "✅ Server is ready!"
               break
-            fi
-            
-            # Try container IP directly (fallback for DinD)
-            if [ ! -z "$CONTAINER_IP" ]; then
-                if curl -v http://$CONTAINER_IP:8000/health; then
-                    echo "✅ Server is ready (container IP)!"
-                    break
-                fi
             fi
             
             if [ $i -eq 30 ]; then
