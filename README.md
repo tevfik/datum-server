@@ -101,7 +101,7 @@ make build-cli
 ./datumctl device create --name "Temperature Sensor"
 ```
 
-See [docs/CLI.md](docs/CLI.md) for complete CLI documentation.
+See [CLI Tutorial](docs/tutorials/CLI.md) for complete CLI documentation.
 
 ## �📡 API Quick Reference
 
@@ -138,7 +138,7 @@ curl -N http://localhost:8080/api/stream/<device-id> \
   -H "Authorization: Bearer <jwt-token>"
 ```
 
-See [docs/API.md](docs/API.md) for complete API documentation.
+See [API Reference](docs/reference/API.md) for complete API documentation.
 
 ## 🧪 Testing
 
@@ -181,9 +181,9 @@ See [Testing Guide](docs/guides/TESTING.md) for comprehensive testing documentat
 ### Getting Started
 | Document | Description |
 |----------|-------------|
-| [QUICKSTART.md](QUICKSTART.md) | **Get up and running in 5 minutes** |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contributing guidelines and standards |
-| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
+| [Quick Start](docs/tutorials/QUICK_START.md) | **Get up and running in 5 minutes** |
+| [Contributing](docs/CONTRIBUTING.md) | Contributing guidelines and standards |
+| [Changelog](docs/CHANGELOG.md) | Version history and release notes |
 
 ### Guides
 | Document | Description |
@@ -251,7 +251,6 @@ JWT_SECRET=<your-secret-key>
 ADMIN_PASSWORD=<admin-password>
 ```
 
-See [.env.example](.env.example) for all configuration options.
 
 ### Command-Line Flags
 
@@ -460,7 +459,7 @@ sudo systemctl status datum-server
 ## 🤝 Contributing
 
 We welcome contributions! Please see:
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Contributing guidelines, code standards, PR process
+- [Contributing](docs/CONTRIBUTING.md) - Contributing guidelines, code standards, PR process
 - [Testing Guide](docs/guides/TESTING.md) - How to write and run tests
 - [Deployment Guide](docs/guides/DEPLOYMENT.md) - Deployment best practices
 
@@ -468,13 +467,13 @@ We welcome contributions! Please see:
 
 1. Fork the repository
 2. Create feature branch (`git checkout -b feature/amazing`)
-3. Follow [coding standards](CONTRIBUTING.md#coding-standards)
+3. Follow [coding standards](docs/CONTRIBUTING.md#coding-standards)
 4. Write tests (minimum 60% coverage for new code)
 5. Commit changes (`git commit -m 'feat: add amazing feature'`)
 6. Push to branch (`git push origin feature/amazing`)
 7. Open Pull Request
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+See [Contributing](docs/CONTRIBUTING.md) for detailed guidelines.
 
 ## 📄 License
 
