@@ -159,13 +159,6 @@ func main() {
 		// Command endpoints (user sends commands)
 		devicesGroup.POST("/:device_id/commands", sendCommandHandler)
 		devicesGroup.GET("/:device_id/commands", listCommandsHandler)
-
-		// Provisioning endpoints (mobile app)
-		devicesGroup.POST("/register", registerDeviceHandler)
-		devicesGroup.GET("/check", checkDeviceUIDHandler)
-		devicesGroup.GET("/provisioning", listProvisioningRequestsHandler)
-		devicesGroup.GET("/provisioning/:request_id", getProvisioningStatusHandler)
-		devicesGroup.DELETE("/provisioning/:request_id", cancelProvisioningHandler)
 	}
 
 	// Device command polling (device auth)
