@@ -470,17 +470,11 @@ func exportDatabaseHandler(c *gin.Context) {
 }
 
 func forceCleanupHandler(c *gin.Context) {
-	dataPath := "/app/data/tsdata"
-	if envPath := os.Getenv("TSDATA_PATH"); envPath != "" {
-		dataPath = envPath
-	}
-
-	config := storage.GetRetentionConfigFromEnv()
-	deletedCount := store.CleanupNow(dataPath, config.MaxAge)
-
+	// Manual cleanup is deprecated as tstorage handles retention internally
+	// This endpoint is kept for compatibility but does nothing
 	c.JSON(http.StatusOK, gin.H{
-		"message":            "Cleanup completed",
-		"partitions_deleted": deletedCount,
+		"message":            "Cleanup is handled automatically by storage engine",
+		"partitions_deleted": 0,
 	})
 }
 

@@ -41,6 +41,7 @@ services:
       - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-100}
       - RATE_LIMIT_WINDOW_SECONDS=${RATE_LIMIT_WINDOW_SECONDS:-60}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]

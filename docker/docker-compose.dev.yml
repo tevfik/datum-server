@@ -27,6 +27,7 @@ services:
       - RETENTION_MAX_DAYS=1
       - RETENTION_CHECK_HOURS=1
       - LOG_LEVEL=DEBUG
+      - LOG_FORMAT=pretty
       - CORS_ORIGINS=*
       - RATE_LIMIT_REQUESTS=10000
     # Direct port exposure for development

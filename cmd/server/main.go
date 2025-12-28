@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"datum-go/internal/auth"
@@ -68,35 +71,27 @@ func main() {
 		}
 	}
 
-	// Initialize storage (BuntDB for metadata, tstorage for time-series)
-	var err error
-	store, err = storage.New(dataDirPath+"/meta.db", dataDirPath+"/tsdata")
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize storage")
-	}
-	defer store.Close()
-
-	log.Info().
-		Str("metadata", "BuntDB").
-		Str("timeseries", "tstorage").
-		Str("data_dir", dataDirPath).
-		Msg("Storage initialized")
-
 	// Configure retention (priority: flag > env > default)
 	retentionConfig := storage.GetRetentionConfigFromEnv()
 	if *retentionDays > 0 {
 		retentionConfig.MaxAge = time.Duration(*retentionDays) * 24 * time.Hour
 	}
-	if *retentionCheckHours > 0 {
-		retentionConfig.CleanupEvery = time.Duration(*retentionCheckHours) * time.Hour
-	}
+	// Note: CleanupEvery is handled internally by tstorage or ignored if using WithRetention
 
-	// Start retention worker (cleanup old data)
-	store.StartRetentionWorker(retentionConfig, dataDirPath+"/tsdata")
+	// Initialize storage (BuntDB for metadata, tstorage for time-series)
+	var err error
+	store, err = storage.New(dataDirPath+"/meta.db", dataDirPath+"/tsdata", retentionConfig.MaxAge)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to initialize storage")
+	}
+	// Defer close is handled in graceful shutdown
+
 	log.Info().
-		Dur("max_age", retentionConfig.MaxAge).
-		Dur("check_interval", retentionConfig.CleanupEvery).
-		Msg("Data retention worker started")
+		Str("metadata", "BuntDB").
+		Str("timeseries", "tstorage").
+		Str("data_dir", dataDirPath).
+		Dur("retention", retentionConfig.MaxAge).
+		Msg("Storage initialized")
 
 	// Setup router
 	gin.SetMode(gin.ReleaseMode)
@@ -245,9 +240,38 @@ func main() {
 func rootHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"service": "Datumpy IoT Platform",
-		"version": "1.0.0",
-		"endpoints": gin.H{
-			"auth":         []string{"POST /auth/register", "POST /auth/login"},
+	// Start server
+	srv := &http.Server{
+		Addr:    ":" + serverPort,
+		Handler: r,
+	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal().Err(err).Msg("Server failed to start")
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shutdown the server
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Info().Msg("Shutting down server...")
+
+	// The context is used to inform the server it has 5 seconds to finish
+	// the request it is currently handling
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatal().Err(err).Msg("Server forced to shutdown")
+	}
+
+	// Close storage-server
+	if err := store.Close(); err != nil {
+		log.Error().Err(err).Msg("Error closing storage")
+	}
+
+	log.Info().Msg("Server exiting")	"auth":         []string{"POST /auth/register", "POST /auth/login"},
 			"devices":      []string{"POST /devices", "GET /devices", "DELETE /devices/{id}"},
 			"commands":     []string{"POST /devices/{id}/commands", "GET /device/{id}/commands"},
 			"data":         []string{"POST /data/{id}", "GET /data/{id}", "GET /data/{id}/history"},

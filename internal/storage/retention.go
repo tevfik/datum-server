@@ -1,11 +1,8 @@
 package storage
 
 import (
-	"log"
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -40,100 +37,4 @@ type RetentionConfig struct {
 var DefaultRetention = RetentionConfig{
 	MaxAge:       7 * 24 * time.Hour,
 	CleanupEvery: 1 * time.Hour,
-}
-
-// StartRetentionWorker runs a background goroutine that cleans old data
-func (s *Storage) StartRetentionWorker(config RetentionConfig, dataPath string) {
-	go func() {
-		log.Printf("🧹 Retention worker started: delete data older than %v, check every %v",
-			config.MaxAge, config.CleanupEvery)
-
-		ticker := time.NewTicker(config.CleanupEvery)
-		defer ticker.Stop()
-
-		// Run once immediately
-		s.cleanupOldPartitions(dataPath, config.MaxAge)
-
-		for range ticker.C {
-			s.cleanupOldPartitions(dataPath, config.MaxAge)
-		}
-	}()
-}
-
-// cleanupOldPartitions removes tstorage partitions older than maxAge
-func (s *Storage) cleanupOldPartitions(dataPath string, maxAge time.Duration) {
-	cutoff := time.Now().Add(-maxAge).Unix()
-	deletedCount := 0
-
-	entries, err := os.ReadDir(dataPath)
-	if err != nil {
-		return
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "p-") {
-			continue
-		}
-
-		// Parse partition name: p-{startTs}-{endTs}
-		parts := strings.Split(entry.Name(), "-")
-		if len(parts) != 3 {
-			continue
-		}
-
-		endTs, err := strconv.ParseInt(parts[2], 10, 64)
-		if err != nil {
-			continue
-		}
-
-		// If partition's end timestamp is before cutoff, delete it
-		if endTs < cutoff {
-			partitionPath := filepath.Join(dataPath, entry.Name())
-			if err := os.RemoveAll(partitionPath); err != nil {
-				log.Printf("⚠️ Failed to delete partition %s: %v", entry.Name(), err)
-			} else {
-				deletedCount++
-			}
-		}
-	}
-
-	if deletedCount > 0 {
-		log.Printf("🧹 Retention: deleted %d old partition(s)", deletedCount)
-	}
-}
-
-// CleanupNow forces an immediate cleanup (for testing)
-func (s *Storage) CleanupNow(dataPath string, maxAge time.Duration) int {
-	cutoff := time.Now().Add(-maxAge).Unix()
-	deletedCount := 0
-
-	entries, err := os.ReadDir(dataPath)
-	if err != nil {
-		return 0
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "p-") {
-			continue
-		}
-
-		parts := strings.Split(entry.Name(), "-")
-		if len(parts) != 3 {
-			continue
-		}
-
-		endTs, err := strconv.ParseInt(parts[2], 10, 64)
-		if err != nil {
-			continue
-		}
-
-		if endTs < cutoff {
-			partitionPath := filepath.Join(dataPath, entry.Name())
-			if err := os.RemoveAll(partitionPath); err == nil {
-				deletedCount++
-			}
-		}
-	}
-
-	return deletedCount
 }

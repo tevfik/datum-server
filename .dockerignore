@@ -1,0 +1,10 @@
+.git
+.gitea
+build/
+data/
+tmp/
+tests/
+docs/
+examples/
+.env
+*.log

@@ -15,7 +15,7 @@ type Storage struct {
 	ts tstorage.Storage // For time-series data points
 }
 
-func New(metaPath, dataPath string) (*Storage, error) {
+func New(metaPath, dataPath string, retention time.Duration) (*Storage, error) {
 	// Open BuntDB for metadata
 	db, err := buntdb.Open(metaPath)
 	if err != nil {
@@ -26,6 +26,7 @@ func New(metaPath, dataPath string) (*Storage, error) {
 	ts, err := tstorage.NewStorage(
 		tstorage.WithDataPath(dataPath),
 		tstorage.WithPartitionDuration(time.Hour), // 1 hour partitions
+		tstorage.WithRetention(retention),
 		tstorage.WithWriteTimeout(time.Second),
 	)
 	if err != nil {

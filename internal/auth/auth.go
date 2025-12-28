@@ -4,11 +4,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"log"
 	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -25,7 +25,7 @@ var jwtSecret = initJWTSecret()
 func initJWTSecret() []byte {
 	if secret := os.Getenv("JWT_SECRET"); secret != "" {
 		if len(secret) < 32 {
-			log.Println("⚠️  WARNING: JWT_SECRET is too short (< 32 chars), using anyway but consider strengthening it")
+			log.Warn().Msg("JWT_SECRET is too short (< 32 chars), using anyway but consider strengthening it")
 		}
 		return []byte(secret)
 	}
@@ -33,12 +33,12 @@ func initJWTSecret() []byte {
 	// Generate a secure random secret (32 bytes = 256 bits)
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
-		log.Fatal("Failed to generate JWT secret:", err)
+		log.Fatal().Err(err).Msg("Failed to generate JWT secret")
 	}
 	secret := hex.EncodeToString(bytes)
-	log.Println("⚠️  WARNING: No JWT_SECRET set, generated random secret (will invalidate tokens on restart)")
-	log.Printf("🔑 Generated JWT_SECRET: %s", secret)
-	log.Println("   Set JWT_SECRET environment variable to persist tokens across restarts")
+	log.Warn().Msg("No JWT_SECRET set, generated random secret (will invalidate tokens on restart)")
+	log.Info().Msgf("Generated JWT_SECRET: %s", secret)
+	log.Info().Msg("Set JWT_SECRET environment variable to persist tokens across restarts")
 	return []byte(secret)
 }
 

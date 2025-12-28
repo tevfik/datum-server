@@ -15,7 +15,7 @@ func createTestStorageForSystem(t *testing.T) *Storage {
 	metaPath := filepath.Join(tmpDir, "system_test.db")
 	dataPath := filepath.Join(tmpDir, "system_data")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	require.NoError(t, err, "Failed to create test storage")
 
 	return storage

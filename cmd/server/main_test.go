@@ -17,7 +17,7 @@ func setupTestRouter() (*gin.Engine, *storage.Storage) {
 	gin.SetMode(gin.TestMode)
 
 	// Create in-memory storage for testing
-	testStore, _ := storage.New(":memory:", "")
+	testStore, _ := storage.New(":memory:", "", 0)
 
 	r := gin.New()
 	return r, testStore

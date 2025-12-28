@@ -18,7 +18,7 @@ func createTestStorage(t *testing.T) (*Storage, func()) {
 	metaPath := filepath.Join(tmpDir, "test.db")
 	dataPath := filepath.Join(tmpDir, "tsdata")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	require.NoError(t, err)
 
 	cleanup := func() {
