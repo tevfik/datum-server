@@ -60,10 +60,35 @@ jobs:
           chmod +x tests/*.sh
           . venv/bin/activate
           
+          # Start server in background
+          mkdir -p data
+          ./datum-server > server.log 2>&1 &
+          SERVER_PID=$!
+          echo "Server started with PID $SERVER_PID"
+          
+          # Wait for server to be ready
+          echo "Waiting for server to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:8000/health > /dev/null; then
+              echo "Server is ready!"
+              break
+            fi
+            sleep 1
+          done
+          
+          if ! curl -s http://localhost:8000/health > /dev/null; then
+            echo "Server failed to start"
+            cat server.log
+            exit 1
+          fi
+          
           # Run integration test suite from root
           ./tests/integration_test.sh
           python3 ./tests/provisioning_test.py
           ./tests/sse_test.sh
+          
+          # Cleanup
+          kill $SERVER_PID || true
 
       - name: Cleanup
         if: always()

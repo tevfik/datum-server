@@ -47,21 +47,28 @@ info "Creating data directory..."
 mkdir -p ./data
 pass_test "Data directory created"
 
-# Start server in background
-info "Starting server..."
-./datum-server > server.log 2>&1 &
-SERVER_PID=$!
+# Check if server is already running
+SERVER_ALREADY_RUNNING=false
+if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+    info "Server is already running on port 8000. Skipping startup."
+    SERVER_ALREADY_RUNNING=true
+else
+    # Start server in background
+    info "Starting server..."
+    ./datum-server > server.log 2>&1 &
+    SERVER_PID=$!
 
-# Wait for server to start
-sleep 3
+    # Wait for server to start
+    sleep 3
 
-# Check if server is still running
-if ! kill -0 $SERVER_PID 2>/dev/null; then
-    echo "Server logs:"
-    cat server.log
-    fail_test "Server failed to start"
+    # Check if server is still running
+    if ! kill -0 $SERVER_PID 2>/dev/null; then
+        echo "Server logs:"
+        cat server.log
+        fail_test "Server failed to start"
+    fi
+    pass_test "Server started (PID: $SERVER_PID)"
 fi
-pass_test "Server started (PID: $SERVER_PID)"
 
 # Test health endpoint
 info "Testing health endpoint..."
@@ -71,19 +78,25 @@ for i in {1..10}; do
         break
     fi
     if [ $i -eq 10 ]; then
-        kill $SERVER_PID 2>/dev/null || true
-        cat server.log
+        if [ "$SERVER_ALREADY_RUNNING" = "false" ]; then
+            kill $SERVER_PID 2>/dev/null || true
+            cat server.log
+        fi
         fail_test "Health endpoint not responding after 10 attempts"
     fi
     sleep 1
 done
 
 # Cleanup
-info "Cleaning up..."
-kill $SERVER_PID 2>/dev/null || true
-wait $SERVER_PID 2>/dev/null || true
-rm -f server.log
-rm -rf ./data
+if [ "$SERVER_ALREADY_RUNNING" = "false" ]; then
+    info "Cleaning up..."
+    kill $SERVER_PID 2>/dev/null || true
+    wait $SERVER_PID 2>/dev/null || true
+    rm -f server.log
+    rm -rf ./data
+else
+    info "Skipping cleanup (server was already running)"
+fi
 
 echo ""
 echo -e "${GREEN}✓ All integration tests passed!${NC}"
