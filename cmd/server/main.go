@@ -229,17 +229,21 @@ func main() {
 	}
 
 	go func() {
+		fmt.Fprintf(os.Stderr, "DEBUG: Calling ListenAndServe on %s\n", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			// Ensure error is printed to stderr even if logger fails
 			fmt.Fprintf(os.Stderr, "CRITICAL ERROR: Server failed to start: %v\n", err)
 			log.Fatal().Err(err).Msg("Server failed to start")
 		}
+		fmt.Fprintf(os.Stderr, "DEBUG: ListenAndServe returned (server closed)\n")
 	}()
 
 	// Wait for interrupt signal to gracefully shutdown the server
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	fmt.Fprintf(os.Stderr, "DEBUG: Waiting for signal...\n")
+	sig := <-quit
+	fmt.Fprintf(os.Stderr, "DEBUG: Received signal: %v\n", sig)
 	log.Info().Msg("Shutting down server...")
 
 	// The context is used to inform the server it has 5 seconds to finish
