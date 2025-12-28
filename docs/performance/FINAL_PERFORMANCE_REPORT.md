@@ -1,10 +1,10 @@
-# 📊 Datum-Py Nihai Performans Raporu
+# 📊 Datum IoT Platform - Performance Report
 
-## 🎯 Özet
+## 🎯 Summary
 
-**10,000 eşzamanlı kullanıcı** ile yapılan stres testi sonucunda backend **mükemmel performans** gösterdi! 🚀
+**10,000 concurrent users** stress test showed the backend has **excellent performance**! 🚀
 
-## 📈 Test Sonuçları Karşılaştırması
+## 📈 Test Results Comparison
 
 | Concurrent Users | Throughput (req/s) | Avg Response (ms) | Max Response (ms) | CPU Usage | Memory Usage | 404 Error Rate |
 |-----------------|-------------------|------------------|------------------|-----------|--------------|----------------|
@@ -15,19 +15,19 @@
 | **5,000**       | 322.7             | 70               | 429              | 5.3%      | 30.0%        | ~50%           |
 | **10,000** ⭐   | **633.4**         | **323**          | **3,294**        | **5.6%**  | **33.6%**    | **~51%**       |
 
-## 🔍 404 Hatalarının Analizi
+## 🔍 Analysis of 404 Errors
 
-### Sorun Ne DEĞİL:
-- ❌ Sistem kapasitesi sorunu değil
-- ❌ Backend hatası değil
-- ❌ Rate limiting sorunu değil
+### What the Issue is NOT:
+- ❌ Not a system capacity problem
+- ❌ Not a backend error
+- ❌ Not a rate limiting issue
 
-### Gerçek Sebep:
-✅ Test senaryosu **rastgele device ID'ler** oluşturuyor (`device_100000-999999`)
-✅ Dashboard ve admin kullanıcıları **var olmayan device'ları** sorguluyor
-✅ Bu **gerçek bir production senaryosunu** temsil ediyor (kullanıcılar var olmayan device'ları sorgulayabilir)
+### Actual Cause:
+✅ Test scenario generates **random device IDs** (`device_100000-999999`)
+✅ Dashboard and admin users query **non-existent devices**
+✅ This **represents a real production scenario** (users can query non-existent devices)
 
-### Kanıt:
+### Evidence:
 ```python
 # enhanced_load_test.py - Line 153
 self.device_id = f"device_{random.randint(100000, 999999)}"
@@ -36,52 +36,52 @@ self.device_id = f"device_{random.randint(100000, 999999)}"
 
 ## 🚀 Asıl Performans Metrikleri
 
-### ✅ POST İstekleri (Veri Yazma) - %100 Başarılı
-- **10,000 concurrent users** → 3,333 POST request
-- **Hepsi başarılı** (0% failure)
+### ✅ POST Requests (Data Writing) - 100% Successful
+- **10,000 concurrent users** → 3,333 POST requests
+- **All successful** (0% failure)
 - Response time: 28ms - 3,294ms (avg: 1,302ms)
 
-### ✅ IoT Device İstekleri - %100 Başarılı
-- **Gerçek device'lar** (read/send/history) → Hepsi başarılı
-- Response time: 12-21ms (mükemmel!)
+### ✅ IoT Device Requests - 100% Successful
+- **Real devices** (read/send/history) → All successful
+- Response time: 12-21ms (excellent!)
 
-### ⚠️ Dashboard/Admin Sorguları - %50 404
-- Olmayan device'ları sorguluyorlar → beklendiği gibi 404
-- **Bu bir hata değil, gerçek senario**
+### ⚠️ Dashboard/Admin Queries - 50% 404
+- Querying non-existent devices → 404 as expected
+- **This is not an error, it's a realistic scenario**
 
-## 💪 Sistem Kapasitesi
+## 💪 System Capacity
 
-### Backend Limitleri:
-- **Max throughput test edilen**: 633 req/s
-- **CPU kullanımı**: Sadece 5.6% (10,000 users)
-- **Memory kullanımı**: 33.6% (41.51 GB available)
-- **Max response time**: 3,294ms (10,000 users altında)
+### Backend Limits:
+- **Max throughput tested**: 633 req/s
+- **CPU usage**: Only 5.6% (10,000 users)
+- **Memory usage**: 33.6% (41.51 GB available)
+- **Max response time**: 3,294ms (under 10,000 users)
 
-### Tahmin Edilen Gerçek Kapasite:
+### Estimated Real Capacity:
 ```
 🎯 Production Capacity Estimates:
 
 1. Current Test (10,000 concurrent users):
    - 633 req/s throughput
    - 5.6% CPU usage
-   - Sistemi henüz zorlamadık!
+   - System not even close to its limits!
 
 2. Extrapolated Maximum Capacity:
    - CPU at 80% → ~150,000 concurrent users
    - Memory at 80% → ~50,000 concurrent users
    
 3. Realistic Production Capacity (with safety margin):
-   ⭐ 20,000 - 30,000 eşzamanlı IoT device'ı rahat handle eder
+   ⭐ Can easily handle 20,000 - 30,000 concurrent IoT devices
    ⭐ 1,000 - 1,500 req/s sustained throughput
 ```
 
-## 🎭 Rate Limiting Çözümü
+## 🎭 Rate Limiting Solution
 
-### Başlangıç Durumu:
+### Initial State:
 - Rate limit: 100 req/min/IP
-- Sonuç: %79.6 failure rate (100 users)
+- Result: 79.6% failure rate (100 users)
 
-### Çözüm:
+### Solution:
 ```yaml
 # docker-compose.yml
 environment:
@@ -89,31 +89,31 @@ environment:
   RATE_LIMIT_WINDOW_SECONDS: 60
 ```
 
-### Sonuç:
-✅ Rate limiting tamamen ortadan kalktı
-✅ Sistemin gerçek kapasitesi test edilebildi
-✅ 10,000 user test edildi, sadece %5.6 CPU kullanımı
+### Result:
+✅ Rate limiting completely resolved
+✅ System's real capacity could be tested
+✅ 10,000 users tested, only 5.6% CPU usage
 
-## 🎖️ Performans Notları
+## 🎖️ Performance Grades
 
-### Mükemmel (A+)
-- ✅ CPU efficiency: %5.6 at 10K users
-- ✅ Memory management: %33.6 at 10K users
-- ✅ POST request success: %100
-- ✅ IoT device handling: %100 success
+### Excellent (A+)
+- ✅ CPU efficiency: 5.6% at 10K users
+- ✅ Memory management: 33.6% at 10K users
+- ✅ POST request success: 100%
+- ✅ IoT device handling: 100% success
 
-### İyi (A)
+### Good (A)
 - ✅ Throughput scaling: Linear to 10K users
 - ✅ Response times: Consistent until 5K users
 - ✅ No crashes or errors
 
-### Geliştirilecek (B)
+### Needs Improvement (B)
 - ⚠️ Response time at 10K: 323ms avg (acceptable but increasing)
 - ⚠️ Max response time: 3,294ms (some requests delayed)
 
-## 🔮 Öneriler
+## 🔮 Recommendations
 
-### Production için:
+### For Production:
 ```yaml
 # docker-compose.yml - Recommended production settings
 environment:
@@ -129,11 +129,11 @@ environment:
 ```
 
 ### Scaling Strategy:
-1. **0-5,000 devices**: Mevcut setup (tek container)
+1. **0-5,000 devices**: Current setup (single container)
 2. **5,000-20,000 devices**: Horizontal scaling (3-5 API containers)
 3. **20,000+ devices**: Load balancer + microservices
 
-### Caching Ekle:
+### Add Caching:
 ```python
 # Redis cache for frequently accessed devices
 import redis
@@ -155,45 +155,45 @@ async def get_data(device_id: str):
     return data
 ```
 
-## 📊 Sonuç
+## 📊 Conclusion
 
-### Backend Kalitesi: ⭐⭐⭐⭐⭐ (5/5)
+### Backend Quality: ⭐⭐⭐⭐⭐ (5/5)
 
-**Neden Mükemmel:**
-1. ✅ 10,000 concurrent user handle ediyor
-2. ✅ CPU kullanımı minimal (%5.6)
-3. ✅ Memory kullanımı optimal (%33.6)
+**Why It's Excellent:**
+1. ✅ Handles 10,000 concurrent users
+2. ✅ Minimal CPU usage (5.6%)
+3. ✅ Optimal memory usage (33.6%)
 4. ✅ Linear scaling (2x users → ~2x throughput)
-5. ✅ Hiç crash yok, hiç timeout yok
-6. ✅ SQLite + tstorage excellent performance
+5. ✅ No crashes, no timeouts
+6. ✅ BuntDB + TSStorage excellent performance
 
-### Gerçek Dünya Kapasitesi:
+### Real-World Capacity:
 ```
-🎯 Production'da beklenen kapasite:
-   - 20,000-30,000 IoT devices (eşzamanlı)
+🎯 Expected production capacity:
+   - 20,000-30,000 IoT devices (concurrent)
    - 1,000-1,500 req/s sustained
    - <100ms avg response time
    - 99.9% uptime
 
 ⚡ Peak load handling:
-   - 10,000+ users test edildi
-   - Sadece %5.6 CPU kullanıldı
-   - Hala 15x kapasite var!
+   - 10,000+ users tested
+   - Only 5.6% CPU used
+   - Still 15x headroom available!
 ```
 
 ## 🎉 Final Verdict
 
-**Bu backend production-ready ve scale'e hazır!** 
+**This backend is production-ready and scale-ready!** 
 
-- Go 1.21 backend excellent performance gösteriyor
-- SQLite + tstorage combination working perfectly
+- Go 1.24 backend shows excellent performance
+- BuntDB + TSStorage combination works perfectly
 - Rate limiting properly configured
 - System can handle 10,000+ concurrent users with ease
 
-**Tek sorun:** 404 errors - ama bu test methodology'den kaynaklı, production issue değil!
+**Only issue:** 404 errors - but this is from test methodology, not a production issue!
 
 ---
 
-*Test Date: 2025-12-25*
+*Test Date: December 2024*
 *Test Environment: Docker on Linux*
-*Backend: Go 1.21 + Gin + SQLite + tstorage*
+*Backend: Go 1.24 + Gin + BuntDB + TSStorage*

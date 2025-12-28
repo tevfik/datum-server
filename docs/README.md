@@ -18,6 +18,8 @@ Step-by-step guides for common tasks and setup procedures:
 
 Hands-on tutorials for working with the platform:
 
+- **[Quick Start Guide](tutorials/QUICK_START.md)** - Get your first device running in 10 minutes
+- **[Use Cases](tutorials/USE_CASES.md)** - Real-world application examples
 - **[CLI Tutorial](tutorials/CLI.md)** - Complete guide to using the datumctl command-line tool
 - **[Firmware Development](tutorials/FIRMWARE.md)** - Build firmware for IoT devices
 - **[SSE Commands](tutorials/SSE_COMMANDS.md)** - Server-Sent Events and real-time commands
@@ -38,6 +40,12 @@ Performance benchmarks and test results:
 - **[Performance Report](performance/FINAL_PERFORMANCE_REPORT.md)** - Comprehensive performance analysis
 - **[BuntDB Test Results](performance/BUNTDB_TEST_RESULTS.md)** - Metadata storage benchmarks
 - **[TSStorage Test Results](performance/TSTORAGE_TEST_RESULTS.md)** - Time-series storage benchmarks
+
+## 📊 Diagrams
+
+Visual documentation and architecture diagrams:
+
+- **[Architecture Diagrams](diagrams/ARCHITECTURE.md)** - System architecture, data flow, and deployment diagrams
 
 ## Quick Links
 
@@ -83,16 +91,22 @@ Performance benchmarks and test results:
 ```
 docs/
 ├── README.md                          # This index file
+├── diagrams/                          # Visual documentation
+│   └── ARCHITECTURE.md               # System architecture diagrams
 ├── guides/                            # How-to guides
+│   ├── DEPLOYMENT.md                 # Production deployment
 │   ├── PASSWORD_RESET.md             # Password recovery
 │   ├── PROVISIONING.md               # Device provisioning
 │   ├── REGISTRATION.md               # User registration & setup
 │   ├── RETENTION.md                  # Data retention policies
-│   └── SECURITY.md                   # Security best practices
+│   ├── SECURITY.md                   # Security best practices
+│   └── TESTING.md                    # Testing guide
 ├── tutorials/                         # Step-by-step tutorials
 │   ├── CLI.md                        # Command-line tool tutorial
 │   ├── FIRMWARE.md                   # Firmware development guide
-│   └── SSE_COMMANDS.md               # Real-time commands tutorial
+│   ├── QUICK_START.md                # Quick start guide
+│   ├── SSE_COMMANDS.md               # Real-time commands tutorial
+│   └── USE_CASES.md                  # Real-world use cases
 ├── reference/                         # Technical references
 │   ├── API.md                        # REST API documentation
 │   ├── RATE_LIMITING.md              # Rate limiting reference

@@ -131,6 +131,9 @@ func main() {
 	// Admin routes (system setup, user/device/db management)
 	setupAdminRoutes(r, store)
 
+	// Provisioning routes (WiFi AP mode device setup)
+	RegisterProvisioningRoutes(r, auth.AuthMiddleware())
+
 	// Root endpoint
 	r.GET("/", rootHandler)
 
@@ -160,6 +163,13 @@ func main() {
 		// Command endpoints (user sends commands)
 		devicesGroup.POST("/:device_id/commands", sendCommandHandler)
 		devicesGroup.GET("/:device_id/commands", listCommandsHandler)
+
+		// Provisioning endpoints (mobile app)
+		devicesGroup.POST("/register", registerDeviceHandler)
+		devicesGroup.GET("/check", checkDeviceUIDHandler)
+		devicesGroup.GET("/provisioning", listProvisioningRequestsHandler)
+		devicesGroup.GET("/provisioning/:request_id", getProvisioningStatusHandler)
+		devicesGroup.DELETE("/provisioning/:request_id", cancelProvisioningHandler)
 	}
 
 	// Device command polling (device auth)
@@ -193,6 +203,10 @@ func main() {
 	r.GET("/public/data/:device_id", getPublicDataHandler)
 	r.GET("/public/data/:device_id/history", getPublicDataHistoryHandler)
 
+	// Provisioning endpoints (device-side, NO authentication - called by unconfigured devices)
+	r.POST("/provisioning/activate/:request_id", deviceActivateHandler)
+	r.GET("/provisioning/check/:uid", deviceCheckHandler)
+
 	// Swagger UI documentation
 	setupSwagger(r)
 
@@ -207,7 +221,7 @@ func main() {
 
 	log.Info().
 		Str("port", serverPort).
-		Str("endpoints", "/auth, /devices, /data, /public/data").
+		Str("endpoints", "/auth, /devices, /data, /public/data, /provisioning").
 		Str("docs", "http://localhost:"+serverPort+"/docs").
 		Msg("🚀 Datum IoT Platform starting")
 
@@ -221,11 +235,12 @@ func rootHandler(c *gin.Context) {
 		"service": "Datumpy IoT Platform",
 		"version": "1.0.0",
 		"endpoints": gin.H{
-			"auth":     []string{"POST /auth/register", "POST /auth/login"},
-			"devices":  []string{"POST /devices", "GET /devices", "DELETE /devices/{id}"},
-			"commands": []string{"POST /devices/{id}/commands", "GET /device/{id}/commands"},
-			"data":     []string{"POST /data/{id}", "GET /data/{id}", "GET /data/{id}/history"},
-			"public":   []string{"POST /public/data/{id}", "GET /public/data/{id}"},
+			"auth":         []string{"POST /auth/register", "POST /auth/login"},
+			"devices":      []string{"POST /devices", "GET /devices", "DELETE /devices/{id}"},
+			"commands":     []string{"POST /devices/{id}/commands", "GET /device/{id}/commands"},
+			"data":         []string{"POST /data/{id}", "GET /data/{id}", "GET /data/{id}/history"},
+			"public":       []string{"POST /public/data/{id}", "GET /public/data/{id}"},
+			"provisioning": []string{"POST /devices/register", "GET /devices/provisioning", "POST /provisioning/activate/{id}"},
 		},
 	})
 }

@@ -1,8 +1,8 @@
-# 🧪 TStor age Unit Test ve Maximum Load Test Sonuçları
+# 🧪 TSStorage Unit Test and Maximum Load Test Results
 
-## 📋 Test Kapsamı
+## 📋 Test Scope
 
-Oluşturulan **comprehensive test suite** şunları içeriyor:
+The **comprehensive test suite** includes:
 - ✅ **Basic Tests**: Storage, user, device operations
 - ✅ **Time-Series Tests**: Data insertion and query
 - ✅ **Load Tests**: Concurrent operations (1K-50K operations)
@@ -10,7 +10,7 @@ Oluşturulan **comprehensive test suite** şunları içeriyor:
 - ✅ **Benchmark Tests**: Performance measurements
 - ✅ **Memory Tests**: Memory usage under load
 
-## 🚀 Test Sonuçları
+## 🚀 Test Results
 
 ### Basic Unit Tests ✅
 ```
@@ -24,7 +24,7 @@ Oluşturulan **comprehensive test suite** şunları içeriyor:
 ✓ TestGetDataPoints              PASS
 ```
 
-### 💪 Load Test Sonuçları
+### 💪 Load Test Results
 
 #### 1. Concurrent Device Creation
 ```
@@ -59,7 +59,7 @@ Oluşturulan **comprehensive test suite** şunları içeriyor:
    Status: ✅ PASS
 ```
 
-### 📈 Benchmark Sonuçları
+### 📈 Benchmark Results
 
 #### Device Creation Benchmark
 ```
@@ -102,7 +102,7 @@ BenchmarkConcurrentInserts-20
 
 ## 🎯 Performance Highlights
 
-### Tstorage Mükemmel Performans Gösteriyor! ⭐⭐⭐⭐⭐
+### TSStorage Shows Excellent Performance! ⭐⭐⭐⭐⭐
 
 #### Write Performance:
 - ⚡ **347,182 inserts/sec** (maximum stress test)
@@ -126,7 +126,7 @@ BenchmarkConcurrentInserts-20
 ✓ Low allocation counts (22-28 allocs/op for inserts)
 ```
 
-## 🏆 Karşılaştırma: Backend API vs Direct Storage
+## 🏆 Comparison: Backend API vs Direct Storage
 
 ### Backend API (HTTP/REST):
 ```
@@ -247,22 +247,22 @@ go test -bench=. -benchmem -benchtime=3s ./internal/storage
 go test -v ./internal/storage -timeout 10m
 ```
 
-## 📝 Sonuç
+## 📝 Conclusion
 
-### ⭐ TSStorage Performansı: MÜKEMMEL
+### ⭐ TSStorage Performance: EXCELLENT
 
-**Neler Öğrendik:**
-1. ✅ Tstorage **347K inserts/sec** handle edebiliyor
-2. ✅ Concurrent operations %100 success rate
-3. ✅ Memory efficiency mükemmel (1-2 KB per op)
+**Key Findings:**
+1. ✅ TSStorage can handle **347K inserts/sec**
+2. ✅ Concurrent operations with 100% success rate
+3. ✅ Excellent memory efficiency (1-2 KB per op)
 4. ✅ Zero errors in stress tests
-5. ✅ Backend bottleneck storage değil, HTTP layer!
+5. ✅ Backend bottleneck is not storage, it's HTTP layer!
 
-**Production Için:**
-- 🎯 Current backend (633 req/s) storage tarafından sınırlanmıyor
-- 🎯 Storage 100x daha fazla yük handle edebilir
-- 🎯 Scale için HTTP layer'ı optimize edin (load balancer, caching)
-- 🎯 Tstorage perfect for IoT time-series data
+**For Production:**
+- 🎯 Current backend (633 req/s) is not limited by storage
+- 🎯 Storage can handle 100x more load
+- 🎯 Optimize HTTP layer for scaling (load balancer, caching)
+- 🎯 TSStorage is perfect for IoT time-series data
 
 **Test Coverage:**
 - ✅ Unit tests: Complete

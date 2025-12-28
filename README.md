@@ -199,7 +199,9 @@ See [Testing Guide](docs/guides/TESTING.md) for comprehensive testing documentat
 ### Tutorials
 | Document | Description |
 |----------|-------------|
-| [CLI Tutorial](docs/tutorials/CLI.md) | **Command-line tool (datumctl)** |
+| [Quick Start](docs/tutorials/QUICK_START.md) | **Get your first device running in 10 minutes** |
+| [Use Cases](docs/tutorials/USE_CASES.md) | **Real-world application examples** |
+| [CLI Tutorial](docs/tutorials/CLI.md) | Command-line tool (datumctl) |
 | [Firmware Development](docs/tutorials/FIRMWARE.md) | Arduino/ESP32 examples |
 | [SSE Commands](docs/tutorials/SSE_COMMANDS.md) | Server-Sent Events guide |
 
@@ -217,6 +219,11 @@ See [Testing Guide](docs/guides/TESTING.md) for comprehensive testing documentat
 | [Performance Report](docs/performance/FINAL_PERFORMANCE_REPORT.md) | Load testing results |
 | [TSStorage Benchmarks](docs/performance/TSTORAGE_TEST_RESULTS.md) | Time-series storage benchmarks |
 | [BuntDB Benchmarks](docs/performance/BUNTDB_TEST_RESULTS.md) | Metadata storage benchmarks |
+
+### Visual Documentation
+| Document | Description |
+|----------|-------------|
+| [Architecture Diagrams](docs/diagrams/ARCHITECTURE.md) | System architecture & data flow diagrams |
 
 ## 🔧 Configuration
 

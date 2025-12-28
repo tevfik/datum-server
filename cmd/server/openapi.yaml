@@ -860,3 +860,269 @@ paths:
           description: System reset
         '400':
           description: Invalid confirmation
+
+  # ============ Provisioning Endpoints ============
+
+  /devices/register:
+    post:
+      summary: Register device for provisioning
+      description: |
+        Registers a device UID to the current user's account and creates a
+        provisioning request. The device will receive credentials when it
+        calls the /provisioning/activate endpoint.
+        
+        Called by mobile app after discovering device via WiFi AP.
+      tags: [Provisioning]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_uid, device_name]
+              properties:
+                device_uid:
+                  type: string
+                  description: Hardware unique ID (MAC address, chip ID)
+                  example: "AABBCCDDEEFF"
+                device_name:
+                  type: string
+                  description: User-provided device name
+                  example: "Living Room Sensor"
+                device_type:
+                  type: string
+                  description: Device type/model
+                  example: "temperature_humidity"
+                wifi_ssid:
+                  type: string
+                  description: WiFi network name (optional, for device config)
+                wifi_pass:
+                  type: string
+                  description: WiFi password (optional)
+      responses:
+        '201':
+          description: Provisioning request created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request_id:
+                    type: string
+                    example: "prov_abc123..."
+                  device_uid:
+                    type: string
+                  device_id:
+                    type: string
+                    example: "dev_xyz789..."
+                  api_key:
+                    type: string
+                    example: "dk_secret..."
+                  server_url:
+                    type: string
+                    example: "https://api.datum.io"
+                  expires_at:
+                    type: string
+                    format: date-time
+                  status:
+                    type: string
+                    example: "pending"
+                  activate_url:
+                    type: string
+                    example: "https://api.datum.io/provisioning/activate"
+        '400':
+          description: Invalid request
+        '409':
+          description: Device already registered
+
+  /devices/check-uid/{uid}:
+    get:
+      summary: Check if device UID is registered
+      description: Check if a device with the given UID is already registered.
+      tags: [Provisioning]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Device hardware UID
+      responses:
+        '200':
+          description: UID status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  registered:
+                    type: boolean
+                  device_id:
+                    type: string
+                  has_pending:
+                    type: boolean
+                  request_id:
+                    type: string
+
+  /devices/provisioning:
+    get:
+      summary: List provisioning requests
+      description: List all provisioning requests for the current user.
+      tags: [Provisioning]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of provisioning requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requests:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        request_id:
+                          type: string
+                        device_uid:
+                          type: string
+                        device_name:
+                          type: string
+                        status:
+                          type: string
+                          enum: [pending, completed, expired, cancelled]
+                        expires_at:
+                          type: string
+                          format: date-time
+                        created_at:
+                          type: string
+                          format: date-time
+
+  /devices/provisioning/{request_id}:
+    get:
+      summary: Get provisioning request status
+      tags: [Provisioning]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Provisioning request details
+        '404':
+          description: Request not found
+    delete:
+      summary: Cancel provisioning request
+      tags: [Provisioning]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Request cancelled
+        '400':
+          description: Cannot cancel (not pending)
+        '404':
+          description: Request not found
+
+  /provisioning/activate:
+    post:
+      summary: Activate device
+      description: |
+        Called by IoT device to complete provisioning and receive credentials.
+        No authentication required - device doesn't have credentials yet.
+        
+        Device must be pre-registered via /devices/register endpoint.
+      tags: [Provisioning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_uid]
+              properties:
+                device_uid:
+                  type: string
+                  description: Hardware unique ID
+                  example: "AABBCCDDEEFF"
+                firmware_version:
+                  type: string
+                  example: "1.0.0"
+                model:
+                  type: string
+                  example: "datum-sensor-v1"
+      responses:
+        '200':
+          description: Device activated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device_id:
+                    type: string
+                  api_key:
+                    type: string
+                  server_url:
+                    type: string
+                  wifi_ssid:
+                    type: string
+                  wifi_pass:
+                    type: string
+                  message:
+                    type: string
+        '404':
+          description: No provisioning request found
+        '409':
+          description: Device already registered
+        '410':
+          description: Provisioning request expired
+
+  /provisioning/check/{uid}:
+    get:
+      summary: Check provisioning status
+      description: |
+        Called by device to check if there's a pending provisioning request.
+        Device can poll this endpoint while in setup mode.
+      tags: [Provisioning]
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Device hardware UID
+      responses:
+        '200':
+          description: Provisioning status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [unconfigured, pending, completed, expired]
+                  message:
+                    type: string
+                  activate_url:
+                    type: string
+                  expires_at:
+                    type: string
+                    format: date-time

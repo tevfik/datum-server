@@ -1,6 +1,9 @@
 # Ignore build outputs
 /datum-server
+/server
+/datumctl
 /bin/
+/build/
 *.exe
 *.dll
 *.so
@@ -11,6 +14,8 @@
 
 # Output of the go coverage tool
 *.out
+coverage.html
+*.log
 
 # Dependency directories
 vendor/

@@ -837,3 +837,291 @@ func containsHelper(s, substr string) bool {
 	}
 	return false
 }
+
+// ============ Provisioning operations (BuntDB) ============
+
+// ProvisioningRequest represents a pending device registration request
+type ProvisioningRequest struct {
+	ID          string    `json:"id"`          // Unique request ID
+	DeviceUID   string    `json:"device_uid"`  // Hardware unique ID (MAC, chip ID)
+	UserID      string    `json:"user_id"`     // User who initiated the request
+	DeviceName  string    `json:"device_name"` // User-provided device name
+	DeviceType  string    `json:"device_type"` // Device type/model
+	Status      string    `json:"status"`      // pending, completed, expired, cancelled
+	DeviceID    string    `json:"device_id"`   // Assigned device ID (after completion)
+	APIKey      string    `json:"api_key"`     // Generated API key (after completion)
+	ServerURL   string    `json:"server_url"`  // Server URL for device
+	WiFiSSID    string    `json:"wifi_ssid"`   // WiFi credentials (optional)
+	WiFiPass    string    `json:"wifi_pass"`   // WiFi password (optional)
+	ExpiresAt   time.Time `json:"expires_at"`  // Request expiration time
+	CreatedAt   time.Time `json:"created_at"`
+	CompletedAt time.Time `json:"completed_at,omitempty"`
+}
+
+// CreateProvisioningRequest creates a new provisioning request
+func (s *Storage) CreateProvisioningRequest(req *ProvisioningRequest) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		// Check if UID is already registered as a device
+		uidDeviceKey := fmt.Sprintf("device:uid:%s", req.DeviceUID)
+		if existingDeviceID, err := tx.Get(uidDeviceKey); err == nil {
+			return fmt.Errorf("device with UID '%s' is already registered as device '%s'", req.DeviceUID, existingDeviceID)
+		}
+
+		// Check if there's already a pending request for this UID
+		uidPendingKey := fmt.Sprintf("provision:uid:%s", req.DeviceUID)
+		if existingReqID, err := tx.Get(uidPendingKey); err == nil {
+			// Check if the existing request is still pending
+			existingReqKey := fmt.Sprintf("provision:%s", existingReqID)
+			if existingReqData, err := tx.Get(existingReqKey); err == nil {
+				var existingReq ProvisioningRequest
+				if json.Unmarshal([]byte(existingReqData), &existingReq) == nil {
+					if existingReq.Status == "pending" && time.Now().Before(existingReq.ExpiresAt) {
+						return fmt.Errorf("a pending provisioning request already exists for UID '%s'", req.DeviceUID)
+					}
+				}
+			}
+		}
+
+		// Store the provisioning request
+		reqKey := fmt.Sprintf("provision:%s", req.ID)
+		reqData, _ := json.Marshal(req)
+		tx.Set(reqKey, string(reqData), nil)
+
+		// Index by UID for device lookup
+		tx.Set(uidPendingKey, req.ID, nil)
+
+		// Index by user for listing
+		userProvKey := fmt.Sprintf("user:%s:provisions", req.UserID)
+		provsJSON, _ := tx.Get(userProvKey)
+		var provIDs []string
+		if provsJSON != "" {
+			json.Unmarshal([]byte(provsJSON), &provIDs)
+		}
+		provIDs = append(provIDs, req.ID)
+		provsData, _ := json.Marshal(provIDs)
+		tx.Set(userProvKey, string(provsData), nil)
+
+		return nil
+	})
+}
+
+// GetProvisioningRequestByUID retrieves a pending provisioning request by device UID
+func (s *Storage) GetProvisioningRequestByUID(deviceUID string) (*ProvisioningRequest, error) {
+	var req ProvisioningRequest
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		uidPendingKey := fmt.Sprintf("provision:uid:%s", deviceUID)
+		reqID, err := tx.Get(uidPendingKey)
+		if err != nil {
+			return fmt.Errorf("no provisioning request found for UID '%s'", deviceUID)
+		}
+
+		reqKey := fmt.Sprintf("provision:%s", reqID)
+		reqData, err := tx.Get(reqKey)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal([]byte(reqData), &req)
+	})
+	return &req, err
+}
+
+// GetProvisioningRequest retrieves a provisioning request by ID
+func (s *Storage) GetProvisioningRequest(reqID string) (*ProvisioningRequest, error) {
+	var req ProvisioningRequest
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		reqKey := fmt.Sprintf("provision:%s", reqID)
+		reqData, err := tx.Get(reqKey)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal([]byte(reqData), &req)
+	})
+	return &req, err
+}
+
+// CompleteProvisioningRequest marks a provisioning request as completed and creates the device
+func (s *Storage) CompleteProvisioningRequest(reqID string) (*Device, error) {
+	var device *Device
+	err := s.db.Update(func(tx *buntdb.Tx) error {
+		// Get the request
+		reqKey := fmt.Sprintf("provision:%s", reqID)
+		reqData, err := tx.Get(reqKey)
+		if err != nil {
+			return fmt.Errorf("provisioning request not found")
+		}
+
+		var req ProvisioningRequest
+		if err := json.Unmarshal([]byte(reqData), &req); err != nil {
+			return err
+		}
+
+		// Check if request is valid
+		if req.Status != "pending" {
+			return fmt.Errorf("provisioning request is not pending (status: %s)", req.Status)
+		}
+		if time.Now().After(req.ExpiresAt) {
+			req.Status = "expired"
+			reqData, _ := json.Marshal(req)
+			tx.Set(reqKey, string(reqData), nil)
+			return fmt.Errorf("provisioning request has expired")
+		}
+
+		// Update request status
+		req.Status = "completed"
+		req.CompletedAt = time.Now()
+		updatedReqData, _ := json.Marshal(req)
+		tx.Set(reqKey, string(updatedReqData), nil)
+
+		// Create the device
+		device = &Device{
+			ID:        req.DeviceID,
+			UserID:    req.UserID,
+			Name:      req.DeviceName,
+			Type:      req.DeviceType,
+			APIKey:    req.APIKey,
+			Status:    "active",
+			CreatedAt: time.Now(),
+		}
+
+		deviceKey := fmt.Sprintf("device:%s", device.ID)
+		deviceData, _ := json.Marshal(device)
+		tx.Set(deviceKey, string(deviceData), nil)
+
+		// Add to user's device list
+		userDevicesKey := fmt.Sprintf("user:%s:devices", device.UserID)
+		devicesJSON, _ := tx.Get(userDevicesKey)
+		var devices []string
+		if devicesJSON != "" {
+			json.Unmarshal([]byte(devicesJSON), &devices)
+		}
+		devices = append(devices, device.ID)
+		devicesData, _ := json.Marshal(devices)
+		tx.Set(userDevicesKey, string(devicesData), nil)
+
+		// Index by API key
+		apiKeyIndex := fmt.Sprintf("apikey:%s", device.APIKey)
+		tx.Set(apiKeyIndex, device.ID, nil)
+
+		// Index by UID (for preventing duplicate registrations)
+		uidDeviceKey := fmt.Sprintf("device:uid:%s", req.DeviceUID)
+		tx.Set(uidDeviceKey, device.ID, nil)
+
+		// Remove pending UID index
+		uidPendingKey := fmt.Sprintf("provision:uid:%s", req.DeviceUID)
+		tx.Delete(uidPendingKey)
+
+		return nil
+	})
+	return device, err
+}
+
+// CancelProvisioningRequest cancels a pending provisioning request
+func (s *Storage) CancelProvisioningRequest(reqID string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		reqKey := fmt.Sprintf("provision:%s", reqID)
+		reqData, err := tx.Get(reqKey)
+		if err != nil {
+			return fmt.Errorf("provisioning request not found")
+		}
+
+		var req ProvisioningRequest
+		if err := json.Unmarshal([]byte(reqData), &req); err != nil {
+			return err
+		}
+
+		if req.Status != "pending" {
+			return fmt.Errorf("can only cancel pending requests")
+		}
+
+		req.Status = "cancelled"
+		cancelledData, _ := json.Marshal(req)
+		tx.Set(reqKey, string(cancelledData), nil)
+
+		// Remove pending UID index
+		uidPendingKey := fmt.Sprintf("provision:uid:%s", req.DeviceUID)
+		tx.Delete(uidPendingKey)
+
+		return nil
+	})
+}
+
+// GetUserProvisioningRequests returns all provisioning requests for a user
+func (s *Storage) GetUserProvisioningRequests(userID string) ([]ProvisioningRequest, error) {
+	var requests []ProvisioningRequest
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		userProvKey := fmt.Sprintf("user:%s:provisions", userID)
+		provsJSON, err := tx.Get(userProvKey)
+		if err != nil {
+			return nil // No requests
+		}
+
+		var provIDs []string
+		json.Unmarshal([]byte(provsJSON), &provIDs)
+
+		for _, provID := range provIDs {
+			reqKey := fmt.Sprintf("provision:%s", provID)
+			reqData, err := tx.Get(reqKey)
+			if err != nil {
+				continue
+			}
+			var req ProvisioningRequest
+			if json.Unmarshal([]byte(reqData), &req) == nil {
+				requests = append(requests, req)
+			}
+		}
+		return nil
+	})
+	return requests, err
+}
+
+// IsDeviceUIDRegistered checks if a device UID is already registered
+func (s *Storage) IsDeviceUIDRegistered(deviceUID string) (bool, string, error) {
+	var deviceID string
+	var registered bool
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		uidDeviceKey := fmt.Sprintf("device:uid:%s", deviceUID)
+		id, err := tx.Get(uidDeviceKey)
+		if err == nil {
+			registered = true
+			deviceID = id
+		}
+		return nil
+	})
+	return registered, deviceID, err
+}
+
+// CleanupExpiredProvisioningRequests removes expired provisioning requests
+func (s *Storage) CleanupExpiredProvisioningRequests() (int, error) {
+	var cleaned int
+	err := s.db.Update(func(tx *buntdb.Tx) error {
+		var expiredKeys []string
+		tx.Ascend("", func(key, value string) bool {
+			if len(key) > 10 && key[:10] == "provision:" && key[10:14] != "uid:" {
+				var req ProvisioningRequest
+				if json.Unmarshal([]byte(value), &req) == nil {
+					if req.Status == "pending" && time.Now().After(req.ExpiresAt) {
+						expiredKeys = append(expiredKeys, key)
+					}
+				}
+			}
+			return true
+		})
+
+		for _, key := range expiredKeys {
+			reqData, _ := tx.Get(key)
+			var req ProvisioningRequest
+			if json.Unmarshal([]byte(reqData), &req) == nil {
+				req.Status = "expired"
+				newData, _ := json.Marshal(req)
+				tx.Set(key, string(newData), nil)
+
+				// Remove UID index
+				uidPendingKey := fmt.Sprintf("provision:uid:%s", req.DeviceUID)
+				tx.Delete(uidPendingKey)
+				cleaned++
+			}
+		}
+		return nil
+	})
+	return cleaned, err
+}

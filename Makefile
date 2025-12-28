@@ -1,9 +1,10 @@
 .PHONY: help build run stop clean test bench dev logs shell db-backup db-restore
 
 # Variables
-COMPOSE=docker compose
-COMPOSE_DEV=docker compose -f docker-compose.yml -f docker-compose.dev.yml
-SERVER_BINARY=server
+COMPOSE=docker compose -f docker/docker-compose.yml
+COMPOSE_DEV=docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml
+SERVER_BINARY=build/binaries/server
+CLI_BINARY=build/binaries/datumctl
 
 help: ## Show this help message
 	@echo "Datum IoT Platform - Makefile Commands"
@@ -12,7 +13,7 @@ help: ## Show this help message
 
 # Docker commands
 build: ## Build all Docker images
-	$(COMPOSE) build
+	docker compose -f docker/docker-compose.yml build
 
 build-dashboard: ## Build dashboard image only
 	$(COMPOSE) build dashboard
@@ -86,7 +87,15 @@ db-clean: ## Clean all data (WARNING: destroys all data)
 # Testing commands
 test: ## Run all Go tests
 	@echo "🧪 Running Go tests..."
+	@mkdir -p build
 	@go test ./... -v
+
+test-coverage: ## Run tests with coverage
+	@echo "🧪 Running tests with coverage..."
+	@mkdir -p build
+	@go test ./... -coverprofile=build/coverage.out
+	@go tool cover -html=build/coverage.out -o build/coverage.html
+	@echo "✅ Coverage report: build/coverage.html"
 
 test-storage: ## Run storage tests with verbose output
 	@echo "🧪 Running storage tests..."
@@ -107,13 +116,15 @@ test-load: ## Run HTTP load tests with Locust
 # Build commands
 build-server: ## Build Go server binary locally
 	@echo "🔨 Building Go server..."
+	@mkdir -p build/binaries
 	@go build -o $(SERVER_BINARY) ./cmd/server
 	@echo "✅ Binary created: $(SERVER_BINARY)"
 
 build-cli: ## Build datumctl CLI tool
 	@echo "🔨 Building datumctl..."
-	@go build -o datumctl ./cmd/datumctl
-	@echo "✅ CLI tool created: datumctl"
+	@mkdir -p build/binaries
+	@go build -o $(CLI_BINARY) ./cmd/datumctl
+	@echo "✅ CLI tool created: $(CLI_BINARY)"
 
 build-all: build-server build-cli ## Build server and CLI
 
@@ -142,7 +153,8 @@ shell-api: ## Open shell in API container
 
 clean: ## Clean build artifacts and containers
 	$(COMPOSE) down -v
-	rm -f $(SERVER_BINARY)
+	rm -rf build/
+	rm -f datumctl server
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	@echo "✅ Cleaned"
 
