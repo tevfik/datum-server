@@ -60,6 +60,15 @@ else
     fail_test "System setup failed - config not created"
 fi
 
+# Login as admin
+info "Logging in as admin..."
+$DATUMCTL login --email ${ADMIN_USER}@example.com --password ${ADMIN_PASS} > /dev/null
+if [ $? -eq 0 ]; then
+    pass_test "Logged in successfully"
+else
+    fail_test "Login failed"
+fi
+
 # Test 4: Check Login Status
 info "Test 4: Verifying login status..."
 STATUS=$($DATUMCTL status 2>&1)
@@ -71,10 +80,11 @@ fi
 
 # Test 5: Create Additional User
 info "Test 5: Creating additional user..."
-OUTPUT=$($DATUMCTL admin create-user --email ${TEST_USER}@example.com --password ${TEST_PASS} 2>&1)
+OUTPUT=$($DATUMCTL admin create-user --email ${TEST_USER}@example.com --password ${TEST_PASS} 2>&1 || true)
 if echo "$OUTPUT" | grep -q "created"; then
     pass_test "User created successfully"
 else
+    echo "Output: $OUTPUT"
     fail_test "User creation failed"
 fi
 
@@ -89,7 +99,7 @@ fi
 
 # Test 7: Create Device (auto-generated ID)
 info "Test 7: Creating device with auto-generated ID..."
-OUTPUT=$($DATUMCTL device create --name "${TEST_DEVICE}" --type sensor 2>&1)
+OUTPUT=$($DATUMCTL device create --name "${TEST_DEVICE}" --type sensor 2>&1 || true)
 if echo "$OUTPUT" | grep -q "created"; then
     DEVICE_ID=$(echo "$OUTPUT" | grep "ID:" | awk '{print $2}')
     API_KEY=$(echo "$OUTPUT" | grep "API Key:" | awk '{print $3}')
@@ -110,7 +120,7 @@ fi
 # Test 9: Create Device with Custom ID
 info "Test 9: Creating device with custom ID..."
 CUSTOM_ID="custom-$(date +%s)"
-OUTPUT=$($DATUMCTL device create --name "custom-device" --type temperature --id ${CUSTOM_ID} 2>&1)
+OUTPUT=$($DATUMCTL device create --name "custom-device" --type temperature --id ${CUSTOM_ID} 2>&1 || true)
 if echo "$OUTPUT" | grep -q "${CUSTOM_ID}"; then
     pass_test "Custom device ID accepted"
 else
@@ -155,7 +165,7 @@ pass_test "Device deleted"
 
 # Test 14: Password Reset
 info "Test 14: Testing password reset..."
-OUTPUT=$($DATUMCTL admin reset-password ${TEST_USER}@example.com --new-password "newpass456" 2>&1)
+OUTPUT=$($DATUMCTL admin reset-password ${TEST_USER}@example.com --new-password "newpass456" 2>&1 || true)
 if echo "$OUTPUT" | grep -q "reset"; then
     pass_test "Password reset successful"
 else
@@ -164,7 +174,7 @@ fi
 
 # Test 15: Delete User
 info "Test 15: Deleting test user..."
-OUTPUT=$($DATUMCTL admin delete-user ${TEST_USER}@example.com --force 2>&1)
+OUTPUT=$($DATUMCTL admin delete-user ${TEST_USER}@example.com --force 2>&1 || true)
 if echo "$OUTPUT" | grep -q "deleted"; then
     pass_test "User deleted"
 else
