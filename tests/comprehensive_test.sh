@@ -164,8 +164,13 @@ fi
 
 # Test 15: Delete User
 info "Test 15: Deleting test user..."
-$DATUMCTL admin delete-user ${TEST_USER}@example.com --force > /dev/null 2>&1
-pass_test "User deleted"
+OUTPUT=$($DATUMCTL admin delete-user ${TEST_USER}@example.com --force 2>&1)
+if echo "$OUTPUT" | grep -q "deleted"; then
+    pass_test "User deleted"
+else
+    echo "Output: $OUTPUT"
+    fail_test "User deletion failed"
+fi
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
