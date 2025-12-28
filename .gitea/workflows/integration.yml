@@ -47,13 +47,19 @@ jobs:
         run: |
           chmod +x datum-server datumctl
 
+      - name: Install Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          pip3 install requests
+
       - name: Run integration tests
         run: |
           chmod +x tests/*.sh
           
           # Run integration test suite from root
           ./tests/integration_test.sh
-          ./tests/provisioning_test.py
+          python3 ./tests/provisioning_test.py
           ./tests/sse_test.sh
 
       - name: Cleanup
