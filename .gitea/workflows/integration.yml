@@ -50,12 +50,15 @@ jobs:
       - name: Install Python dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-pip
+          sudo apt-get install -y python3-pip python3-venv
+          python3 -m venv venv
+          . venv/bin/activate
           pip3 install requests
 
       - name: Run integration tests
         run: |
           chmod +x tests/*.sh
+          . venv/bin/activate
           
           # Run integration test suite from root
           ./tests/integration_test.sh
