@@ -1,0 +1,94 @@
+name: Functional Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/**'
+      - 'tests/**'
+      - '.gitea/workflows/functional.yml'
+  pull_request:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/**'
+      - 'tests/**'
+  workflow_dispatch:
+
+jobs:
+  functional-test:
+    name: Functional Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Build binaries
+        run: |
+          go build -o datum-server ./cmd/server
+          go build -o datumctl ./cmd/datumctl
+          chmod +x datum-server datumctl
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+
+      - name: Start Server
+        run: |
+          mkdir -p data
+          # Start server in background on port 8082
+          PORT=8082 ./datum-server > server.log 2>&1 &
+          echo $! > server.pid
+          
+          # Wait for server to be ready
+          echo "Waiting for server to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:8082/health > /dev/null; then
+              echo "Server is ready!"
+              break
+            fi
+            sleep 1
+          done
+          
+          if ! curl -s http://localhost:8082/health > /dev/null; then
+            echo "Server failed to start"
+            cat server.log
+            exit 1
+          fi
+
+      - name: Run Comprehensive Test Suite
+        env:
+          DATUMCTL: "./datumctl --server http://localhost:8082"
+          SERVER_URL: "http://localhost:8082"
+        run: |
+          # Modify the test script to use our environment variables if needed
+          # or just pass them directly if the script supports it.
+          # The script hardcodes localhost:8001, so we need to sed it or update it.
+          
+          sed -i 's/localhost:8001/localhost:8082/g' tests/comprehensive_test.sh
+          sed -i 's|./datumctl|./datumctl|g' tests/comprehensive_test.sh
+          
+          # Run the test
+          bash tests/comprehensive_test.sh
+
+      - name: Server Logs (on failure)
+        if: failure()
+        run: cat server.log
+
+      - name: Cleanup
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+          fi
