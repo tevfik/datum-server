@@ -230,6 +230,8 @@ func main() {
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			// Ensure error is printed to stderr even if logger fails
+			fmt.Fprintf(os.Stderr, "CRITICAL ERROR: Server failed to start: %v\n", err)
 			log.Fatal().Err(err).Msg("Server failed to start")
 		}
 	}()
