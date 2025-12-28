@@ -63,9 +63,14 @@ func InitLogger() {
 	// Set as global logger
 	log.Logger = Logger
 
+	displayFormat := logFormat
+	if displayFormat == "" {
+		displayFormat = "pretty (default)"
+	}
+
 	Logger.Info().
-		Str("level", logLevel).
-		Str("format", logFormat).
+		Str("configured_level", logLevel).
+		Str("format", displayFormat).
 		Msg("Logger initialized")
 }
 
