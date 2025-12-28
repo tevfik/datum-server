@@ -99,13 +99,28 @@ jobs:
           
           # Run container with auto-remove
           docker run -d --rm --name datum-server-test -p 8000:8000 datum-server:test
-          sleep 5
           
-          # Test health endpoint
-          curl -f http://localhost:8000/health || exit 1
+          # Wait for container to be ready (with timeout)
+          echo "Waiting for server to start..."
+          for i in {1..30}; do
+            if curl -f http://localhost:8000/health 2>/dev/null; then
+              echo "✅ Server is ready!"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "❌ Timeout waiting for server"
+              echo "Container logs:"
+              docker logs datum-server-test
+              exit 1
+            fi
+            echo "Attempt $i/30: Server not ready yet, waiting..."
+            sleep 2
+          done
           
           # Verify datumctl is available
           docker exec datum-server-test datumctl --version || exit 1
+          
+          echo "✅ Docker image test passed!"
 
       - name: Cleanup Docker container
         if: always()
