@@ -219,7 +219,7 @@ var provisionStatusCmd = &cobra.Command{
 		} else {
 			var result map[string]interface{}
 			if err := json.Unmarshal(body, &result); err == nil {
-				fmt.Println("\n📋 Provisioning Request Details\n")
+				fmt.Println("\n📋 Provisioning Request Details")
 				fmt.Printf("Request ID: %v\n", result["request_id"])
 				fmt.Printf("Device UID: %v\n", result["device_uid"])
 				fmt.Printf("Device Name: %v\n", result["device_name"])

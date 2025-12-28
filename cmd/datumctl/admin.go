@@ -432,7 +432,7 @@ func runAdminStats(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print formatted stats
-	fmt.Println("\n📊 System Statistics\n")
+	fmt.Println("\n📊 System Statistics")
 
 	// Database stats
 	if dbStats, ok := stats["database"].(map[string]interface{}); ok {
@@ -488,7 +488,7 @@ func runAdminConfig(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print formatted config
-	fmt.Println("\n⚙️  System Configuration\n")
+	fmt.Println("\n⚙️  System Configuration")
 
 	if platf, ok := config["platform_name"].(string); ok {
 		fmt.Printf("Platform: %s\n", platf)
