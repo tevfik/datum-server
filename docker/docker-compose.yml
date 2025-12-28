@@ -73,8 +73,6 @@ services:
       - "traefik.http.routers.datum-server.middlewares=datum-redirect"
     restart: unless-stopped
 
-    restart: unless-stopped
-
 networks:
   datum-network:
     driver: bridge
