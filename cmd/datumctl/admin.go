@@ -417,7 +417,7 @@ func runAdminStats(cmd *cobra.Command, args []string) error {
 	}
 
 	client := NewAPIClient(serverURL, token, apiKey)
-	resp, err := client.Get("/admin/stats")
+	resp, err := client.Get("/admin/database/stats")
 	if err != nil {
 		return fmt.Errorf("failed to get stats: %w", err)
 	}
