@@ -1,0 +1,63 @@
+name: Integration
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - '**.go'
+      - 'tests/**'
+      - 'cmd/**'
+      - '.gitea/workflows/integration.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Generate go.sum
+        run: go mod tidy && go mod verify
+
+      - name: Build datum-server
+        run: |
+          CGO_ENABLED=0 go build -o datum-server ./cmd/server
+
+      - name: Build datumctl
+        run: |
+          CGO_ENABLED=0 go build -o datumctl ./cmd/datumctl
+
+      - name: Make binaries executable
+        run: |
+          chmod +x datum-server datumctl
+
+      - name: Run integration tests
+        run: |
+          chmod +x tests/*.sh
+          
+          # Run integration test suite from root
+          ./tests/integration_test.sh
+          ./tests/provisioning_test.py
+          ./tests/sse_test.sh
+
+      - name: Cleanup
+        if: always()
+        run: |
+          pkill -f datum-server || true
+          rm -rf ./data
