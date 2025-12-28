@@ -169,10 +169,10 @@ jobs:
 
       - name: Run integration tests
         run: |
-          cd tests
-          chmod +x *.sh
+          chmod +x tests/*.sh
           
-          # Run integration test suite
+          # Run integration test suite from root
+          ./tests/integration_test.sh
           ./integration_test.sh
           
           # Run command tests
@@ -197,6 +197,14 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Generate go.sum
+        run: go mod download && go mod tidy
 
       - name: Build Docker image
         run: |
@@ -230,6 +238,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.23'
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Generate go.sum
+        run: go mod tidy && go mod verify
 
       - name: Run Gosec Security Scanner
         run: |

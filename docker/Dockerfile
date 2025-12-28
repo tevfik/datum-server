@@ -4,8 +4,9 @@ FROM golang:1.23-alpine AS builder
 WORKDIR /app
 
 # Copy go mod files
-COPY go.mod go.sum ./
-RUN go mod download
+COPY go.mod ./
+COPY go.sum* ./
+RUN go mod download && go mod tidy
 
 # Copy source code
 COPY . .
