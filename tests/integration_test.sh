@@ -42,6 +42,11 @@ info "Testing datumctl..."
 ./datumctl version > /dev/null 2>&1 || fail_test "datumctl version failed"
 pass_test "datumctl works"
 
+# Create data directory for server
+info "Creating data directory..."
+mkdir -p ./data
+pass_test "Data directory created"
+
 # Start server in background
 info "Starting server..."
 ./datum-server > server.log 2>&1 &
