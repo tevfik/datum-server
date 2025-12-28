@@ -75,7 +75,7 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		"password": loginPassword,
 	}
 
-	resp, err := client.Post("/api/login", loginReq)
+	resp, err := client.Post("/auth/login", loginReq)
 	if err != nil {
 		return fmt.Errorf("login failed: %w", err)
 	}

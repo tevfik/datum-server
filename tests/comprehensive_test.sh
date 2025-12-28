@@ -5,8 +5,8 @@
 
 set -e  # Exit on error
 
-DATUMCTL="./datumctl --server http://localhost:8001"
-SERVER_URL="http://localhost:8001"
+DATUMCTL=${DATUMCTL:-"./datumctl --server http://localhost:8001"}
+SERVER_URL=${SERVER_URL:-"http://localhost:8001"}
 ADMIN_USER="admin"
 ADMIN_PASS="admin123"
 TEST_USER="testuser"
@@ -38,10 +38,14 @@ info() {
 
 # Test 1: Server Health
 info "Test 1: Checking server health..."
-HEALTH=$(curl -s ${SERVER_URL}/health | jq -r .status)
+RESPONSE=$(curl -s ${SERVER_URL}/health)
+# echo "Raw response: $RESPONSE"
+HEALTH=$(echo "$RESPONSE" | jq -r .status)
 if [ "$HEALTH" = "healthy" ]; then
     pass_test "Server is healthy"
 else
+    echo "Raw response: $RESPONSE"
+    echo "Health status: $HEALTH"
     fail_test "Server health check failed"
 fi
 

@@ -155,7 +155,7 @@ func runDeviceGet(cmd *cobra.Command, args []string) error {
 	client := NewAPIClient(serverURL, token, apiKey)
 
 	deviceID := args[0]
-	resp, err := client.Get("/api/devices/" + deviceID)
+	resp, err := client.Get("/admin/devices/" + deviceID)
 	if err != nil {
 		return err
 	}

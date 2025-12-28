@@ -93,7 +93,7 @@ func runDataGet(cmd *cobra.Command, args []string) error {
 	client := NewAPIClient(serverURL, token, apiKey)
 
 	// Build query parameters
-	path := fmt.Sprintf("/api/data/%s", dataDevice)
+	path := fmt.Sprintf("/data/%s", dataDevice)
 	queryParams := ""
 
 	if dataLast != "" {
@@ -187,7 +187,7 @@ func runDataPost(cmd *cobra.Command, args []string) error {
 	// Determine endpoint
 	var path string
 	if dataDevice != "" {
-		path = fmt.Sprintf("/api/data/%s", dataDevice)
+		path = fmt.Sprintf("/data/%s", dataDevice)
 	} else {
 		path = "/public/data"
 	}
@@ -215,7 +215,7 @@ func runDataStats(cmd *cobra.Command, args []string) error {
 	}
 	from := time.Now().Add(-duration)
 
-	path := fmt.Sprintf("/api/data/%s/stats?from=%s", dataDevice, from.Format(time.RFC3339))
+	path := fmt.Sprintf("/data/%s/stats?from=%s", dataDevice, from.Format(time.RFC3339))
 
 	resp, err := client.Get(path)
 	if err != nil {
