@@ -620,7 +620,7 @@ func TestDataPersistence(t *testing.T) {
 	dataPath := filepath.Join(tmpDir, "persist_tsdata")
 
 	// Create storage and add data
-	storage1, err := New(metaPath, dataPath)
+	storage1, err := New(metaPath, dataPath, 7*24*time.Hour)
 	require.NoError(t, err)
 
 	user := &User{
@@ -651,7 +651,7 @@ func TestDataPersistence(t *testing.T) {
 	require.NoError(t, err)
 
 	// Reopen storage and verify data persists
-	storage2, err := New(metaPath, dataPath)
+	storage2, err := New(metaPath, dataPath, 7*24*time.Hour)
 	require.NoError(t, err)
 	defer storage2.Close()
 
@@ -683,7 +683,7 @@ func BenchmarkUserCreation(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench_meta.db")
 	dataPath := filepath.Join(tmpDir, "bench_data")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -708,7 +708,7 @@ func BenchmarkUserLookupByEmail(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench_meta.db")
 	dataPath := filepath.Join(tmpDir, "bench_data")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -739,7 +739,7 @@ func BenchmarkMetadataDeviceCreation(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench_meta.db")
 	dataPath := filepath.Join(tmpDir, "bench_data")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -776,7 +776,7 @@ func BenchmarkAPIKeyLookup(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench_meta.db")
 	dataPath := filepath.Join(tmpDir, "bench_data")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -818,7 +818,7 @@ func BenchmarkGetUserDevices(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench_meta.db")
 	dataPath := filepath.Join(tmpDir, "bench_data")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -859,7 +859,7 @@ func BenchmarkConcurrentDeviceCreation(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench_meta.db")
 	dataPath := filepath.Join(tmpDir, "bench_data")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -899,7 +899,7 @@ func BenchmarkConcurrentAPIKeyLookup(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench_meta.db")
 	dataPath := filepath.Join(tmpDir, "bench_data")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}

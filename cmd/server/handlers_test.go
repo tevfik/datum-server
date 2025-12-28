@@ -261,7 +261,7 @@ func TestForceCleanupHandler(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "Cleanup completed")
+	assert.Contains(t, w.Body.String(), "Cleanup is handled automatically by storage engine")
 }
 
 func TestLoginHandlerSuccess(t *testing.T) {

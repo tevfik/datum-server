@@ -46,7 +46,8 @@ func main() {
 	port := flag.String("port", "", "Server port (default: 8000 or PORT env var)")
 	dataDir := flag.String("data-dir", "", "Data directory path (default: ./data or DATA_DIR env var)")
 	retentionDays := flag.Int("retention-days", 0, "Data retention in days (default: 7 or RETENTION_MAX_DAYS env var)")
-	retentionCheckHours := flag.Int("retention-check-hours", 0, "Retention check interval in hours (default: 24 or RETENTION_CHECK_HOURS env var)")
+	// retentionCheckHours is deprecated as retention is handled by storage engine
+	_ = flag.Int("retention-check-hours", 0, "DEPRECATED: Retention check interval in hours")
 	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
 
@@ -232,14 +233,6 @@ func main() {
 		Str("docs", "http://localhost:"+serverPort+"/docs").
 		Msg("🚀 Datum IoT Platform starting")
 
-	if err := r.Run(":" + serverPort); err != nil {
-		log.Fatal().Err(err).Msg("Server failed to start")
-	}
-}
-
-func rootHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"service": "Datumpy IoT Platform",
 	// Start server
 	srv := &http.Server{
 		Addr:    ":" + serverPort,
@@ -266,12 +259,20 @@ func rootHandler(c *gin.Context) {
 		log.Fatal().Err(err).Msg("Server forced to shutdown")
 	}
 
-	// Close storage-server
+	// Close storage
 	if err := store.Close(); err != nil {
 		log.Error().Err(err).Msg("Error closing storage")
 	}
 
-	log.Info().Msg("Server exiting")	"auth":         []string{"POST /auth/register", "POST /auth/login"},
+	log.Info().Msg("Server exiting")
+}
+
+func rootHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"service": "Datum IoT Platform",
+		"version": "1.0.0",
+		"endpoints": gin.H{
+			"auth":         []string{"POST /auth/register", "POST /auth/login"},
 			"devices":      []string{"POST /devices", "GET /devices", "DELETE /devices/{id}"},
 			"commands":     []string{"POST /devices/{id}/commands", "GET /device/{id}/commands"},
 			"data":         []string{"POST /data/{id}", "GET /data/{id}", "GET /data/{id}/history"},

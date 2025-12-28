@@ -19,7 +19,7 @@ func setupAdminConfigTestServer(t *testing.T) (*gin.Engine, func()) {
 
 	tmpDir := t.TempDir()
 	var err error
-	store, err = storage.New(tmpDir+"/meta.db", tmpDir+"/tsdata")
+	store, err = storage.New(tmpDir+"/meta.db", tmpDir+"/tsdata", 7*24*time.Hour)
 	require.NoError(t, err)
 
 	// Initialize system
@@ -453,7 +453,7 @@ func TestGetSystemStatusHandlerNotInitialized(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	tmpDir := t.TempDir()
 	var err error
-	store, err = storage.New(tmpDir+"/meta.db", tmpDir+"/tsdata")
+	store, err = storage.New(tmpDir+"/meta.db", tmpDir+"/tsdata", 7*24*time.Hour)
 	require.NoError(t, err)
 	defer store.Close()
 

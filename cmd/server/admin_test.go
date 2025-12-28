@@ -20,7 +20,7 @@ func setupTestEnvironment(t *testing.T) (*gin.Engine, *storage.Storage, string) 
 	gin.SetMode(gin.TestMode)
 
 	// Create in-memory storage
-	testStore, err := storage.New(":memory:", "")
+	testStore, err := storage.New(":memory:", "", 7*24*time.Hour)
 	assert.NoError(t, err)
 
 	store = testStore // Set global store
@@ -56,7 +56,7 @@ func setupTestEnvironment(t *testing.T) (*gin.Engine, *storage.Storage, string) 
 // TestSystemSetup tests the system setup endpoint
 func TestSystemSetup(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	testStore, _ := storage.New(":memory:", "")
+	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
 	store = testStore
 
 	r := gin.New()

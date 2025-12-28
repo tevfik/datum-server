@@ -537,7 +537,7 @@ func TestSystemConfigPersistence(t *testing.T) {
 	dataPath := filepath.Join(tmpDir, "persist_data")
 
 	// Create storage and initialize
-	storage1, err := New(metaPath, dataPath)
+	storage1, err := New(metaPath, dataPath, 7*24*time.Hour)
 	require.NoError(t, err)
 
 	err = storage1.InitializeSystem("Persistent Platform", true, 30)
@@ -547,7 +547,7 @@ func TestSystemConfigPersistence(t *testing.T) {
 	storage1.Close()
 
 	// Reopen storage
-	storage2, err := New(metaPath, dataPath)
+	storage2, err := New(metaPath, dataPath, 7*24*time.Hour)
 	require.NoError(t, err)
 	defer storage2.Close()
 
@@ -569,7 +569,7 @@ func BenchmarkGetSystemConfig(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench_meta.db")
 	dataPath := filepath.Join(tmpDir, "bench_data")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -588,7 +588,7 @@ func BenchmarkSaveSystemConfig(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench_meta.db")
 	dataPath := filepath.Join(tmpDir, "bench_data")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -613,7 +613,7 @@ func BenchmarkUpdateDataRetention(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench_meta.db")
 	dataPath := filepath.Join(tmpDir, "bench_data")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -632,7 +632,7 @@ func BenchmarkExportDatabase(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench_meta.db")
 	dataPath := filepath.Join(tmpDir, "bench_data")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}

@@ -18,7 +18,7 @@ import (
 // TestPostDataWithDeviceAuth tests data submission with device API key
 func TestPostDataWithDeviceAuth(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	testStore, err := storage.New(":memory:", "")
+	testStore, err := storage.New(":memory:", "", 7*24*time.Hour)
 	assert.NoError(t, err)
 	store = testStore
 
@@ -74,7 +74,7 @@ func TestPostDataWithDeviceAuth(t *testing.T) {
 // TestPostDataUnauthorized tests data submission without auth
 func TestPostDataUnauthorized(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	testStore, _ := storage.New(":memory:", "")
+	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
 	store = testStore
 
 	r := gin.New()
@@ -102,7 +102,7 @@ func TestPostDataUnauthorized(t *testing.T) {
 // TestPublicDataEndpoint tests public data endpoint
 func TestPublicDataEndpoint(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	testStore, _ := storage.New(":memory:", "")
+	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
 	store = testStore
 
 	testStore.InitializeSystem("Test", false, 7)
@@ -130,7 +130,7 @@ func TestPublicDataEndpoint(t *testing.T) {
 // TestGetLatestData tests fetching latest device data
 func TestGetLatestData(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	testStore, _ := storage.New(":memory:", "")
+	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
 	store = testStore
 
 	testStore.InitializeSystem("Test", false, 7)
@@ -182,7 +182,7 @@ func TestGetLatestData(t *testing.T) {
 // TestDeleteDevice tests device deletion
 func TestDeleteDevice(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	testStore, _ := storage.New(":memory:", "")
+	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
 	store = testStore
 
 	testStore.InitializeSystem("Test", false, 7)
@@ -226,7 +226,7 @@ func TestDeleteDevice(t *testing.T) {
 // TestGetDevice tests fetching single device
 func TestGetDevice(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	testStore, _ := storage.New(":memory:", "")
+	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
 	store = testStore
 
 	testStore.InitializeSystem("Test", false, 7)
@@ -274,7 +274,7 @@ func TestGetDevice(t *testing.T) {
 // TestUpdateDevice tests device update
 func TestUpdateDevice(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	testStore, _ := storage.New(":memory:", "")
+	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
 	store = testStore
 
 	testStore.InitializeSystem("Test", false, 7)
@@ -325,7 +325,7 @@ func TestUpdateDevice(t *testing.T) {
 // TestDataHistory tests historical data query
 func TestDataHistory(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	testStore, _ := storage.New(":memory:", "")
+	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
 	store = testStore
 
 	testStore.InitializeSystem("Test", false, 7)
@@ -368,7 +368,7 @@ func TestDataHistory(t *testing.T) {
 // TestInvalidDeviceID tests operations with non-existent device
 func TestInvalidDeviceID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	testStore, _ := storage.New(":memory:", "")
+	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
 	store = testStore
 
 	testStore.InitializeSystem("Test", false, 7)
@@ -398,7 +398,7 @@ func TestInvalidDeviceID(t *testing.T) {
 // TestRateLimitingOnPublicEndpoint tests rate limiting
 func TestRateLimitingOnPublicEndpoint(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	testStore, _ := storage.New(":memory:", "")
+	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
 	store = testStore
 
 	r := gin.New()

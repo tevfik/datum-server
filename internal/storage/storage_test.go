@@ -545,7 +545,7 @@ func BenchmarkDeviceCreation(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench.db")
 	dataPath := filepath.Join(tmpDir, "tsdata")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -574,7 +574,7 @@ func BenchmarkDataPointInsertion(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench.db")
 	dataPath := filepath.Join(tmpDir, "tsdata")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -615,7 +615,7 @@ func BenchmarkDataPointQuery(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench.db")
 	dataPath := filepath.Join(tmpDir, "tsdata")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -660,7 +660,7 @@ func BenchmarkConcurrentInserts(b *testing.B) {
 	metaPath := filepath.Join(tmpDir, "bench.db")
 	dataPath := filepath.Join(tmpDir, "tsdata")
 
-	storage, err := New(metaPath, dataPath)
+	storage, err := New(metaPath, dataPath, 7*24*time.Hour)
 	if err != nil {
 		b.Fatal(err)
 	}

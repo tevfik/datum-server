@@ -36,7 +36,7 @@ func TestRootHandler(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "Datumpy IoT Platform", response["service"])
+	assert.Equal(t, "Datum IoT Platform", response["service"])
 }
 
 func TestHealthHandler(t *testing.T) {

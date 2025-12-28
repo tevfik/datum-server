@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,7 @@ func setupMetricsTestServer(t *testing.T) (*gin.Engine, func()) {
 
 	tmpDir := t.TempDir()
 	var err error
-	store, err = storage.New(tmpDir+"/meta.db", tmpDir+"/tsdata")
+	store, err = storage.New(tmpDir+"/meta.db", tmpDir+"/tsdata", 7*24*time.Hour)
 	require.NoError(t, err)
 
 	// Reset metrics for testing

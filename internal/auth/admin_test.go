@@ -19,7 +19,7 @@ func createTestStorageForAuth(t *testing.T) (*storage.Storage, func()) {
 	metaPath := filepath.Join(tmpDir, "auth_test.db")
 	dataPath := filepath.Join(tmpDir, "auth_data")
 
-	store, err := storage.New(metaPath, dataPath)
+	store, err := storage.New(metaPath, dataPath, 7*24*time.Hour)
 	require.NoError(t, err)
 
 	cleanup := func() {

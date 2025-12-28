@@ -17,7 +17,7 @@ func setupSSETestServer(t *testing.T) (*gin.Engine, func()) {
 
 	tmpDir := t.TempDir()
 	var err error
-	store, err = storage.New(tmpDir+"/meta.db", tmpDir+"/tsdata")
+	store, err = storage.New(tmpDir+"/meta.db", tmpDir+"/tsdata", 7*24*time.Hour)
 	require.NoError(t, err)
 
 	store.InitializeSystem("Test Platform", true, 7)
