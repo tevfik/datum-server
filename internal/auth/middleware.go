@@ -70,7 +70,7 @@ func DeviceAuthMiddleware() gin.HandlerFunc {
 		apiKey := parts[1]
 
 		// Validate API key format
-		if !strings.HasPrefix(apiKey, "sk_live_") {
+		if !strings.HasPrefix(apiKey, "dk_") {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid API key format"})
 			c.Abort()
 			return

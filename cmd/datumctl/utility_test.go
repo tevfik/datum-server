@@ -102,7 +102,7 @@ func TestLoadConfig(t *testing.T) {
 	oldServerURL := serverURL
 	oldToken := token
 	oldAPIKey := apiKey
-	serverURL = "http://localhost:8080"
+	serverURL = DefaultServerURL
 	token = ""
 	apiKey = ""
 	defer func() {

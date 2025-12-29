@@ -412,14 +412,14 @@ func normalizeUID(uid string) string {
 
 // generateProvisioningID generates a prefixed random ID for provisioning
 func generateProvisioningID(prefix string) string {
-	bytes := make([]byte, 12)
+	bytes := make([]byte, 6)
 	rand.Read(bytes)
 	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(bytes))
 }
 
 // generateProvisioningAPIKey generates a secure API key for provisioning
 func generateProvisioningAPIKey() string {
-	bytes := make([]byte, 24)
+	bytes := make([]byte, 8)
 	rand.Read(bytes)
 	return "dk_" + hex.EncodeToString(bytes)
 }

@@ -122,8 +122,9 @@ func TestGetSystemStatus(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, true, response["initialized"])
-	assert.NotNil(t, response["platform_name"])
-	assert.NotNil(t, response["setup_at"])
+	// Platform details are hidden when initialized
+	// assert.NotNil(t, response["platform_name"])
+	// assert.NotNil(t, response["setup_at"])
 
 	testStore.Close()
 }

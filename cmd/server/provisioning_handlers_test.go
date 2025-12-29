@@ -590,7 +590,7 @@ func TestGenerateProvisioningAPIKey(t *testing.T) {
 
 	assert.NotEqual(t, key1, key2, "Keys should be unique")
 	assert.Contains(t, key1, "dk_")
-	assert.Greater(t, len(key1), 20)
+	assert.Greater(t, len(key1), 10)
 }
 
 // TestSetProvisioningServerURL tests setting server URL

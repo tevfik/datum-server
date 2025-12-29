@@ -68,17 +68,21 @@ func setupAdminRoutes(r *gin.Engine, store *storage.Storage) {
 
 func getSystemStatusHandler(c *gin.Context) {
 	initialized := store.IsSystemInitialized()
-	config, _ := store.GetSystemConfig()
+	// config, _ := store.GetSystemConfig()
 
 	status := gin.H{
 		"initialized": initialized,
 	}
 
-	if initialized {
-		status["platform_name"] = config.PlatformName
-		status["allow_register"] = config.AllowRegister
-		status["setup_at"] = config.SetupAt
-	}
+	// Only return details if NOT initialized (to help with setup)
+	// Once initialized, we don't want to leak platform details publicly
+	/*
+		if initialized {
+			status["platform_name"] = config.PlatformName
+			status["allow_register"] = config.AllowRegister
+			status["setup_at"] = config.SetupAt
+		}
+	*/
 
 	c.JSON(http.StatusOK, status)
 }
@@ -533,11 +537,11 @@ func provisionDeviceHandler(c *gin.Context) {
 	// Generate device ID if not provided
 	deviceID := req.DeviceID
 	if deviceID == "" {
-		deviceID = generateIDString(16)
+		deviceID = "dev_" + generateIDString(6)
 	}
 
-	// Generate API key
-	apiKey := generateIDString(32)
+	// Generate API key (dk_ + 16 hex chars = 19 chars total)
+	apiKey := "dk_" + generateIDString(8)
 
 	// Get admin user ID from context
 	adminUserID := c.GetString("user_id")

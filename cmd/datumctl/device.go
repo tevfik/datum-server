@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -141,6 +142,16 @@ func runDeviceList(cmd *cobra.Command, args []string) error {
 		dtype := getString(device, "type")
 		status := getString(device, "status")
 		lastSeen := getString(device, "last_seen")
+
+		// Format last seen time
+		if lastSeen == "0001-01-01T00:00:00Z" {
+			lastSeen = "Never"
+		} else {
+			// Try to parse and format nicely
+			if t, err := time.Parse(time.RFC3339, lastSeen); err == nil {
+				lastSeen = t.Local().Format("2006-01-02 15:04:05")
+			}
+		}
 
 		table.Append(id, name, dtype, status, lastSeen)
 	}

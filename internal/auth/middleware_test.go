@@ -102,12 +102,12 @@ func TestDeviceAuthMiddlewareValidAPIKey(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("GET", "/test", nil)
-	req.Header.Set("Authorization", "Bearer sk_live_test_api_key_123")
+	req.Header.Set("Authorization", "Bearer dk_test_api_key_123")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, 200, w.Code)
-	assert.Contains(t, w.Body.String(), "sk_live_test_api_key_123")
+	assert.Contains(t, w.Body.String(), "dk_test_api_key_123")
 }
 
 func TestDeviceAuthMiddlewareQueryParameter(t *testing.T) {
@@ -120,12 +120,12 @@ func TestDeviceAuthMiddlewareQueryParameter(t *testing.T) {
 		c.JSON(200, gin.H{"api_key": apiKey})
 	})
 
-	req := httptest.NewRequest("GET", "/test?key=sk_live_query_key", nil)
+	req := httptest.NewRequest("GET", "/test?key=dk_query_key", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, 200, w.Code)
-	assert.Contains(t, w.Body.String(), "sk_live_query_key")
+	assert.Contains(t, w.Body.String(), "dk_query_key")
 }
 
 func TestDeviceAuthMiddlewareMissingAPIKey(t *testing.T) {

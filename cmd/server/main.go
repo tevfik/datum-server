@@ -838,7 +838,7 @@ func pushDataViaGetHandler(c *gin.Context) {
 // Utility functions
 
 func generateID(prefix string) string {
-	bytes := make([]byte, 8)
+	bytes := make([]byte, 6)
 	rand.Read(bytes)
 	return prefix + "_" + hex.EncodeToString(bytes)
 }

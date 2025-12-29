@@ -18,6 +18,7 @@ var (
 	outputJSON bool
 	configFile string
 	verbose    bool
+	showCurl   bool
 )
 
 var rootCmd = &cobra.Command{
@@ -55,6 +56,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&token, "token", "", "JWT token for authentication")
 	rootCmd.PersistentFlags().BoolVar(&outputJSON, "json", false, "Output in JSON format")
 	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Config file (default: $HOME/.datumctl.yaml or /root/data/.datumctl.yaml)")
+	rootCmd.PersistentFlags().BoolVar(&showCurl, "curl", false, "Print equivalent curl command")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 }
 

@@ -56,10 +56,12 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 				fmt.Printf("\n❌ Error: %v\n", err)
 			}
 		case "System Status":
+			fmt.Println("\n> datumctl status")
 			if err := runStatus(nil, nil); err != nil {
 				fmt.Printf("\n❌ Error: %v\n", err)
 			}
 		case "Configuration":
+			fmt.Println("\n> datumctl config show")
 			runConfigShow(nil, nil)
 		case "Exit":
 			fmt.Println("\n👋 Goodbye!")
@@ -110,6 +112,7 @@ func deviceMenu() error {
 
 	switch action {
 	case "List all devices":
+		fmt.Println("\n> datumctl device list")
 		if err := runDeviceList(nil, nil); err != nil {
 			if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "cannot unmarshal object") {
 				fmt.Println("\n📱 No devices found. Create your first device!")
@@ -126,6 +129,7 @@ func deviceMenu() error {
 		}, &deviceID); err != nil {
 			return err
 		}
+		fmt.Printf("\n> datumctl device get %s\n", deviceID)
 		return runDeviceGet(nil, []string{deviceID})
 
 	case "Create new device":
@@ -148,6 +152,7 @@ func deviceMenu() error {
 
 		if confirm {
 			forceDelete = true
+			fmt.Printf("\n> datumctl device delete %s --force\n", deviceID)
 			return runDeviceDelete(nil, []string{deviceID})
 		}
 		fmt.Println("Cancelled")
@@ -176,6 +181,12 @@ func promptCreateDevice() error {
 	}, &deviceTypeInput)
 
 	deviceName = name
+	cmdStr := fmt.Sprintf("datumctl device create --name %q --type %q", name, deviceTypeInput)
+	if id != "" {
+		cmdStr += fmt.Sprintf(" --id %q", id)
+	}
+	fmt.Printf("\n> %s\n", cmdStr)
+
 	deviceID = id
 	deviceType = deviceTypeInput
 
@@ -261,6 +272,8 @@ func promptGetData() error {
 	dataLast = lastTime
 	fmt.Sscanf(limitInput, "%d", &dataLimit)
 
+	fmt.Printf("\n> datumctl data get --device %s --last %s --limit %d\n", device, lastTime, dataLimit)
+
 	return runDataGet(nil, nil)
 }
 
@@ -280,6 +293,12 @@ func promptPostData() error {
 
 	dataDevice = device
 	dataJSON = jsonData
+
+	cmdStr := fmt.Sprintf("datumctl data post --data %q", jsonData)
+	if device != "" {
+		cmdStr += fmt.Sprintf(" --device %s", device)
+	}
+	fmt.Printf("\n> %s\n", cmdStr)
 
 	return runDataPost(nil, nil)
 }
@@ -304,6 +323,8 @@ func promptDataStats() error {
 		Options: []string{"1h", "6h", "24h", "7d", "30d"},
 		Default: "24h",
 	}, &timeRange); err != nil {
+		fmt.Printf("\n> datumctl data stats --device %s --last %s\n", device, timeRange)
+
 		return err
 	}
 

@@ -38,7 +38,7 @@ func TestPostDataWithDeviceAuth(t *testing.T) {
 		ID:        "device-1",
 		UserID:    "user-1",
 		Name:      "Test Device",
-		APIKey:    "sk_live_test_api_key_123",
+		APIKey:    "dk_test_api_key_123",
 		Status:    "active",
 		CreatedAt: time.Now(),
 	}
@@ -62,7 +62,7 @@ func TestPostDataWithDeviceAuth(t *testing.T) {
 	body, _ := json.Marshal(dataPayload)
 	req, _ := http.NewRequest("POST", "/data/device-1", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer sk_live_test_api_key_123")
+	req.Header.Set("Authorization", "Bearer dk_test_api_key_123")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 

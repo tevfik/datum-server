@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -32,15 +33,18 @@ func NewAPIClient(baseURL, token, apiKey string) *APIClient {
 // Request makes an HTTP request to the API
 func (c *APIClient) Request(method, path string, body interface{}) (*http.Response, error) {
 	var reqBody io.Reader
+	var jsonData []byte
 	if body != nil {
-		jsonData, err := json.Marshal(body)
+		var err error
+		jsonData, err = json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
 		reqBody = bytes.NewBuffer(jsonData)
 	}
 
-	req, err := http.NewRequest(method, c.BaseURL+path, reqBody)
+	fullURL := c.BaseURL + path
+	req, err := http.NewRequest(method, fullURL, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -53,6 +57,24 @@ func (c *APIClient) Request(method, path string, body interface{}) (*http.Respon
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 	} else if c.APIKey != "" {
 		req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	}
+
+	if showCurl {
+		var cmd strings.Builder
+		cmd.WriteString(fmt.Sprintf("curl -X %s %s", method, fullURL))
+		cmd.WriteString(" \\\n  -H 'Content-Type: application/json'")
+
+		if c.Token != "" {
+			cmd.WriteString(fmt.Sprintf(" \\\n  -H 'Authorization: Bearer %s'", c.Token))
+		} else if c.APIKey != "" {
+			cmd.WriteString(fmt.Sprintf(" \\\n  -H 'Authorization: Bearer %s'", c.APIKey))
+		}
+
+		if len(jsonData) > 0 {
+			cmd.WriteString(fmt.Sprintf(" \\\n  -d '%s'", string(jsonData)))
+		}
+
+		fmt.Println("\n" + cmd.String() + "\n")
 	}
 
 	if verbose {
