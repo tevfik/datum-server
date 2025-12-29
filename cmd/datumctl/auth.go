@@ -141,6 +141,12 @@ func getConfigPath() string {
 	if configFile != "" {
 		return configFile
 	}
+
+	// If running in Docker container with mounted data volume, use it for persistence
+	if _, err := os.Stat("/root/data"); err == nil {
+		return "/root/data/.datumctl.yaml"
+	}
+
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".datumctl.yaml")
 }
@@ -149,6 +155,11 @@ func loadConfig() {
 	if configFile != "" {
 		viper.SetConfigFile(configFile)
 	} else {
+		// Search in /root/data first (for Docker persistence)
+		if _, err := os.Stat("/root/data"); err == nil {
+			viper.AddConfigPath("/root/data")
+		}
+
 		home, _ := os.UserHomeDir()
 		viper.AddConfigPath(home)
 		viper.SetConfigName(".datumctl")

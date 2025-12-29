@@ -479,24 +479,7 @@ See [Contributing](docs/CONTRIBUTING.md) for detailed guidelines.
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-## 🐛 Known Issues
-
-1. `GetUserCount()` slice bounds bug in export function (non-critical, test only)
-2. TSStorage partition creation timing in some test scenarios
-
-See GitHub Issues for tracking.
-
-## 🗺️ Roadmap
-
-- [ ] gRPC API support
-- [ ] Multi-region replication
-- [ ] Prometheus metrics exporter
-- [ ] GraphQL API
-- [ ] WebSocket support
-- [ ] Data aggregation functions
-- [ ] Alert system
-
-## 💬 Support
+##  Support
 
 - **Documentation**: [docs/](docs/)
 - **Issues**: GitHub Issues

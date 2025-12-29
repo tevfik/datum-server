@@ -9,7 +9,7 @@ on:
       - 'go.sum'
       - 'cmd/**'
       - 'tests/**'
-      - '.gitea/workflows/functional.yml'
+      - '.github/workflows/functional.yml'
   pull_request:
     paths:
       - '**.go'

@@ -190,10 +190,34 @@ Run the server using the external configuration file (from the `docker` director
 docker-compose -f docker-compose.external.yml up -d
 ```
 
-networks:
-  proxy:
-    external: true  # Connect to existing network
-```
+### Local / Offline Deployment (No Domain/SSL)
+
+If you are deploying in an offline environment (no internet) or on a local network without a domain name, use the `docker-compose.local.yml` configuration. This setup bypasses Traefik and exposes the server directly on a port.
+
+**Use Cases:**
+- Local LAN server (e.g., `http://192.168.1.100`)
+- Offline / Air-gapped environments
+- Simple testing without SSL
+
+**Configuration:**
+
+1.  **Configure Environment**:
+    Update `.env` file. `DOMAIN` and `ACME_EMAIL` are ignored in this mode.
+    ```bash
+    # Only these are used
+    PORT=8000
+    JWT_SECRET=your-secret
+    ```
+
+2.  **Deployment**:
+    Run using the local configuration file:
+    ```bash
+    # Exposes server on port 80 by default
+    docker-compose -f docker-compose.local.yml up -d
+    ```
+
+3.  **Access**:
+    The server will be available at `http://<YOUR-SERVER-IP>`.
 
 ## ⚙️ Systemd Service
 

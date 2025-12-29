@@ -7,7 +7,7 @@ on:
       - '**.go'
       - 'go.mod'
       - 'go.sum'
-      - '.gitea/workflows/lint.yml'
+      - '.github/workflows/lint.yml'
   pull_request:
     paths:
       - '**.go'

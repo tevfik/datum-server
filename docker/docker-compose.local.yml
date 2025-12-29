@@ -1,0 +1,20 @@
+services:
+  datum-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: datum-server
+    restart: unless-stopped
+    # Expose directly on port 80 (HTTP)
+    # You can change "80:8000" to "8080:8000" if you want to use port 8080
+    ports:
+      - "80:8000"
+    environment:
+      - PORT=8000
+      - JWT_SECRET=${JWT_SECRET}
+      - RETENTION_MAX_DAYS=${RETENTION_MAX_DAYS:-7}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Allow all origins since we are accessing via IP
+      - CORS_ORIGINS=*
+    volumes:
+      - ${DATA_DIR:-../data}:/root/data

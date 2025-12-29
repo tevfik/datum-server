@@ -51,7 +51,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&apiKey, "api-key", "", "API key for authentication")
 	rootCmd.PersistentFlags().StringVar(&token, "token", "", "JWT token for authentication")
 	rootCmd.PersistentFlags().BoolVar(&outputJSON, "json", false, "Output in JSON format")
-	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Config file (default: $HOME/.datumctl.yaml)")
+	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Config file (default: $HOME/.datumctl.yaml or /root/data/.datumctl.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 }
 

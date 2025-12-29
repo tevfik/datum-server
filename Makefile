@@ -15,20 +15,9 @@ help: ## Show this help message
 build: ## Build all Docker images
 	docker compose -f docker/docker-compose.yml build
 
-build-dashboard: ## Build dashboard image only
-	$(COMPOSE) build dashboard
-
 run: ## Start all services
 	$(COMPOSE) up -d
 	@echo "✅ Services started"
-
-run-dashboard: ## Start dashboard only
-	$(COMPOSE) up -d dashboard
-	@echo "🎨 Dashboard started at http://localhost:3000"
-	@echo "📡 API: http://localhost:8007"
-	@echo "📊 Analytics: http://localhost:8001"
-	@echo "🌐 Dashboard: http://localhost:3000"
-	@echo "📖 API Docs: http://localhost:8007/docs"
 
 stop: ## Stop all services
 	$(COMPOSE) down
@@ -36,7 +25,7 @@ stop: ## Stop all services
 restart: ## Restart all services
 	$(COMPOSE) restart
 
-logs: ## Show logs (use SERVICE=api|analytics to filter)
+logs: ## Show logs (use SERVICE=datum-server to filter)
 	@if [ -z "$(SERVICE)" ]; then \
 		$(COMPOSE) logs -f; \
 	else \
@@ -148,8 +137,8 @@ fmt-python: ## Format Python test scripts
 	@cd tests && black *.py 2>/dev/null || echo "⚠️  Black not installed"
 
 # Utility commands
-shell-api: ## Open shell in API container
-	$(COMPOSE) exec api sh
+shell-server: ## Open shell in server container
+	$(COMPOSE) exec datum-server sh
 
 clean: ## Clean build artifacts and containers
 	$(COMPOSE) down -v
@@ -161,17 +150,16 @@ clean: ## Clean build artifacts and containers
 install-tools: ## Install development tools
 	@echo "📦 Installing development tools..."
 	@go install golang.org/x/tools/cmd/goimports@latest
-	@pip3 install locust black 2>/dev/null || echo "⚠️  pip3 not found"
+	@pip3 install locust black 2>/dev/null || echo "⚠️  pip3 not found (required for load tests)"
 
 # Health checks
-health: ## Check service health
+health: ## Check service health (Development)
 	@echo "🏥 Checking service health..."
-	@curl -s http://localhost:8007/health | python3 -m json.tool || echo "❌ API not responding"
-	@curl -s http://localhost:8001/health | python3 -m json.tool || echo "❌ Analytics not responding"
+	@curl -s http://localhost:8000/health | python3 -m json.tool || echo "❌ Server not responding (ensure you are running in dev mode or port 8000 is exposed)"
 
 # Documentation
-docs: ## Open API documentation in browser
+docs: ## Open API documentation in browser (Development)
 	@echo "📖 Opening API docs..."
-	@xdg-open http://localhost:8007/docs 2>/dev/null || open http://localhost:8007/docs 2>/dev/null || echo "Open http://localhost:8007/docs in your browser"
+	@xdg-open http://localhost:8000/docs 2>/dev/null || open http://localhost:8000/docs 2>/dev/null || echo "Open http://localhost:8000/docs in your browser"
 
 .DEFAULT_GOAL := help

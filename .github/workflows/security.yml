@@ -8,7 +8,7 @@ on:
       - '**.go'
       - 'go.mod'
       - 'go.sum'
-      - '.gitea/workflows/security.yml'
+      - '.github/workflows/security.yml'
   schedule:
     - cron: '0 2 * * 1'  # Every Monday at 02:00
   workflow_dispatch:
