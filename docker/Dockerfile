@@ -13,10 +13,11 @@ COPY . .
 # Build arguments
 ARG VERSION=1.0.0
 ARG BUILD_DATE
+ARG DEFAULT_SERVER_URL=http://localhost:8000
 
 # Build both server and datumctl binaries
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.Version=${VERSION} -X main.BuildDate=${BUILD_DATE}" -o server ./cmd/server
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.Version=${VERSION}" -o datumctl ./cmd/datumctl
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.Version=${VERSION} -X main.DefaultServerURL=${DEFAULT_SERVER_URL}" -o datumctl ./cmd/datumctl
 
 # Run Stage
 FROM alpine:latest

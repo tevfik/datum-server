@@ -170,7 +170,8 @@ func loadConfig() {
 	viper.ReadInConfig()
 
 	// Load from config if not set via flags
-	if serverURL == "http://localhost:8080" && viper.IsSet("server") {
+	// Note: We check against the default value defined in main.go
+	if serverURL == DefaultServerURL && viper.IsSet("server") {
 		serverURL = viper.GetString("server")
 	}
 	if token == "" && viper.IsSet("token") {

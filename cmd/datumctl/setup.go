@@ -53,7 +53,22 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	client := NewAPIClient(serverURL, "", "")
 	resp, err := client.Get("/system/status")
 	if err != nil {
-		return fmt.Errorf("cannot connect to server: %w\nMake sure server is running on %s", err, serverURL)
+		fmt.Printf("⚠️  Cannot connect to server at %s\n", serverURL)
+
+		var newURL string
+		if err := survey.AskOne(&survey.Input{
+			Message: "Enter Datum Server URL:",
+			Default: serverURL,
+		}, &newURL); err != nil {
+			return err
+		}
+
+		serverURL = newURL
+		client = NewAPIClient(serverURL, "", "")
+		resp, err = client.Get("/system/status")
+		if err != nil {
+			return fmt.Errorf("still cannot connect to server: %w", err)
+		}
 	}
 
 	var status map[string]interface{}

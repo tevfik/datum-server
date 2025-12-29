@@ -8,6 +8,9 @@ import (
 )
 
 var (
+	// Build time variables
+	DefaultServerURL = "http://localhost:8000"
+
 	// Global flags
 	serverURL  string
 	apiKey     string
@@ -47,7 +50,7 @@ func init() {
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 
 	// Global flags
-	rootCmd.PersistentFlags().StringVar(&serverURL, "server", "http://localhost:8000", "Datum server URL")
+	rootCmd.PersistentFlags().StringVar(&serverURL, "server", DefaultServerURL, "Datum server URL")
 	rootCmd.PersistentFlags().StringVar(&apiKey, "api-key", "", "API key for authentication")
 	rootCmd.PersistentFlags().StringVar(&token, "token", "", "JWT token for authentication")
 	rootCmd.PersistentFlags().BoolVar(&outputJSON, "json", false, "Output in JSON format")

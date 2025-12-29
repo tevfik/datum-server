@@ -4,6 +4,7 @@
 GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "1.0.0-dev")
 VERSION ?= $(GIT_VERSION)
 BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+DEFAULT_SERVER_URL ?= http://localhost:8000
 COMPOSE=docker compose -f docker/docker-compose.yml
 COMPOSE_DEV=docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml
 SERVER_BINARY=build/binaries/server
@@ -18,10 +19,11 @@ help: ## Show this help message
 build: ## Build all Docker images
 	docker compose -f docker/docker-compose.yml build
 
-release: ## Build release Docker image (usage: make release VERSION=1.2.3)
+release: ## Build release Docker image (usage: make release VERSION=1.2.3 DEFAULT_SERVER_URL=http://api.example.com)
 	docker build \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		--build-arg DEFAULT_SERVER_URL=$(DEFAULT_SERVER_URL) \
 		-t datum-server:$(VERSION) \
 		-t datum-server:latest \
 		-f docker/Dockerfile .
@@ -123,7 +125,7 @@ build-server: ## Build Go server binary locally
 build-cli: ## Build datumctl CLI tool
 	@echo "🔨 Building datumctl..."
 	@mkdir -p build/binaries
-	@go build -o $(CLI_BINARY) ./cmd/datumctl
+	@go build -ldflags "-X main.Version=$(VERSION) -X main.DefaultServerURL=$(DEFAULT_SERVER_URL)" -o $(CLI_BINARY) ./cmd/datumctl
 	@echo "✅ CLI tool created: $(CLI_BINARY)"
 
 build-all: build-server build-cli ## Build server and CLI
