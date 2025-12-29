@@ -50,5 +50,4 @@ services:
 
 networks:
   traefik_network:
-    external: true
     name: ${TRAEFIK_NETWORK:-proxy}
