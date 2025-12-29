@@ -1,6 +1,9 @@
-.PHONY: help build run stop clean test bench dev logs shell db-backup db-restore
+.PHONY: help build run stop clean test bench dev logs shell db-backup db-restore release
 
 # Variables
+GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "1.0.0-dev")
+VERSION ?= $(GIT_VERSION)
+BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 COMPOSE=docker compose -f docker/docker-compose.yml
 COMPOSE_DEV=docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml
 SERVER_BINARY=build/binaries/server
@@ -14,6 +17,14 @@ help: ## Show this help message
 # Docker commands
 build: ## Build all Docker images
 	docker compose -f docker/docker-compose.yml build
+
+release: ## Build release Docker image (usage: make release VERSION=1.2.3)
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t datum-server:$(VERSION) \
+		-t datum-server:latest \
+		-f docker/Dockerfile .
 
 run: ## Start all services
 	$(COMPOSE) up -d
@@ -143,7 +154,7 @@ shell-server: ## Open shell in server container
 clean: ## Clean build artifacts and containers
 	$(COMPOSE) down -v
 	rm -rf build/
-	rm -f datumctl server
+	rm -f datumctl server # Remove binaries if built in root
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	@echo "✅ Cleaned"
 

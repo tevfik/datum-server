@@ -96,6 +96,11 @@ The default configuration uses Traefik as a reverse proxy for automatic HTTPS an
     docker-compose up -d
     ```
 
+    > **Note on Release Builds:**
+    > If you want to build a specific version with version information embedded:
+    > 1. Run `make release VERSION=1.2.3` in the root directory.
+    > 2. Start services with `docker compose up -d --no-build` to ensure the pre-built release image is used instead of rebuilding without version tags.
+
 ### Docker Compose Configuration
 
 **docker-compose.yml**:

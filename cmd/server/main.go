@@ -20,6 +20,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+var (
+	Version   = "1.0.0"
+	BuildDate = "unknown"
+)
+
 var store *storage.Storage
 
 // Security headers middleware
@@ -62,8 +67,8 @@ func main() {
 	// Show version and exit
 	if *showVersion {
 		fmt.Println("Datum IoT Platform Server")
-		fmt.Println("Version: 1.0.0")
-		fmt.Println("Build: 2025-12-25")
+		fmt.Printf("Version: %s\n", Version)
+		fmt.Printf("Build: %s\n", BuildDate)
 		os.Exit(0)
 	}
 

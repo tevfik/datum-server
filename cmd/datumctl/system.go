@@ -6,6 +6,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var Version = "1.0.0"
+
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Check server status",
@@ -17,7 +19,7 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Show version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("datumctl version 1.0.0")
+		fmt.Printf("datumctl version %s\n", Version)
 		fmt.Println("Datum IoT Platform CLI")
 	},
 }

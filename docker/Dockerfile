@@ -10,9 +10,13 @@ RUN go mod download && go mod verify
 # Copy source code
 COPY . .
 
+# Build arguments
+ARG VERSION=1.0.0
+ARG BUILD_DATE
+
 # Build both server and datumctl binaries
-RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server
-RUN CGO_ENABLED=0 GOOS=linux go build -o datumctl ./cmd/datumctl
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.Version=${VERSION} -X main.BuildDate=${BUILD_DATE}" -o server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.Version=${VERSION}" -o datumctl ./cmd/datumctl
 
 # Run Stage
 FROM alpine:latest

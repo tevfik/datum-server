@@ -27,6 +27,7 @@ services:
 
   # Go API Server (Main backend)
   datum-server:
+    image: datum-server:latest
     build:
       context: ..
       dockerfile: docker/Dockerfile
