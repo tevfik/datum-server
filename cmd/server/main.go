@@ -273,7 +273,7 @@ func main() {
 func rootHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"service": "Datum IoT Platform",
-		"version": "1.0.0",
+		"version": Version,
 		"endpoints": gin.H{
 			"auth":         []string{"POST /auth/register", "POST /auth/login"},
 			"devices":      []string{"POST /devices", "GET /devices", "DELETE /devices/{id}"},
@@ -292,7 +292,7 @@ func healthHandler(c *gin.Context) {
 		"status":    "healthy",
 		"timestamp": time.Now().Unix(),
 		"service":   "datumpy-api",
-		"version":   "1.0.0",
+		"version":   Version,
 	}
 
 	// Check storage connection

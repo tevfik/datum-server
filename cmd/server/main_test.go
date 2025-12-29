@@ -55,6 +55,7 @@ func TestHealthHandler(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "healthy", response["status"])
 	assert.Equal(t, "connected", response["storage"])
+	assert.Equal(t, Version, response["version"])
 }
 
 func TestHealthHandlerUnhealthy(t *testing.T) {
