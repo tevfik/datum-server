@@ -63,157 +63,144 @@ Best for: Large-scale, high-availability deployments
 ### Prerequisites
 
 ```bash
-# Install Docker
+# Install Docker & Docker Compose
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
-
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
-# Verify installation
-docker --version
-docker-compose --version
 ```
 
-### Production Deployment
+### Production Deployment (with Traefik)
 
-```bash
-# 1. Clone repository
-git clone https://github.com/your-org/datum-server.git
-cd datum-server
+The default configuration uses Traefik as a reverse proxy for automatic HTTPS and load balancing.
 
-# 2. Configure environment
-cp .env.example .env
-nano .env
+1.  **Clone repository**
+    ```bash
+    git clone https://github.com/your-org/datum-server.git
+    cd datum-server
+    ```
 
-# Edit critical settings:
-# - JWT_SECRET (generate secure random string)
-# - RETENTION_MAX_DAYS
-# - LOG_LEVEL=INFO
+2.  **Configure Environment**
+    ```bash
+    cp .env.example .env
+    nano .env
+    ```
+    
+    **Critical Settings:**
+    - `JWT_SECRET`: Generate a secure random string.
+    - `ACME_EMAIL`: Email for Let's Encrypt SSL certificates.
+    - `DOMAIN`: Your domain name (e.g., `iot.example.com`).
 
-# 3. Start services
-docker-compose up -d
-
-# 4. View logs
-docker-compose logs -f
-
-# 5. Check status
-docker-compose ps
-```
+3.  **Start Services**
+    ```bash
+    docker-compose up -d
+    ```
 
 ### Docker Compose Configuration
 
-**docker-compose.yml** (Production):
+**docker-compose.yml**:
 ```yaml
-version: '3.8'
-
 services:
-  datum-server:
-    image: datum-server:latest
-    container_name: datum-server
-    restart: unless-stopped
+  # Traefik Reverse Proxy
+  traefik:
+    image: traefik:v2.10
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
     ports:
+      - "80:80"
+      - "443:443"
       - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+
+  # Datum Server
+  datum-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     environment:
-      - PORT=8080
-      - GIN_MODE=release
-      - LOG_LEVEL=INFO
+      - PORT=8000
       - JWT_SECRET=${JWT_SECRET}
       - RETENTION_MAX_DAYS=${RETENTION_MAX_DAYS:-7}
     volumes:
-      - ./data:/app/data
-      - ./backups:/app/backups
-    networks:
-      - datum-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-networks:
-  datum-network:
-    driver: bridge
-
-volumes:
-  datum-data:
-    driver: local
+      - ${DATA_DIR:-../data}:/root/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.datum-server.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.datum-server.entrypoints=websecure"
+      - "traefik.http.routers.datum-server.tls.certresolver=letsencrypt"
+      # WebSocket support (critical for streaming)
+      - "traefik.http.services.datum-server.loadbalancer.server.port=8000"
+      - "traefik.http.services.datum-server.loadbalancer.passhostheader=true"
+      - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Connection=Upgrade"
+      - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Upgrade=websocket"
+      - "traefik.http.routers.datum-server.middlewares=datum-ws"
 ```
 
-### Docker Commands
+### Management Commands
 
 ```bash
-# Start services
+# View logs
+docker-compose logs -f
+
+# Update images
+docker-compose pull
 docker-compose up -d
 
 # Stop services
 docker-compose down
-
-# Restart services
-docker-compose restart
-
-# View logs
-docker-compose logs -f datum-server
-
-# Update to latest version
-docker-compose pull
-docker-compose up -d
-
-# Access container shell
-docker-compose exec datum-server /bin/bash
-
-# View resource usage
-docker stats datum-server
-
-# Backup data
-docker-compose exec datum-server tar czf /app/backups/backup-$(date +%Y%m%d).tar.gz /app/data
 ```
 
-### Building Custom Docker Image
+### Integration with Existing Traefik
 
-```dockerfile
-# Dockerfile
-FROM golang:1.21-alpine AS builder
+If you already have a Traefik instance running (e.g., as a global proxy), use this configuration instead. This setup connects the Datum Server container to your existing Traefik network.
 
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
+**Prerequisites:**
+1.  Identify your existing Traefik network name (e.g., `proxy`, `traefik-net`, `web`).
+2.  Ensure your existing Traefik is configured to watch Docker events.
 
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o datum-server ./cmd/server
+**docker-compose.yml** (Existing Traefik):
+```yaml
+services:
+  datum-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: datum-server
+    restart: unless-stopped
+    environment:
+      - PORT=8000
+      - JWT_SECRET=${JWT_SECRET}
+      - RETENTION_MAX_DAYS=${RETENTION_MAX_DAYS:-7}
+    volumes:
+      - ${DATA_DIR:-../data}:/root/data
+    networks:
+      - default
+      - proxy  # Name of your existing Traefik network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"  # Important: Tell Traefik which network to use
+      # HTTP Router
+      # WebSocket support
+      - "traefik.http.services.datum-server.loadbalancer.passhostheader=true"
+      - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Connection=Upgrade"
+      - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Upgrade=websocket"
+      - "traefik.http.routers.datum-server.middlewares=datum-ws"
+      - "traefik.http.routers.datum-server.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.datum-server.entrypoints=websecure"
+      - "traefik.http.routers.datum-server.tls=true"
+      - "traefik.http.routers.datum-server.tls.certresolver=letsencrypt" # Match your resolver name
+      # Service definition (point to internal port)
+      - "traefik.http.services.datum-server.loadbalancer.server.port=8000"
 
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates curl
-
-WORKDIR /root/
-COPY --from=builder /app/datum-server .
-COPY --from=builder /app/data ./data
-
-EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8080/health || exit 1
-
-CMD ["./datum-server"]
-```
-
-```bash
-# Build image
-docker build -t datum-server:latest .
-
-# Run container
-docker run -d \
-  --name datum-server \
-  -p 8080:8080 \
-  -v $(pwd)/data:/root/data \
-  -e JWT_SECRET=your-secret \
-  datum-server:latest
+networks:
+  proxy:
+    external: true  # Connect to existing network
 ```
 
 ## ⚙️ Systemd Service
@@ -547,6 +534,146 @@ kubectl set image deployment/datum-server datum-server=datum-server:v2.0.0 -n da
 
 # Delete deployment
 kubectl delete -f deployment.yaml
+```
+
+## ☸️ k3s Deployment (Edge/IoT)
+
+k3s is a lightweight Kubernetes distribution ideal for IoT edge deployments.
+
+### 1. Install k3s
+
+```bash
+curl -sfL https://get.k3s.io | sh -
+# Verify installation
+sudo k3s kubectl get node
+```
+
+### 2. Deployment Manifests
+
+Save the following as `datum-k3s.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: datum
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: datum-config
+  namespace: datum
+data:
+  PORT: "8000"
+  LOG_LEVEL: "INFO"
+  RETENTION_MAX_DAYS: "7"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: datum-secret
+  namespace: datum
+type: Opaque
+stringData:
+  jwt-secret: "CHANGE_ME_TO_SECURE_RANDOM_STRING"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: datum-data
+  namespace: datum
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datum-server
+  namespace: datum
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: datum-server
+  template:
+    metadata:
+      labels:
+        app: datum-server
+    spec:
+      containers:
+      - name: datum-server
+        image: datum-server:latest  # Ensure image is available or use registry
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: datum-config
+        env:
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: datum-secret
+              key: jwt-secret
+        volumeMounts:
+        - name: data
+          mountPath: /root/data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: datum-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: datum-service
+  namespace: datum
+spec:
+  selector:
+    app: datum-server
+  ports:
+    - port: 80
+      targetPort: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: datum-ingress
+  namespace: datum
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: datum-service
+            port:
+              number: 80
+```
+
+### 3. Deploy
+
+```bash
+# Apply configuration
+sudo k3s kubectl apply -f datum-k3s.yaml
+
+# Check status
+sudo k3s kubectl get pods -n datum
+```
+
+### 4. Access
+
+The server will be available on port 80 of your node IP.
+```bash
+curl http://localhost/health
 ```
 
 ## ☁️ Cloud Platforms
