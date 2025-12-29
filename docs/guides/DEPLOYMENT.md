@@ -79,7 +79,9 @@ The default configuration uses Traefik as a reverse proxy for automatic HTTPS an
     ```
 
 2.  **Configure Environment**
+    Navigate to the docker directory and configure the environment:
     ```bash
+    cd docker
     cp .env.example .env
     nano .env
     ```
@@ -182,10 +184,10 @@ TRAEFIK_CERTRESOLVER=letsencrypt
 
 **Deployment:**
 
-Run the server using the external configuration file:
+Run the server using the external configuration file (from the `docker` directory):
 
 ```bash
-docker-compose -f docker/docker-compose.external.yml up -d
+docker-compose -f docker-compose.external.yml up -d
 ```
 
 networks:
