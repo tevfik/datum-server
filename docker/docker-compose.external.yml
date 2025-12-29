@@ -20,7 +20,7 @@ services:
       - ${DATA_DIR:-../data}:/root/data
     networks:
       - default
-      - traefik_network
+      - int_docker
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=${TRAEFIK_NETWORK:-proxy}"
@@ -50,6 +50,6 @@ services:
       - "traefik.http.routers.datum-server.middlewares=datum-redirect"
 
 networks:
-  traefik_network:
+  int_docker:
     name: ${TRAEFIK_NETWORK:-proxy}
     external: true
