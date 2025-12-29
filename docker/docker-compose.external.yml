@@ -1,38 +1,10 @@
 services:
-  # Traefik Reverse Proxy
-  traefik:
-    image: traefik:v2.10
-    container_name: datum-traefik
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@example.com}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--log.level=${TRAEFIK_LOG_LEVEL:-INFO}"
-      - "--accesslog=true"
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080" # Traefik dashboard
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "${LETSENCRYPT_DIR:-./letsencrypt}:/letsencrypt"
-    networks:
-      - datum-network
-    restart: unless-stopped
-
-  # Go API Server (Main backend)
   datum-server:
     build:
       context: ..
       dockerfile: docker/Dockerfile
     container_name: datum-server
-    volumes:
-      - ${DATA_DIR:-../data}:/root/data
+    restart: unless-stopped
     environment:
       - PORT=${PORT:-8000}
       - JWT_SECRET=${JWT_SECRET}
@@ -43,39 +15,40 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FORMAT=${LOG_FORMAT:-json}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    volumes:
+      - ${DATA_DIR:-../data}:/root/data
     networks:
-      - datum-network
+      - default
+      - traefik_network
     labels:
       - "traefik.enable=true"
-      # HTTP router
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-proxy}"
+      
+      # HTTP Router
       - "traefik.http.routers.datum-server.rule=Host(`${DOMAIN:-datum.localhost}`)"
       - "traefik.http.routers.datum-server.entrypoints=${TRAEFIK_ENTRYPOINT_HTTP:-web}"
-      # HTTPS router
+      
+      # HTTPS Router
       - "traefik.http.routers.datum-server-secure.rule=Host(`${DOMAIN:-datum.localhost}`)"
       - "traefik.http.routers.datum-server-secure.entrypoints=${TRAEFIK_ENTRYPOINT_HTTPS:-websecure}"
       - "traefik.http.routers.datum-server-secure.tls=true"
-      - "traefik.http.routers.datum-server-secure.tls.certresolver=letsencrypt"
-      # WebSocket support (critical for streaming)
+      - "traefik.http.routers.datum-server-secure.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      
+      # Service
       - "traefik.http.services.datum-server.loadbalancer.server.port=8000"
+      
+      # WebSocket Support
       - "traefik.http.services.datum-server.loadbalancer.passhostheader=true"
       - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Connection=Upgrade"
       - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Upgrade=websocket"
       - "traefik.http.routers.datum-server-secure.middlewares=datum-ws"
+      
       # HTTP to HTTPS redirect
       - "traefik.http.middlewares.datum-redirect.redirectscheme.scheme=https"
       - "traefik.http.middlewares.datum-redirect.redirectscheme.permanent=true"
       - "traefik.http.routers.datum-server.middlewares=datum-redirect"
-    restart: unless-stopped
 
 networks:
-  datum-network:
-    driver: bridge
-
-# Volumes are now managed as host directories for easier backup
-# See .env.example for DATA_DIR and LETSENCRYPT_DIR configuration
+  traefik_network:
+    external: true
+    name: ${TRAEFIK_NETWORK:-proxy}

@@ -158,45 +158,35 @@ docker-compose down
 
 ### Integration with Existing Traefik
 
-If you already have a Traefik instance running (e.g., as a global proxy), use this configuration instead. This setup connects the Datum Server container to your existing Traefik network.
+If you already have a Traefik instance running (e.g., as a global proxy), use the provided `docker-compose.external.yml` file.
 
 **Prerequisites:**
-1.  Identify your existing Traefik network name (e.g., `proxy`, `traefik-net`, `web`).
-2.  Ensure your existing Traefik is configured to watch Docker events.
+1.  Identify your existing Traefik network name (e.g., `proxy`, `traefik-net`).
+2.  Identify your existing Traefik entrypoint names (e.g., `web`, `websecure` or `http`, `https`).
 
-**docker-compose.yml** (Existing Traefik):
-```yaml
-services:
-  datum-server:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    container_name: datum-server
-    restart: unless-stopped
-    environment:
-      - PORT=8000
-      - JWT_SECRET=${JWT_SECRET}
-      - RETENTION_MAX_DAYS=${RETENTION_MAX_DAYS:-7}
-    volumes:
-      - ${DATA_DIR:-../data}:/root/data
-    networks:
-      - default
-      - proxy  # Name of your existing Traefik network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=proxy"  # Important: Tell Traefik which network to use
-      # HTTP Router
-      # WebSocket support
-      - "traefik.http.services.datum-server.loadbalancer.passhostheader=true"
-      - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Connection=Upgrade"
-      - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Upgrade=websocket"
-      - "traefik.http.routers.datum-server.middlewares=datum-ws"
-      - "traefik.http.routers.datum-server.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.datum-server.entrypoints=websecure"
-      - "traefik.http.routers.datum-server.tls=true"
-      - "traefik.http.routers.datum-server.tls.certresolver=letsencrypt" # Match your resolver name
-      # Service definition (point to internal port)
-      - "traefik.http.services.datum-server.loadbalancer.server.port=8000"
+**Configuration:**
+
+Update your `.env` file with your specific Traefik details:
+
+```bash
+# Network name where your Traefik is running
+TRAEFIK_NETWORK=proxy
+
+# Entrypoint names defined in your Traefik
+TRAEFIK_ENTRYPOINT_HTTP=web
+TRAEFIK_ENTRYPOINT_HTTPS=websecure
+
+# Cert resolver name defined in your Traefik
+TRAEFIK_CERTRESOLVER=letsencrypt
+```
+
+**Deployment:**
+
+Run the server using the external configuration file:
+
+```bash
+docker-compose -f docker/docker-compose.external.yml up -d
+```
 
 networks:
   proxy:
