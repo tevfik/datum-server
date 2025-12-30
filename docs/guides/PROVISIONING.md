@@ -14,22 +14,22 @@ This guide shows how to provision (register) a new IoT device with Datumpy.
 
 ```bash
 # Login to get auth token
-curl -X POST http://localhost:8000/auth/login \
+curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "your_password"}'
 
 # Response: {"token": "eyJhbGc..."}
 
 # Create device
-curl -X POST http://localhost:8000/devices \
+curl -X POST http://localhost:8080/admin/devices \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name": "Living Room Sensor", "type": "temperature_humidity"}'
 
 # Response: 
 # {
-#   "device_id": "dev_abc123",
-#   "api_key": "sk_live_xyz789..."
+#   "id": "dev_abc123def456",
+#   "api_key": "dk_0123456789abcdef"
 # }
 ```
 
@@ -43,9 +43,9 @@ Save the `device_id` and `api_key` from step 1.
 import requests
 import time
 
-DEVICE_ID = "dev_abc123"
-API_KEY = "sk_live_xyz789..."
-API_URL = "http://localhost:8000"
+DEVICE_ID = "dev_abc123def456"
+API_KEY = "dk_0123456789abcdef"
+API_URL = "http://localhost:8080"
 
 while True:
     data = {
@@ -72,12 +72,12 @@ while True:
 
 ```bash
 # List your devices
-curl http://localhost:8000/devices \
+curl http://localhost:8080/admin/devices \
   -H "Authorization: Bearer YOUR_TOKEN"
 
-# Should show your device with "status": "online"
+# Should show your device with "status": "active"
 ```
 
 ## Next Steps
 - See `tests/provisioning_test.py` for automated testing
-- See API documentation at http://localhost:8000/docs
+- See API documentation at http://localhost:8080/docs (if Swagger is enabled)

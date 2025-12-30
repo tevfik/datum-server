@@ -100,7 +100,7 @@ Admin can create user accounts using CLI:
 
 Or using API:
 ```bash
-curl -X POST http://localhost:8000/admin/users \
+curl -X POST http://localhost:8080/admin/users \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -115,7 +115,7 @@ curl -X POST http://localhost:8000/admin/users \
 If you enabled `allow_register` during setup:
 
 ```bash
-curl -X POST http://localhost:8000/auth/register \
+curl -X POST http://localhost:8080/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "newuser@example.com",
@@ -130,7 +130,7 @@ curl -X POST http://localhost:8000/auth/register \
 Admin can enable/disable registration via system config:
 
 ```bash
-curl -X PUT http://localhost:8000/admin/config \
+curl -X PUT http://localhost:8080/admin/config \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -152,11 +152,11 @@ Devices don't use email/password. They use API keys:
 ✅ Device created: temp-sensor-abc123
 
 🔑 API Key (save this - shown only once!):
-   sk_abc123def456...
+   dk_0123456789abcdef
 
 📝 Use this API key for device authentication:
-   curl -X POST http://localhost:8000/public/data \
-     -H "Authorization: Bearer sk_abc123def456..." \
+   curl -X POST http://localhost:8080/data/YOUR_DEVICE_ID \
+     -H "Authorization: Bearer dk_0123456789abcdef" \
      -H "Content-Type: application/json" \
      -d '{"temperature": 25.5}'
 ```
@@ -183,7 +183,7 @@ datumctl setup --allow-register
 
 Or enable it later as admin:
 ```bash
-curl -X PUT http://localhost:8000/admin/config \
+curl -X PUT http://localhost:8080/admin/config \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -d '{"allow_register": true}'
 ```
@@ -215,7 +215,7 @@ make run-server
 ./datumctl device create --name "My Sensor"
 
 # 4. Start sending data (use the API key from step 3)
-curl -X POST http://localhost:8000/public/data \
+curl -X POST http://localhost:8080/data/YOUR_DEVICE_ID \
   -H "Authorization: Bearer YOUR_DEVICE_API_KEY" \
   -d '{"temperature": 22.5, "humidity": 60}'
 

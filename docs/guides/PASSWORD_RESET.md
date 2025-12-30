@@ -126,9 +126,9 @@ datumctl admin create-user
 
 ### Use API keys for automation
 ```bash
-# Generate API key (save it somewhere safe!)
-curl -X POST http://localhost:8080/api/generate-key \
-  -H "Authorization: Bearer YOUR_TOKEN"
+# Device API keys are generated when you create a device
+datumctl device create --name "My Device"
+# Save the returned API key (dk_...) in a secure place
 ```
 
 ## Quick Reset Script

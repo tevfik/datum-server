@@ -131,7 +131,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     environment:
-      - PORT=8000
+      - PORT=8080
       - JWT_SECRET=${JWT_SECRET}
       - RETENTION_MAX_DAYS=${RETENTION_MAX_DAYS:-7}
     volumes:
@@ -142,7 +142,7 @@ services:
       - "traefik.http.routers.datum-server.entrypoints=websecure"
       - "traefik.http.routers.datum-server.tls.certresolver=letsencrypt"
       # WebSocket support (critical for streaming)
-      - "traefik.http.services.datum-server.loadbalancer.server.port=8000"
+      - "traefik.http.services.datum-server.loadbalancer.server.port=8080"
       - "traefik.http.services.datum-server.loadbalancer.passhostheader=true"
       - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Connection=Upgrade"
       - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Upgrade=websocket"
@@ -210,7 +210,7 @@ If you are deploying in an offline environment (no internet) or on a local netwo
     Update `.env` file. `DOMAIN` and `ACME_EMAIL` are ignored in this mode.
     ```bash
     # Only these are used
-    PORT=8000
+    PORT=8080
     JWT_SECRET=your-secret
     ```
 
@@ -585,7 +585,7 @@ metadata:
   name: datum-config
   namespace: datum
 data:
-  PORT: "8000"
+  PORT: "8080"
   LOG_LEVEL: "INFO"
   RETENTION_MAX_DAYS: "7"
 ---

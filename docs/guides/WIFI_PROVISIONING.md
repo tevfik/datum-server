@@ -91,12 +91,12 @@ Content-Type: application/json
 Response:
 ```json
 {
-    "request_id": "prov_abc123...",
+    "request_id": "prov_abc123def456",
     "device_uid": "AABBCCDDEEFF",
-    "device_id": "dev_xyz789...",
-    "api_key": "dk_secret123...",
+    "device_id": "dev_xyz789abc012",
+    "api_key": "dk_0123456789abcdef",
     "server_url": "https://api.datum.io",
-    "expires_at": "2024-01-15T12:30:00Z",
+    "expires_at": "2025-01-15T12:30:00Z",
     "status": "pending",
     "activate_url": "https://api.datum.io/provisioning/activate"
 }

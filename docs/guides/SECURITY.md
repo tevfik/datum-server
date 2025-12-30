@@ -6,7 +6,7 @@ If you discover a security vulnerability in Datumpy, please report it responsibl
 
 **DO NOT** open a public GitHub issue for security vulnerabilities.
 
-Instead, please email security concerns to: [your-email@example.com]
+Instead, please email security concerns to: security@datum.io (or your organization's security contact)
 
 Include the following information:
 - Description of the vulnerability
@@ -82,10 +82,7 @@ The following security headers are automatically set:
 Keep dependencies up to date:
 ```bash
 # Go dependencies
-cd backend/go && go get -u && go mod tidy
-
-# Python dependencies
-cd backend/python && pip install -r requirements.txt --upgrade
+go get -u && go mod tidy
 ```
 
 ### Audit Log
