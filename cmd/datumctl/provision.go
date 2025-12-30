@@ -1,11 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -42,14 +38,13 @@ Typically called by a mobile app after discovering a device via WiFi AP.`,
     --wifi-ssid "HomeWiFi" \
     --wifi-pass "password123"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		loadConfig()
 		if provisionUID == "" {
 			return fmt.Errorf("device UID is required (--uid)")
 		}
 		if provisionName == "" {
 			return fmt.Errorf("device name is required (--name)")
 		}
-
-		client := &http.Client{}
 
 		payload := map[string]interface{}{
 			"device_uid":  provisionUID,
@@ -66,51 +61,30 @@ Typically called by a mobile app after discovering a device via WiFi AP.`,
 			payload["wifi_pass"] = provisionWiFiPass
 		}
 
-		jsonData, err := json.Marshal(payload)
-		if err != nil {
-			return fmt.Errorf("failed to encode request: %w", err)
-		}
-
-		req, err := http.NewRequest("POST", serverURL+"/devices/register", strings.NewReader(string(jsonData)))
+		client := NewAPIClient(serverURL, token, apiKey)
+		resp, err := client.Post("/devices/register", payload)
 		if err != nil {
 			return err
 		}
 
-		req.Header.Set("Content-Type", "application/json")
-		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return fmt.Errorf("request failed: %w", err)
-		}
-		defer resp.Body.Close()
-
-		body, _ := io.ReadAll(resp.Body)
-
-		if resp.StatusCode != http.StatusCreated {
-			return fmt.Errorf("registration failed (%d): %s", resp.StatusCode, string(body))
+		var result map[string]interface{}
+		if err := ParseResponse(resp, &result); err != nil {
+			return err
 		}
 
 		if outputJSON {
-			fmt.Println(string(body))
-		} else {
-			var result map[string]interface{}
-			if err := json.Unmarshal(body, &result); err == nil {
-				fmt.Println("✅ Device registered successfully")
-				fmt.Printf("\nRequest ID: %v\n", result["request_id"])
-				fmt.Printf("Device ID: %v\n", result["device_id"])
-				fmt.Printf("API Key: %v\n", result["api_key"])
-				fmt.Printf("Status: %v\n", result["status"])
-				if expiry, ok := result["expires_at"]; ok {
-					fmt.Printf("Expires: %v\n", expiry)
-				}
-				fmt.Printf("\nActivation URL: %v\n", result["activate_url"])
-			} else {
-				fmt.Println(string(body))
-			}
+			return printJSON(result)
 		}
+
+		fmt.Println("✅ Device registered successfully")
+		fmt.Printf("\nRequest ID: %v\n", result["request_id"])
+		fmt.Printf("Device ID: %v\n", result["device_id"])
+		fmt.Printf("API Key: %v\n", result["api_key"])
+		fmt.Printf("Status: %v\n", result["status"])
+		if expiry, ok := result["expires_at"]; ok {
+			fmt.Printf("Expires: %v\n", expiry)
+		}
+		fmt.Printf("\nActivation URL: %v\n", result["activate_url"])
 
 		return nil
 	},
@@ -126,56 +100,40 @@ var provisionListCmd = &cobra.Command{
   # List in JSON format
   datumctl provision list --json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client := &http.Client{}
-
-		req, err := http.NewRequest("GET", serverURL+"/devices/provisioning", nil)
+		loadConfig()
+		client := NewAPIClient(serverURL, token, apiKey)
+		resp, err := client.Get("/devices/provisioning")
 		if err != nil {
 			return err
 		}
 
-		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return fmt.Errorf("request failed: %w", err)
-		}
-		defer resp.Body.Close()
-
-		body, _ := io.ReadAll(resp.Body)
-
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("request failed (%d): %s", resp.StatusCode, string(body))
+		var result map[string]interface{}
+		if err := ParseResponse(resp, &result); err != nil {
+			return err
 		}
 
 		if outputJSON {
-			fmt.Println(string(body))
-		} else {
-			var result map[string]interface{}
-			if err := json.Unmarshal(body, &result); err == nil {
-				requests, ok := result["requests"].([]interface{})
-				if !ok || len(requests) == 0 {
-					fmt.Println("No provisioning requests found")
-					return nil
-				}
+			return printJSON(result)
+		}
 
-				fmt.Printf("\n📋 Provisioning Requests (%d)\n\n", len(requests))
-				for _, req := range requests {
-					r := req.(map[string]interface{})
-					fmt.Printf("Request ID: %v\n", r["request_id"])
-					fmt.Printf("  Device UID: %v\n", r["device_uid"])
-					fmt.Printf("  Name: %v\n", r["device_name"])
-					fmt.Printf("  Status: %v\n", r["status"])
-					fmt.Printf("  Created: %v\n", r["created_at"])
-					if expiry, ok := r["expires_at"]; ok {
-						fmt.Printf("  Expires: %v\n", expiry)
-					}
-					fmt.Println()
-				}
-			} else {
-				fmt.Println(string(body))
+		requests, ok := result["requests"].([]interface{})
+		if !ok || len(requests) == 0 {
+			fmt.Println("No provisioning requests found")
+			return nil
+		}
+
+		fmt.Printf("\n📋 Provisioning Requests (%d)\n\n", len(requests))
+		for _, req := range requests {
+			r := req.(map[string]interface{})
+			fmt.Printf("Request ID: %v\n", r["request_id"])
+			fmt.Printf("  Device UID: %v\n", r["device_uid"])
+			fmt.Printf("  Name: %v\n", r["device_name"])
+			fmt.Printf("  Status: %v\n", r["status"])
+			fmt.Printf("  Created: %v\n", r["created_at"])
+			if expiry, ok := r["expires_at"]; ok {
+				fmt.Printf("  Expires: %v\n", expiry)
 			}
+			fmt.Println()
 		}
 
 		return nil
@@ -190,53 +148,37 @@ var provisionStatusCmd = &cobra.Command{
   datumctl provision status prov_abc123`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		loadConfig()
 		requestID := args[0]
-		client := &http.Client{}
-
-		req, err := http.NewRequest("GET", serverURL+"/devices/provisioning/"+requestID, nil)
+		client := NewAPIClient(serverURL, token, apiKey)
+		resp, err := client.Get("/devices/provisioning/" + requestID)
 		if err != nil {
 			return err
 		}
 
-		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return fmt.Errorf("request failed: %w", err)
-		}
-		defer resp.Body.Close()
-
-		body, _ := io.ReadAll(resp.Body)
-
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("request failed (%d): %s", resp.StatusCode, string(body))
+		var result map[string]interface{}
+		if err := ParseResponse(resp, &result); err != nil {
+			return err
 		}
 
 		if outputJSON {
-			fmt.Println(string(body))
-		} else {
-			var result map[string]interface{}
-			if err := json.Unmarshal(body, &result); err == nil {
-				fmt.Println("\n📋 Provisioning Request Details")
-				fmt.Printf("Request ID: %v\n", result["request_id"])
-				fmt.Printf("Device UID: %v\n", result["device_uid"])
-				fmt.Printf("Device Name: %v\n", result["device_name"])
-				fmt.Printf("Device Type: %v\n", result["device_type"])
-				fmt.Printf("Status: %v\n", result["status"])
-				fmt.Printf("Created: %v\n", result["created_at"])
-				if expiry, ok := result["expires_at"]; ok {
-					fmt.Printf("Expires: %v\n", expiry)
-				}
-				if deviceID, ok := result["device_id"]; ok {
-					fmt.Printf("Device ID: %v\n", deviceID)
-				}
-				fmt.Println()
-			} else {
-				fmt.Println(string(body))
-			}
+			return printJSON(result)
 		}
+
+		fmt.Println("\n📋 Provisioning Request Details")
+		fmt.Printf("Request ID: %v\n", result["request_id"])
+		fmt.Printf("Device UID: %v\n", result["device_uid"])
+		fmt.Printf("Device Name: %v\n", result["device_name"])
+		fmt.Printf("Device Type: %v\n", result["device_type"])
+		fmt.Printf("Status: %v\n", result["status"])
+		fmt.Printf("Created: %v\n", result["created_at"])
+		if expiry, ok := result["expires_at"]; ok {
+			fmt.Printf("Expires: %v\n", expiry)
+		}
+		if deviceID, ok := result["device_id"]; ok {
+			fmt.Printf("Device ID: %v\n", deviceID)
+		}
+		fmt.Println()
 
 		return nil
 	},
@@ -250,35 +192,24 @@ var provisionCancelCmd = &cobra.Command{
   datumctl provision cancel prov_abc123`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		loadConfig()
 		requestID := args[0]
-		client := &http.Client{}
-
-		req, err := http.NewRequest("DELETE", serverURL+"/devices/provisioning/"+requestID, nil)
+		client := NewAPIClient(serverURL, token, apiKey)
+		resp, err := client.Delete("/devices/provisioning/"+requestID, nil)
 		if err != nil {
 			return err
 		}
 
-		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return fmt.Errorf("request failed: %w", err)
-		}
-		defer resp.Body.Close()
-
-		body, _ := io.ReadAll(resp.Body)
-
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("cancellation failed (%d): %s", resp.StatusCode, string(body))
+		var result map[string]interface{}
+		if err := ParseResponse(resp, &result); err != nil {
+			return err
 		}
 
 		if outputJSON {
-			fmt.Println(string(body))
-		} else {
-			fmt.Printf("✅ Provisioning request %s cancelled successfully\n", requestID)
+			return printJSON(result)
 		}
+
+		fmt.Printf("✅ Provisioning request %s cancelled successfully\n", requestID)
 
 		return nil
 	},
