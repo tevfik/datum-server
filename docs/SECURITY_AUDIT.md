@@ -341,56 +341,197 @@ type Device struct {
    - No way to invalidate the key
 ```
 
-### Recommended Fix
+---
 
-**Option 1: Add Key Rotation API** (RECOMMENDED)
+### Industry Standard Approaches
+
+#### 🏆 **1. AWS IoT Core Model** (Most Secure)
+```
+Device Identity: X.509 Client Certificates (long-lived, 10-15 years)
+Access Control: Certificate-based mutual TLS
+Rotation: Automated certificate rotation with overlap period
+Revocation: Certificate Revocation List (CRL) + OCSP
+```
+**Pros**: Military-grade security, mutual authentication  
+**Cons**: Complex setup, requires TLS infrastructure, certificate management overhead
+
+---
+
+#### 🏆 **2. Azure IoT Hub Model** (Industry Standard for IoT)
+```
+Device Credentials: Shared Access Signatures (SAS) Tokens
+Token Lifetime: Configurable (typically 7 days to 1 year)
+Renewal: Device requests new token before expiry
+Revocation: Token blacklist + device disable
+```
+
+**Implementation Pattern**:
 ```go
-// Add to admin endpoints
+type Device struct {
+    DeviceID    string
+    MasterKey   string    // Long-lived, stored securely on device
+    SASToken    string    // Short-lived, auto-renewed
+    TokenExpiry time.Time // 7-90 days typical
+}
+
+// Device authentication flow
+1. Device uses SAS token for API calls
+2. Server checks token expiry
+3. If near expiry, device generates new token from MasterKey
+4. Old token valid during grace period
+```
+
+**Pros**: Balance of security and practicality, standard in IoT industry  
+**Cons**: Requires token refresh logic in device firmware
+
+---
+
+#### 🏆 **3. Google Cloud IoT Model** (JWT-based)
+```
+Device Identity: JWT signed with device private key
+Access Token: Short-lived (1 hour typical)
+Renewal: Device signs new JWT periodically
+Revocation: Disable device in registry
+```
+
+---
+
+#### 🏆 **4. Simple Rotating API Keys** (Common for SMB/Prototyping)
+```
+API Key: Long-lived but rotatable (30-365 days)
+Rotation: Manual or automatic with grace period
+Revocation: Key blacklist
+```
+
+**Implementation Pattern**:
+```go
+type Device struct {
+    APIKey         string
+    PreviousAPIKey string    // Grace period
+    KeyExpiresAt   time.Time // Warning threshold
+    KeyRotatedAt   time.Time
+}
+
+// Grace period: both keys valid for 7 days
+if apiKey == device.APIKey || 
+   (apiKey == device.PreviousAPIKey && withinGracePeriod) {
+    // Authenticated
+}
+```
+
+**Pros**: Simple, works with constrained devices  
+**Cons**: Less secure than token-based approaches
+
+---
+
+### **Recommended Implementation for Datum**
+
+Based on system architecture (embedded devices, command channel available):
+
+#### **Phase 1: API Key Rotation with Grace Period** (2-3 hours)
+```go
+type Device struct {
+    APIKey         string    `json:"api_key"`
+    PreviousAPIKey string    `json:"previous_api_key"`
+    KeyRotatedAt   time.Time `json:"key_rotated_at"`
+    KeyExpiresAt   time.Time `json:"key_expires_at"` // Warning, not hard limit
+}
+
+// Admin endpoint
 POST /admin/devices/:device_id/rotate-key
 {
-  "notify_device": true  // Send new key via command channel
+  "grace_period_days": 7,  // Both keys valid for 7 days
+  "notify_device": true    // Send new key via command channel
 }
 
 Response:
 {
-  "old_key": "dk_abc123...",      // For grace period
   "new_key": "dk_def456...",
-  "expires_at": "2025-12-31T23:59:59Z"  // Grace period
+  "old_key_expires": "2026-01-07T00:00:00Z",
+  "command_sent": true
 }
 ```
 
-**Option 2: Automatic Expiration**
+**Rotation Flow**:
+1. Admin triggers rotation via API
+2. Server generates new key, keeps old key valid
+3. Server sends new key to device via command channel
+4. Device updates key in firmware
+5. Device ACKs command
+6. After grace period, old key auto-expires
+
+---
+
+#### **Phase 2: Automatic Key Expiry Warnings** (1-2 hours)
+```go
+// Add monitoring job
+func checkKeyExpiryWarnings() {
+    devices := getDevicesWithKeysExpiringIn(30) // 30 days
+    
+    for _, device := range devices {
+        // Send warning via command channel
+        sendCommand(device.ID, "key_expiry_warning", {
+            "days_remaining": daysUntil(device.KeyExpiresAt),
+            "action_required": "Request key rotation from admin"
+        })
+        
+        // Notify device owner via email
+        notifyOwner(device.UserID, "Device key expiring soon")
+    }
+}
+```
+
+---
+
+#### **Phase 3: (Optional) SAS Token Model** (4-6 hours)
+Similar to Azure IoT Hub:
 ```go
 type Device struct {
-    APIKey          string    `json:"api_key"`
-    APIKeyExpiresAt time.Time `json:"api_key_expires_at"`  // NEW
-    APIKeyVersion   int       `json:"api_key_version"`     // NEW
+    DeviceID     string
+    MasterSecret string    // Stored on device, never transmitted
+    AccessToken  string    // Short-lived (7-30 days)
+    TokenExpiry  time.Time
 }
 
-// Middleware check
-if time.Now().After(device.APIKeyExpiresAt) {
-    return http.StatusUnauthorized, "API key expired - rotate required"
-}
-```
+// Device generates token from master secret
+token := generateSAS(deviceID, masterSecret, expiryTime)
 
-**Option 3: Key Revocation List**
-```go
-// Add to storage
-type RevokedKey struct {
-    APIKey     string
-    DeviceID   string
-    RevokedAt  time.Time
-    Reason     string
-}
-
-// Check before authenticating
-if store.IsKeyRevoked(apiKey) {
-    return http.StatusUnauthorized, "API key has been revoked"
+// Server validates token
+if validateSAS(token, device.MasterSecret) && !isExpired(token) {
+    // Authenticated
 }
 ```
 
-**Priority**: HIGH (security best practice)  
-**Effort**: 2-3 hours for basic rotation, 4-6 hours for full lifecycle
+---
+
+### Industry Comparison
+
+| Approach | Security | Complexity | Best For |
+|----------|----------|------------|----------|
+| **X.509 Certificates** | ⭐⭐⭐⭐⭐ | High | Critical infrastructure, medical devices |
+| **SAS Tokens (Azure)** | ⭐⭐⭐⭐ | Medium | General IoT, cloud-connected devices |
+| **JWT (Google)** | ⭐⭐⭐⭐ | Medium | Devices with crypto capabilities |
+| **Rotating API Keys** | ⭐⭐⭐ | Low | Prototyping, simple devices, SMB |
+| **Static API Keys** | ⭐⭐ | Very Low | ❌ Not recommended for production |
+
+---
+
+### **Recommended Priority for Datum**
+
+**Immediate (Pre-Production)**:
+- ✅ Implement API Key Rotation with Grace Period (Phase 1)
+- ✅ Add key revocation list for compromised credentials
+
+**Short-term (Post-Launch)**:
+- 📊 Add key expiry warnings and monitoring (Phase 2)
+- 📈 Collect metrics on key rotation usage
+
+**Long-term (Enterprise Features)**:
+- 🔒 Consider SAS token model for high-value deployments (Phase 3)
+- 🔒 Optional X.509 support for regulated industries
+
+**Priority**: HIGH (Phase 1 required for production)  
+**Effort**: 2-3 hours for Phase 1, industry-standard solution
 
 ---
 
