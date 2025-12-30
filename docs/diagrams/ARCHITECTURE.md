@@ -309,9 +309,9 @@ graph TD
     COMMANDS --> STREAM[GET /stream]
     COMMANDS --> ACK[POST /&#123;cmd_id&#125;/ack]
     
-    ADMIN --> USERS[/users]
-    ADMIN --> DEVICES_ADMIN[/devices]
-    ADMIN --> DATABASE[/database]
+    ADMIN --> USERS["/users"]
+    ADMIN --> DEVICES_ADMIN["/devices"]
+    ADMIN --> DATABASE["/database"]
     
     style API fill:#2196F3
     style AUTH fill:#9C27B0
