@@ -456,11 +456,16 @@ type Command struct {
 	Params    map[string]interface{} `json:"params"`
 	Status    string                 `json:"status"`
 	CreatedAt time.Time              `json:"created_at"`
+	ExpiresAt time.Time              `json:"expires_at,omitempty"`
 	AckedAt   time.Time              `json:"acked_at,omitempty"`
 	Result    map[string]interface{} `json:"result,omitempty"`
 }
 
 func (s *Storage) CreateCommand(cmd *Command) error {
+	if cmd.ExpiresAt.IsZero() {
+		cmd.ExpiresAt = time.Now().Add(24 * time.Hour) // Default 24h TTL
+	}
+
 	return s.db.Update(func(tx *buntdb.Tx) error {
 		key := fmt.Sprintf("command:%s", cmd.ID)
 		data, _ := json.Marshal(cmd)
@@ -499,6 +504,12 @@ func (s *Storage) GetPendingCommands(deviceID string) ([]Command, error) {
 			}
 			var cmd Command
 			json.Unmarshal([]byte(cmdData), &cmd)
+
+			// Check for expiration
+			if cmd.Status == "pending" && !cmd.ExpiresAt.IsZero() && time.Now().After(cmd.ExpiresAt) {
+				continue // Skip expired commands
+			}
+
 			if cmd.Status == "pending" {
 				commands = append(commands, cmd)
 			}

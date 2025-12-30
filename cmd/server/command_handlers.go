@@ -15,8 +15,9 @@ import (
 // Command handlers
 
 type SendCommandRequest struct {
-	Action string                 `json:"action" binding:"required"`
-	Params map[string]interface{} `json:"params"`
+	Action    string                 `json:"action" binding:"required"`
+	Params    map[string]interface{} `json:"params"`
+	ExpiresIn int                    `json:"expires_in"` // Duration in seconds
 }
 
 func sendCommandHandler(c *gin.Context) {
@@ -40,6 +41,12 @@ func sendCommandHandler(c *gin.Context) {
 		return
 	}
 
+	// Calculate expiration
+	expiresAt := time.Now().Add(24 * time.Hour) // Default 24h
+	if req.ExpiresIn > 0 {
+		expiresAt = time.Now().Add(time.Duration(req.ExpiresIn) * time.Second)
+	}
+
 	// Create command
 	cmdID := generateCommandID()
 	cmd := &storage.Command{
@@ -49,6 +56,7 @@ func sendCommandHandler(c *gin.Context) {
 		Params:    req.Params,
 		Status:    "pending",
 		CreatedAt: time.Now(),
+		ExpiresAt: expiresAt,
 	}
 
 	if err := store.CreateCommand(cmd); err != nil {
@@ -60,6 +68,7 @@ func sendCommandHandler(c *gin.Context) {
 		"command_id": cmdID,
 		"status":     "pending",
 		"message":    "Command queued for device",
+		"expires_at": expiresAt,
 	})
 }
 

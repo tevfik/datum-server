@@ -89,11 +89,12 @@ var commandCancelCmd = &cobra.Command{
 
 // Flags
 var (
-	commandParams []string
-	commandLimit  int
-	commandStatus string
-	commandWait   bool
-	commandJSON   string
+	commandParams    []string
+	commandLimit     int
+	commandStatus    string
+	commandWait      bool
+	commandJSON      string
+	commandExpiresIn int
 )
 
 func init() {
@@ -109,6 +110,7 @@ func init() {
 	commandSendCmd.Flags().StringArrayVarP(&commandParams, "param", "p", []string{}, "Command parameters (key=value)")
 	commandSendCmd.Flags().StringVar(&commandJSON, "params-json", "", "Parameters as JSON string")
 	commandSendCmd.Flags().BoolVarP(&commandWait, "wait", "w", false, "Wait for command execution and show result")
+	commandSendCmd.Flags().IntVar(&commandExpiresIn, "expires-in", 0, "Command expiration time in seconds (default 86400)")
 
 	// History flags
 	commandHistoryCmd.Flags().IntVarP(&commandLimit, "limit", "l", 0, "Limit number of results")
@@ -155,6 +157,9 @@ func runCommandSend(cmd *cobra.Command, args []string) error {
 	if len(params) > 0 {
 		requestBody["params"] = params
 	}
+	if commandExpiresIn > 0 {
+		requestBody["expires_in"] = commandExpiresIn
+	}
 
 	client := NewAPIClient(serverURL, token, apiKey)
 	resp, err := client.Post(fmt.Sprintf("/devices/%s/commands", deviceID), requestBody)
@@ -175,6 +180,9 @@ func runCommandSend(cmd *cobra.Command, args []string) error {
 	fmt.Printf("📤 Command ID: %s\n", result["command_id"])
 	fmt.Printf("📊 Status: %s\n", result["status"])
 	fmt.Printf("💬 Message: %s\n", result["message"])
+	if expiresAt, ok := result["expires_at"]; ok {
+		fmt.Printf("⏰ Expires: %s\n", expiresAt)
+	}
 
 	// Wait for execution if requested
 	if commandWait {
