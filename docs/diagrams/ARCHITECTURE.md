@@ -302,8 +302,8 @@ graph TD
     DATA --> GET_LATEST[GET /&#123;id&#125;]
     DATA --> GET_HISTORY[GET /&#123;id&#125;/history]
     
-    DEVICE --> COMMANDS[/commands]
-    DEVICE --> PUSH[GET /&#123;id&#125;/push]
+    DEVICE --> COMMANDS["/commands"]
+    DEVICE --> PUSH["GET /&#123;id&#125;/push"]
     
     COMMANDS --> POLL[GET /poll]
     COMMANDS --> STREAM[GET /stream]
