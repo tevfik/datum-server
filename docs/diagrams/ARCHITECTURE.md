@@ -115,11 +115,11 @@ sequenceDiagram
 ```mermaid
 graph LR
     subgraph "BuntDB (Metadata)"
-        U[Users<br/>user:{id}]
-        D[Devices<br/>device:{id}]
-        AK[API Keys<br/>apikey:{key}]
+        U[Users<br/>user:&#123;id&#125;]
+        D[Devices<br/>device:&#123;id&#125;]
+        AK[API Keys<br/>apikey:&#123;key&#125;]
         SYS[System Config<br/>system:*]
-        CMD[Commands<br/>command:{id}]
+        CMD[Commands<br/>command:&#123;id&#125;]
     end
     
     subgraph "TSStorage (Time-Series)"
@@ -168,7 +168,7 @@ sequenceDiagram
     Note over SSE,Device: Command delivered in real-time
     SSE->>Device: event: command<br/>data: {id, action: "reboot"}
     
-    Device->>API: POST /device/{id}/commands/{cmd_id}/ack<br/>{status: "success"}
+    Device->>API: POST /device/&#123;id&#125;/commands/&#123;cmd_id&#125;/ack<br/>{status: "success"}
     API->>BuntDB: Update command status
     API-->>Device: 200 OK
 ```
@@ -296,18 +296,18 @@ graph TD
     
     DEVICES --> CREATE_DEV[POST /]
     DEVICES --> LIST_DEV[GET /]
-    DEVICES --> DELETE_DEV[DELETE /{id}]
-    
-    DATA --> POST_DATA[POST /{id}]
-    DATA --> GET_LATEST[GET /{id}]
-    DATA --> GET_HISTORY[GET /{id}/history]
+    DEVICES --> DELETE_DEV[DELETE /&#123;id&#125;]
+
+    DATA --> POST_DATA[POST /&#123;id&#125;]
+    DATA --> GET_LATEST[GET /&#123;id&#125;]
+    DATA --> GET_HISTORY[GET /&#123;id&#125;/history]
     
     DEVICE --> COMMANDS[/commands]
-    DEVICE --> PUSH[GET /{id}/push]
+    DEVICE --> PUSH[GET /&#123;id&#125;/push]
     
     COMMANDS --> POLL[GET /poll]
     COMMANDS --> STREAM[GET /stream]
-    COMMANDS --> ACK[POST /{cmd_id}/ack]
+    COMMANDS --> ACK[POST /&#123;cmd_id&#125;/ack]
     
     ADMIN --> USERS[/users]
     ADMIN --> DEVICES_ADMIN[/devices]
@@ -330,7 +330,7 @@ stateDiagram-v2
     Active --> Banned: Rate limit exceeded
     Suspended --> Active: Admin reactivates
     Banned --> Active: Admin unbans
-    Active --> Deleted: DELETE /devices/{id}
+    Active --> Deleted: DELETE /devices/&#123;id&#125;
     Suspended --> Deleted: Admin deletes
     Deleted --> [*]
     
