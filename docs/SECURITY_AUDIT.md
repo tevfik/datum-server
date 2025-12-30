@@ -289,15 +289,112 @@ WiFi passwords stored in plaintext in:
 ### Implementation
 ```go
 func generateProvisioningAPIKey() string {
-    b := make([]byte, 32) // 256 bits
-    rand.Read(b)
-    return hex.EncodeToString(b)
+    bytes := make([]byte, 8) // 64 bits
+    rand.Read(bytes)
+    return "dk_" + hex.EncodeToString(bytes) // dk_ + 16 hex chars = 19 chars total
 }
 ```
 
 **Status**: ✅ **CRYPTOGRAPHICALLY SECURE**
 - Uses crypto/rand (not math/rand)
-- 256-bit entropy
+- 64-bit entropy (128-bit would be better for long-term keys)
+- Hex-encoded for safe transmission
+
+---
+
+## 9. API Key Lifecycle Management ⚠️
+
+### Current Implementation
+Device API keys are:
+- Generated once during provisioning
+- Never expire
+- Cannot be rotated
+- Cannot be revoked without deleting device
+
+**Status**: ⚠️ **NO KEY ROTATION MECHANISM**
+
+### Issue
+```go
+type Device struct {
+    // ...
+    APIKey    string    `json:"api_key"` // ⚠️ Permanent, unchangeable
+    // No APIKeyExpiresAt field
+    // No APIKeyVersion field
+    // ...
+}
+```
+
+### Risk
+- **Compromised keys remain valid forever**
+- No way to rotate keys without factory reset
+- Device cannot detect compromised credentials
+- Leaked keys in logs/network captures persist indefinitely
+
+### Real-World Scenario
+```
+1. Device sends data with API key
+2. Network traffic captured (e.g., unencrypted WiFi)
+3. Attacker extracts API key from packet
+4. Attacker can now:
+   - Send fake data from "device"
+   - Monitor device status indefinitely
+   - No way to invalidate the key
+```
+
+### Recommended Fix
+
+**Option 1: Add Key Rotation API** (RECOMMENDED)
+```go
+// Add to admin endpoints
+POST /admin/devices/:device_id/rotate-key
+{
+  "notify_device": true  // Send new key via command channel
+}
+
+Response:
+{
+  "old_key": "dk_abc123...",      // For grace period
+  "new_key": "dk_def456...",
+  "expires_at": "2025-12-31T23:59:59Z"  // Grace period
+}
+```
+
+**Option 2: Automatic Expiration**
+```go
+type Device struct {
+    APIKey          string    `json:"api_key"`
+    APIKeyExpiresAt time.Time `json:"api_key_expires_at"`  // NEW
+    APIKeyVersion   int       `json:"api_key_version"`     // NEW
+}
+
+// Middleware check
+if time.Now().After(device.APIKeyExpiresAt) {
+    return http.StatusUnauthorized, "API key expired - rotate required"
+}
+```
+
+**Option 3: Key Revocation List**
+```go
+// Add to storage
+type RevokedKey struct {
+    APIKey     string
+    DeviceID   string
+    RevokedAt  time.Time
+    Reason     string
+}
+
+// Check before authenticating
+if store.IsKeyRevoked(apiKey) {
+    return http.StatusUnauthorized, "API key has been revoked"
+}
+```
+
+**Priority**: HIGH (security best practice)  
+**Effort**: 2-3 hours for basic rotation, 4-6 hours for full lifecycle
+
+---
+
+## 10. Error Information Disclosure ✅
 - Hex-encoded for safe transmission
 
 ---
@@ -519,6 +616,7 @@ logger.GetLogger().Warn().
 | Input Validation | ✅ Adequate | - | - |
 | WiFi Credentials | ⚠️ Plaintext | MEDIUM | 2-3 hrs |
 | API Key Generation | ✅ Secure | - | - |
+| **API Key Lifecycle** | ⚠️ **No Rotation** | **HIGH** | **2-6 hrs** |
 | Error Handling | ✅ Secure | - | ✅ Done |
 | Race Conditions | ✅ Secure | - | ✅ Done |
 | Security Headers | ✅ Applied | - | ✅ Done |
@@ -536,13 +634,16 @@ logger.GetLogger().Warn().
 5. ✅ **Add provisioning audit logging** - COMPREHENSIVE LOGGING ADDED
 
 ### Short-term (1 week)
-1. ⚠️ **Encrypt WiFi passwords** in database
-2. 🧹 **Implement cleanup job** for expired requests
+1. ⚠️ **API Key Rotation Mechanism** - Allow manual key rotation via admin API
+2. ⚠️ **Encrypt WiFi passwords** in database
+3. 🧹 **Implement cleanup job** for expired requests
 
 ### Long-term (1 month)
-7. 📈 **Add metrics** for provisioning success/failure rates
-8. 🔍 **Implement anomaly detection** for abuse patterns
-9. 📋 **Create security runbook** for incident response
+4. 🔑 **Automatic API key expiration** with configurable TTL
+5. 🔑 **Key revocation list** for compromised credentials
+6. 📈 **Add metrics** for provisioning success/failure rates
+7. 🔍 **Implement anomaly detection** for abuse patterns
+8. 📋 **Create security runbook** for incident response
 
 ---
 
@@ -566,7 +667,12 @@ The WiFi provisioning system demonstrates **strong security implementation**:
 5. ✅ Security headers already in place
 
 **Remaining Recommendations**:
-1. ⚠️ Encrypt WiFi credentials in database (MEDIUM priority)
-2. 🧹 Implement cleanup job for expired requests (LOW priority)
+1. ⚠️ **API Key Rotation** - Manual rotation endpoint (HIGH priority, 2-3 hrs)
+2. ⚠️ Encrypt WiFi credentials in database (MEDIUM priority, 2-3 hrs)
+3. 🧹 Cleanup job for expired requests (LOW priority)
 
-**Overall Risk**: **LOW** - System is production-ready with current implementation. WiFi credential encryption would further reduce risk to **VERY LOW**.
+**Overall Risk**: **LOW** - System is production-ready with current implementation. 
+
+**Critical Next Step**: **API key rotation mechanism** should be implemented before production deployment to handle compromised credentials. Without key rotation, a leaked API key remains valid forever, allowing unauthorized data injection indefinitely.
+
+**WiFi credential encryption** would further reduce risk to **VERY LOW**.
