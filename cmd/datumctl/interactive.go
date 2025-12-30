@@ -55,6 +55,14 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 			if err := dataMenu(); err != nil {
 				fmt.Printf("\n❌ Error: %v\n", err)
 			}
+		case "Command & Control":
+			if err := commandMenu(); err != nil {
+				fmt.Printf("\n❌ Error: %v\n", err)
+			}
+		case "Provisioning":
+			if err := provisionMenu(); err != nil {
+				fmt.Printf("\n❌ Error: %v\n", err)
+			}
 		case "System Status":
 			fmt.Println("\n> datumctl status")
 			if err := runStatus(nil, nil); err != nil {
@@ -79,6 +87,8 @@ func showMainMenu() (string, error) {
 		Options: []string{
 			"Device Management",
 			"Data Queries",
+			"Command & Control",
+			"Provisioning",
 			"System Status",
 			"Configuration",
 			"Exit",
@@ -332,6 +342,228 @@ func promptDataStats() error {
 	dataLast = timeRange
 
 	return runDataStats(nil, nil)
+}
+
+func commandMenu() error {
+	var action string
+	prompt := &survey.Select{
+		Message: "Command & Control:",
+		Options: []string{
+			"Send command",
+			"List commands",
+			"Get command details",
+			"← Back to main menu",
+		},
+	}
+
+	if err := survey.AskOne(prompt, &action); err != nil {
+		return err
+	}
+
+	switch action {
+	case "Send command":
+		return promptSendCommand()
+	case "List commands":
+		return promptListCommands()
+	case "Get command details":
+		return promptGetCommand()
+	}
+	return nil
+}
+
+func promptSendCommand() error {
+	var device string
+	if err := survey.AskOne(&survey.Input{
+		Message: "Device ID:",
+	}, &device, survey.WithValidator(survey.Required)); err != nil {
+		return err
+	}
+
+	var cmdAction string
+	if err := survey.AskOne(&survey.Input{
+		Message: "Command Action (e.g., reboot, update-config):",
+	}, &cmdAction, survey.WithValidator(survey.Required)); err != nil {
+		return err
+	}
+
+	var addParams bool
+	if err := survey.AskOne(&survey.Confirm{
+		Message: "Add parameters?",
+		Default: false,
+	}, &addParams); err != nil {
+		return err
+	}
+
+	var params []string
+	if addParams {
+		var paramStr string
+		if err := survey.AskOne(&survey.Input{
+			Message: "Parameters (key=value, comma separated):",
+			Help:    "Example: interval=60,mode=auto",
+		}, &paramStr); err != nil {
+			return err
+		}
+		if paramStr != "" {
+			params = strings.Split(paramStr, ",")
+		}
+	}
+
+	commandParams = params
+	fmt.Printf("\n> datumctl command send %s %s", device, cmdAction)
+	for _, p := range params {
+		fmt.Printf(" --param %s", p)
+	}
+	fmt.Println()
+
+	return runCommandSend(nil, []string{device, cmdAction})
+}
+
+func promptListCommands() error {
+	var device string
+	if err := survey.AskOne(&survey.Input{
+		Message: "Device ID:",
+	}, &device, survey.WithValidator(survey.Required)); err != nil {
+		return err
+	}
+
+	fmt.Printf("\n> datumctl command list %s\n", device)
+	return runCommandList(nil, []string{device})
+}
+
+func promptGetCommand() error {
+	var device string
+	if err := survey.AskOne(&survey.Input{
+		Message: "Device ID:",
+	}, &device, survey.WithValidator(survey.Required)); err != nil {
+		return err
+	}
+
+	var cmdID string
+	if err := survey.AskOne(&survey.Input{
+		Message: "Command ID:",
+	}, &cmdID, survey.WithValidator(survey.Required)); err != nil {
+		return err
+	}
+
+	fmt.Printf("\n> datumctl command get %s %s\n", device, cmdID)
+	return runCommandGet(nil, []string{device, cmdID})
+}
+
+func provisionMenu() error {
+	var action string
+	prompt := &survey.Select{
+		Message: "Provisioning:",
+		Options: []string{
+			"Register device (WiFi AP)",
+			"List requests",
+			"Check status",
+			"Cancel request",
+			"← Back to main menu",
+		},
+	}
+
+	if err := survey.AskOne(prompt, &action); err != nil {
+		return err
+	}
+
+	switch action {
+	case "Register device (WiFi AP)":
+		return promptProvisionRegister()
+	case "List requests":
+		fmt.Println("\n> datumctl provision list")
+		return provisionListCmd.RunE(nil, nil)
+	case "Check status":
+		return promptProvisionStatus()
+	case "Cancel request":
+		return promptProvisionCancel()
+	}
+	return nil
+}
+
+func promptProvisionStatus() error {
+	var reqID string
+	if err := survey.AskOne(&survey.Input{
+		Message: "Provisioning Request ID:",
+	}, &reqID, survey.WithValidator(survey.Required)); err != nil {
+		return err
+	}
+
+	fmt.Printf("\n> datumctl provision status %s\n", reqID)
+	return provisionStatusCmd.RunE(nil, []string{reqID})
+}
+
+func promptProvisionCancel() error {
+	var reqID string
+	if err := survey.AskOne(&survey.Input{
+		Message: "Provisioning Request ID:",
+	}, &reqID, survey.WithValidator(survey.Required)); err != nil {
+		return err
+	}
+
+	var confirm bool
+	if err := survey.AskOne(&survey.Confirm{
+		Message: fmt.Sprintf("Cancel request '%s'?", reqID),
+	}, &confirm); err != nil {
+		return err
+	}
+
+	if confirm {
+		fmt.Printf("\n> datumctl provision cancel %s\n", reqID)
+		return provisionCancelCmd.RunE(nil, []string{reqID})
+	}
+	fmt.Println("Cancelled")
+	return nil
+}
+
+func promptProvisionRegister() error {
+	var uid string
+	if err := survey.AskOne(&survey.Input{
+		Message: "Device UID (MAC address):",
+	}, &uid, survey.WithValidator(survey.Required)); err != nil {
+		return err
+	}
+
+	var name string
+	if err := survey.AskOne(&survey.Input{
+		Message: "Device Name:",
+	}, &name, survey.WithValidator(survey.Required)); err != nil {
+		return err
+	}
+
+	var devType string
+	survey.AskOne(&survey.Input{
+		Message: "Device Type:",
+		Default: "sensor",
+	}, &devType)
+
+	var ssid string
+	survey.AskOne(&survey.Input{
+		Message: "WiFi SSID:",
+	}, &ssid)
+
+	var pass string
+	if ssid != "" {
+		survey.AskOne(&survey.Password{
+			Message: "WiFi Password:",
+		}, &pass)
+	}
+
+	provisionUID = uid
+	provisionName = name
+	provisionType = devType
+	provisionWiFiSSID = ssid
+	provisionWiFiPass = pass
+
+	cmdStr := fmt.Sprintf("datumctl provision register --uid %q --name %q --type %q", uid, name, devType)
+	if ssid != "" {
+		cmdStr += fmt.Sprintf(" --wifi-ssid %q", ssid)
+	}
+	if pass != "" {
+		cmdStr += fmt.Sprintf(" --wifi-pass %q", pass)
+	}
+	fmt.Printf("\n> %s\n", cmdStr)
+
+	return provisionRegisterCmd.RunE(nil, nil)
 }
 
 func promptLogin() error {

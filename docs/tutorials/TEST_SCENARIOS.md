@@ -126,7 +126,29 @@ This document provides a comprehensive guide to testing the Datum IoT Platform u
     datumctl command get sensor-001 <COMMAND_ID>
     ```
 
-## Scenario 6: Cleanup
+## Scenario 6: Mobile Provisioning Workflow
+
+**Goal**: Simulate the mobile app provisioning flow where a device is registered for WiFi setup.
+
+1.  **Register Device for Provisioning**
+    Simulate a mobile app registering a new device found via Bluetooth/WiFi.
+    ```bash
+    datumctl provision register \
+      --uid "AA:BB:CC:DD:EE:FF" \
+      --name "Smart Bulb" \
+      --type "light" \
+      --wifi-ssid "MyHomeWiFi" \
+      --wifi-pass "secret123"
+    ```
+    *Expected Output*: JSON containing `provisioning_id` and `secret`.
+
+2.  **Verify Provisioning Status**
+    (Optional) Check if the device appears in the list (it might be in a 'provisioning' state if supported, or just created).
+    ```bash
+    datumctl device list
+    ```
+
+## Scenario 7: Cleanup
 
 **Goal**: Remove test resources to leave the system clean.
 
