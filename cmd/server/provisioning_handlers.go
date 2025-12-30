@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"datum-go/internal/auth"
+	"datum-go/internal/logger"
 	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -107,11 +109,10 @@ func registerDeviceHandler(c *gin.Context) {
 	deviceUID := normalizeUID(req.DeviceUID)
 
 	// Check if UID is already registered
-	registered, existingDeviceID, _ := store.IsDeviceUIDRegistered(deviceUID)
+	registered, _, _ := store.IsDeviceUIDRegistered(deviceUID)
 	if registered {
 		c.JSON(http.StatusConflict, gin.H{
-			"error":     "device already registered",
-			"device_id": existingDeviceID,
+			"error": "device already registered",
 		})
 		return
 	}
@@ -139,6 +140,13 @@ func registerDeviceHandler(c *gin.Context) {
 	}
 
 	if err := store.CreateProvisioningRequest(provReq); err != nil {
+		logger.GetLogger().Warn().
+			Str("user_id", userID).
+			Str("device_uid", deviceUID).
+			Str("ip", c.ClientIP()).
+			Err(err).
+			Msg("Failed to create provisioning request")
+
 		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "already registered") {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
@@ -146,6 +154,17 @@ func registerDeviceHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create provisioning request"})
 		return
 	}
+
+	// Log successful provisioning registration
+	logger.GetLogger().Info().
+		Str("event", "provisioning_registration").
+		Str("user_id", userID).
+		Str("device_uid", deviceUID).
+		Str("request_id", requestID).
+		Str("device_id", deviceID).
+		Str("ip", c.ClientIP()).
+		Time("expires_at", provReq.ExpiresAt).
+		Msg("Provisioning request created")
 
 	c.JSON(http.StatusCreated, RegisterDeviceResponse{
 		RequestID:   requestID,
@@ -236,6 +255,14 @@ func cancelProvisioningHandler(c *gin.Context) {
 
 	// Check ownership
 	if req.UserID != userID {
+		logger.GetLogger().Warn().
+			Str("event", "provisioning_cancel_forbidden").
+			Str("user_id", userID).
+			Str("request_id", requestID).
+			Str("owner_id", req.UserID).
+			Str("ip", c.ClientIP()).
+			Msg("Unauthorized provisioning cancel attempt")
+
 		c.JSON(http.StatusForbidden, gin.H{"error": "not authorized to cancel this request"})
 		return
 	}
@@ -244,6 +271,15 @@ func cancelProvisioningHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Log cancellation
+	logger.GetLogger().Info().
+		Str("event", "provisioning_cancelled").
+		Str("user_id", userID).
+		Str("request_id", requestID).
+		Str("device_uid", req.DeviceUID).
+		Str("ip", c.ClientIP()).
+		Msg("Provisioning request cancelled")
 
 	c.JSON(http.StatusOK, gin.H{"message": "provisioning request cancelled"})
 }
@@ -338,9 +374,28 @@ func deviceActivateHandler(c *gin.Context) {
 	// Complete the provisioning
 	device, err := store.CompleteProvisioningRequest(provReq.ID)
 	if err != nil {
+		logger.GetLogger().Error().
+			Str("request_id", provReq.ID).
+			Str("device_uid", deviceUID).
+			Str("ip", c.ClientIP()).
+			Err(err).
+			Msg("Failed to complete provisioning")
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to complete provisioning: " + err.Error()})
 		return
 	}
+
+	// Log successful activation
+	logger.GetLogger().Info().
+		Str("event", "device_activation").
+		Str("device_id", device.ID).
+		Str("device_uid", deviceUID).
+		Str("user_id", provReq.UserID).
+		Str("request_id", provReq.ID).
+		Str("firmware", req.FirmwareVersion).
+		Str("model", req.Model).
+		Str("ip", c.ClientIP()).
+		Msg("Device activated successfully")
 
 	c.JSON(http.StatusOK, DeviceActivateResponse{
 		DeviceID:  device.ID,
@@ -440,7 +495,9 @@ func RegisterProvisioningRoutes(r *gin.Engine, authMiddleware gin.HandlerFunc) {
 	}
 
 	// Device endpoints (no auth - device doesn't have credentials yet)
+	// Apply rate limiting to prevent abuse
 	provisioning := r.Group("/provisioning")
+	provisioning.Use(auth.RateLimitMiddleware())
 	{
 		provisioning.POST("/activate", deviceActivateHandler)
 		provisioning.GET("/check/:uid", deviceCheckHandler)
