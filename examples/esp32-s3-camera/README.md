@@ -1,11 +1,12 @@
 # ESP32-S3 Camera Streaming with Datum Server
 
-Complete guide for setting up video streaming from ESP32-S3 camera to Datum server using WebSocket and MJPEG protocols.
+Complete guide for setting up video streaming from ESP32-S3 camera boards to Datum server using WebSocket and MJPEG protocols.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Hardware Requirements](#hardware-requirements)
+- [Supported Boards](#supported-boards)
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
 - [WebSocket vs MJPEG Comparison](#websocket-vs-mjpeg-comparison)
@@ -21,6 +22,10 @@ Complete guide for setting up video streaming from ESP32-S3 camera to Datum serv
 
 This example demonstrates real-time camera streaming from ESP32-S3 behind NAT/proxy to web clients using Datum server as a relay.
 
+**Supported Cameras:**
+- ✅ **OV2640** (2MP) - Default sensor on most boards
+- ✅ **OV3660** (3MP) - Higher resolution upgrade
+
 **Supported Protocols:**
 - **WebSocket**: Binary frames, low latency (~50-100ms), best for live streaming
 - **MJPEG over HTTP**: Text-based, higher latency (~200ms), simpler but works everywhere
@@ -30,35 +35,65 @@ This example demonstrates real-time camera streaming from ESP32-S3 behind NAT/pr
 - ✅ Command-based stream control (start/stop via datumctl)
 - ✅ Multiple simultaneous viewers
 - ✅ Automatic frame broadcasting
+- ✅ WiFi auto-reconnection
 - ✅ Compatible with Traefik reverse proxy
 
 ---
 
 ## Hardware Requirements
 
-### ESP32-S3 Camera Board
-- **Recommended**: AI-Thinker ESP32-CAM or ESP32-S3-CAM
-- **RAM**: Minimum 4MB (8MB PSRAM recommended)
+### ESP32-S3 (Recommended)
+- **Processor**: Dual-core Xtensa LX7 @ 240MHz
+- **RAM**: 512KB SRAM + 8MB PSRAM (recommended)
 - **Flash**: Minimum 4MB
+- **Camera Interface**: DVP (8-bit parallel)
 
-### Pinout (AI-Thinker ESP32-CAM)
+> **Note**: ESP32-S3 is recommended over ESP32-S2 for camera applications. The ESP32-S2 has limited camera interface support and may have compatibility issues with some sensors.
+
+---
+
+## Supported Boards
+
+### 1. ESP32-S3-CAM (Seeed XIAO, Waveshare)
 ```
-PWDN:  GPIO 32
-XCLK:  GPIO  0
-SIOD:  GPIO 26 (SDA)
-SIOC:  GPIO 27 (SCL)
-Y9:    GPIO 35
-Y8:    GPIO 34
-Y7:    GPIO 39
+XCLK:  GPIO 10     Y5:    GPIO 16
+SIOD:  GPIO 40     Y4:    GPIO 18
+SIOC:  GPIO 39     Y3:    GPIO 17
+Y9:    GPIO 48     Y2:    GPIO 15
+Y8:    GPIO 11     VSYNC: GPIO 38
+Y7:    GPIO 12     HREF:  GPIO 47
+Y6:    GPIO 14     PCLK:  GPIO 13
+```
+
+### 2. Freenove ESP32-S3 WROOM CAM
+```
+XCLK:  GPIO 15     Y5:    GPIO 10
+SIOD:  GPIO  4     Y4:    GPIO  8
+SIOC:  GPIO  5     Y3:    GPIO  9
+Y9:    GPIO 16     Y2:    GPIO 11
+Y8:    GPIO 17     VSYNC: GPIO  6
+Y7:    GPIO 18     HREF:  GPIO  7
+Y6:    GPIO 12     PCLK:  GPIO 13
+```
+
+### 3. AI-Thinker ESP32-CAM (Legacy)
+```
+PWDN:  GPIO 32     Y5:    GPIO 21
+XCLK:  GPIO  0     Y4:    GPIO 19
+SIOD:  GPIO 26     Y3:    GPIO 18
+SIOC:  GPIO 27     Y2:    GPIO  5
+Y9:    GPIO 35     VSYNC: GPIO 25
+Y8:    GPIO 34     HREF:  GPIO 23
+Y7:    GPIO 39     PCLK:  GPIO 22
 Y6:    GPIO 36
-Y5:    GPIO 21
-Y4:    GPIO 19
-Y3:    GPIO 18
-Y2:    GPIO  5
-VSYNC: GPIO 25
-HREF:  GPIO 23
-PCLK:  GPIO 22
 ```
+
+### Camera Sensors
+
+| Sensor | Resolution | Max FPS | Notes |
+|--------|------------|---------|-------|
+| **OV2640** | 1600x1200 (2MP) | 15fps @ UXGA | Default, widely available |
+| **OV3660** | 2048x1536 (3MP) | 15fps @ QXGA | Higher quality, may need vflip |
 
 ---
 
@@ -89,9 +124,9 @@ PCLK:  GPIO 22
 ```
 
 **Data Flow:**
-1. ESP32 polls for commands (every 5 seconds)
+1. ESP32-S3 polls for commands (every 5 seconds)
 2. User sends `start-stream` command via datumctl
-3. ESP32 starts capturing and POSTing JPEG frames
+3. ESP32-S3 starts capturing and POSTing JPEG frames
 4. Server broadcasts frames to all connected WebSocket/MJPEG clients
 5. Web viewer displays real-time video
 
