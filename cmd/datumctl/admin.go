@@ -177,6 +177,38 @@ func runResetPassword(cmd *cobra.Command, args []string) error {
 		fmt.Println("\n⚠️  Save this password - it won't be shown again!")
 	}
 
+	// If token is missing (legacy server), try to login to get it
+	if _, hasToken := response["token"]; !hasToken {
+		pass := adminNewPassword
+		if newPass, ok := response["new_password"].(string); ok {
+			pass = newPass
+		}
+
+		if pass != "" {
+			// Try to login to get token
+			loginClient := NewAPIClient(serverURL, "", "")
+			loginPayload := map[string]interface{}{
+				"email":    username,
+				"password": pass,
+			}
+
+			if loginResp, err := loginClient.Post("/auth/login", loginPayload); err == nil {
+				var loginData map[string]interface{}
+				if err := ParseResponse(loginResp, &loginData); err == nil {
+					if token, ok := loginData["token"].(string); ok {
+						response["token"] = token
+					}
+				}
+			}
+		}
+	}
+
+	if token, ok := response["token"].(string); ok {
+		fmt.Println("\n🔑 New Access Token (JWT):")
+		fmt.Println(token)
+		fmt.Println("\nUse this token for API access or Stream Viewer login.")
+	}
+
 	return nil
 }
 

@@ -629,9 +629,13 @@ func resetPasswordHandler(c *gin.Context) {
 		return
 	}
 
+	// Generate new token for immediate use
+	newToken, _ := auth.GenerateToken(user.ID, user.Email, user.Role)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message":      "Password reset successfully",
 		"new_password": req.NewPassword,
+		"token":        newToken,
 	})
 }
 

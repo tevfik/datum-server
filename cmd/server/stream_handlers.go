@@ -103,6 +103,9 @@ func uploadFrameHandler(c *gin.Context) {
 	// Broadcast frame to all connected clients
 	streamManager.BroadcastFrame(deviceID, frameData)
 
+	// Update device last seen
+	go store.UpdateDeviceLastSeen(deviceID)
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":     "frame_received",
 		"size_bytes": len(frameData),

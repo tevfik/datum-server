@@ -13,10 +13,17 @@ This guide shows how to provision (register) a new IoT device with Datumpy.
 ### 1. Create Device via API
 
 ```bash
+# Using CLI (Recommended)
+datumctl device create --name "Living Room Sensor" --type "temperature_humidity"
+
+# Using API directly
 # Login to get auth token
 curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "your_password"}'
+  
+# ... (rest of curl example)
+
 
 # Response: {"token": "eyJhbGc..."}
 

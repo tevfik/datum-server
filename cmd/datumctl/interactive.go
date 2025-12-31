@@ -63,6 +63,33 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 			if err := provisionMenu(); err != nil {
 				fmt.Printf("\n❌ Error: %v\n", err)
 			}
+
+		case "Admin Management":
+			if err := adminMenu(); err != nil {
+				fmt.Printf("\n❌ Error: %v\n", err)
+			}
+		case "Setup System":
+			fmt.Println("\n> datumctl setup")
+			if err := runSetup(nil, nil); err != nil {
+				fmt.Printf("\n❌ Error: %v\n", err)
+			}
+		case "Login / Switch User":
+			if err := promptLogin(); err != nil {
+				fmt.Printf("\n❌ Error: %v\n", err)
+			}
+		case "Register User":
+			fmt.Println("\n> datumctl register")
+			if err := runRegister(nil, nil); err != nil {
+				fmt.Printf("\n❌ Error: %v\n", err)
+			}
+		case "Logout":
+			fmt.Println("\n> datumctl logout")
+			if err := runLogout(nil, nil); err != nil {
+				fmt.Printf("\n❌ Error: %v\n", err)
+			}
+			// Reset global variables
+			token = ""
+			apiKey = ""
 		case "System Status":
 			fmt.Println("\n> datumctl status")
 			if err := runStatus(nil, nil); err != nil {
@@ -71,10 +98,13 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 		case "Configuration":
 			fmt.Println("\n> datumctl config show")
 			runConfigShow(nil, nil)
-		case "Admin Management":
-			if err := adminMenu(); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
+		case "Show Version":
+			fmt.Println("\nDatum IoT Platform CLI")
+			fmt.Printf("Version: %s\n", Version)
+			// fmt.Printf("Build: %s\n", BuildDate)
+		case fmt.Sprintf("Toggle Curl Output (Current: %v)", showCurl), "Toggle Curl Output (Current: true)", "Toggle Curl Output (Current: false)":
+			showCurl = !showCurl
+			fmt.Printf("\n🔄 Curl output toggled: %v\n", showCurl)
 		case "Exit":
 			fmt.Println("\n👋 Goodbye!")
 			return nil
@@ -93,9 +123,15 @@ func showMainMenu() (string, error) {
 			"Data Queries",
 			"Command & Control",
 			"Provisioning",
-			"System Status",
 			"Admin Management",
+			"Setup System",
+			"Login / Switch User",
+			"Register User",
+			"Logout",
+			"System Status",
 			"Configuration",
+			"Show Version",
+			fmt.Sprintf("Toggle Curl Output (Current: %v)", showCurl),
 			"Exit",
 		},
 		PageSize: 10,
@@ -117,7 +153,6 @@ func deviceMenu() error {
 			"Get device details",
 			"Create new device",
 			"Delete device",
-			"─── Key Management ───",
 			"Token info",
 			"Rotate key",
 			"Revoke key (emergency)",

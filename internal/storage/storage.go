@@ -768,6 +768,26 @@ func (s *Storage) UpdateDevice(deviceID string, status string) error {
 	})
 }
 
+// UpdateDeviceLastSeen updates the last seen timestamp of a device
+func (s *Storage) UpdateDeviceLastSeen(deviceID string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		deviceKey := fmt.Sprintf("device:%s", deviceID)
+		deviceData, err := tx.Get(deviceKey)
+		if err != nil {
+			return fmt.Errorf("device not found")
+		}
+
+		var device Device
+		json.Unmarshal([]byte(deviceData), &device)
+		device.LastSeen = time.Now()
+		// We don't update UpdatedAt here to keep it semantic to configuration changes
+
+		data, _ := json.Marshal(device)
+		tx.Set(deviceKey, string(data), nil)
+		return nil
+	})
+}
+
 // ForceDeleteDevice deletes a device by admin (bypasses user ownership check)
 func (s *Storage) ForceDeleteDevice(deviceID string) error {
 	return s.db.Update(func(tx *buntdb.Tx) error {
