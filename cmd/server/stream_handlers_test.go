@@ -177,7 +177,7 @@ func TestStreamInfoHandler(t *testing.T) {
 	store.CreateDevice(testDevice)
 
 	// Generate admin token
-	adminToken, _ := auth.GenerateToken(testUser.ID, testUser.Email)
+	adminToken, _ := auth.GenerateToken(testUser.ID, testUser.Email, "user")
 
 	// Register route
 	router.GET("/devices/:device_id/stream/info", func(c *gin.Context) {
@@ -246,7 +246,7 @@ func TestStreamInfoHandler(t *testing.T) {
 			UpdatedAt:    time.Now(),
 		}
 		store.CreateUser(otherUser)
-		otherToken, _ := auth.GenerateToken(otherUser.ID, otherUser.Email)
+		otherToken, _ := auth.GenerateToken(otherUser.ID, otherUser.Email, "user")
 
 		// Create a separate router for this test that sets the other user's ID
 		otherRouter, _ := setupTestRouter()
@@ -425,7 +425,7 @@ func TestMJPEGStreamHandler(t *testing.T) {
 	}
 	store.CreateDevice(testDevice)
 
-	adminToken, _ := auth.GenerateToken(testUser.ID, testUser.Email)
+	adminToken, _ := auth.GenerateToken(testUser.ID, testUser.Email, "user")
 
 	// Register route
 	router.GET("/devices/:device_id/stream/mjpeg", func(c *gin.Context) {
@@ -467,7 +467,7 @@ func TestMJPEGStreamHandler(t *testing.T) {
 		}
 		store.CreateDevice(otherDevice)
 
-		otherToken, _ := auth.GenerateToken(otherUser.ID, otherUser.Email)
+		otherToken, _ := auth.GenerateToken(otherUser.ID, otherUser.Email, "user")
 
 		// Create router that sets otherUser's ID
 		otherRouter, _ := setupTestRouter()
@@ -515,7 +515,7 @@ func TestWebSocketStreamHandler(t *testing.T) {
 	}
 	store.CreateDevice(testDevice)
 
-	adminToken, _ := auth.GenerateToken(testUser.ID, testUser.Email)
+	adminToken, _ := auth.GenerateToken(testUser.ID, testUser.Email, "user")
 
 	// Register route
 	router.GET("/devices/:device_id/stream/ws", func(c *gin.Context) {
@@ -547,7 +547,7 @@ func TestWebSocketStreamHandler(t *testing.T) {
 			UpdatedAt:    time.Now(),
 		}
 		store.CreateUser(otherUser)
-		otherToken, _ := auth.GenerateToken(otherUser.ID, otherUser.Email)
+		otherToken, _ := auth.GenerateToken(otherUser.ID, otherUser.Email, "user")
 
 		// Create router that sets otherUser's ID
 		otherRouter, _ := setupTestRouter()

@@ -103,6 +103,17 @@ make build-cli
 
 See [CLI Tutorial](docs/tutorials/CLI.md) for complete CLI documentation.
 
+## 📺 Stream Viewer
+
+A web-based viewer is included to easily test and view camera streams:
+
+1. Open `stream_viewer.html` in your browser.
+2. Log in with your admin credentials.
+3. Enter the Target Device ID.
+4. View the authenticated MJPEG stream.
+
+This viewer handles JWT token acquisition and passes it to the stream endpoint securely.
+
 ## �📡 API Quick Reference
 
 ### Device Authentication

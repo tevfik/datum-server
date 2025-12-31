@@ -73,8 +73,11 @@ func getLatestDataHandler(c *gin.Context) {
 		return
 	}
 	if device.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-		return
+		role, _ := auth.GetUserRole(c)
+		if role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 	}
 
 	point, err := store.GetLatestData(deviceID)
@@ -102,8 +105,11 @@ func getDataHistoryHandler(c *gin.Context) {
 		return
 	}
 	if device.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-		return
+		role, _ := auth.GetUserRole(c)
+		if role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 	}
 
 	limit := 1000

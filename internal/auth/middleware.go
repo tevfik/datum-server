@@ -13,9 +13,15 @@ func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
-			c.Abort()
-			return
+			// Fallback: check query parameter (useful for WebSockets and MJPEG streams)
+			tokenParam := c.Query("token")
+			if tokenParam != "" {
+				authHeader = "Bearer " + tokenParam
+			} else {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+				c.Abort()
+				return
+			}
 		}
 
 		// Extract token from "Bearer <token>"
@@ -37,6 +43,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		// Store user info in context
 		c.Set("user_id", claims.UserID)
 		c.Set("email", claims.Email)
+		c.Set("role", claims.Role)
 		c.Next()
 	}
 }
@@ -105,4 +112,13 @@ func GetUserID(c *gin.Context) (string, error) {
 		return "", fmt.Errorf("user_id not found in context")
 	}
 	return userID.(string), nil
+}
+
+// GetUserRole extracts user role from context
+func GetUserRole(c *gin.Context) (string, error) {
+	role, exists := c.Get("role")
+	if !exists {
+		return "", fmt.Errorf("role not found in context")
+	}
+	return role.(string), nil
 }

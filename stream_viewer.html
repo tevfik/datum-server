@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datum Camera Viewer</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+            --text-secondary: #94a3b8;
+            --error: #ef4444;
+            --success: #22c55e;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: var(--surface);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            width: 100%;
+            max-width: 480px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            background-color: #0f172a;
+            color: var(--text);
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .error-msg {
+            color: var(--error);
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+
+        #stream-container {
+            display: none;
+            text-align: center;
+        }
+
+        #stream-view {
+            width: 100%;
+            background-color: #000;
+            border-radius: 8px;
+            aspect-ratio: 4/3;
+            object-fit: contain;
+            margin-bottom: 1rem;
+        }
+
+        .status {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 1rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="login-panel">
+        <h1>Login to Datum</h1>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="admin@example.com">
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="••••••••">
+        </div>
+        <div class="form-group">
+            <label for="device-id">Camera Device ID</label>
+            <input type="text" id="device-id" placeholder="dev_XXXXXX">
+        </div>
+        <button onclick="login()">Connect to Camera</button>
+        <div class="error-msg" id="login-error"></div>
+    </div>
+
+    <div class="container hidden" id="stream-panel">
+        <h1>Camera Stream</h1>
+        <div id="stream-container" style="display: block;">
+            <img id="stream-view" alt="Camera Stream" src="">
+        </div>
+        <p class="status">Connected via Authenticated MJPEG Stream</p>
+        <button onclick="logout()" style="background-color: #334155; margin-top: 1rem;">Disconnect</button>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8080"; 
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const deviceId = document.getElementById('device-id').value;
+            const errorDiv = document.getElementById('login-error');
+
+            if (!email || !password || !deviceId) {
+                errorDiv.textContent = "All fields are required";
+                errorDiv.style.display = "block";
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Login failed');
+                }
+
+                const token = data.token;
+                startStream(deviceId, token);
+
+            } catch (err) {
+                errorDiv.textContent = err.message;
+                errorDiv.style.display = "block";
+            }
+        }
+
+        function startStream(deviceId, token) {
+            document.getElementById('login-panel').classList.add('hidden');
+            document.getElementById('stream-panel').classList.remove('hidden');
+
+            const img = document.getElementById('stream-view');
+            // Use the new ?token= query parameter capability
+            img.src = `${API_URL}/devices/${deviceId}/stream/mjpeg?token=${token}`;
+            
+            img.onerror = () => {
+                alert("Failed to load stream. Check Device ID and ensure camera is online.");
+            };
+        }
+
+        function logout() {
+            document.getElementById('stream-view').src = "";
+            document.getElementById('stream-panel').classList.add('hidden');
+            document.getElementById('login-panel').classList.remove('hidden');
+            document.getElementById('password').value = "";
+        }
+    </script>
+</body>
+</html>

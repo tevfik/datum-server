@@ -36,7 +36,7 @@ func TestGenerateToken(t *testing.T) {
 	userID := "usr_123"
 	email := "test@example.com"
 
-	token, err := GenerateToken(userID, email)
+	token, err := GenerateToken(userID, email, "user")
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, token)
@@ -46,13 +46,14 @@ func TestValidateToken(t *testing.T) {
 	userID := "usr_123"
 	email := "test@example.com"
 
-	token, _ := GenerateToken(userID, email)
+	token, _ := GenerateToken(userID, email, "user")
 
 	// Test valid token
 	claims, err := ValidateToken(token)
 	assert.NoError(t, err)
 	assert.Equal(t, userID, claims.UserID)
 	assert.Equal(t, email, claims.Email)
+	assert.Equal(t, "user", claims.Role)
 
 	// Test invalid token
 	_, err = ValidateToken("invalid.token.here")

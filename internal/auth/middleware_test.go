@@ -12,7 +12,7 @@ func TestAuthMiddlewareValid(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	// Create a valid token
-	token, _ := GenerateToken("user123", "test@example.com")
+	token, _ := GenerateToken("user123", "test@example.com", "user")
 
 	// Setup router with middleware
 	r := gin.New()

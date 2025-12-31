@@ -48,7 +48,7 @@ func TestAdminMiddlewareSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create admin token
-	token, err := GenerateToken("admin123", "admin@test.com")
+	token, err := GenerateToken("admin123", "admin@test.com", "admin")
 	require.NoError(t, err)
 
 	r := gin.New()
@@ -81,7 +81,7 @@ func TestAdminMiddlewareNotAdmin(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	token, _ := GenerateToken("user123", "user@test.com")
+	token, _ := GenerateToken("user123", "user@test.com", "user")
 
 	r := gin.New()
 	r.Use(AdminMiddleware(store))
@@ -114,7 +114,7 @@ func TestAdminMiddlewareSuspendedUser(t *testing.T) {
 	}
 	store.CreateUser(adminUser)
 
-	token, _ := GenerateToken("admin123", "admin@test.com")
+	token, _ := GenerateToken("admin123", "admin@test.com", "admin")
 
 	r := gin.New()
 	r.Use(AdminMiddleware(store))
@@ -137,7 +137,7 @@ func TestAdminMiddlewareUserNotFound(t *testing.T) {
 	store, cleanup := createTestStorageForAuth(t)
 	defer cleanup()
 
-	token, _ := GenerateToken("nonexistent", "nonexistent@test.com")
+	token, _ := GenerateToken("nonexistent", "nonexistent@test.com", "user")
 
 	r := gin.New()
 	r.Use(AdminMiddleware(store))

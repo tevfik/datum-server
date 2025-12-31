@@ -24,6 +24,20 @@
 #include <WebServer.h>
 #include <WiFi.h>
 
+// Debug Configuration
+// Uncomment the following line to enable detailed debug logs
+// #define DEBUG_MODE
+
+#ifdef DEBUG_MODE
+#define DEBUG_PRINT(...) Serial.print(__VA_ARGS__)
+#define DEBUG_PRINTLN(...) Serial.println(__VA_ARGS__)
+#define DEBUG_PRINTF(...) Serial.printf(__VA_ARGS__)
+#else
+#define DEBUG_PRINT(...)
+#define DEBUG_PRINTLN(...)
+#define DEBUG_PRINTF(...)
+#endif
+
 // ============================================================================
 // Board Selection
 // ============================================================================
@@ -80,7 +94,7 @@
 #define VSYNC_GPIO_NUM 6
 #define HREF_GPIO_NUM 7
 #define PCLK_GPIO_NUM 13
-#define LED_GPIO_NUM 48
+#define LED_GPIO_NUM 2
 #elif defined(CAMERA_MODEL_AI_THINKER)
 #define PWDN_GPIO_NUM 32
 #define RESET_GPIO_NUM -1
@@ -116,6 +130,8 @@ String serverURL;
 String wifiSSID;
 String wifiPass;
 String deviceID;
+String userEmail;
+String userPass;
 
 enum DeviceState {
   STATE_BOOT,
@@ -143,7 +159,7 @@ bool isActivated() { return apiKey.length() > 0; }
 // Web Interface (ESP-DASH Style)
 // ============================================================================
 const char DASHBOARD_HTML[] PROGMEM =
-    R"rawliteral(<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Datum Camera</title><style>body{background:#1b1b1b;color:white;font-family:sans-serif;margin:0;padding:20px}.card{background:#2d2d2d;padding:20px;margin-bottom:20px;border-radius:8px}.btn{background:#00bcd4;color:white;border:none;padding:10px;width:100%;border-radius:4px;font-size:16px;cursor:pointer;margin-top:5px}.btn-dan{background:#f44336}input{width:100%;padding:10px;margin:5px 0 15px;box-sizing:border-box;background:#444;border:none;color:white;border-radius:4px}img{width:100%;max-width:640px;display:block;margin:0 auto;background:black;border-radius:4px}.info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.info div{background:#333;padding:10px;border-radius:4px;text-align:center}label{display:block;margin-bottom:5px;color:#aaa;font-size:14px}</style></head><body><h1>📷 Datum Camera</h1><div class="card"><img id="stream" src="/stream" onload="this.style.opacity=1" onerror="this.style.opacity=0.5; setTimeout(reload, 1000)"><div class="info"><div>Signal<br><b id="rssi">-</b></div><div>Uptime<br><b id="uptime">0s</b></div></div></div><div class="card"><h2>📡 Configuration</h2><form action="/configure" method="POST"><label>Server URL</label><input type="url" name="server_url" placeholder="https://..." required><label>WiFi SSID</label><input type="text" name="wifi_ssid" required><label>WiFi Password</label><input type="password" name="wifi_pass"><button type="submit" class="btn">Save & Restart</button></form></div><div class="card"><h2>⚡ Controls</h2><div style="display:flex;gap:10px"><button class="btn" onclick="fetch('/action?type=led')">Toggle LED</button><button class="btn btn-dan" onclick="if(confirm('Reboot?')) fetch('/action?type=restart')">Restart</button></div></div><script>function reload(){document.getElementById('stream').src='/stream?t='+Date.now()}function update(){fetch('/info').then(r=>r.json()).then(d=>{document.getElementById('rssi').innerText='Active'}).catch(e=>console.log(e))}let s=0;setInterval(()=>{document.getElementById('uptime').innerText=Math.floor(++s/60)+'m '+(s%60)+'s'},1000);setInterval(update,5000);update()</script></body></html>)rawliteral";
+    R"rawliteral(<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Datum Camera</title><style>body{background:#1b1b1b;color:white;font-family:sans-serif;margin:0;padding:20px}.card{background:#2d2d2d;padding:20px;margin-bottom:20px;border-radius:8px}.btn{background:#00bcd4;color:white;border:none;padding:10px;width:100%;border-radius:4px;font-size:16px;cursor:pointer;margin-top:5px}.btn-dan{background:#f44336}input{width:100%;padding:10px;margin:5px 0 15px;box-sizing:border-box;background:#444;border:none;color:white;border-radius:4px}img{width:100%;max-width:640px;display:block;margin:0 auto;background:black;border-radius:4px}.info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.info div{background:#333;padding:10px;border-radius:4px;text-align:center}label{display:block;margin-bottom:5px;color:#aaa;font-size:14px}</style></head><body><h1>📷 Datum Camera</h1><div class="card"><img id="stream" src="/capture"><div class="info"><div>Signal<br><b id="rssi">-</b></div><div>Uptime<br><b id="uptime">0s</b></div></div></div><div class="card"><h2>📡 Configuration</h2><form action="/configure" method="POST"><label>Server URL</label><input type="url" name="server_url" placeholder="https://..." required><label>WiFi SSID</label><input type="text" name="wifi_ssid" required><label>WiFi Password</label><input type="password" name="wifi_pass"><hr style="border-color:#444;margin:20px 0"><label>User Email</label><input type="email" name="user_email" required><label>User Password</label><input type="password" name="user_password" required><button type="submit" class="btn">Save & Restart</button></form></div><div class="card"><h2>⚡ Controls</h2><div style="display:flex;gap:10px"><button class="btn" onclick="fetch('/action?type=led')">Toggle LED</button><button class="btn btn-dan" onclick="if(confirm('Reboot?')) fetch('/action?type=restart')">Restart</button></div></div><script>const i=document.getElementById('stream');const l=()=>{setTimeout(()=>{i.src='/capture?t='+Date.now()},200)};i.onload=l;i.onerror=l;document.querySelector('form').onsubmit=(e)=>{e.preventDefault();const b=document.querySelector('button[type=submit]');b.disabled=true;b.innerText='Saving...';fetch('/configure',{method:'POST',body:new FormData(e.target)}).then(()=>{document.body.innerHTML='<div style="text-align:center;margin-top:50px"><h1>🔄 Restarting...</h1><p>Please connect to your WiFi network.</p></div>'}).catch(e=>alert('Error: '+e))};function update(){fetch('/info').then(r=>r.json()).then(d=>{document.getElementById('rssi').innerText='Active'}).catch(e=>console.log(e))}let s=0;setInterval(()=>{document.getElementById('uptime').innerText=Math.floor(++s/60)+'m '+(s%60)+'s'},1000);setInterval(update,5000);update()</script></body></html>)rawliteral";
 
 // ============================================================================
 // Core Functions
@@ -185,32 +201,45 @@ void loadCredentials() {
   wifiSSID = prefs.getString("wifi_ssid", "");
   wifiPass = prefs.getString("wifi_pass", "");
   deviceID = prefs.getString("device_id", "");
+  userEmail = prefs.getString("user_email", "");
+  userPass = prefs.getString("user_pass", "");
   prefs.end();
 }
 
-void saveCredentials(String u, String s, String p) {
+void saveCredentials(String u, String s, String p, String email, String pwd) {
   prefs.begin("datum", false);
   prefs.putString("server_url", u);
   prefs.putString("wifi_ssid", s);
   prefs.putString("wifi_pass", p);
+  prefs.putString("user_email", email);
+  prefs.putString("user_pass", pwd);
   prefs.end();
   serverURL = u;
   wifiSSID = s;
   wifiPass = p;
+  userEmail = email;
+  userPass = pwd;
 }
 
 void saveActivation(String id, String key) {
   prefs.begin("datum", false);
   prefs.putString("device_id", id);
   prefs.putString("api_key", key);
+  // Clear temp user creds
+  prefs.remove("user_email");
+  prefs.remove("user_pass");
   prefs.end();
   deviceID = id;
   apiKey = key;
+  userEmail = "";
+  userPass = "";
 }
 
+// Use Low-Level MAC retrieval to ensure it works even if WiFi isn't ready
+#include "esp_mac.h"
 void initDeviceUID() {
   uint8_t mac[6];
-  WiFi.macAddress(mac);
+  esp_efuse_mac_get_default(mac);
   char buf[13];
   sprintf(buf, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3],
           mac[4], mac[5]);
@@ -330,11 +359,14 @@ void handleConfigure() {
   String u = setupServer.arg("server_url");
   String s = setupServer.arg("wifi_ssid");
   String p = setupServer.arg("wifi_pass");
-  if (u.length() == 0 || s.length() == 0) {
+  String email = setupServer.arg("user_email");
+  String pwd = setupServer.arg("user_password");
+
+  if (u.length() == 0 || s.length() == 0 || email.length() == 0) {
     setupServer.send(400, "text/plain", "Missing fields");
     return;
   }
-  saveCredentials(u, s, p);
+  saveCredentials(u, s, p, email, pwd);
   String html =
       R"(<html><body style='background:#1b1b1b;color:white;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif'>
         <div style='background:#2d2d2d;padding:40px;border-radius:12px;text-align:center'>
@@ -350,13 +382,24 @@ void handleNotFound() {
 }
 
 void startSetupMode() {
-  Serial.println("Starting Setup Mode");
+  Serial.println("Starting Setup Mode"); // Always print critical state changes
   currentState = STATE_SETUP_MODE;
   setupStartTime = millis();
   WiFi.mode(WIFI_AP);
   String ap = String(SETUP_AP_PREFIX) + deviceUID.substring(8);
   WiFi.softAP(ap.c_str(), SETUP_AP_PASSWORD);
 
+  setupServer.on("/", HTTP_GET, handleSetupRoot);
+  setupServer.on("/stream", HTTP_GET, handleStream);
+  setupServer.on("/capture", HTTP_GET, handleCapture);
+  setupServer.on("/info", HTTP_GET, handleDeviceInfo);
+  setupServer.on("/action", HTTP_GET, handleAction);
+  setupServer.on("/configure", HTTP_POST, handleConfigure);
+  setupServer.onNotFound(handleNotFound);
+  setupServer.begin();
+}
+
+void startCameraServer() {
   setupServer.on("/", HTTP_GET, handleSetupRoot);
   setupServer.on("/stream", HTTP_GET, handleStream);
   setupServer.on("/capture", HTTP_GET, handleCapture);
@@ -374,34 +417,64 @@ bool connectToWiFi() {
   WiFi.begin(wifiSSID.c_str(), wifiPass.c_str());
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 40) {
+    Serial.print(".");
     delay(500);
     updateLED();
     attempts++;
   }
+  Serial.println();
   return WiFi.status() == WL_CONNECTED;
 }
 
+String extractJsonVal(String json, String key) {
+  int s = json.indexOf("\"" + key + "\":\"");
+  if (s < 0)
+    return "";
+  s += key.length() + 4;
+  int e = json.indexOf("\"", s);
+  return json.substring(s, e);
+}
+
 bool activateWithServer() {
+  if (userEmail.length() == 0)
+    return false;
+
   currentState = STATE_ACTIVATING;
   HTTPClient http;
-  http.begin(serverURL + "/provisioning/activate");
+
+  // 1. Login
+  http.begin(serverURL + "/auth/login");
   http.addHeader("Content-Type", "application/json");
-  String pl = "{\"device_uid\":\"" + deviceUID + "\",\"firmware_version\":\"" +
-              FIRMWARE_VERSION + "\",\"model\":\"" + DEVICE_MODEL + "\"}";
-  int code = http.POST(pl);
-  if (code == 200) {
-    String resp = http.getString();
-    int ds = resp.indexOf("\"device_id\":\"") + 13;
-    int de = resp.indexOf("\"", ds);
-    int ks = resp.indexOf("\"api_key\":\"") + 11;
-    int ke = resp.indexOf("\"", ks);
-    if (ds > 13 && ks > 11) {
-      saveActivation(resp.substring(ds, de), resp.substring(ks, ke));
-      http.end();
+  String loginPl =
+      "{\"email\":\"" + userEmail + "\",\"password\":\"" + userPass + "\"}";
+  int code = http.POST(loginPl);
+  String resp = http.getString();
+  http.end();
+
+  if (code != 200)
+    return false;
+  String token = extractJsonVal(resp, "token");
+  if (token.length() == 0)
+    return false;
+
+  // 2. Register Device
+  http.begin(serverURL + "/devices");
+  http.addHeader("Authorization", "Bearer " + token);
+  http.addHeader("Content-Type", "application/json");
+  String devPl = "{\"name\":\"Camera-" + deviceMAC + "\",\"type\":\"camera\"}";
+
+  code = http.POST(devPl);
+  resp = http.getString();
+  http.end();
+
+  if (code == 201) {
+    String did = extractJsonVal(resp, "device_id");
+    String key = extractJsonVal(resp, "api_key");
+    if (did.length() > 0 && key.length() > 0) {
+      saveActivation(did, key);
       return true;
     }
   }
-  http.end();
   return false;
 }
 
@@ -444,25 +517,44 @@ void streamLoop() {
   esp_camera_fb_return(fb);
 }
 
+// Setup logic with late camera init
 void setup() {
   Serial.begin(115200);
 #ifdef LED_GPIO_NUM
   pinMode(LED_GPIO_NUM, OUTPUT);
 #endif
   initDeviceUID();
-  initCamera();
   loadCredentials();
 
-  if (wifiSSID.length() == 0)
+  // If no credentials, start AP immediately (and init camera for preview)
+  if (wifiSSID.length() == 0) {
+    initCamera();
     startSetupMode();
-  else if (connectToWiFi()) {
+    return;
+  }
+
+  // Try to connect to WiFi FIRST (without camera active)
+  if (connectToWiFi()) {
+    // Connection successful, NOW init camera
+    initCamera();
+
+    // Check activation
     if (apiKey.length() > 0 || activateWithServer()) {
       currentState = STATE_ONLINE;
-      startSetupMode(); // Keep dashboard accessible even when online
-    } else
+      // Optional: Keep setup server running for reconfiguration?
+      // startSetupMode();
+      startCameraServer(); // Start streaming server
+      streaming = true;    // Auto start stream if configured
+    } else {
       currentState = STATE_OFFLINE;
-  } else
+      // Activation failed, go to setup mode
+      startSetupMode();
+    }
+  } else {
+    // Connection failed
+    initCamera();
     startSetupMode();
+  }
 }
 
 void loop() {

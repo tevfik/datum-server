@@ -43,7 +43,7 @@ func setupTestEnvironment(t *testing.T) (*gin.Engine, *storage.Storage, string) 
 	assert.NoError(t, err)
 
 	// Generate admin token
-	token, err := auth.GenerateToken(adminUser.ID, adminUser.Email)
+	token, err := auth.GenerateToken(adminUser.ID, adminUser.Email, "admin")
 	assert.NoError(t, err)
 
 	// Setup router

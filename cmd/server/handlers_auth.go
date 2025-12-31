@@ -72,7 +72,7 @@ func registerHandler(c *gin.Context) {
 		return
 	}
 
-	token, err := auth.GenerateToken(userID, req.Email)
+	token, err := auth.GenerateToken(userID, req.Email, "user")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
@@ -114,7 +114,7 @@ func loginHandler(c *gin.Context) {
 	// Update last login
 	store.UpdateUserLastLogin(user.ID)
 
-	token, err := auth.GenerateToken(user.ID, user.Email)
+	token, err := auth.GenerateToken(user.ID, user.Email, user.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return

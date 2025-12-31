@@ -45,6 +45,7 @@ func initJWTSecret() []byte {
 type Claims struct {
 	UserID string `json:"user_id"`
 	Email  string `json:"email"`
+	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -61,10 +62,11 @@ func CheckPassword(hashedPassword, password string) bool {
 }
 
 // GenerateToken creates a JWT token for a user
-func GenerateToken(userID, email string) (string, error) {
+func GenerateToken(userID, email, role string) (string, error) {
 	claims := Claims{
 		UserID: userID,
 		Email:  email,
+		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

@@ -160,7 +160,7 @@ func TestGetLatestData(t *testing.T) {
 	testStore.StoreData(dataPoint)
 
 	// Generate user token
-	token, _ := auth.GenerateToken("user-1", "user@test.com")
+	token, _ := auth.GenerateToken("user-1", "user@test.com", "user")
 
 	r := gin.New()
 	dataQueryGroup := r.Group("/data")
@@ -204,7 +204,7 @@ func TestDeleteDevice(t *testing.T) {
 	testStore.CreateDevice(device)
 
 	// Generate admin token
-	token, _ := auth.GenerateToken("admin-1", "admin@test.com")
+	token, _ := auth.GenerateToken("admin-1", "admin@test.com", "admin")
 
 	r := gin.New()
 	setupAdminRoutes(r, testStore)
@@ -250,7 +250,7 @@ func TestGetDevice(t *testing.T) {
 	testStore.CreateDevice(device)
 
 	// Generate admin token
-	token, _ := auth.GenerateToken("admin-1", "admin@test.com")
+	token, _ := auth.GenerateToken("admin-1", "admin@test.com", "admin")
 
 	r := gin.New()
 	setupAdminRoutes(r, testStore)
@@ -297,7 +297,7 @@ func TestUpdateDevice(t *testing.T) {
 	testStore.CreateDevice(device)
 
 	// Generate admin token
-	token, _ := auth.GenerateToken("admin-1", "admin@test.com")
+	token, _ := auth.GenerateToken("admin-1", "admin@test.com", "admin")
 
 	r := gin.New()
 	setupAdminRoutes(r, testStore)
@@ -346,7 +346,7 @@ func TestDataHistory(t *testing.T) {
 	testStore.CreateDevice(device)
 
 	// Generate user token
-	token, _ := auth.GenerateToken("user-1", "user@test.com")
+	token, _ := auth.GenerateToken("user-1", "user@test.com", "user")
 
 	r := gin.New()
 	dataQueryGroup := r.Group("/data")
@@ -380,7 +380,7 @@ func TestInvalidDeviceID(t *testing.T) {
 	}
 	testStore.CreateUser(adminUser)
 
-	token, _ := auth.GenerateToken("admin-1", "admin@test.com")
+	token, _ := auth.GenerateToken("admin-1", "admin@test.com", "admin")
 
 	r := gin.New()
 	setupAdminRoutes(r, testStore)

@@ -154,7 +154,7 @@ func setupSystemHandler(c *gin.Context) {
 	}
 
 	// Generate token for admin
-	token, _ := auth.GenerateToken(userID, req.AdminEmail)
+	token, _ := auth.GenerateToken(userID, req.AdminEmail, "admin")
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message":  "System initialized successfully",

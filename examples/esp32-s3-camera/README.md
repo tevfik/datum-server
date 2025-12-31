@@ -50,6 +50,12 @@ This example demonstrates real-time camera streaming from ESP32-S3 behind NAT/pr
 
 > **Note**: ESP32-S3 is recommended over ESP32-S2 for camera applications. The ESP32-S2 has limited camera interface support and may have compatibility issues with some sensors.
 
+### ⚠️ Important: PSRAM Configuration
+Most ESP32-S3 Camera boards (especially Freenove S3 Cam and generic clones) use **8MB OPI PSRAM**.
+- **Error**: `E (226) quad_psram: PSRAM chip is not connected`
+- **Fix**: In Arduino IDE, go to **Tools > PSRAM** and select **"OPI PSRAM"**.
+- if your board has no PSRAM, select "Disabled".
+
 ---
 
 ## Supported Boards

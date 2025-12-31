@@ -71,6 +71,10 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 		case "Configuration":
 			fmt.Println("\n> datumctl config show")
 			runConfigShow(nil, nil)
+		case "Admin Management":
+			if err := adminMenu(); err != nil {
+				fmt.Printf("\n❌ Error: %v\n", err)
+			}
 		case "Exit":
 			fmt.Println("\n👋 Goodbye!")
 			return nil
@@ -90,6 +94,7 @@ func showMainMenu() (string, error) {
 			"Command & Control",
 			"Provisioning",
 			"System Status",
+			"Admin Management",
 			"Configuration",
 			"Exit",
 		},
@@ -658,4 +663,85 @@ func promptLogin() error {
 	loginPassword = password
 
 	return runLogin(nil, nil)
+}
+
+func adminMenu() error {
+	var action string
+	prompt := &survey.Select{
+		Message: "Admin Management:",
+		Options: []string{
+			"List users",
+			"Create user",
+			"Delete user",
+			"Reset user password",
+			"System statistics",
+			"System config",
+			"Reset system (Dangerous)",
+			"← Back to main menu",
+		},
+	}
+
+	if err := survey.AskOne(prompt, &action); err != nil {
+		return err
+	}
+
+	// Reset admin flags to avoid carrying over values
+	adminEmail = ""
+	adminPassword = ""
+	adminRole = ""
+	adminNewPassword = ""
+	adminForceDelete = false
+	adminForceReset = false
+
+	switch action {
+	case "List users":
+		fmt.Println("\n> datumctl admin list-users")
+		return runListUsers(nil, nil)
+
+	case "Create user":
+		return runCreateUser(nil, nil)
+
+	case "Delete user":
+		return promptAdminDeleteUser()
+
+	case "Reset user password":
+		return promptAdminResetPassword()
+
+	case "System statistics":
+		fmt.Println("\n> datumctl admin stats")
+		return runAdminStats(nil, nil)
+
+	case "System config":
+		fmt.Println("\n> datumctl admin get-config")
+		return runAdminConfig(nil, nil)
+
+	case "Reset system (Dangerous)":
+		return runResetSystem(nil, nil)
+	}
+
+	return nil
+}
+
+func promptAdminDeleteUser() error {
+	var email string
+	if err := survey.AskOne(&survey.Input{
+		Message: "User Email to delete:",
+	}, &email, survey.WithValidator(survey.Required)); err != nil {
+		return err
+	}
+
+	fmt.Printf("\n> datumctl admin delete-user %s\n", email)
+	return runDeleteUser(nil, []string{email})
+}
+
+func promptAdminResetPassword() error {
+	var email string
+	if err := survey.AskOne(&survey.Input{
+		Message: "User Email/Username:",
+	}, &email, survey.WithValidator(survey.Required)); err != nil {
+		return err
+	}
+
+	fmt.Printf("\n> datumctl admin reset-password %s\n", email)
+	return runResetPassword(nil, []string{email})
 }
