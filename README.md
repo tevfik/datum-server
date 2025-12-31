@@ -313,6 +313,17 @@ void sendData(float temp, float humidity) {
 
 See [examples/arduino/](examples/arduino/) for complete examples.
 
+### ESP32-S3 Camera (Features)
+
+The `examples/esp32-s3-camera` directory contains a production-ready firmware supporting:
+
+- **Zero-Touch Provisioning**: Connect to `Datum-Camera-XXXX` hotspot to configure WiFi.
+- **Local Dashboard**: Modern embedded web interface for monitoring and control.
+- **Dual Streaming**: Local MJPEG stream + Cloud WebSocket stream.
+- **Supported Boards**: ESP32-S3-CAM, Freenove S3, AI-Thinker.
+
+See [examples/esp32-s3-camera/README.md](examples/esp32-s3-camera/README.md) for flashing instructions.
+
 ### MicroPython
 
 ```python
