@@ -58,11 +58,66 @@ var deviceDeleteCmd = &cobra.Command{
 	RunE:    runDeviceDelete,
 }
 
+var deviceRotateKeyCmd = &cobra.Command{
+	Use:   "rotate-key [device-id]",
+	Short: "Rotate device API key",
+	Long: `Rotate the API key for a device.
+
+The old key remains valid during the grace period (default: 7 days),
+allowing the device to transition to the new key without downtime.
+
+The new key can be delivered to the device via:
+- Command channel (SSE or polling)
+- Manual update (for offline devices)`,
+	Args: cobra.ExactArgs(1),
+	Example: `  # Rotate key with default 7-day grace period
+  datumctl device rotate-key my-device-001
+
+  # Rotate key with custom grace period
+  datumctl device rotate-key my-device-001 --grace-days 14
+
+  # Rotate key and notify device via command channel
+  datumctl device rotate-key my-device-001 --notify`,
+	RunE: runDeviceRotateKey,
+}
+
+var deviceRevokeKeyCmd = &cobra.Command{
+	Use:   "revoke-key [device-id]",
+	Short: "Revoke device API key (emergency)",
+	Long: `Immediately revoke all API keys for a device.
+
+⚠️  WARNING: This is an emergency action!
+The device will be unable to authenticate until re-provisioned.
+
+Use this when:
+- A device key has been compromised
+- A device has been stolen
+- Immediate access termination is required`,
+	Args: cobra.ExactArgs(1),
+	Example: `  # Revoke device key immediately
+  datumctl device revoke-key my-device-001
+
+  # Revoke without confirmation (use with caution)
+  datumctl device revoke-key my-device-001 --force`,
+	RunE: runDeviceRevokeKey,
+}
+
+var deviceTokenInfoCmd = &cobra.Command{
+	Use:     "token-info [device-id]",
+	Short:   "Show device token information",
+	Long:    `Display token status, expiration, and rotation information for a device.`,
+	Args:    cobra.ExactArgs(1),
+	Example: `  datumctl device token-info my-device-001`,
+	RunE:    runDeviceTokenInfo,
+}
+
 var (
-	deviceName  string
-	deviceID    string
-	deviceType  string
-	forceDelete bool
+	deviceName      string
+	deviceID        string
+	deviceType      string
+	forceDelete     bool
+	gracePeriodDays int
+	notifyDevice    bool
 )
 
 func init() {
@@ -72,6 +127,9 @@ func init() {
 	deviceCmd.AddCommand(deviceGetCmd)
 	deviceCmd.AddCommand(deviceCreateCmd)
 	deviceCmd.AddCommand(deviceDeleteCmd)
+	deviceCmd.AddCommand(deviceRotateKeyCmd)
+	deviceCmd.AddCommand(deviceRevokeKeyCmd)
+	deviceCmd.AddCommand(deviceTokenInfoCmd)
 
 	deviceCreateCmd.Flags().StringVar(&deviceName, "name", "", "Device name (required)")
 	deviceCreateCmd.Flags().StringVar(&deviceID, "id", "", "Device ID (auto-generated if not provided)")
@@ -79,6 +137,11 @@ func init() {
 	deviceCreateCmd.MarkFlagRequired("name")
 
 	deviceDeleteCmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Skip confirmation")
+
+	deviceRotateKeyCmd.Flags().IntVar(&gracePeriodDays, "grace-days", 7, "Grace period in days (both old and new keys valid)")
+	deviceRotateKeyCmd.Flags().BoolVar(&notifyDevice, "notify", false, "Notify device via command channel")
+
+	deviceRevokeKeyCmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Skip confirmation")
 }
 
 func runDeviceList(cmd *cobra.Command, args []string) error {
@@ -272,6 +335,149 @@ func runDeviceDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("✅ Device '%s' deleted\n", deviceID)
+	return nil
+}
+
+func runDeviceRotateKey(cmd *cobra.Command, args []string) error {
+	loadConfig()
+	client := NewAPIClient(serverURL, token, apiKey)
+
+	deviceID := args[0]
+
+	payload := map[string]interface{}{
+		"grace_period_days": gracePeriodDays,
+		"notify_device":     notifyDevice,
+	}
+
+	resp, err := client.Post("/admin/devices/"+deviceID+"/rotate-key", payload)
+	if err != nil {
+		return err
+	}
+
+	var result map[string]interface{}
+	if err := ParseResponse(resp, &result); err != nil {
+		return err
+	}
+
+	if outputJSON {
+		return printJSON(result)
+	}
+
+	fmt.Println("\n🔑 API Key Rotated Successfully")
+	fmt.Printf("\nDevice ID: %s\n", deviceID)
+
+	if newKey, ok := result["new_token"].(string); ok {
+		fmt.Printf("New Token: %s\n", newKey)
+	}
+	if expiresAt, ok := result["token_expires_at"].(string); ok {
+		fmt.Printf("Token Expires: %s\n", expiresAt)
+	}
+	if gracePeriodEnd, ok := result["grace_period_end"].(string); ok {
+		fmt.Printf("Grace Period Until: %s\n", gracePeriodEnd)
+		fmt.Printf("\n⚠️  Old key remains valid until grace period ends\n")
+	}
+	if notifyDevice {
+		if notified, ok := result["device_notified"].(bool); ok && notified {
+			fmt.Printf("✅ Device notified via command channel\n")
+		} else {
+			fmt.Printf("⚠️  Device not online - command queued for delivery\n")
+		}
+	}
+	fmt.Println()
+
+	return nil
+}
+
+func runDeviceRevokeKey(cmd *cobra.Command, args []string) error {
+	loadConfig()
+	client := NewAPIClient(serverURL, token, apiKey)
+
+	deviceID := args[0]
+
+	if !forceDelete {
+		fmt.Printf("⚠️  REVOKE all keys for device '%s'? This is PERMANENT! (y/N): ", deviceID)
+		var confirm string
+		fmt.Scanln(&confirm)
+		if confirm != "y" && confirm != "Y" {
+			fmt.Println("Cancelled")
+			return nil
+		}
+	}
+
+	payload := map[string]interface{}{
+		"immediate": true,
+	}
+
+	resp, err := client.Post("/admin/devices/"+deviceID+"/revoke-key", payload)
+	if err != nil {
+		return err
+	}
+
+	var result map[string]interface{}
+	if err := ParseResponse(resp, &result); err != nil {
+		return err
+	}
+
+	if outputJSON {
+		return printJSON(result)
+	}
+
+	fmt.Println("\n🚨 Device Keys Revoked")
+	fmt.Printf("\nDevice ID: %s\n", deviceID)
+	fmt.Printf("Status: All keys invalidated\n")
+	fmt.Printf("\n⚠️  Device will be unable to authenticate until re-provisioned\n")
+	fmt.Println()
+
+	return nil
+}
+
+func runDeviceTokenInfo(cmd *cobra.Command, args []string) error {
+	loadConfig()
+	client := NewAPIClient(serverURL, token, apiKey)
+
+	deviceID := args[0]
+
+	resp, err := client.Get("/admin/devices/" + deviceID + "/token-info")
+	if err != nil {
+		return err
+	}
+
+	var result map[string]interface{}
+	if err := ParseResponse(resp, &result); err != nil {
+		return err
+	}
+
+	if outputJSON {
+		return printJSON(result)
+	}
+
+	fmt.Println("\n🔐 Device Token Information")
+	fmt.Printf("\nDevice ID: %s\n", deviceID)
+
+	if hasToken, ok := result["has_token"].(bool); ok && hasToken {
+		fmt.Printf("Token Status: Active\n")
+		if expiresAt, ok := result["token_expires_at"].(string); ok {
+			fmt.Printf("Token Expires: %s\n", expiresAt)
+		}
+		if needsRefresh, ok := result["needs_refresh"].(bool); ok && needsRefresh {
+			fmt.Printf("⚠️  Token approaching expiry - refresh recommended\n")
+		}
+		if inGracePeriod, ok := result["in_grace_period"].(bool); ok && inGracePeriod {
+			fmt.Printf("🔄 Rotation in progress (grace period active)\n")
+			if gracePeriodEnd, ok := result["grace_period_end"].(string); ok {
+				fmt.Printf("Grace Period Ends: %s\n", gracePeriodEnd)
+			}
+		}
+	} else {
+		fmt.Printf("Token Status: Using legacy API key\n")
+		fmt.Printf("💡 Consider migrating to token-based auth for better security\n")
+	}
+
+	if lastRotated, ok := result["last_rotated_at"].(string); ok && lastRotated != "" {
+		fmt.Printf("Last Rotated: %s\n", lastRotated)
+	}
+
+	fmt.Println()
 	return nil
 }
 

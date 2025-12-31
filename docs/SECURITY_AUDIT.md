@@ -302,44 +302,69 @@ func generateProvisioningAPIKey() string {
 
 ---
 
-## 9. API Key Lifecycle Management ⚠️
+## 9. API Key Lifecycle Management ✅ IMPLEMENTED
 
 ### Current Implementation
-Device API keys are:
-- Generated once during provisioning
-- Never expire
-- Cannot be rotated
-- Cannot be revoked without deleting device
+Device API keys now support:
+- ✅ Token-based authentication (Hybrid SAS approach)
+- ✅ Token expiration (90 days default)
+- ✅ Automatic key rotation with grace period
+- ✅ Admin-initiated key rotation
+- ✅ Emergency key revocation
+- ✅ Backward compatibility with legacy API keys
 
-**Status**: ⚠️ **NO KEY ROTATION MECHANISM**
+**Status**: ✅ **IMPLEMENTED** (December 31, 2025)
 
-### Issue
+### Implementation Details
+
+#### Token System
 ```go
 type Device struct {
-    // ...
-    APIKey    string    `json:"api_key"` // ⚠️ Permanent, unchangeable
-    // No APIKeyExpiresAt field
-    // No APIKeyVersion field
-    // ...
+    // Legacy (backward compatible)
+    APIKey    string    `json:"api_key"`
+    
+    // New Token System (Hybrid SAS)
+    MasterSecret   string    `json:"master_secret,omitempty"`
+    CurrentToken   string    `json:"current_token,omitempty"`
+    PreviousToken  string    `json:"previous_token,omitempty"`
+    TokenExpiresAt time.Time `json:"token_expires_at,omitempty"`
+    GracePeriodEnd time.Time `json:"grace_period_end,omitempty"`
+    KeyRevokedAt   time.Time `json:"key_revoked_at,omitempty"`
 }
 ```
 
-### Risk
-- **Compromised keys remain valid forever**
-- No way to rotate keys without factory reset
-- Device cannot detect compromised credentials
-- Leaked keys in logs/network captures persist indefinitely
+#### Token Format
+```
+dk_{expiry_unix}.{hmac_signature}
+Example: dk_1735660800.a1b2c3d4e5f67890abcdef12
+```
 
-### Real-World Scenario
+#### API Endpoints
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/admin/devices/:id/rotate-key` | POST | Admin-initiated key rotation |
+| `/admin/devices/:id/revoke-key` | POST | Emergency key revocation |
+| `/admin/devices/:id/token-info` | GET | Token status information |
+| `/device/token/refresh` | POST | Device self-refresh (before expiry) |
+
+#### CLI Commands
+```bash
+datumctl device rotate-key <device_id> [--grace-days 7] [--notify]
+datumctl device revoke-key <device_id> [--force]
+datumctl device token-info <device_id>
 ```
-1. Device sends data with API key
-2. Network traffic captured (e.g., unencrypted WiFi)
-3. Attacker extracts API key from packet
-4. Attacker can now:
-   - Send fake data from "device"
-   - Monitor device status indefinitely
-   - No way to invalidate the key
-```
+
+### Security Benefits
+| Before | After |
+|--------|-------|
+| API key valid forever | Tokens expire (90 days default) |
+| No rotation possible | Automatic + manual rotation |
+| Compromised key = permanent access | Grace period + immediate revocation |
+| Single credential | Master secret + rotating token |
+
+### Documentation
+- Architecture: [docs/diagrams/API_KEY_SECURITY.md](./diagrams/API_KEY_SECURITY.md)
+- Includes flow diagrams, usage examples, and firmware code
 
 ---
 

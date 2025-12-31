@@ -112,6 +112,10 @@ func deviceMenu() error {
 			"Get device details",
 			"Create new device",
 			"Delete device",
+			"─── Key Management ───",
+			"Token info",
+			"Rotate key",
+			"Revoke key (emergency)",
 			"← Back to main menu",
 		},
 	}
@@ -166,6 +170,75 @@ func deviceMenu() error {
 			return runDeviceDelete(nil, []string{deviceID})
 		}
 		fmt.Println("Cancelled")
+
+	case "Token info":
+		var deviceID string
+		if err := survey.AskOne(&survey.Input{
+			Message: "Enter device ID:",
+		}, &deviceID); err != nil {
+			return err
+		}
+		fmt.Printf("\n> datumctl device token-info %s\n", deviceID)
+		return runDeviceTokenInfo(nil, []string{deviceID})
+
+	case "Rotate key":
+		var deviceID string
+		if err := survey.AskOne(&survey.Input{
+			Message: "Enter device ID:",
+		}, &deviceID); err != nil {
+			return err
+		}
+
+		var graceDays int
+		if err := survey.AskOne(&survey.Input{
+			Message: "Grace period (days, default 7):",
+			Default: "7",
+		}, &graceDays); err != nil {
+			graceDays = 7
+		}
+
+		var notify bool
+		if err := survey.AskOne(&survey.Confirm{
+			Message: "Notify device via command channel?",
+			Default: true,
+		}, &notify); err != nil {
+			return err
+		}
+
+		gracePeriodDays = graceDays
+		notifyDevice = notify
+		fmt.Printf("\n> datumctl device rotate-key %s --grace-days %d\n", deviceID, graceDays)
+		return runDeviceRotateKey(nil, []string{deviceID})
+
+	case "Revoke key (emergency)":
+		var deviceID string
+		if err := survey.AskOne(&survey.Input{
+			Message: "Enter device ID:",
+		}, &deviceID); err != nil {
+			return err
+		}
+
+		fmt.Println("\n⚠️  WARNING: This will immediately invalidate all keys for this device!")
+		fmt.Println("The device will be unable to authenticate until re-provisioned.")
+
+		var confirm bool
+		if err := survey.AskOne(&survey.Confirm{
+			Message: fmt.Sprintf("REVOKE all keys for '%s'?", deviceID),
+			Default: false,
+		}, &confirm); err != nil {
+			return err
+		}
+
+		if confirm {
+			forceDelete = true
+			fmt.Printf("\n> datumctl device revoke-key %s --force\n", deviceID)
+			return runDeviceRevokeKey(nil, []string{deviceID})
+		}
+		fmt.Println("Cancelled")
+
+	case "─── Key Management ───":
+		// Separator, do nothing
+		return deviceMenu()
 	}
 
 	return nil

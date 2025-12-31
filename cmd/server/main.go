@@ -107,6 +107,14 @@ func main() {
 		Dur("retention", retentionConfig.MaxAge).
 		Msg("Storage initialized")
 
+	// Startup cleanup: expired grace periods and provisioning requests
+	if cleanedCount, err := store.CleanupExpiredGracePeriods(); err == nil && cleanedCount > 0 {
+		log.Info().Int("count", cleanedCount).Msg("Cleaned up expired grace periods")
+	}
+	if cleanedCount, err := store.CleanupExpiredProvisioningRequests(); err == nil && cleanedCount > 0 {
+		log.Info().Int("count", cleanedCount).Msg("Cleaned up expired provisioning requests")
+	}
+
 	// Setup router
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()

@@ -46,6 +46,11 @@ func setupAdminRoutes(r *gin.Engine, store *storage.Storage) {
 		admin.PUT("/devices/:device_id", updateDeviceHandler)
 		admin.DELETE("/devices/:device_id", forceDeleteDeviceHandler)
 
+		// Key management (token rotation and revocation)
+		admin.POST("/devices/:device_id/rotate-key", rotateDeviceKeyHandler)
+		admin.POST("/devices/:device_id/revoke-key", revokeDeviceKeyHandler)
+		admin.GET("/devices/:device_id/token-info", getDeviceTokenInfoHandler)
+
 		// Database operations
 		admin.GET("/database/stats", getDatabaseStatsHandler)
 		admin.POST("/database/export", exportDatabaseHandler)
@@ -61,6 +66,13 @@ func setupAdminRoutes(r *gin.Engine, store *storage.Storage) {
 		// Logs management
 		admin.GET("/logs", getLogsHandler)
 		admin.DELETE("/logs", clearLogsHandler)
+	}
+
+	// Device auth routes for token refresh
+	deviceAuth := r.Group("/device")
+	deviceAuth.Use(auth.DeviceAuthMiddleware())
+	{
+		deviceAuth.POST("/token/refresh", refreshTokenHandler)
 	}
 }
 

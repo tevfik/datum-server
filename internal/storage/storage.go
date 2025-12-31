@@ -111,11 +111,20 @@ type Device struct {
 	UserID    string    `json:"user_id"`
 	Name      string    `json:"name"`
 	Type      string    `json:"type"`
-	APIKey    string    `json:"api_key"`
-	Status    string    `json:"status"` // "active", "banned", "suspended"
+	APIKey    string    `json:"api_key"` // Legacy API key (for backward compatibility)
+	Status    string    `json:"status"`  // "active", "banned", "suspended", "revoked"
 	LastSeen  time.Time `json:"last_seen"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
+
+	// Token-based authentication (Hybrid SAS system)
+	MasterSecret   string    `json:"master_secret,omitempty"`    // Device's master secret for token generation
+	CurrentToken   string    `json:"current_token,omitempty"`    // Current active token
+	PreviousToken  string    `json:"previous_token,omitempty"`   // Previous token (valid during grace period)
+	TokenIssuedAt  time.Time `json:"token_issued_at,omitempty"`  // When current token was issued
+	TokenExpiresAt time.Time `json:"token_expires_at,omitempty"` // When current token expires
+	GracePeriodEnd time.Time `json:"grace_period_end,omitempty"` // When previous token becomes invalid
+	KeyRevokedAt   time.Time `json:"key_revoked_at,omitempty"`   // When keys were revoked (if revoked)
 }
 
 func (s *Storage) CreateDevice(device *Device) error {
@@ -774,6 +783,11 @@ func (s *Storage) ForceDeleteDevice(deviceID string) error {
 		tx.Delete(deviceKey)
 		tx.Delete(fmt.Sprintf("apikey:%s", device.APIKey))
 
+		// Also delete token index if exists
+		if device.CurrentToken != "" {
+			tx.Delete(fmt.Sprintf("token:%s", device.CurrentToken))
+		}
+
 		// Remove from user's device list
 		userDevicesKey := fmt.Sprintf("user:%s:devices", device.UserID)
 		devicesJSON, _ := tx.Get(userDevicesKey)
@@ -790,6 +804,241 @@ func (s *Storage) ForceDeleteDevice(deviceID string) error {
 		tx.Set(userDevicesKey, string(devicesData), nil)
 		return nil
 	})
+}
+
+// ============ Token Management Operations ============
+
+// RotateDeviceKey generates a new token for a device with grace period for transition
+func (s *Storage) RotateDeviceKey(deviceID string, newToken string, tokenExpiresAt time.Time, gracePeriodDays int) (*Device, error) {
+	var device *Device
+	err := s.db.Update(func(tx *buntdb.Tx) error {
+		deviceKey := fmt.Sprintf("device:%s", deviceID)
+		deviceData, err := tx.Get(deviceKey)
+		if err != nil {
+			return fmt.Errorf("device not found")
+		}
+
+		var d Device
+		json.Unmarshal([]byte(deviceData), &d)
+
+		// Check if device is revoked
+		if d.Status == "revoked" {
+			return fmt.Errorf("device keys are revoked, cannot rotate")
+		}
+
+		// Delete old token index
+		if d.CurrentToken != "" {
+			tx.Delete(fmt.Sprintf("token:%s", d.CurrentToken))
+		}
+
+		// Move current token to previous
+		d.PreviousToken = d.CurrentToken
+		d.CurrentToken = newToken
+		d.TokenIssuedAt = time.Now()
+		d.TokenExpiresAt = tokenExpiresAt
+		d.GracePeriodEnd = time.Now().Add(time.Duration(gracePeriodDays) * 24 * time.Hour)
+		d.UpdatedAt = time.Now()
+
+		// Create new token index
+		tx.Set(fmt.Sprintf("token:%s", newToken), deviceID, nil)
+
+		data, _ := json.Marshal(d)
+		tx.Set(deviceKey, string(data), nil)
+		device = &d
+		return nil
+	})
+	return device, err
+}
+
+// RevokeDeviceKey immediately invalidates all tokens for a device
+func (s *Storage) RevokeDeviceKey(deviceID string) (*Device, error) {
+	var device *Device
+	err := s.db.Update(func(tx *buntdb.Tx) error {
+		deviceKey := fmt.Sprintf("device:%s", deviceID)
+		deviceData, err := tx.Get(deviceKey)
+		if err != nil {
+			return fmt.Errorf("device not found")
+		}
+
+		var d Device
+		json.Unmarshal([]byte(deviceData), &d)
+
+		// Delete token indexes
+		if d.CurrentToken != "" {
+			tx.Delete(fmt.Sprintf("token:%s", d.CurrentToken))
+		}
+		if d.PreviousToken != "" {
+			tx.Delete(fmt.Sprintf("token:%s", d.PreviousToken))
+		}
+
+		// Clear tokens and mark as revoked
+		d.PreviousToken = ""
+		d.CurrentToken = ""
+		d.TokenExpiresAt = time.Time{}
+		d.GracePeriodEnd = time.Time{}
+		d.KeyRevokedAt = time.Now()
+		d.Status = "revoked"
+		d.UpdatedAt = time.Now()
+
+		data, _ := json.Marshal(d)
+		tx.Set(deviceKey, string(data), nil)
+		device = &d
+		return nil
+	})
+	return device, err
+}
+
+// GetDeviceByToken retrieves a device by its current or previous token
+func (s *Storage) GetDeviceByToken(token string) (*Device, bool, error) {
+	var device Device
+	var isGracePeriod bool
+
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		// First try to find by token index
+		tokenKey := fmt.Sprintf("token:%s", token)
+		deviceID, err := tx.Get(tokenKey)
+		if err == nil {
+			// Token found in index
+			deviceKey := fmt.Sprintf("device:%s", deviceID)
+			deviceData, err := tx.Get(deviceKey)
+			if err != nil {
+				return fmt.Errorf("device not found")
+			}
+			return json.Unmarshal([]byte(deviceData), &device)
+		}
+
+		// Token not in index, check if it's a previous token in grace period
+		// We need to scan devices (this is slower but handles grace period)
+		var found bool
+		tx.Ascend("", func(key, value string) bool {
+			if len(key) > 7 && key[:7] == "device:" {
+				// Skip command-related keys
+				if contains(key, ":pending") || contains(key, ":commands") {
+					return true
+				}
+				var d Device
+				if err := json.Unmarshal([]byte(value), &d); err == nil {
+					if d.PreviousToken == token && time.Now().Before(d.GracePeriodEnd) {
+						device = d
+						isGracePeriod = true
+						found = true
+						return false // Stop iteration
+					}
+				}
+			}
+			return true
+		})
+
+		if !found {
+			return fmt.Errorf("token not found or expired")
+		}
+		return nil
+	})
+
+	return &device, isGracePeriod, err
+}
+
+// GetDeviceTokenInfo returns token status information for a device
+func (s *Storage) GetDeviceTokenInfo(deviceID string) (map[string]interface{}, error) {
+	device, err := s.GetDevice(deviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	info := make(map[string]interface{})
+	info["device_id"] = device.ID
+	info["has_token"] = device.CurrentToken != ""
+
+	if device.CurrentToken != "" {
+		info["token_expires_at"] = device.TokenExpiresAt
+		info["token_issued_at"] = device.TokenIssuedAt
+		info["needs_refresh"] = time.Until(device.TokenExpiresAt) < 7*24*time.Hour && time.Now().Before(device.TokenExpiresAt)
+		info["in_grace_period"] = device.PreviousToken != "" && time.Now().Before(device.GracePeriodEnd)
+		if info["in_grace_period"].(bool) {
+			info["grace_period_end"] = device.GracePeriodEnd
+		}
+	}
+
+	if !device.KeyRevokedAt.IsZero() {
+		info["revoked"] = true
+		info["revoked_at"] = device.KeyRevokedAt
+	}
+
+	return info, nil
+}
+
+// InitializeDeviceToken sets up initial token for a new device or migrates a legacy device
+func (s *Storage) InitializeDeviceToken(deviceID, masterSecret, token string, tokenExpiresAt time.Time) (*Device, error) {
+	var device *Device
+	err := s.db.Update(func(tx *buntdb.Tx) error {
+		deviceKey := fmt.Sprintf("device:%s", deviceID)
+		deviceData, err := tx.Get(deviceKey)
+		if err != nil {
+			return fmt.Errorf("device not found")
+		}
+
+		var d Device
+		json.Unmarshal([]byte(deviceData), &d)
+
+		// Set up token system
+		d.MasterSecret = masterSecret
+		d.CurrentToken = token
+		d.TokenIssuedAt = time.Now()
+		d.TokenExpiresAt = tokenExpiresAt
+		d.UpdatedAt = time.Now()
+
+		// Create token index
+		tx.Set(fmt.Sprintf("token:%s", token), deviceID, nil)
+
+		data, _ := json.Marshal(d)
+		tx.Set(deviceKey, string(data), nil)
+		device = &d
+		return nil
+	})
+	return device, err
+}
+
+// CleanupExpiredGracePeriods removes previous tokens for devices past grace period
+func (s *Storage) CleanupExpiredGracePeriods() (int, error) {
+	count := 0
+	err := s.db.Update(func(tx *buntdb.Tx) error {
+		var devicesToUpdate []Device
+		now := time.Now()
+
+		tx.Ascend("", func(key, value string) bool {
+			if len(key) > 7 && key[:7] == "device:" {
+				if contains(key, ":pending") || contains(key, ":commands") {
+					return true
+				}
+				var d Device
+				if err := json.Unmarshal([]byte(value), &d); err == nil {
+					// Check if grace period has expired and previous token exists
+					if d.PreviousToken != "" && now.After(d.GracePeriodEnd) {
+						devicesToUpdate = append(devicesToUpdate, d)
+					}
+				}
+			}
+			return true
+		})
+
+		for _, d := range devicesToUpdate {
+			// Clear previous token
+			if d.PreviousToken != "" {
+				tx.Delete(fmt.Sprintf("token:%s", d.PreviousToken))
+			}
+			d.PreviousToken = ""
+			d.GracePeriodEnd = time.Time{}
+			d.UpdatedAt = now
+
+			deviceKey := fmt.Sprintf("device:%s", d.ID)
+			data, _ := json.Marshal(d)
+			tx.Set(deviceKey, string(data), nil)
+			count++
+		}
+
+		return nil
+	})
+	return count, err
 }
 
 // GetDatabaseStats returns storage statistics
