@@ -345,10 +345,28 @@ See [examples/micropython/](examples/micropython/) for complete examples.
 
 - **JWT Authentication**: Secure user sessions
 - **API Key Auth**: Per-device authentication
+- **API Key Rotation**: Hybrid SAS token system with 90-day expiry, 7-day grace period
 - **Rate Limiting**: Token bucket algorithm (100K req/min configurable)
 - **User Roles**: Admin and regular user roles
 - **Device Ownership**: User-based access control
 - **HTTPS Support**: TLS/SSL ready
+
+### API Key Rotation
+
+Devices use rotating tokens for enhanced security:
+
+```bash
+# Rotate device key (admin)
+datumctl device rotate-key <device_id> --grace-days 7
+
+# View token status
+datumctl device token-info <device_id>
+
+# Emergency revocation
+datumctl device revoke-key <device_id> --force
+```
+
+See [API Key Security](docs/diagrams/API_KEY_SECURITY.md) for detailed documentation.
 
 ## 🔄 Data Retention
 
