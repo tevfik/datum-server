@@ -251,36 +251,20 @@ type RegisterDeviceRequest struct {
 type ProvisioningRequest struct {
     // ...
     WiFiSSID   string
-    WiFiPass   string  // ⚠️ Plaintext password stored
+    WiFiPass   string  // ✅ Encrypted DB storage (AES-256-GCM)
     // ...
 }
 ```
 
-**Status**: ⚠️ **EXPOSED IN DATABASE**
+**Status**: ✅ **SECURE / ENCRYPTED**
 
-### Issue
-WiFi passwords stored in plaintext in:
-1. BuntDB provisioning requests
-2. Transmitted in API responses
+### Mitigation
+WiFi passwords are now encrypted using AES-256-GCM before storage and only decrypted when needed for transmission to authorized devices.
 
-### Risk
-- Database compromise exposes WiFi credentials
-- API key compromise exposes WiFi credentials (device activation response)
+**Risk**: LOW
+**Implementation**: `internal/storage/wifi_encryption.go`
 
-### Recommended Fix
-```go
-// Option 1: Encrypt WiFi password in database
-// Use AES-256-GCM with server key
-
-// Option 2: Clear WiFi credentials after successful activation
-// Delete from provisioning request after CompleteProvisioningRequest()
-
-// Option 3: Short-lived storage
-// Automatic cleanup job removes expired requests with credentials
-```
-
-**Priority**: MEDIUM  
-**Effort**: 2-3 hours for encryption implementation
+**Status**: IMPLEMENTED ✅
 
 ---
 
@@ -780,9 +764,9 @@ logger.GetLogger().Warn().
 | Duplicate Prevention | ✅ Secure | - | - |
 | Ownership Validation | ✅ Secure | - | - |
 | Input Validation | ✅ Adequate | - | - |
-| WiFi Credentials | ⚠️ Plaintext | MEDIUM | 2-3 hrs |
+| WiFi Credentials | ✅ Encrypted | - | ✅ Done |
 | API Key Generation | ✅ Secure | - | - |
-| **API Key Lifecycle** | ⚠️ **No Rotation** | **HIGH** | **2-6 hrs** |
+| **API Key Lifecycle** | ✅ **Rotation Active** | - | ✅ Done |
 | Error Handling | ✅ Secure | - | ✅ Done |
 | Race Conditions | ✅ Secure | - | ✅ Done |
 | Security Headers | ✅ Applied | - | ✅ Done |
