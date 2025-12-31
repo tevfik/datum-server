@@ -142,132 +142,74 @@ bool isActivated() { return apiKey.length() > 0; }
 // ============================================================================
 // Web Interface (ESP-DASH Style)
 // ============================================================================
-const char *DASHBOARD_HTML = R"html(
+const char *DASHBOARD_HTML = R"rawliteral(
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Datum Device Dashboard</title>
-    <style>
-        :root { --bg-color: #1b1b1b; --card-bg: #2d2d2d; --text-primary: #ffffff; --text-secondary: #a0a0a0; --accent-color: #00bcd4; --success-color: #4caf50; --danger-color: #f44336; }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background-color: var(--bg-color); color: var(--text-primary); padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid #333; padding-bottom: 15px; }
-        .brand { font-size: 24px; font-weight: 700; color: var(--accent-color); display: flex; align-items: center; gap: 10px; }
-        .status-badge { background: var(--card-bg); padding: 5px 12px; border-radius: 20px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
-        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-secondary); }
-        .dot.online { background: var(--success-color); box-shadow: 0 0 10px var(--success-color); }
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-        .card { background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .card h2 { font-size: 18px; color: var(--text-secondary); margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
-        .preview-container { text-align: center; background: #000; border-radius: 8px; overflow: hidden; position: relative; min-height: 240px; display: flex; align-items: center; justify-content: center; }
-        img#camera-stream { width: 100%; height: auto; display: block; }
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .stat-item { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; }
-        .stat-value { font-size: 20px; font-weight: bold; }
-        .stat-label { font-size: 12px; color: var(--text-secondary); }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-size: 14px; margin-bottom: 5px; color: var(--text-secondary); }
-        input { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid #444; color: white; padding: 12px; border-radius: 6px; outline: none; color: white; }
-        input:focus { border-color: var(--accent-color); }
-        .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; margin-top: 10px; }
-        .btn-primary { background: linear-gradient(135deg, var(--accent-color), #008ba3); color: white; }
-        .btn-danger { background: var(--danger-color); color: white; width: auto; padding: 8px 16px; font-size: 14px; }
-        svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-        @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Datum Camera</title>
+  <style>
+    body { background:#1b1b1b; color:white; font-family:sans-serif; margin:0; padding:20px; }
+    .card { background:#2d2d2d; padding:20px; margin-bottom:20px; border-radius:8px; }
+    .btn { background:#00bcd4; color:white; border:none; padding:10px; width:100%; border-radius:4px; font-size:16px; cursor:pointer; margin-top:5px; }
+    .btn-dan { background:#f44336; }
+    input { width:100%; padding:10px; margin:5px 0 15px; box-sizing:border-box; background:#444; border:none; color:white; border-radius:4px; }
+    img { width:100%; max-width:640px; display:block; margin:0 auto; background:black; border-radius:4px; }
+    .info { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+    .info div { background:#333; padding:10px; border-radius:4px; text-align:center; }
+    label { display:block; margin-bottom:5px; color:#aaa; font-size:14px; }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="brand">
-                <svg viewBox="0 0 24 24" width="24" height="24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                Datum Dash
-            </div>
-            <div class="status-badge"><div class="dot" id="status-dot"></div><span id="status-text">Disconnected</span></div>
-        </header>
+  <h1>📷 Datum Camera</h1>
+  
+  <div class="card">
+    <img id="stream" src="/stream" onload="this.style.opacity=1" onerror="this.style.opacity=0.5; setTimeout(reload, 1000)">
+    <div class="info">
+      <div>Signal<br><b id="rssi">-</b></div>
+      <div>Uptime<br><b id="uptime">0s</b></div>
+    </div>
+  </div>
+  
+  <div class="card">
+    <h2>📡 Configuration</h2>
+    <form action="/configure" method="POST">
+      <label>Server URL</label>
+      <input type="url" name="server_url" placeholder="https://..." required>
+      <label>WiFi SSID</label>
+      <input type="text" name="wifi_ssid" required>
+      <label>WiFi Password</label>
+      <input type="password" name="wifi_pass">
+      <button type="submit" class="btn">Save & Restart</button>
+    </form>
+  </div>
 
-        <div class="dashboard-grid">
-            <div class="card">
-                <h2><svg viewBox="0 0 24 24"><path d="M15 10l5-5-5 5z"/><path d="M4 8V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg> Live Stream</h2>
-                <div class="preview-container">
-                    <img id="camera-stream" src="/stream" onload="this.style.opacity=1" onerror="this.style.opacity=0.5; setTimeout(reloadStream, 1000);">
-                    <div style="position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 4px; font-size: 12px;">MJPEG Local</div>
-                </div>
-            </div>
+  <div class="card">
+    <h2>⚡ Controls</h2>
+    <div style="display:flex; gap:10px">
+      <button class="btn" onclick="fetch('/action?type=led')">Toggle LED</button>
+      <button class="btn btn-dan" onclick="if(confirm('Reboot?')) fetch('/action?type=restart')">Restart</button>
+    </div>
+  </div>
 
-            <div class="card">
-                <h2><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Device Info</h2>
-                <div class="stats-grid">
-                    <div class="stat-item"><div class="stat-value" id="rssi">-</div><div class="stat-label">WiFi Signal</div></div>
-                    <div class="stat-item"><div class="stat-value" id="uptime">0s</div><div class="stat-label">Uptime</div></div>
-                    <div class="stat-item"><div class="stat-value">ESP32-S3</div><div class="stat-label">Model</div></div>
-                    <div class="stat-item"><div class="stat-value" id="firmware">v2.1</div><div class="stat-label">Firmware</div></div>
-                </div>
-                <div style="margin-top: 20px;"><div class="stat-label" style="margin-bottom: 5px;">Device UID</div><div class="stat-value" style="font-size: 14px; font-family: monospace;" id="uid">...</div></div>
-            </div>
-
-            <div class="card" style="grid-column: 1/-1;">
-                <h2><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Network Configuration</h2>
-                <form action="/configure" method="POST">
-                    <div class="form-group"><label>Datum Server URL</label><input type="url" name="server_url" placeholder="https://datum.example.com" required></div>
-                    <div class="form-group"><label>WiFi Network (SSID)</label><input type="text" name="wifi_ssid" placeholder="Enter WiFi Name" required></div>
-                    <div class="form-group"><label>WiFi Password</label><input type="password" name="wifi_pass" placeholder="Enter WiFi Password"></div>
-                    <button type="submit" class="btn btn-primary">Save & Restart</button>
-                </form>
-            </div>
-
-            <div class="card">
-                <h2><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Actions</h2>
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="flashLED()" class
-    = "btn" style =
-        "background: #333; color: white;" > Test LED</ button>
-        <button onclick = "restartDevice()" class = "btn btn-danger">
-            Restart</ button></ div></ div></ div></ div>
-        <script> function updateStats() {
-  fetch('/info')
-      .then(r = > r.json())
-      .then(d = >
-                {
-                  document.getElementById('uid').textContent = d.device_uid;
-                  document.getElementById('firmware').textContent =
-                      d.firmware_version;
-                  if (d.status == = 'configured') {
-                    document.getElementById('status-dot').className =
-                        'dot online';
-                    document.getElementById('status-text').textContent =
-                        'Configured';
-                  }
-                  document.getElementById('rssi').textContent = 'Active';
-                })
-      .catch(console.log);
-}
-function reloadStream() {
-  document.getElementById('camera-stream').src = '/stream?t=' + Date.now();
-}
-function flashLED() { fetch('/action?type=led'); }
-function restartDevice() {
-  if (confirm('Restart?'))
-    fetch('/action?type=restart');
-}
-
-setInterval(updateStats, 5000);
-updateStats();
-let s = 0;
-setInterval(() = >
-                 {
-                   s++;
-                   document.getElementById('uptime').textContent =`${
-                       Math.floor(s / 60)} m ${s % 60} s`
-                 },
-            1000);
-    </script>
+  <script>
+    function reload() { document.getElementById('stream').src = '/stream?t=' + Date.now(); }
+    
+    function update() {
+      fetch('/info').then(r => r.json()).then(d => {
+        document.getElementById('rssi').innerText = 'Active'; 
+      }).catch(e => console.log(e));
+    }
+    
+    let s = 0;
+    setInterval(() => { document.getElementById('uptime').innerText = Math.floor(++s/60) + 'm ' + (s%60) + 's'; }, 1000);
+    setInterval(update, 5000);
+    update();
+  </script>
 </body>
 </html>
-)html";
+)rawliteral";
 
 // ============================================================================
 // Core Functions
