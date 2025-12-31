@@ -28,8 +28,8 @@
 // Board Selection
 // ============================================================================
 // #define CAMERA_MODEL_AI_THINKER
-#define CAMERA_MODEL_ESP32S3_CAM
-// #define CAMERA_MODEL_FREENOVE_S3
+// #define CAMERA_MODEL_ESP32S3_CAM
+#define CAMERA_MODEL_FREENOVE_S3
 
 // ============================================================================
 // Configuration
