@@ -142,7 +142,7 @@ bool isActivated() { return apiKey.length() > 0; }
 // ============================================================================
 // Web Interface (ESP-DASH Style)
 // ============================================================================
-const char *DASHBOARD_HTML = R"=====(
+const char *DASHBOARD_HTML = R"html(
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -267,7 +267,7 @@ setInterval(() = >
     </script>
 </body>
 </html>
-)=====";
+)html";
 
 // ============================================================================
 // Core Functions
