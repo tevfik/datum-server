@@ -142,74 +142,8 @@ bool isActivated() { return apiKey.length() > 0; }
 // ============================================================================
 // Web Interface (ESP-DASH Style)
 // ============================================================================
-const char *DASHBOARD_HTML = R"rawliteral(
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Datum Camera</title>
-  <style>
-    body { background:#1b1b1b; color:white; font-family:sans-serif; margin:0; padding:20px; }
-    .card { background:#2d2d2d; padding:20px; margin-bottom:20px; border-radius:8px; }
-    .btn { background:#00bcd4; color:white; border:none; padding:10px; width:100%; border-radius:4px; font-size:16px; cursor:pointer; margin-top:5px; }
-    .btn-dan { background:#f44336; }
-    input { width:100%; padding:10px; margin:5px 0 15px; box-sizing:border-box; background:#444; border:none; color:white; border-radius:4px; }
-    img { width:100%; max-width:640px; display:block; margin:0 auto; background:black; border-radius:4px; }
-    .info { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
-    .info div { background:#333; padding:10px; border-radius:4px; text-align:center; }
-    label { display:block; margin-bottom:5px; color:#aaa; font-size:14px; }
-  </style>
-</head>
-<body>
-  <h1>📷 Datum Camera</h1>
-  
-  <div class="card">
-    <img id="stream" src="/stream" onload="this.style.opacity=1" onerror="this.style.opacity=0.5; setTimeout(reload, 1000)">
-    <div class="info">
-      <div>Signal<br><b id="rssi">-</b></div>
-      <div>Uptime<br><b id="uptime">0s</b></div>
-    </div>
-  </div>
-  
-  <div class="card">
-    <h2>📡 Configuration</h2>
-    <form action="/configure" method="POST">
-      <label>Server URL</label>
-      <input type="url" name="server_url" placeholder="https://..." required>
-      <label>WiFi SSID</label>
-      <input type="text" name="wifi_ssid" required>
-      <label>WiFi Password</label>
-      <input type="password" name="wifi_pass">
-      <button type="submit" class="btn">Save & Restart</button>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2>⚡ Controls</h2>
-    <div style="display:flex; gap:10px">
-      <button class="btn" onclick="fetch('/action?type=led')">Toggle LED</button>
-      <button class="btn btn-dan" onclick="if(confirm('Reboot?')) fetch('/action?type=restart')">Restart</button>
-    </div>
-  </div>
-
-  <script>
-    function reload() { document.getElementById('stream').src = '/stream?t=' + Date.now(); }
-    
-    function update() {
-      fetch('/info').then(r => r.json()).then(d => {
-        document.getElementById('rssi').innerText = 'Active'; 
-      }).catch(e => console.log(e));
-    }
-    
-    let s = 0;
-    setInterval(() => { document.getElementById('uptime').innerText = Math.floor(++s/60) + 'm ' + (s%60) + 's'; }, 1000);
-    setInterval(update, 5000);
-    update();
-  </script>
-</body>
-</html>
-)rawliteral";
+const char DASHBOARD_HTML[] PROGMEM =
+    R"rawliteral(<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Datum Camera</title><style>body{background:#1b1b1b;color:white;font-family:sans-serif;margin:0;padding:20px}.card{background:#2d2d2d;padding:20px;margin-bottom:20px;border-radius:8px}.btn{background:#00bcd4;color:white;border:none;padding:10px;width:100%;border-radius:4px;font-size:16px;cursor:pointer;margin-top:5px}.btn-dan{background:#f44336}input{width:100%;padding:10px;margin:5px 0 15px;box-sizing:border-box;background:#444;border:none;color:white;border-radius:4px}img{width:100%;max-width:640px;display:block;margin:0 auto;background:black;border-radius:4px}.info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.info div{background:#333;padding:10px;border-radius:4px;text-align:center}label{display:block;margin-bottom:5px;color:#aaa;font-size:14px}</style></head><body><h1>📷 Datum Camera</h1><div class="card"><img id="stream" src="/stream" onload="this.style.opacity=1" onerror="this.style.opacity=0.5; setTimeout(reload, 1000)"><div class="info"><div>Signal<br><b id="rssi">-</b></div><div>Uptime<br><b id="uptime">0s</b></div></div></div><div class="card"><h2>📡 Configuration</h2><form action="/configure" method="POST"><label>Server URL</label><input type="url" name="server_url" placeholder="https://..." required><label>WiFi SSID</label><input type="text" name="wifi_ssid" required><label>WiFi Password</label><input type="password" name="wifi_pass"><button type="submit" class="btn">Save & Restart</button></form></div><div class="card"><h2>⚡ Controls</h2><div style="display:flex;gap:10px"><button class="btn" onclick="fetch('/action?type=led')">Toggle LED</button><button class="btn btn-dan" onclick="if(confirm('Reboot?')) fetch('/action?type=restart')">Restart</button></div></div><script>function reload(){document.getElementById('stream').src='/stream?t='+Date.now()}function update(){fetch('/info').then(r=>r.json()).then(d=>{document.getElementById('rssi').innerText='Active'}).catch(e=>console.log(e))}let s=0;setInterval(()=>{document.getElementById('uptime').innerText=Math.floor(++s/60)+'m '+(s%60)+'s'},1000);setInterval(update,5000);update()</script></body></html>)rawliteral";
 
 // ============================================================================
 // Core Functions
