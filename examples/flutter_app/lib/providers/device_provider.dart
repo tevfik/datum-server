@@ -17,7 +17,7 @@ class DeviceProvider with ChangeNotifier {
       final data = await _api.getDevices();
       _devices = data.map((json) => Device.fromJson(json)).toList();
     } catch (e) {
-      print('Error fetching devices: $e');
+      debugPrint('Error fetching devices: $e');
     } finally {
       _isLoading = false;
       notifyListeners();

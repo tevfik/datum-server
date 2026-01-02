@@ -6,7 +6,8 @@ class ProvisioningWizard extends StatefulWidget {
   const ProvisioningWizard({super.key});
 
   @override
-  _ProvisioningWizardState createState() => _ProvisioningWizardState();
+  @override
+  State<ProvisioningWizard> createState() => _ProvisioningWizardState();
 }
 
 class _ProvisioningWizardState extends State<ProvisioningWizard> {
@@ -53,11 +54,16 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
       body: Stepper(
         currentStep: _step,
         onStepContinue: () {
-          if (_step < 2) setState(() => _step++);
-          else _connectAndProvision();
+          if (_step < 2) {
+            setState(() => _step++);
+          } else {
+            _connectAndProvision();
+          }
         },
         onStepCancel: () {
-          if (_step > 0) setState(() => _step--);
+          if (_step > 0) {
+            setState(() => _step--);
+          }
         },
         steps: [
           Step(
