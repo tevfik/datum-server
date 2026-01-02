@@ -557,8 +557,15 @@ bool attemptSelfRegistration() {
   regPayload += "\"device_type\":\"camera\"";
   regPayload += "}";
 
+  DEBUG_PRINTLN("Sending Registration Payload: ");
+  DEBUG_PRINTLN(regPayload);
+
   int code = http.POST(regPayload);
+  DEBUG_PRINT("Registration Response Code: ");
+  DEBUG_PRINTLN(code);
   String resp = http.getString();
+  DEBUG_PRINT("Registration Response Body: ");
+  DEBUG_PRINTLN(resp);
   http.end();
 
   DEBUG_PRINTLN("Register Code: " + String(code));

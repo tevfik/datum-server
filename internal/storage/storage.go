@@ -160,6 +160,12 @@ func (s *Storage) CreateDevice(device *Device) error {
 		// Index by API key
 		apiKeyIndex := fmt.Sprintf("apikey:%s", device.APIKey)
 		tx.Set(apiKeyIndex, device.ID, nil)
+
+		// Index by Device UID (hardware ID)
+		if device.DeviceUID != "" {
+			uidIndex := fmt.Sprintf("device:uid:%s", device.DeviceUID)
+			tx.Set(uidIndex, device.ID, nil)
+		}
 		return nil
 	})
 }
