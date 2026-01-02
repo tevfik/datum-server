@@ -130,7 +130,6 @@ String serverURL;
 String wifiSSID;
 String wifiPass;
 String deviceID;
-String deviceID;
 String userToken;  // Store token directly
 String deviceName; // Custom device name
 
