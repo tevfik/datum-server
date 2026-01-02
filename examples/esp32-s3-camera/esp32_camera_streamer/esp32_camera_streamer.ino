@@ -130,7 +130,9 @@ String serverURL;
 String wifiSSID;
 String wifiPass;
 String deviceID;
-String userToken; // Store token directly
+String deviceID;
+String userToken;  // Store token directly
+String deviceName; // Custom device name
 
 enum DeviceState {
   STATE_BOOT,
@@ -257,20 +259,23 @@ void loadCredentials() {
   wifiPass = prefs.getString("wifi_pass", "");
   deviceID = prefs.getString("device_id", "");
   userToken = prefs.getString("user_token", "");
+  deviceName = prefs.getString("device_name", "");
   prefs.end();
 }
 
-void saveCredentials(String u, String s, String p, String token) {
+void saveCredentials(String u, String s, String p, String token, String name) {
   prefs.begin("datum", false);
   prefs.putString("server_url", u);
   prefs.putString("wifi_ssid", s);
   prefs.putString("wifi_pass", p);
   prefs.putString("user_token", token);
+  prefs.putString("device_name", name);
   prefs.end();
   serverURL = u;
   wifiSSID = s;
   wifiPass = p;
   userToken = token;
+  deviceName = name;
 }
 
 void saveActivation(String id, String key) {
@@ -424,8 +429,9 @@ void handleProvision() {
     return;
   }
 
-  saveCredentials(u, s, p,
-                  ""); // Clear user creds as they are not needed on device
+  saveCredentials(
+      u, s, p, "",
+      ""); // Clear user creds and name as they are not needed on device
 
   setupServer.send(200, "application/json",
                    "{\"status\":\"success\",\"message\":\"Credentials saved. "
@@ -457,13 +463,14 @@ void handleConfigure() {
   String s = setupServer.arg("wifi_ssid");
   String p = setupServer.arg("wifi_pass");
   String token = setupServer.arg("user_token");
+  String name = setupServer.arg("device_name");
 
   if (u.length() == 0 || s.length() == 0 || token.length() == 0) {
     setupServer.send(400, "text/plain", "Missing fields");
     return;
   }
-  // Save credentials including user token for self-registration
-  saveCredentials(u, s, p, token);
+  // Save credentials including user token and device name for self-registration
+  saveCredentials(u, s, p, token, name);
 
   String html =
       R"(<html><body style='background:#1b1b1b;color:white;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif'>
@@ -541,9 +548,13 @@ bool attemptSelfRegistration() {
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", "Bearer " + userToken); // Use User Token
 
+  String finalName = deviceName;
+  if (finalName.length() == 0)
+    finalName = String(DEVICE_MODEL);
+
   String regPayload = "{";
   regPayload += "\"device_uid\":\"" + deviceUID + "\",";
-  regPayload += "\"device_name\":\"" + String(DEVICE_MODEL) + "\",";
+  regPayload += "\"device_name\":\"" + finalName + "\",";
   regPayload += "\"device_type\":\"camera\"";
   regPayload += "}";
 

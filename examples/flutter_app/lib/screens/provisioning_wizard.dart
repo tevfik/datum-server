@@ -12,7 +12,9 @@ class ProvisioningWizard extends StatefulWidget {
 
 class _ProvisioningWizardState extends State<ProvisioningWizard> {
   final _ssidController = TextEditingController();
+  final _ssidController = TextEditingController();
   final _passController = TextEditingController();
+  final _nameController = TextEditingController();
   
   String? _selectedSSID;
   List<dynamic> _networks = [];
@@ -29,7 +31,9 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
   @override
   void dispose() {
     _ssidController.dispose();
+    _ssidController.dispose();
     _passController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
   
@@ -132,6 +136,10 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
         data: FormData.fromMap({
           "wifi_ssid": _ssidController.text,
           "wifi_pass": _passController.text,
+          "server_url": "https://datum.bezg.in",
+          "wifi_ssid": _ssidController.text,
+          "wifi_pass": _passController.text,
+          "device_name": _nameController.text.isNotEmpty ? _nameController.text : "Camera",
           "server_url": "https://datum.bezg.in",
           "user_token": token,
         }),
@@ -284,17 +292,26 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (_deviceUID != null) ...[
-                   Text("Device ID: $_deviceUID\nFirmware: ${_firmwareVersion ?? 'Unknown'}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                   const SizedBox(height: 10),
-                ],
-                const Text('Device will be linked to your account automatically.'),
-                 
-                 if (_statusMessage != null) ...[
-                    const SizedBox(height: 10),
-                    Text(_statusMessage!, style: TextStyle(color: _isLoading ? Colors.blue : Colors.green)),
-                 ],
-                 if (_isLoading) const LinearProgressIndicator(),
+                  if (_deviceUID != null) ...[
+                     Text("Device ID: $_deviceUID\nFirmware: ${_firmwareVersion ?? 'Unknown'}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                     const SizedBox(height: 10),
+                  ],
+                  TextField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Device Name', 
+                      hintText: 'e.g. Living Room Camera',
+                      border: OutlineInputBorder()
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('Device will be linked to your account automatically.'),
+                  
+                   if (_statusMessage != null) ...[
+                      const SizedBox(height: 10),
+                      Text(_statusMessage!, style: TextStyle(color: _isLoading ? Colors.blue : Colors.green)),
+                   ],
+                   if (_isLoading) const LinearProgressIndicator(),
               ],
             ),
             isActive: _step >= 2,
