@@ -13,205 +13,298 @@ class ProvisioningWizard extends StatefulWidget {
 class _ProvisioningWizardState extends State<ProvisioningWizard> {
   final _ssidController = TextEditingController();
   final _passController = TextEditingController();
-  final _uidController = TextEditingController();
+  final _userPassController = TextEditingController(); // Confirm user password
+  String? _selectedSSID;
+  List<dynamic> _networks = [];
+  bool _scanning = false;
+  
+  // Device Info
+  String? _deviceUID;
+  String? _firmwareVersion;
+
   int _step = 0;
   bool _isLoading = false;
   String? _statusMessage;
+  
+  // Helper to connect to SoftAP endpoints with short timeout
+  Dio _getDeviceDio() {
+    final dio = Dio();
+    dio.options.baseUrl = 'http://192.168.4.1';
+    dio.options.connectTimeout = const Duration(seconds: 3);
+    dio.options.sendTimeout = const Duration(seconds: 3);
+    return dio; 
+  }
 
-  // Step 1: Register on Server (Needs Internet)
-  Future<void> _registerOnServer() async {
+  // Step 1: Discover Device
+  Future<void> _discoverDevice() async {
     setState(() {
       _isLoading = true;
-      _statusMessage = "Registering device on cloud...";
+      _statusMessage = "Connecting to device...";
     });
 
     try {
-      await Provider.of<DeviceProvider>(context, listen: false).createProvisioningRequest(
-        _uidController.text,
-        "New Camera",
-        _ssidController.text,
-        "",
-      );
-      
-      if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-        _step++;
-        _statusMessage = null;
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Device registered! Now connect to Camera WiFi.')),
-      );
+      final response = await _getDeviceDio().get('/info');
+      if (response.statusCode == 200) {
+        final data = response.data;
+        setState(() {
+          _deviceUID = data['device_uid'];
+          _firmwareVersion = data['firmware_version'];
+          _isLoading = false;
+           _statusMessage = null;
+          _step++; // Move to next step
+        });
+        
+        // Auto-scan for networks
+        _scanNetworks();
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _statusMessage = "Error: $e";
+        _statusMessage = "Could not find device. Ensure you are connected to 'Datum-Camera-...' WiFi.";
       });
     }
   }
 
-  // Step 2: Configure Device (Needs SoftAP Connection)
-  Future<void> _configureDevice() async {
+  // Step 2: Scan Networks
+  Future<void> _scanNetworks() async {
     setState(() {
-      _isLoading = true;
-      _statusMessage = "Sending config to device...";
+      _scanning = true;
+      _networks = []; 
     });
 
-    final dio = Dio();
-    // Short timeout for local device
-    dio.options.connectTimeout = const Duration(seconds: 5);
-    dio.options.sendTimeout = const Duration(seconds: 5);
+    try {
+      final response = await _getDeviceDio().get('/scan');
+      if (response.statusCode == 200 && mounted) {
+        setState(() {
+          _networks = response.data;
+          _scanning = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+           _scanning = false;
+           // If scan fails, allow manual entry
+           _networks = [];
+        });
+      }
+    }
+  }
+
+  // Step 3: Send Configuration (WiFi + User Creds)
+  Future<void> _provisionDevice() async {
+    setState(() {
+      _isLoading = true;
+      _statusMessage = "Sending configuration...";
+    });
+    
+    // Get current user email from AuthProvider (assuming available via context or passed in)
+    // For now we'll ask user to confirm password, and assume email is known? 
+    // Ideally AuthProvider should expose currentUser.email
+    // Let's assume user knows their email or we get it from local storage/auth state
+    // For safety, let's inject Auth Service or similar. 
+    // Simplification: We assume the user is logged in. Use a placeholder or fetch from storage if possible.
+    // NOTE: In a real app, use: Provider.of<AuthProvider>(context, listen: false).user?.email
+    // I will add an email field just to be safe if auth provider isn't handy here.
+    
+    // Actually, let's verify if we can get email.
+    // Using hardcoded email from prompt isn't good. 
+    // Let's add email field for re-verification security.
+  }
+  
+  // Refined Step 3 Implementation
+  Future<void> _completeProvisioning(String email) async {
+     setState(() {
+      _isLoading = true;
+      _statusMessage = "Configuring device...";
+    });
 
     try {
-      // 192.168.4.1 is default ESP32 SoftAP IP
-      final response = await dio.post(
-        'http://192.168.4.1/provision',
-        data: {
+      final response = await _getDeviceDio().post(
+        '/configure',
+        data: FormData.fromMap({
           "wifi_ssid": _ssidController.text,
           "wifi_pass": _passController.text,
-          "server_url": "https://datum.bezg.in", // Hardcoded production or get from env
-        },
-        options: Options(contentType: Headers.jsonContentType),
+          "server_url": "https://datum.bezg.in",
+          "user_email": email,
+          "user_password": _userPassController.text,
+        }),
       );
 
       if (response.statusCode == 200) {
           setState(() {
             _isLoading = false;
-            _statusMessage = "Success! Device is restarting.";
+            _statusMessage = "Success! Device is restarting and will register itself.";
           });
           
-          await Future.delayed(const Duration(seconds: 2));
+          await Future.delayed(const Duration(seconds: 3));
           if (mounted) Navigator.pop(context);
-      } else {
-        throw Exception("Device returned ${response.statusCode}");
       }
-
     } catch (e) {
        setState(() {
         _isLoading = false;
-        _statusMessage = "Failed to connect to Camera. \nAre you connected to 'Datum-Cam-...' WiFi?";
+        _statusMessage = "Failed to configure device: $e";
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Attempt to get user email from provider if possible, else empty
+    // final userEmail = Provider.of<AuthProvider>(context).user?.email ?? "";
+    // Because I don't see AuthProvider file content, I'll add an Email field securely.
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Device')),
+      appBar: AppBar(title: const Text('Add New Device')),
       body: Stepper(
         type: StepperType.vertical,
         currentStep: _step,
         controlsBuilder: (context, details) {
-           if (_isLoading) return const SizedBox.shrink(); // Hide buttons when loading
+           if (_isLoading) return const SizedBox.shrink();
 
-            return Padding(
+           return Padding(
             padding: const EdgeInsets.only(top: 20.0),
             child: Row(
               children: [
-                ElevatedButton(
-                  onPressed: details.onStepContinue,
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.cyan, foregroundColor: Colors.white),
-                  child: Text(_step == 2 ? 'Send Configuration' : 'Continue'),
-                ),
+                if (_step == 0)
+                  ElevatedButton(
+                    onPressed: _discoverDevice,
+                    child: const Text('I am Connected'),
+                  ),
+                  
+                if (_step == 1)
+                  ElevatedButton(
+                     onPressed: () {
+                       if (_ssidController.text.isEmpty) {
+                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Select or enter WiFi SSID")));
+                         return;
+                       }
+                       setState(() => _step++);
+                     },
+                     child: const Text('Next'),
+                  ),
+                  
+                if (_step == 2) ...[
+                   ElevatedButton(
+                     onPressed: () {
+                        if (_userPassController.text.isEmpty) {
+                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Enter password to authorize device")));
+                           return;
+                        }
+                        // Use email from controller if we added it, else use a default or ask
+                        // Ideally we should have the email. I'll Add an email controller.
+                        _completeProvisioning(_emailController.text);
+                     },
+                     style: ElevatedButton.styleFrom(backgroundColor: Colors.cyan, foregroundColor: Colors.white),
+                     child: const Text('Provision Device'),
+                   ),
+                ],
+                
                 const SizedBox(width: 10),
                 if (_step > 0)
                   TextButton(
-                    onPressed: details.onStepCancel,
-                    child: const Text('Back', style: TextStyle(color: Colors.white70)),
+                    onPressed: () => setState(() => _step--),
+                    child: const Text('Back'),
                   ),
               ],
             ),
           );
         },
-        onStepContinue: () {
-          if (_step == 0) {
-             // Validate UID
-             if (_uidController.text.length < 4) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid Device UID')));
-                return;
-             }
-             _step++;
-             setState((){});
-          } else if (_step == 1) {
-             // Register on server
-             _registerOnServer();
-          } else if (_step == 2) {
-             // Configure Device
-             _configureDevice();
-          }
-        },
-        onStepCancel: () {
-          if (_step > 0) setState(() => _step--);
-        },
         steps: [
-          // Step 0: UID
+          // Step 0: Connect
           Step(
-            title: const Text('Device Info'),
+            title: const Text('Connect to Device'),
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Enter the Device UID (MAC Address) found on the device label.'),
+                const Text('1. Open WiFi Settings'),
+                const Text('2. Connect to "Datum-Camera-XXXX"'),
+                const Text('3. Return here and press "I am Connected"'),
                 const SizedBox(height: 10),
-                TextField(
-                  controller: _uidController,
-                  decoration: const InputDecoration(
-                    labelText: 'Device UID',
-                    border: OutlineInputBorder(),
-                    hintText: 'e.g. A0:B1:C2...',
-                  ),
-                ),
+                if (_statusMessage != null) 
+                   Text(_statusMessage!, style: const TextStyle(color: Colors.red)),
               ],
             ),
             isActive: _step >= 0,
-          ),
-          
-          // Step 1: Credentials
-          Step(
-            title: const Text('WiFi Credentials'),
-            content: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Enter the WiFi credentials for the device to connect to.'),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _ssidController,
-                  decoration: const InputDecoration(labelText: 'WiFi SSID'),
-                ),
-                TextField(
-                  controller: _passController,
-                  decoration: const InputDecoration(labelText: 'WiFi Password'),
-                  obscureText: true,
-                ),
-                 if (_isLoading) ...[
-                  const SizedBox(height: 20),
-                  const LinearProgressIndicator(),
-                  Text(_statusMessage ?? ""),
-                ]
-              ],
-            ),
-            isActive: _step >= 1,
+            state: _step > 0 ? StepState.complete : StepState.indexed,
           ),
 
-          // Step 2: Connect & Config
+          // Step 1: Network Selection
           Step(
-            title: const Text('Connect & Configure'),
+             title: const Text('Select WiFi Network'),
+             content: Column(
+               children: [
+                 if (_scanning) const LinearProgressIndicator()
+                 else if (_networks.isEmpty) 
+                    TextButton.icon(icon: const Icon(Icons.refresh), label: const Text("Rescan"), onPressed: _scanNetworks),
+                    
+                 if (_networks.isNotEmpty)
+                   Container(
+                     height: 150,
+                     decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
+                     child: ListView.builder(
+                       itemCount: _networks.length,
+                       itemBuilder: (ctx, i) {
+                         final net = _networks[i];
+                         return ListTile(
+                           title: Text(net['ssid']),
+                           trailing: Icon(Icons.wifi, size: 20),
+                           dense: true,
+                           onTap: () {
+                              setState(() {
+                                _ssidController.text = net['ssid'];
+                                _selectedSSID = net['ssid'];
+                              });
+                           },
+                           selected: _selectedSSID == net['ssid'],
+                         );
+                       }
+                     ),
+                   ),
+                   
+                 const SizedBox(height: 10),
+                 TextField(
+                   controller: _ssidController,
+                   decoration: const InputDecoration(labelText: 'SSID'),
+                 ),
+                 TextField(
+                   controller: _passController,
+                   decoration: const InputDecoration(labelText: 'WiFi Password'),
+                   obscureText: true,
+                 ),
+               ],
+             ),
+             isActive: _step >= 1,
+            state: _step > 1 ? StepState.complete : StepState.indexed,
+          ),
+
+          // Step 2: Confirmation
+          Step(
+            title: const Text('Authorize Device'),
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('1. Go to your Phone Settings -> WiFi'),
-                const Text('2. Connect to network "Datum-Cam-..."'),
-                const Text('3. Return here and press "Send Configuration"'),
-                const SizedBox(height: 20),
-                if (_statusMessage != null) 
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    color: Colors.black12,
-                    child: Text(_statusMessage!, style: const TextStyle(color: Colors.orangeAccent)),
-                  ),
-                  
-                if (_isLoading) const LinearProgressIndicator(),
+                if (_deviceUID != null) ...[
+                   Text("Device ID: $_deviceUID", style: const TextStyle(fontWeight: FontWeight.bold)),
+                   const SizedBox(height: 10),
+                ],
+                const Text('Enter your account credentials to register this device.'),
+                 TextField(
+                   controller: _emailController,
+                   decoration: const InputDecoration(labelText: 'Your Email'),
+                   keyboardType: TextInputType.emailAddress,
+                 ),
+                TextField(
+                   controller: _userPassController,
+                   decoration: const InputDecoration(labelText: 'Your Password'),
+                   obscureText: true,
+                 ),
+                 
+                 if (_statusMessage != null) ...[
+                    const SizedBox(height: 10),
+                    Text(_statusMessage!, style: TextStyle(color: _isLoading ? Colors.blue : Colors.green)),
+                 ],
+                 if (_isLoading) const LinearProgressIndicator(),
               ],
             ),
             isActive: _step >= 2,
@@ -220,4 +313,6 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
       ),
     );
   }
+  
+  final _emailController = TextEditingController();
 }

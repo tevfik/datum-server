@@ -438,6 +438,24 @@ void handleProvision() {
   ESP.restart();
 }
 
+// Scan for WiFi networks and return JSON list
+void handleScan() {
+  int n = WiFi.scanNetworks();
+  String json = "[";
+  for (int i = 0; i < n; ++i) {
+    if (i)
+      json += ",";
+    json += "{\"ssid\":\"" + WiFi.SSID(i) + "\",";
+    json += "\"rssi\":" + String(WiFi.RSSI(i)) + ",";
+    json +=
+        "\"auth\":" +
+        String(WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "false" : "true") +
+        "}";
+  }
+  json += "]";
+  setupServer.send(200, "application/json", json);
+}
+
 void handleConfigure() {
   String u = setupServer.arg("server_url");
   String s = setupServer.arg("wifi_ssid");
@@ -449,7 +467,9 @@ void handleConfigure() {
     setupServer.send(400, "text/plain", "Missing fields");
     return;
   }
+  // Save credentials including user email/pass for self-registration
   saveCredentials(u, s, p, email, pwd);
+
   String html =
       R"(<html><body style='background:#1b1b1b;color:white;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif'>
         <div style='background:#2d2d2d;padding:40px;border-radius:12px;text-align:center'>
@@ -476,6 +496,7 @@ void startSetupMode() {
   setupServer.on("/stream", HTTP_GET, handleStream);
   setupServer.on("/capture", HTTP_GET, handleCapture);
   setupServer.on("/info", HTTP_GET, handleDeviceInfo);
+  setupServer.on("/scan", HTTP_GET, handleScan); // Add scan endpoint
   setupServer.on("/action", HTTP_GET, handleAction);
   setupServer.on("/configure", HTTP_POST, handleConfigure);
   setupServer.on("/provision", HTTP_POST, handleProvision);
@@ -509,6 +530,71 @@ bool connectToWiFi() {
   }
   Serial.println();
   return WiFi.status() == WL_CONNECTED;
+}
+
+bool attemptSelfRegistration() {
+  if (userEmail.length() == 0 || userPass.length() == 0)
+    return false;
+
+  currentState = STATE_ACTIVATING;
+  HTTPClient http;
+  String token = "";
+
+  // 1. Login to get Token
+  DEBUG_PRINTLN("Attempting login for: " + userEmail);
+  http.begin(serverURL + "/auth/login");
+  http.addHeader("Content-Type", "application/json");
+  String loginPayload =
+      "{\"email\":\"" + userEmail + "\",\"password\":\"" + userPass + "\"}";
+  int code = http.POST(loginPayload);
+
+  if (code == 200) {
+    String resp = http.getString();
+    token = extractJsonVal(resp, "token");
+    DEBUG_PRINTLN("Login Success. Token: " + token);
+  } else {
+    DEBUG_PRINTLN("Login Failed: " + String(code));
+    http.end();
+    return false;
+  }
+  http.end();
+
+  if (token.length() == 0)
+    return false;
+
+  // 2. Register Device
+  http.begin(serverURL + "/devices/register");
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Authorization", "Bearer " + token); // Use User Token
+
+  String regPayload = "{";
+  regPayload += "\"device_uid\":\"" + deviceUID + "\",";
+  regPayload +=
+      "\"device_name\":\"" + String(DEVICE_MODEL) + "\","; // Default name
+  regPayload += "\"device_type\":\"camera\"";
+  regPayload += "}";
+
+  code = http.POST(regPayload);
+  String resp = http.getString();
+  http.end();
+
+  DEBUG_PRINTLN("Register Code: " + String(code));
+
+  if (code == 201 ||
+      code == 409) { // Created or Conflict (Conflict handled by server now?)
+    // Actually, if 201, we get API Key.
+    // If 409, it means already registered.
+    // BUT our server now auto-deletes old on conflict and returns 201!
+    if (code == 201) {
+      String did = extractJsonVal(resp, "device_id");
+      String key = extractJsonVal(resp, "api_key");
+      if (did.length() > 0 && key.length() > 0) {
+        saveActivation(did, key);
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 bool activateProvisioning() {
@@ -612,12 +698,20 @@ void setup() {
     initCamera();
 
     // Check activation
-    if (apiKey.length() > 0 || activateProvisioning()) {
+    if (apiKey.length() > 0) {
       currentState = STATE_ONLINE;
-      // Optional: Keep setup server running for reconfiguration?
-      // startSetupMode();
-      startCameraServer(); // Start streaming server
-      streaming = true;    // Auto start stream if configured
+      startCameraServer();
+      streaming = true;
+    } else if (attemptSelfRegistration()) { // Try self registration if we have
+                                            // user creds
+      currentState = STATE_ONLINE;
+      startCameraServer();
+      streaming = true;
+    } else if (activateProvisioning()) { // Fallback to old provisioning if
+                                         // pending request exists
+      currentState = STATE_ONLINE;
+      startCameraServer();
+      streaming = true;
     } else {
       currentState = STATE_OFFLINE;
       // Activation failed, go to setup mode
