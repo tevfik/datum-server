@@ -758,32 +758,55 @@ void handleSnap() {
   if (s == NULL)
     return;
 
+  Serial.println("[SNAP] Starting high-res capture...");
+
+  // Pause streaming to free up DMA
+  bool wasStreaming = streaming;
+  streaming = false;
+  delay(100); // Let current frame complete
+
   // Save current setting
   framesize_t original_size = s->status.framesize;
 
-  // Switch to QXGA (2048x1536) - 3MP (Max for OV3660)
-  s->set_framesize(s, FRAMESIZE_QXGA);
-  delay(500); // Allow sensor to adjust to new resolution and exposure
+  // Flush ALL buffers (fb_count = 3)
+  for (int i = 0; i < 3; i++) {
+    camera_fb_t *fb = esp_camera_fb_get();
+    if (fb)
+      esp_camera_fb_return(fb);
+  }
+  delay(100);
 
-  // Clear buffer (cardinal rule for changing res)
+  // Switch to UXGA (1600x1200) - stable for OV3660
+  s->set_framesize(s, FRAMESIZE_UXGA);
+  delay(500); // Allow sensor to adjust
+
+  // Flush buffer after resolution change
   camera_fb_t *fb = esp_camera_fb_get();
   if (fb)
     esp_camera_fb_return(fb);
+  delay(50);
 
   // Capture High-Res Frame
   fb = esp_camera_fb_get();
   if (fb) {
-    if (fb->len < 1000) {
-      // OVF or failure check (very small frame usually means error)
-      Serial.println("Snapshot failed or OVF");
+    if (fb->len < 5000) {
+      Serial.printf("[SNAP] Failed! Frame too small: %d bytes\n", fb->len);
     } else {
+      Serial.printf("[SNAP] Success! Frame size: %d bytes\n", fb->len);
       uploadFrame(fb);
     }
     esp_camera_fb_return(fb);
+  } else {
+    Serial.println("[SNAP] Failed to get frame!");
   }
 
   // Restore
   s->set_framesize(s, original_size);
+  delay(100);
+
+  // Resume streaming
+  streaming = wasStreaming;
+  Serial.println("[SNAP] Complete.");
 }
 
 // Setup logic with late camera init
