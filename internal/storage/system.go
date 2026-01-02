@@ -109,3 +109,13 @@ func (s *Storage) UpdateDataRetention(days int) error {
 	config.DataRetention = days
 	return s.SaveSystemConfig(config)
 }
+
+// UpdateRegistrationConfig updates the public registration setting
+func (s *Storage) UpdateRegistrationConfig(allow bool) error {
+	config, err := s.GetSystemConfig()
+	if err != nil {
+		return err
+	}
+	config.AllowRegister = allow
+	return s.SaveSystemConfig(config)
+}

@@ -127,7 +127,11 @@ func init() {
 	adminCmd.AddCommand(statsCmd)
 
 	// Config command
+	// Config command
 	adminCmd.AddCommand(adminConfigCmd)
+
+	// Toggle registration command
+	adminCmd.AddCommand(toggleRegistrationCmd)
 }
 
 func runResetPassword(cmd *cobra.Command, args []string) error {
@@ -536,5 +540,53 @@ func runAdminConfig(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Println()
 
+	return nil
+}
+
+var toggleRegistrationCmd = &cobra.Command{
+	Use:   "toggle-registration [true|false]",
+	Short: "Enable/Disable user registration",
+	Long:  `Enable or disable public user registration availability.`,
+	Args:  cobra.ExactArgs(1),
+	RunE:  runToggleRegistration,
+}
+
+func runToggleRegistration(cmd *cobra.Command, args []string) error {
+	loadConfig()
+
+	if token == "" && apiKey == "" {
+		return fmt.Errorf("admin authentication required")
+	}
+
+	if args[0] != "true" && args[0] != "false" {
+		return fmt.Errorf("argument must be 'true' or 'false'")
+	}
+	allow := args[0] == "true"
+
+	client := NewAPIClient(serverURL, token, apiKey)
+
+	payload := map[string]interface{}{
+		"allow_register": allow,
+	}
+
+	resp, err := client.Put("/admin/config/registration", payload)
+	if err != nil {
+		return fmt.Errorf("failed to update config: %w", err)
+	}
+
+	var response map[string]interface{}
+	if err := ParseResponse(resp, &response); err != nil {
+		return err
+	}
+
+	if outputJSON {
+		return printJSON(response)
+	}
+
+	status := "Disabled"
+	if allow {
+		status = "Enabled"
+	}
+	fmt.Printf("✅ Public Registration: %s\n", status)
 	return nil
 }

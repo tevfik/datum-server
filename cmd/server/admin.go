@@ -62,6 +62,7 @@ func setupAdminRoutes(r *gin.Engine, store *storage.Storage) {
 		admin.PUT("/config/retention", updateRetentionPolicyHandler)
 		admin.PUT("/config/rate-limit", updateRateLimitHandler)
 		admin.PUT("/config/alerts", updateAlertConfigHandler)
+		admin.PUT("/config/registration", updateRegistrationConfigHandler)
 
 		// Logs management
 		admin.GET("/logs", getLogsHandler)
@@ -788,4 +789,26 @@ func pathExists(path string) bool {
 // timeNow returns current time (for testability)
 func timeNow() time.Time {
 	return time.Now()
+}
+
+type UpdateRegistrationRequest struct {
+	AllowRegister bool `json:"allow_register"`
+}
+
+func updateRegistrationConfigHandler(c *gin.Context) {
+	var req UpdateRegistrationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := store.UpdateRegistrationConfig(req.AllowRegister); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":        "Registration configuration updated",
+		"allow_register": req.AllowRegister,
+	})
 }

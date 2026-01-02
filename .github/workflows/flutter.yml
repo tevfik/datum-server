@@ -1,0 +1,34 @@
+name: Flutter App
+
+on:
+  push:
+    paths:
+      - 'examples/flutter_app/**'
+  pull_request:
+    paths:
+      - 'examples/flutter_app/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./examples/flutter_app
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.10.x'
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test

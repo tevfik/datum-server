@@ -711,6 +711,7 @@ func adminMenu() error {
 			"Reset user password",
 			"System statistics",
 			"System config",
+			"Toggle Registration",
 			"Reset system (Dangerous)",
 			"← Back to main menu",
 		},
@@ -750,6 +751,9 @@ func adminMenu() error {
 		fmt.Println("\n> datumctl admin get-config")
 		return runAdminConfig(nil, nil)
 
+	case "Toggle Registration":
+		return promptToggleRegistration()
+
 	case "Reset system (Dangerous)":
 		return runResetSystem(nil, nil)
 	}
@@ -777,6 +781,22 @@ func promptAdminResetPassword() error {
 		return err
 	}
 
-	fmt.Printf("\n> datumctl admin reset-password %s\n", email)
 	return runResetPassword(nil, []string{email})
+}
+
+func promptToggleRegistration() error {
+	var enable bool
+	if err := survey.AskOne(&survey.Confirm{
+		Message: "Enable public user registration?",
+		Default: false,
+	}, &enable); err != nil {
+		return err
+	}
+
+	arg := "false"
+	if enable {
+		arg = "true"
+	}
+	fmt.Printf("\n> datumctl admin toggle-registration %s\n", arg)
+	return runToggleRegistration(nil, []string{arg})
 }

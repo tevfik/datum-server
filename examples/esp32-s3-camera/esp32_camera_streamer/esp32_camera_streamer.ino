@@ -355,6 +355,33 @@ void handleCapture() {
   esp_camera_fb_return(fb);
 }
 
+// Handle JSON provisioning from Mobile App
+void handleProvision() {
+  if (setupServer.method() != HTTP_POST) {
+    setupServer.send(405, "text/plain", "Method Not Allowed");
+    return;
+  }
+
+  String body = setupServer.arg("plain");
+  String u = extractJsonVal(body, "server_url");
+  String s = extractJsonVal(body, "wifi_ssid");
+  String p = extractJsonVal(body, "wifi_pass");
+
+  if (u.length() == 0 || s.length() == 0) {
+    setupServer.send(400, "application/json", "{\"error\":\"Missing fields\"}");
+    return;
+  }
+
+  saveCredentials(u, s, p, "",
+                  ""); // Clear user creds as they are not needed on device
+
+  setupServer.send(200, "application/json",
+                   "{\"status\":\"success\",\"message\":\"Credentials saved. "
+                   "Restarting...\"}");
+  delay(500);
+  ESP.restart();
+}
+
 void handleConfigure() {
   String u = setupServer.arg("server_url");
   String s = setupServer.arg("wifi_ssid");
@@ -395,6 +422,7 @@ void startSetupMode() {
   setupServer.on("/info", HTTP_GET, handleDeviceInfo);
   setupServer.on("/action", HTTP_GET, handleAction);
   setupServer.on("/configure", HTTP_POST, handleConfigure);
+  setupServer.on("/provision", HTTP_POST, handleProvision);
   setupServer.onNotFound(handleNotFound);
   setupServer.begin();
 }
@@ -406,6 +434,7 @@ void startCameraServer() {
   setupServer.on("/info", HTTP_GET, handleDeviceInfo);
   setupServer.on("/action", HTTP_GET, handleAction);
   setupServer.on("/configure", HTTP_POST, handleConfigure);
+  setupServer.on("/provision", HTTP_POST, handleProvision);
   setupServer.onNotFound(handleNotFound);
   setupServer.begin();
 }
@@ -435,39 +464,32 @@ String extractJsonVal(String json, String key) {
   return json.substring(s, e);
 }
 
-bool activateWithServer() {
-  if (userEmail.length() == 0)
-    return false;
-
+bool activateProvisioning() {
   currentState = STATE_ACTIVATING;
   HTTPClient http;
 
-  // 1. Login
-  http.begin(serverURL + "/auth/login");
+  // Call /provisioning/activate endpoint with Device UID
+  // The server checks if there is a pending provisioning request for this UID
+  http.begin(serverURL + "/provisioning/activate");
   http.addHeader("Content-Type", "application/json");
-  String loginPl =
-      "{\"email\":\"" + userEmail + "\",\"password\":\"" + userPass + "\"}";
-  int code = http.POST(loginPl);
+
+  // We send UID, Firmware Version, and Model
+  String payload = "{";
+  payload += "\"device_uid\":\"" + deviceUID + "\",";
+  payload += "\"firmware_version\":\"" + String(FIRMWARE_VERSION) + "\",";
+  payload += "\"model\":\"" + String(DEVICE_MODEL) + "\"";
+  payload += "}";
+
+  DEBUG_PRINTLN("Activating: " + payload);
+
+  int code = http.POST(payload);
   String resp = http.getString();
   http.end();
 
-  if (code != 200)
-    return false;
-  String token = extractJsonVal(resp, "token");
-  if (token.length() == 0)
-    return false;
+  DEBUG_PRINTLN("Activation Code: " + String(code));
+  DEBUG_PRINTLN("Response: " + resp);
 
-  // 2. Register Device
-  http.begin(serverURL + "/devices");
-  http.addHeader("Authorization", "Bearer " + token);
-  http.addHeader("Content-Type", "application/json");
-  String devPl = "{\"name\":\"Camera-" + deviceMAC + "\",\"type\":\"camera\"}";
-
-  code = http.POST(devPl);
-  resp = http.getString();
-  http.end();
-
-  if (code == 201) {
+  if (code == 200) {
     String did = extractJsonVal(resp, "device_id");
     String key = extractJsonVal(resp, "api_key");
     if (did.length() > 0 && key.length() > 0) {
@@ -539,7 +561,7 @@ void setup() {
     initCamera();
 
     // Check activation
-    if (apiKey.length() > 0 || activateWithServer()) {
+    if (apiKey.length() > 0 || activateProvisioning()) {
       currentState = STATE_ONLINE;
       // Optional: Keep setup server running for reconfiguration?
       // startSetupMode();
