@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_mjpeg/flutter_mjpeg.dart';
 import 'package:path_provider/path_provider.dart';
