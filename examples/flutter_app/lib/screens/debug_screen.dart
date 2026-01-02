@@ -36,12 +36,15 @@ class DebugScreen extends StatelessWidget {
               final isReq = log.contains('REQ:');
               
               Color color = Colors.white;
-              if (isError) color = Colors.redAccent;
-              else if (isReq) color = Colors.cyanAccent;
+              if (isError) {
+                color = Colors.redAccent;
+              } else if (isReq) {
+                color = Colors.cyanAccent;
+              }
 
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   border: Border(bottom: BorderSide(color: Colors.white10)),
                 ),
                 child: SelectableText(

@@ -42,7 +42,27 @@ class ApiClient {
         _logger.log('RES: ${response.statusCode} ${response.statusMessage}');
         return handler.next(response);
       },
-      onError: (DioError e, handler) {
+[{
+  "StartLine": 45,
+  "EndLine": 45,
+  "TargetContent": "      onError: (DioError e, handler) {",
+  "ReplacementContent": "      onError: (DioException e, handler) {",
+  "AllowMultiple": true
+},
+{
+  "StartLine": 76,
+  "EndLine": 76,
+  "TargetContent": "      if (e is DioError && e.response != null) {",
+  "ReplacementContent": "      if (e is DioException && e.response != null) {",
+  "AllowMultiple": true
+},
+{
+  "StartLine": 91,
+  "EndLine": 91,
+  "TargetContent": "        if (e is DioError && e.response != null) {",
+  "ReplacementContent": "        if (e is DioException && e.response != null) {",
+  "AllowMultiple": true
+}]
         _logger.log('ERR: ${e.response?.statusCode} ${e.message}');
         if (e.response != null) _logger.log('RES DATA: ${e.response?.data}');
         return handler.next(e);
