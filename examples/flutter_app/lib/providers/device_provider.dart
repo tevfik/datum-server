@@ -10,6 +10,20 @@ class DeviceProvider with ChangeNotifier {
 
   final ApiClient _api = ApiClient();
 
+  void updateToken(String? token) {
+    if (token != null) {
+      _api.setToken(token);
+      // If we have a token, we can try fetching devices immediately if list is empty
+      if (_devices.isEmpty && !_isLoading) {
+         fetchDevices();
+      }
+    } else {
+      _api.clearToken();
+      _devices = [];
+      notifyListeners();
+    }
+  }
+
   Future<void> fetchDevices() async {
     _isLoading = true;
     notifyListeners();

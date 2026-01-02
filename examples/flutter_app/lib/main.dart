@@ -10,7 +10,13 @@ void main() {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => DeviceProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, DeviceProvider>(
+          create: (_) => DeviceProvider(),
+          update: (_, auth, deviceProvider) {
+            deviceProvider!.updateToken(auth.token);
+            return deviceProvider;
+          },
+        ),
       ],
       child: const DatumApp(),
     ),
