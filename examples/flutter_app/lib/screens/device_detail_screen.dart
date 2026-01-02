@@ -54,6 +54,51 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     }
   }
 
+  Future<void> _takePhoto() async {
+    setState(() => _loadingAction = true);
+    try {
+      // 1. Send Snap Command
+      await _api.sendCommand(widget.device.id, "snap");
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Requesting High-Res Photo...')),
+        );
+      }
+
+      // 2. Wait for upload (approx 3-4s)
+      await Future.delayed(const Duration(seconds: 4));
+
+      // 3. Show Result
+      if (mounted) {
+        final token = Provider.of<AuthProvider>(context, listen: false).token;
+        final imageUrl = 'https://datum.bezg.in/devices/${widget.device.id}/stream/snapshot?token=$token&t=${DateTime.now().millisecondsSinceEpoch}';
+        
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text("Captured Photo"),
+            content: Image.network(imageUrl),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Close"),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingAction = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
