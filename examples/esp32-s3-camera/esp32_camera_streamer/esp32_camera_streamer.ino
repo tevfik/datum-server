@@ -360,12 +360,12 @@ bool initCamera() {
 
   if (psramFound()) {
     config.frame_size = FRAMESIZE_VGA;
-    config.jpeg_quality = 12;
+    config.jpeg_quality = 15; // Slightly lower quality for speed (10-63)
     config.fb_count = 2;
     config.fb_location = CAMERA_FB_IN_PSRAM;
   } else {
     config.frame_size = FRAMESIZE_QVGA;
-    config.jpeg_quality = 15;
+    config.jpeg_quality = 20; // Lower quality for No-PSRAM
     config.fb_count = 1;
     config.fb_location = CAMERA_FB_IN_DRAM;
   }
@@ -726,7 +726,7 @@ void checkCommands() {
 }
 
 void streamLoop() {
-  if (!streaming || millis() - lastFrameTime < 100)
+  if (!streaming || millis() - lastFrameTime < 30) // 30ms = ~33 FPS
     return;
   lastFrameTime = millis();
   camera_fb_t *fb = esp_camera_fb_get();

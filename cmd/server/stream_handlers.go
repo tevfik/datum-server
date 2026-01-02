@@ -256,6 +256,32 @@ func websocketStreamHandler(c *gin.Context) {
 }
 
 // Stream info endpoint
+// GET /devices/:device_id/stream/snapshot
+func streamSnapshotHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
+	userID, _ := auth.GetUserID(c)
+
+	// Verify device ownership
+	device, err := store.GetDevice(deviceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
+		return
+	}
+	if device.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	frame := streamManager.GetLastFrame(deviceID)
+	if frame == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No stream active"})
+		return
+	}
+
+	c.Data(http.StatusOK, "image/jpeg", frame)
+}
+
+// Stream info endpoint
 // GET /devices/:device_id/stream/info
 func streamInfoHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")

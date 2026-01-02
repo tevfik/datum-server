@@ -216,9 +216,10 @@ func main() {
 		streamGroup := r.Group("/devices")
 		streamGroup.Use(auth.AuthMiddleware())
 		{
-			streamGroup.GET("/:device_id/stream/mjpeg", mjpegStreamHandler)  // MJPEG over HTTP (SSE-like)
-			streamGroup.GET("/:device_id/stream/ws", websocketStreamHandler) // WebSocket binary stream
-			streamGroup.GET("/:device_id/stream/info", streamInfoHandler)    // Stream metadata
+			streamGroup.GET("/:device_id/stream/mjpeg", mjpegStreamHandler)       // MJPEG over HTTP (SSE-like)
+			streamGroup.GET("/:device_id/stream/snapshot", streamSnapshotHandler) // Current frame snapshot
+			streamGroup.GET("/:device_id/stream/ws", websocketStreamHandler)      // WebSocket binary stream
+			streamGroup.GET("/:device_id/stream/info", streamInfoHandler)         // Stream metadata
 		}
 		dataQueryGroup.GET("/:device_id", getLatestDataHandler)
 		dataQueryGroup.GET("/:device_id/history", getDataHistoryHandler)
