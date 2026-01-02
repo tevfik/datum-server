@@ -424,7 +424,7 @@ void handleProvision() {
     return;
   }
 
-  saveCredentials(u, s, p, "",
+  saveCredentials(u, s, p,
                   ""); // Clear user creds as they are not needed on device
 
   setupServer.send(200, "application/json",
