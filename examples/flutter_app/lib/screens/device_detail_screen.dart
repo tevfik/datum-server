@@ -158,7 +158,7 @@ class _ActionButton extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             shape: const CircleBorder(),
             padding: const EdgeInsets.all(24),
-            backgroundColor: color.withOpacity(0.2), 
+            backgroundColor: color.withValues(alpha: 0.2), 
             foregroundColor: color, 
           ),
           child: isLoading 
