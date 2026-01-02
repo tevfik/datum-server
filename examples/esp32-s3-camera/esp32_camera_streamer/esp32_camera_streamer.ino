@@ -762,57 +762,76 @@ void streamLoop() {
 }
 
 void handleSnap() {
-  sensor_t *s = esp_camera_sensor_get();
-  if (s == NULL)
-    return;
+  Serial.println("[SNAP] Starting high-res capture (full reinit)...");
 
-  Serial.println("[SNAP] Starting high-res capture...");
-
-  // Pause streaming to free up DMA
+  // Pause streaming
   bool wasStreaming = streaming;
   streaming = false;
-  delay(100); // Let current frame complete
+  delay(200);
 
-  // Save current setting
-  framesize_t original_size = s->status.framesize;
+  // Deinit current camera
+  esp_camera_deinit();
+  delay(100);
 
-  // Flush ALL buffers (fb_count = 3)
-  for (int i = 0; i < 3; i++) {
-    camera_fb_t *fb = esp_camera_fb_get();
+  // Reinit with HIGH RES config
+  camera_config_t config;
+  config.ledc_channel = LEDC_CHANNEL_0;
+  config.ledc_timer = LEDC_TIMER_0;
+  config.pin_d0 = Y2_GPIO_NUM;
+  config.pin_d1 = Y3_GPIO_NUM;
+  config.pin_d2 = Y4_GPIO_NUM;
+  config.pin_d3 = Y5_GPIO_NUM;
+  config.pin_d4 = Y6_GPIO_NUM;
+  config.pin_d5 = Y7_GPIO_NUM;
+  config.pin_d6 = Y8_GPIO_NUM;
+  config.pin_d7 = Y9_GPIO_NUM;
+  config.pin_xclk = XCLK_GPIO_NUM;
+  config.pin_pclk = PCLK_GPIO_NUM;
+  config.pin_vsync = VSYNC_GPIO_NUM;
+  config.pin_href = HREF_GPIO_NUM;
+  config.pin_sccb_sda = SIOD_GPIO_NUM;
+  config.pin_sccb_scl = SIOC_GPIO_NUM;
+  config.pin_pwdn = PWDN_GPIO_NUM;
+  config.pin_reset = RESET_GPIO_NUM;
+  config.xclk_freq_hz = 20000000;
+  config.pixel_format = PIXFORMAT_JPEG;
+  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+
+  // HIGH RES CONFIG
+  config.frame_size = FRAMESIZE_UXGA; // 1600x1200
+  config.jpeg_quality = 10;           // Best quality
+  config.fb_count = 1;
+  config.fb_location = CAMERA_FB_IN_PSRAM;
+
+  esp_err_t err = esp_camera_init(&config);
+  if (err != ESP_OK) {
+    Serial.printf("[SNAP] High-res init FAILED: 0x%x\n", err);
+    // Restore normal camera
+    initCamera();
+    streaming = wasStreaming;
+    return;
+  }
+
+  delay(500); // Let sensor stabilize
+
+  // Capture
+  camera_fb_t *fb = esp_camera_fb_get();
+  if (fb && fb->len > 5000) {
+    Serial.printf("[SNAP] Success! Frame size: %d bytes (%dx%d)\n", fb->len,
+                  fb->width, fb->height);
+    uploadFrame(fb);
+    esp_camera_fb_return(fb);
+  } else {
+    Serial.println("[SNAP] Failed to capture!");
     if (fb)
       esp_camera_fb_return(fb);
   }
+
+  // Deinit high-res and restore normal
+  esp_camera_deinit();
   delay(100);
+  initCamera();
 
-  // Switch to UXGA (1600x1200) - stable for OV3660
-  s->set_framesize(s, FRAMESIZE_UXGA);
-  delay(500); // Allow sensor to adjust
-
-  // Flush buffer after resolution change
-  camera_fb_t *fb = esp_camera_fb_get();
-  if (fb)
-    esp_camera_fb_return(fb);
-  delay(50);
-
-  // Capture High-Res Frame
-  fb = esp_camera_fb_get();
-  if (fb) {
-    if (fb->len < 5000) {
-      Serial.printf("[SNAP] Failed! Frame too small: %d bytes\n", fb->len);
-    } else {
-      Serial.printf("[SNAP] Success! Frame size: %d bytes\n", fb->len);
-      uploadFrame(fb);
-    }
-    esp_camera_fb_return(fb);
-  } else {
-    Serial.println("[SNAP] Failed to get frame!");
-  }
-
-  // Restore
-  s->set_framesize(s, original_size);
-  delay(100);
-
-  // Resume streaming
   streaming = wasStreaming;
   Serial.println("[SNAP] Complete.");
 }
