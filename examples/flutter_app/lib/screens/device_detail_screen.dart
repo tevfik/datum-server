@@ -91,6 +91,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
 
       // 2. Poll for result (Try for 15 seconds)
       bool success = false;
+      if (!mounted) return;
       final token = Provider.of<AuthProvider>(context, listen: false).token;
       
       for (int i = 0; i < 6; i++) { // 6 attempts * 2.5s = 15s max

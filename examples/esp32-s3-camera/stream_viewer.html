@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -70,14 +71,17 @@
             font-weight: 500;
         }
 
-        input, select, button {
+        input,
+        select,
+        button {
             padding: 10px 15px;
             border: none;
             border-radius: 6px;
             font-size: 1em;
         }
 
-        input, select {
+        input,
+        select {
             background: #3a3a3a;
             color: #fff;
         }
@@ -199,6 +203,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -228,6 +233,7 @@
             </div>
             <button id="connectBtn" onclick="connect()">Connect</button>
             <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+            <button id="snapBtn" onclick="takeSnapshot()" disabled style="background-color: #f59e0b;">📸 Snap</button>
         </div>
 
         <div class="stream-container">
@@ -283,7 +289,7 @@
             entry.className = 'log-entry';
             entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
             logDiv.insertBefore(entry, logDiv.firstChild);
-            
+
             // Keep only last 50 entries
             while (logDiv.children.length > 50) {
                 logDiv.removeChild(logDiv.lastChild);
@@ -294,32 +300,33 @@
             const statusDiv = document.getElementById('status');
             statusDiv.className = 'status ' + (connected ? 'connected' : 'disconnected');
             statusDiv.textContent = connected ? 'Connected' : 'Disconnected';
-            
+
             document.getElementById('connectBtn').disabled = connected;
             document.getElementById('disconnectBtn').disabled = !connected;
+            document.getElementById('snapBtn').disabled = !connected;
         }
 
         function updateStats(frameSize) {
             frameCount++;
             totalBytes += frameSize;
             fpsCounter++;
-            
+
             const now = Date.now();
             const elapsed = (now - lastFrameTime) / 1000;
-            
+
             if (elapsed >= 1) {
                 const fps = fpsCounter / elapsed;
                 const bandwidth = (totalBytes / elapsed) / 1024;
-                
+
                 document.getElementById('fpsValue').textContent = fps.toFixed(1);
                 document.getElementById('fps').textContent = fps.toFixed(1) + ' FPS';
                 document.getElementById('bandwidthValue').textContent = bandwidth.toFixed(1) + ' KB/s';
-                
+
                 fpsCounter = 0;
                 totalBytes = 0;
                 lastFrameTime = now;
             }
-            
+
             document.getElementById('frameCountValue').textContent = frameCount.toLocaleString();
             document.getElementById('frameSizeValue').textContent = (frameSize / 1024).toFixed(1) + ' KB';
         }
@@ -328,20 +335,20 @@
             const serverURL = document.getElementById('serverURL').value;
             const deviceID = document.getElementById('deviceID').value;
             const token = document.getElementById('token').value;
-            
+
             const wsURL = serverURL.replace('http://', 'ws://').replace('https://', 'wss://');
             const url = `${wsURL}/devices/${deviceID}/stream/ws?token=${token}`;
-            
+
             log(`Connecting to WebSocket: ${url}`);
-            
+
             ws = new WebSocket(url);
             ws.binaryType = 'arraybuffer';
-            
+
             ws.onopen = () => {
                 log('WebSocket connected');
                 updateStatus(true);
             };
-            
+
             ws.onmessage = (event) => {
                 if (typeof event.data === 'string') {
                     // Text message (metadata)
@@ -350,25 +357,25 @@
                     // Binary message (JPEG frame)
                     const blob = new Blob([event.data], { type: 'image/jpeg' });
                     const url = URL.createObjectURL(blob);
-                    
+
                     const img = document.getElementById('streamImage');
                     const oldURL = img.src;
                     img.src = url;
-                    
+
                     // Cleanup old blob URL
                     if (oldURL.startsWith('blob:')) {
                         URL.revokeObjectURL(oldURL);
                     }
-                    
+
                     updateStats(event.data.byteLength);
                 }
             };
-            
+
             ws.onerror = (error) => {
                 log('WebSocket error: ' + error);
                 updateStatus(false);
             };
-            
+
             ws.onclose = () => {
                 log('WebSocket disconnected');
                 updateStatus(false);
@@ -380,14 +387,14 @@
             const serverURL = document.getElementById('serverURL').value;
             const deviceID = document.getElementById('deviceID').value;
             const token = document.getElementById('token').value;
-            
+
             const url = `${serverURL}/devices/${deviceID}/stream/mjpeg?token=${token}`;
-            
+
             log(`Connecting to MJPEG: ${url}`);
-            
+
             const img = document.getElementById('streamImage');
             img.src = url;
-            
+
             img.onload = () => {
                 if (frameCount === 0) {
                     log('MJPEG stream started');
@@ -395,25 +402,25 @@
                 }
                 updateStats(0); // Size unknown for MJPEG
             };
-            
+
             img.onerror = () => {
                 log('MJPEG stream error');
                 updateStatus(false);
             };
-            
+
             mjpegImg = img;
         }
 
         function connect() {
             const protocol = document.getElementById('protocol').value;
-            document.getElementById('protocolBadge').textContent = 
+            document.getElementById('protocolBadge').textContent =
                 protocol === 'ws' ? 'WebSocket' : 'MJPEG';
-            
+
             frameCount = 0;
             fpsCounter = 0;
             totalBytes = 0;
             lastFrameTime = Date.now();
-            
+
             if (protocol === 'ws') {
                 connectWebSocket();
             } else {
@@ -426,12 +433,12 @@
                 ws.close();
                 ws = null;
             }
-            
+
             if (mjpegImg) {
                 mjpegImg.src = '';
                 mjpegImg = null;
             }
-            
+
             document.getElementById('streamImage').src = '';
             updateStatus(false);
             log('Disconnected');
@@ -439,6 +446,65 @@
 
         // Auto-connect on load (optional)
         // window.onload = () => setTimeout(connect, 1000);
+
+        async function takeSnapshot() {
+            const serverURL = document.getElementById('serverURL').value;
+            const deviceID = document.getElementById('deviceID').value;
+            const token = document.getElementById('token').value;
+
+            document.getElementById('snapBtn').disabled = true;
+            document.getElementById('snapBtn').textContent = '⏳ Capturing...';
+            log('Sending snap command...');
+
+            try {
+                // 1. Send snap command
+                const cmdRes = await fetch(`${serverURL}/devices/${deviceID}/commands`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ action: 'snap' })
+                });
+
+                if (!cmdRes.ok) {
+                    throw new Error('Failed to send snap command: ' + await cmdRes.text());
+                }
+                log('Snap command sent. Waiting for image...');
+
+                // 2. Poll for snapshot (up to 15 seconds)
+                let success = false;
+                for (let i = 0; i < 6; i++) {
+                    await new Promise(r => setTimeout(r, 2500));
+                    try {
+                        const snapshotURL = `${serverURL}/devices/${deviceID}/stream/snapshot?token=${token}&t=${Date.now()}`;
+                        const imgRes = await fetch(snapshotURL);
+                        if (imgRes.ok) {
+                            const blob = await imgRes.blob();
+                            if (blob.size > 20000) {
+                                const url = URL.createObjectURL(blob);
+                                window.open(url, '_blank');
+                                log(`Snapshot captured! Size: ${(blob.size / 1024).toFixed(1)} KB`);
+                                success = true;
+                                break;
+                            }
+                        }
+                    } catch (e) {
+                        log('Retry ' + (i + 1) + ': ' + e.message);
+                    }
+                }
+                if (!success) {
+                    throw new Error('Snapshot took too long or failed.');
+                }
+            } catch (e) {
+                log('Snapshot Error: ' + e.message);
+                alert('Snapshot failed: ' + e.message);
+            } finally {
+                document.getElementById('snapBtn').disabled = false;
+                document.getElementById('snapBtn').textContent = '📸 Snap';
+            }
+        }
     </script>
 </body>
+
 </html>
