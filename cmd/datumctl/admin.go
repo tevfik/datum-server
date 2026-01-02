@@ -390,7 +390,38 @@ func runDeleteUser(cmd *cobra.Command, args []string) error {
 
 	client := NewAPIClient(serverURL, token, apiKey)
 
-	resp, err := client.Delete("/admin/users/"+email, nil)
+	// If identifier looks like an email, try to resolve it to an ID first
+	userID := email
+	if identifierContainsEmail(email) {
+		// List users to find the ID
+		resp, err := client.Get("/admin/users")
+		if err != nil {
+			return fmt.Errorf("failed to list users for resolution: %w", err)
+		}
+
+		var response map[string]interface{}
+		if err := ParseResponse(resp, &response); err != nil {
+			return err
+		}
+
+		found := false
+		if users, ok := response["users"].([]interface{}); ok {
+			for _, u := range users {
+				user := u.(map[string]interface{})
+				if getString(user, "email") == email {
+					userID = getString(user, "id")
+					found = true
+					break
+				}
+			}
+		}
+
+		if !found {
+			return fmt.Errorf("user not found with email: %s", email)
+		}
+	}
+
+	resp, err := client.Delete("/admin/users/"+userID, nil)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
