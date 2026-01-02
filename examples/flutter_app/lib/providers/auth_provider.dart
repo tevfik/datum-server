@@ -26,6 +26,7 @@ class AuthProvider with ChangeNotifier {
     try {
       final token = await _api.login(email, password);
       _token = token;
+      _api.setToken(token);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
       notifyListeners();
