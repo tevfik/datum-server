@@ -97,7 +97,7 @@
 #define VSYNC_GPIO_NUM 6
 #define HREF_GPIO_NUM 7
 #define PCLK_GPIO_NUM 13
-#define LED_GPIO_NUM 2
+#define LED_GPIO_NUM 48
 #elif defined(CAMERA_MODEL_AI_THINKER)
 #define PWDN_GPIO_NUM 32
 #define RESET_GPIO_NUM -1
@@ -238,7 +238,12 @@ void updateLED() {
     break;
   case STATE_ONLINE:
 #ifdef LED_GPIO_NUM
-    digitalWrite(LED_GPIO_NUM, HIGH);
+    if (LED_GPIO_NUM == 48) {
+      // Solid Green for Online
+      neopixelWrite(LED_GPIO_NUM, 0, 10, 0);
+    } else {
+      digitalWrite(LED_GPIO_NUM, HIGH);
+    }
 #endif
     return;
   default:
@@ -247,7 +252,13 @@ void updateLED() {
   if (now - lastLedBlink >= blinkInterval) {
     ledState = !ledState;
 #ifdef LED_GPIO_NUM
-    digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
+    if (LED_GPIO_NUM == 48) {
+      // Freenove S3 WS2812 RGB LED
+      // Blue for status blink
+      neopixelWrite(LED_GPIO_NUM, 0, 0, ledState ? 10 : 0);
+    } else {
+      digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
+    }
 #endif
     lastLedBlink = now;
   }
@@ -382,9 +393,17 @@ void handleAction() {
   String type = setupServer.arg("type");
   if (type == "led") {
 #ifdef LED_GPIO_NUM
-    digitalWrite(LED_GPIO_NUM, HIGH);
-    delay(200);
-    digitalWrite(LED_GPIO_NUM, LOW);
+    if (LED_GPIO_NUM == 48) {
+      // Toggle Torch (White)
+      static bool torchState = false;
+      torchState = !torchState;
+      neopixelWrite(LED_GPIO_NUM, torchState ? 255 : 0, torchState ? 255 : 0,
+                    torchState ? 255 : 0);
+    } else {
+      digitalWrite(LED_GPIO_NUM, HIGH);
+      delay(200);
+      digitalWrite(LED_GPIO_NUM, LOW);
+    }
 #endif
     setupServer.send(200, "text/plain", "OK");
   } else if (type == "restart") {
@@ -644,7 +663,13 @@ void checkCommands() {
     else if (pl.indexOf("led") > 0) {
       ledState = !ledState;
 #ifdef LED_GPIO_NUM
-      digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
+      if (LED_GPIO_NUM == 48) {
+        // Torch toggle
+        neopixelWrite(LED_GPIO_NUM, ledState ? 255 : 0, ledState ? 255 : 0,
+                      ledState ? 255 : 0);
+      } else {
+        digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
+      }
 #endif
     }
   }
