@@ -108,7 +108,7 @@ class ApiClient {
         });
         return response.data;
       } catch (e) {
-        if (e is DioError && e.response != null) {
+        if (e is DioException && e.response != null) {
             throw Exception('Registration failed: ${e.response?.data}');
         }
         throw Exception('Registration failed: $e');
