@@ -89,50 +89,62 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         );
       }
 
-      // 2. Wait for upload (approx 3-4s)
-      await Future.delayed(const Duration(seconds: 4));
-
-      // 3. Fetch and Save
-      if (mounted) {
-        final token = Provider.of<AuthProvider>(context, listen: false).token;
-        final imageUrl = 'https://datum.bezg.in/devices/${widget.device.id}/stream/snapshot?token=$token&t=${DateTime.now().millisecondsSinceEpoch}';
+      // 2. Poll for result (Try for 15 seconds)
+      bool success = false;
+      for (int i = 0; i < 6; i++) { // 6 attempts * 2.5s = 15s max
+        if (!mounted) return;
         
-        // Fetch bytes
-        final request = await HttpClient().getUrl(Uri.parse(imageUrl));
-        final response = await request.close();
-        if (response.statusCode == 200) {
-            final bytes = (await response.fold<BytesBuilder>(BytesBuilder(), (b, d) => b..add(d))).takeBytes();
-            
-            // Save to file
-            final directory = await getApplicationDocumentsDirectory();
-            final photoDir = Directory('${directory.path}/photos');
-            if (!await photoDir.exists()) await photoDir.create(recursive: true);
-            
-            final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-            final file = File('${photoDir.path}/snap_$timestamp.jpg');
-            await file.writeAsBytes(bytes);
-            
-            if (mounted) {
-                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Saved to Gallery: ${file.path.split("/").last}')),
-                );
-                _loadPhotos(); // Refresh list
-                
-                // Show Dialog
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text("Captured"),
-                    content: Image.file(file),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close")),
-                    ],
-                  ),
-                );
-            }
-        } else {
-             throw Exception("Failed to fetch snapshot");
+        await Future.delayed(const Duration(milliseconds: 2500));
+        
+        try {
+          final token = Provider.of<AuthProvider>(context, listen: false).token;
+          final imageUrl = 'https://datum.bezg.in/devices/${widget.device.id}/stream/snapshot?token=$token&t=${DateTime.now().millisecondsSinceEpoch}';
+          
+          final request = await HttpClient().getUrl(Uri.parse(imageUrl));
+          final response = await request.close();
+          
+          if (response.statusCode == 200) {
+              final bytes = (await response.fold<BytesBuilder>(BytesBuilder(), (b, d) => b..add(d))).takeBytes();
+              
+              // Verify size (Snapshots should be > 20KB usually, streams are smaller)
+              // This ensures we don't accidentally grab an old low-res frame if stream is active
+              if (bytes.length > 20000) { 
+                 final directory = await getApplicationDocumentsDirectory();
+                 final photoDir = Directory('${directory.path}/photos');
+                 if (!await photoDir.exists()) await photoDir.create(recursive: true);
+                 
+                 final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+                 final file = File('${photoDir.path}/snap_$timestamp.jpg');
+                 await file.writeAsBytes(bytes);
+                 
+                 if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                       SnackBar(content: Text('Saved to Gallery: ${file.path.split("/").last}')),
+                     );
+                     _loadPhotos();
+                     
+                     showDialog(
+                       context: context,
+                       builder: (ctx) => AlertDialog(
+                         title: const Text("Captured"),
+                         content: Image.file(file),
+                         actions: [
+                           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close")),
+                         ],
+                       ),
+                     );
+                 }
+                 success = true;
+                 break; // Success!
+              }
+          }
+        } catch (e) {
+           debugPrint("Retry $i failed: $e");
         }
+      }
+      
+      if (!success && mounted) {
+           throw Exception("Snapshot took too long or failed.");
       }
     } catch (e) {
       if (mounted) {
