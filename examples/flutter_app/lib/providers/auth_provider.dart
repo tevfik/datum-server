@@ -6,9 +6,10 @@ class AuthProvider with ChangeNotifier {
   String? _token;
   bool get isAuthenticated => _token != null;
 
-  final ApiClient _api = ApiClient();
+  late final ApiClient _api;
 
-  AuthProvider() {
+  AuthProvider({ApiClient? apiClient}) {
+    _api = apiClient ?? ApiClient();
     _loadToken();
   }
 
