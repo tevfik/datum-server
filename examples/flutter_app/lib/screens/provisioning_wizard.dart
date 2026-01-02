@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
-import '../providers/device_provider.dart';
 
 class ProvisioningWizard extends StatefulWidget {
   const ProvisioningWizard({super.key});
@@ -13,7 +11,9 @@ class ProvisioningWizard extends StatefulWidget {
 class _ProvisioningWizardState extends State<ProvisioningWizard> {
   final _ssidController = TextEditingController();
   final _passController = TextEditingController();
-  final _userPassController = TextEditingController(); // Confirm user password
+  final _userPassController = TextEditingController();
+  final _emailController = TextEditingController();
+  
   String? _selectedSSID;
   List<dynamic> _networks = [];
   bool _scanning = false;
@@ -25,6 +25,15 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
   int _step = 0;
   bool _isLoading = false;
   String? _statusMessage;
+  
+  @override
+  void dispose() {
+    _ssidController.dispose();
+    _passController.dispose();
+    _userPassController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
   
   // Helper to connect to SoftAP endpoints with short timeout
   Dio _getDeviceDio() {
@@ -58,10 +67,12 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
         _scanNetworks();
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _statusMessage = "Could not find device. Ensure you are connected to 'Datum-Camera-...' WiFi.";
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _statusMessage = "Could not find device. Ensure you are connected to 'Datum-Camera-...' WiFi.";
+        });
+      }
     }
   }
 
@@ -91,28 +102,7 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
     }
   }
 
-  // Step 3: Send Configuration (WiFi + User Creds)
-  Future<void> _provisionDevice() async {
-    setState(() {
-      _isLoading = true;
-      _statusMessage = "Sending configuration...";
-    });
-    
-    // Get current user email from AuthProvider (assuming available via context or passed in)
-    // For now we'll ask user to confirm password, and assume email is known? 
-    // Ideally AuthProvider should expose currentUser.email
-    // Let's assume user knows their email or we get it from local storage/auth state
-    // For safety, let's inject Auth Service or similar. 
-    // Simplification: We assume the user is logged in. Use a placeholder or fetch from storage if possible.
-    // NOTE: In a real app, use: Provider.of<AuthProvider>(context, listen: false).user?.email
-    // I will add an email field just to be safe if auth provider isn't handy here.
-    
-    // Actually, let's verify if we can get email.
-    // Using hardcoded email from prompt isn't good. 
-    // Let's add email field for re-verification security.
-  }
-  
-  // Refined Step 3 Implementation
+  // Step 3 Implementation
   Future<void> _completeProvisioning(String email) async {
      setState(() {
       _isLoading = true;
@@ -132,28 +122,28 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
       );
 
       if (response.statusCode == 200) {
-          setState(() {
-            _isLoading = false;
-            _statusMessage = "Success! Device is restarting and will register itself.";
-          });
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _statusMessage = "Success! Device is restarting and will register itself.";
+            });
+          }
           
           await Future.delayed(const Duration(seconds: 3));
           if (mounted) Navigator.pop(context);
       }
     } catch (e) {
-       setState(() {
-        _isLoading = false;
-        _statusMessage = "Failed to configure device: $e";
-      });
+       if (mounted) {
+         setState(() {
+          _isLoading = false;
+          _statusMessage = "Failed to configure device: $e";
+        });
+       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Attempt to get user email from provider if possible, else empty
-    // final userEmail = Provider.of<AuthProvider>(context).user?.email ?? "";
-    // Because I don't see AuthProvider file content, I'll add an Email field securely.
-
     return Scaffold(
       appBar: AppBar(title: const Text('Add New Device')),
       body: Stepper(
@@ -191,8 +181,6 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Enter password to authorize device")));
                            return;
                         }
-                        // Use email from controller if we added it, else use a default or ask
-                        // Ideally we should have the email. I'll Add an email controller.
                         _completeProvisioning(_emailController.text);
                      },
                      style: ElevatedButton.styleFrom(backgroundColor: Colors.cyan, foregroundColor: Colors.white),
@@ -248,7 +236,7 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
                          final net = _networks[i];
                          return ListTile(
                            title: Text(net['ssid']),
-                           trailing: Icon(Icons.wifi, size: 20),
+                           trailing: const Icon(Icons.wifi, size: 20),
                            dense: true,
                            onTap: () {
                               setState(() {
@@ -285,7 +273,7 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (_deviceUID != null) ...[
-                   Text("Device ID: $_deviceUID", style: const TextStyle(fontWeight: FontWeight.bold)),
+                   Text("Device ID: $_deviceUID\nFirmware: ${_firmwareVersion ?? 'Unknown'}", style: const TextStyle(fontWeight: FontWeight.bold)),
                    const SizedBox(height: 10),
                 ],
                 const Text('Enter your account credentials to register this device.'),
@@ -313,6 +301,4 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
       ),
     );
   }
-  
-  final _emailController = TextEditingController();
 }
