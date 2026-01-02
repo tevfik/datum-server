@@ -109,12 +109,19 @@ func registerDeviceHandler(c *gin.Context) {
 	deviceUID := normalizeUID(req.DeviceUID)
 
 	// Check if UID is already registered
-	registered, _, _ := store.IsDeviceUIDRegistered(deviceUID)
+	registered, existingDeviceID, _ := store.IsDeviceUIDRegistered(deviceUID)
 	if registered {
-		c.JSON(http.StatusConflict, gin.H{
-			"error": "device already registered",
-		})
-		return
+		// Device already registered - delete old registration to allow re-onboarding
+		logger.GetLogger().Info().
+			Str("device_uid", deviceUID).
+			Str("old_device_id", existingDeviceID).
+			Msg("Re-registering existing device - deleting old record")
+
+		if err := store.ForceDeleteDevice(existingDeviceID); err != nil {
+			logger.GetLogger().Error().Err(err).Str("device_id", existingDeviceID).Msg("Failed to delete old device during re-registration")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clean up old device registration"})
+			return
+		}
 	}
 
 	// Generate IDs and keys

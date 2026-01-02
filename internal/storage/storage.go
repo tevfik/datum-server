@@ -809,6 +809,11 @@ func (s *Storage) ForceDeleteDevice(deviceID string) error {
 			tx.Delete(fmt.Sprintf("token:%s", device.CurrentToken))
 		}
 
+		// Delete UID index if exists
+		if device.DeviceUID != "" {
+			tx.Delete(fmt.Sprintf("device:uid:%s", device.DeviceUID))
+		}
+
 		// Remove from user's device list
 		userDevicesKey := fmt.Sprintf("user:%s:devices", device.UserID)
 		devicesJSON, _ := tx.Get(userDevicesKey)

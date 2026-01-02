@@ -164,8 +164,64 @@ const char DASHBOARD_HTML[] PROGMEM =
 // ============================================================================
 // Core Functions
 // ============================================================================
+String extractJsonVal(String json, String key) {
+  int s = json.indexOf("\"" + key + "\":\"");
+  if (s < 0)
+    return "";
+  s += key.length() + 4;
+  int e = json.indexOf("\"", s);
+  return json.substring(s, e);
+}
+
+// Check for Factory Reset (Boot Button held manually during runtime)
+unsigned long buttonPressStart = 0;
+
+void handleFactoryResetButton() {
+  pinMode(0, INPUT_PULLUP);
+
+  if (digitalRead(0) == LOW) {
+    // Button pressed
+    if (buttonPressStart == 0) {
+      buttonPressStart = millis();
+      Serial.println("Button Pressed... Hold for 3s to Reset");
+    }
+
+    // Check duration
+    if (millis() - buttonPressStart > 3000) {
+      Serial.println("Factory Reset: TRIGGERED!");
+
+      // Visual feedback
+      for (int i = 0; i < 5; i++) {
+#ifdef LED_GPIO_NUM
+        digitalWrite(LED_GPIO_NUM, !digitalRead(LED_GPIO_NUM));
+#endif
+        delay(100);
+      }
+
+      // Clear NVS
+      prefs.begin("datum", false);
+      prefs.clear();
+      prefs.end();
+
+      Serial.println("Factory Reset: Complete. Restarting...");
+      ESP.restart();
+    }
+  } else {
+    // Button released
+    if (buttonPressStart != 0) {
+      Serial.println("Button Released (Reset Cancelled)");
+    }
+    buttonPressStart = 0;
+  }
+}
+
 void updateLED() {
+  if (digitalRead(0) == LOW)
+    return; // Don't interfere if button is being used for other things (though
+            // usually checked at boot)
+
   unsigned long now = millis();
+
   int blinkInterval = 1000;
   switch (currentState) {
   case STATE_SETUP_MODE:
@@ -455,15 +511,6 @@ bool connectToWiFi() {
   return WiFi.status() == WL_CONNECTED;
 }
 
-String extractJsonVal(String json, String key) {
-  int s = json.indexOf("\"" + key + "\":\"");
-  if (s < 0)
-    return "";
-  s += key.length() + 4;
-  int e = json.indexOf("\"", s);
-  return json.substring(s, e);
-}
-
 bool activateProvisioning() {
   currentState = STATE_ACTIVATING;
   HTTPClient http;
@@ -545,6 +592,10 @@ void setup() {
 #ifdef LED_GPIO_NUM
   pinMode(LED_GPIO_NUM, OUTPUT);
 #endif
+
+  // checkFactoryReset(); // Removed: Calling this at boot triggers Download
+  // Mode. Moved to loop.
+
   initDeviceUID();
   loadCredentials();
 
@@ -580,6 +631,7 @@ void setup() {
 }
 
 void loop() {
+  handleFactoryResetButton(); // Check button every loop
   updateLED();
   if (currentState == STATE_SETUP_MODE || currentState == STATE_ONLINE) {
     setupServer.handleClient();
