@@ -12,7 +12,6 @@ class ProvisioningWizard extends StatefulWidget {
 
 class _ProvisioningWizardState extends State<ProvisioningWizard> {
   final _ssidController = TextEditingController();
-  final _ssidController = TextEditingController();
   final _passController = TextEditingController();
   final _nameController = TextEditingController();
   
@@ -30,7 +29,6 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
   
   @override
   void dispose() {
-    _ssidController.dispose();
     _ssidController.dispose();
     _passController.dispose();
     _nameController.dispose();
@@ -134,9 +132,6 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
       final response = await _getDeviceDio().post(
         '/configure',
         data: FormData.fromMap({
-          "wifi_ssid": _ssidController.text,
-          "wifi_pass": _passController.text,
-          "server_url": "https://datum.bezg.in",
           "wifi_ssid": _ssidController.text,
           "wifi_pass": _passController.text,
           "device_name": _nameController.text.isNotEmpty ? _nameController.text : "Camera",
