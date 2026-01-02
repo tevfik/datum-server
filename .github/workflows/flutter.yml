@@ -4,9 +4,11 @@ on:
   push:
     paths:
       - 'examples/flutter_app/**'
+      - '.github/workflows/flutter.yml'
   pull_request:
     paths:
       - 'examples/flutter_app/**'
+      - '.github/workflows/flutter.yml'
 
 jobs:
   test:
