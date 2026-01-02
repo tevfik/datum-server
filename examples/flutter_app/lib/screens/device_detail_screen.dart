@@ -151,6 +151,13 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                       isLoading: _loadingAction,
                     ),
                     _ActionButton(
+                      icon: Icons.camera_alt,
+                      label: "Take Photo",
+                      color: Colors.blueAccent,
+                      onPressed: _takePhoto,
+                      isLoading: _loadingAction,
+                    ),
+                    _ActionButton(
                       icon: Icons.restart_alt,
                       label: "Restart",
                       color: Colors.redAccent,
