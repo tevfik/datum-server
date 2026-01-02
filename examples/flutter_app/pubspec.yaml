@@ -15,7 +15,6 @@ dependencies:
   shared_preferences: ^2.0.0
   fl_chart: ^0.61.0
   intl: ^0.18.0
-  wifi_iot: ^0.3.18 # For WiFi provisioning
   permission_handler: ^10.0.0
 
 dev_dependencies:
