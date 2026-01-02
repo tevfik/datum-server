@@ -658,6 +658,17 @@ void handleAction() {
     return false;
   }
 
+  // Helper to ACK commands so they don't loop
+  void ackCommand(String cmdId) {
+    HTTPClient http;
+    http.begin(serverURL + "/device/" + deviceID + "/commands/" + cmdId +
+               "/ack");
+    http.addHeader("Authorization", "Bearer " + apiKey);
+    http.addHeader("Content-Type", "application/json");
+    http.POST("{\"status\":\"executed\"}");
+    http.end();
+  }
+
   void checkCommands() {
     if (millis() - lastCommandCheck < 5000)
       return;
@@ -670,23 +681,50 @@ void handleAction() {
     http.addHeader("Authorization", "Bearer " + apiKey);
     if (http.GET() == 200) {
       String pl = http.getString();
-      if (pl.indexOf("start-stream") > 0)
-        streaming = true;
-      else if (pl.indexOf("stop-stream") > 0)
-        streaming = false;
-      else if (pl.indexOf("restart") > 0)
-        ESP.restart();
-      else if (pl.indexOf("led") > 0) {
+
+      // Parse simplified JSON list manually
+      // Format: {"commands":[{"command_id":"cmd_xxx","action":"restart"}]}
+      int cmdIdx = pl.indexOf("\"command_id\":\"");
+      while (cmdIdx > 0) {
+        int endIdx = pl.indexOf("\"", cmdIdx + 14);
+        String cmdId = pl.substring(cmdIdx + 14, endIdx);
+
+        // Find action for this command
+        int actIdx = pl.indexOf("\"action\":\"", cmdIdx);
+        if (actIdx > 0) {
+          int actEnd = pl.indexOf("\"", actIdx + 10);
+          String action = pl.substring(actIdx + 10, actEnd);
+
+          Serial.println("Executing: " + action + " ID: " + cmdId);
+
+          if (action == "start-stream") {
+            streaming = true;
+            ackCommand(cmdId);
+          } else if (action == "stop-stream") {
+            streaming = false;
+            ackCommand(cmdId);
+          } else if (action == "restart") {
+            ackCommand(cmdId); // ACK BEFORE RESTART is critical
+            delay(500);
+            ESP.restart();
+          } else if (action == "led") {
 #ifdef LED_GPIO_NUM
 #if LED_GPIO_NUM == 48
-        torchState = !torchState;
-        neopixelWrite(LED_GPIO_NUM, torchState ? 255 : 0, torchState ? 255 : 0,
-                      torchState ? 255 : 0);
+            torchState = !torchState;
+            neopixelWrite(LED_GPIO_NUM, torchState ? 255 : 0,
+                          torchState ? 255 : 0, torchState ? 255 : 0);
 #else
-        ledState = !ledState;
-        digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
+            ledState = !ledState;
+            digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
 #endif
 #endif
+            ackCommand(cmdId);
+          } else {
+            ackCommand(cmdId);
+          }
+        }
+        // Look for next command
+        cmdIdx = pl.indexOf("\"command_id\":\"", endIdx);
       }
     }
     http.end();
