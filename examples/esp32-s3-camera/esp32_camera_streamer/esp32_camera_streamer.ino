@@ -733,12 +733,20 @@ void checkCommands() {
 
 void uploadFrame(camera_fb_t *fb) {
   HTTPClient http;
-  // Use a longer timeout for high-res images
-  http.setTimeout(10000);
+  http.setTimeout(15000); // 15s for high-res uploads
   http.begin(serverURL + "/device/" + deviceID + "/stream/frame");
   http.addHeader("Authorization", "Bearer " + apiKey);
   http.addHeader("Content-Type", "image/jpeg");
-  http.POST(fb->buf, fb->len);
+
+  int httpCode = http.POST(fb->buf, fb->len);
+
+  if (httpCode == 200) {
+    Serial.printf("[UPLOAD] OK: %d bytes sent\n", fb->len);
+  } else {
+    Serial.printf("[UPLOAD] FAILED! HTTP %d, size: %d bytes\n", httpCode,
+                  fb->len);
+  }
+
   http.end();
 }
 
