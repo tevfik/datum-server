@@ -23,20 +23,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-[{
-  "StartLine": 26,
-  "EndLine": 26,
-  "TargetContent": "          flutter-version: '3.10.x'",
-  "ReplacementContent": "          flutter-version: '3.27.x'",
-  "AllowMultiple": true
-},
-{
-  "StartLine": 56,
-  "EndLine": 56,
-  "TargetContent": "          flutter-version: '3.10.x'",
-  "ReplacementContent": "          flutter-version: '3.27.x'",
-  "AllowMultiple": true
-}]
+          flutter-version: '3.27.x'
           channel: 'stable'
 
       - name: Install dependencies
@@ -66,20 +53,7 @@ jobs:
       - uses: android-actions/setup-android@v2
       - uses: subosito/flutter-action@v2
         with:
-[{
-  "StartLine": 26,
-  "EndLine": 26,
-  "TargetContent": "          flutter-version: '3.10.x'",
-  "ReplacementContent": "          flutter-version: '3.27.x'",
-  "AllowMultiple": true
-},
-{
-  "StartLine": 56,
-  "EndLine": 56,
-  "TargetContent": "          flutter-version: '3.10.x'",
-  "ReplacementContent": "          flutter-version: '3.27.x'",
-  "AllowMultiple": true
-}]
+          flutter-version: '3.27.x'
           channel: 'stable'
       - run: flutter pub get
       
