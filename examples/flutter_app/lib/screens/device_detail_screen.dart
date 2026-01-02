@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_mjpeg/flutter_mjpeg.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'dart:typed_data';
 import '../providers/auth_provider.dart';
 import '../api_client.dart';
 import '../models/device.dart';
@@ -47,7 +48,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         });
       }
     } catch (e) {
-      print("Error loading photos: $e");
+      debugPrint("Error loading photos: $e");
     }
   }
 
@@ -100,7 +101,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         final request = await HttpClient().getUrl(Uri.parse(imageUrl));
         final response = await request.close();
         if (response.statusCode == 200) {
-            final bytes = await (await response.fold<BytesBuilder>(BytesBuilder(), (b, d) => b..add(d))).takeBytes();
+            final bytes = (await response.fold<BytesBuilder>(BytesBuilder(), (b, d) => b..add(d))).takeBytes();
             
             // Save to file
             final directory = await getApplicationDocumentsDirectory();
