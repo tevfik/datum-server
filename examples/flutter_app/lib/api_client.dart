@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 
 class ApiClient {
   final Dio _dio = Dio();
-  String? _token;
 
   ApiClient() {
     _dio.options.baseUrl = 'http://localhost:8080'; // Default, updated dynamically
@@ -15,12 +14,10 @@ class ApiClient {
   }
 
   void setToken(String token) {
-    _token = token;
     _dio.options.headers['Authorization'] = 'Bearer $token';
   }
 
   void clearToken() {
-    _token = null;
     _dio.options.headers.remove('Authorization');
   }
 
