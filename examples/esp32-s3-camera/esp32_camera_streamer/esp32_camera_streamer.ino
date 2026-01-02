@@ -356,7 +356,7 @@ bool initCamera() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.grab_mode = CAMERA_GRAB_LATEST;
+  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY; // Only capture when buffer is free
 
   if (psramFound()) {
     Serial.printf("PSRAM Found! Size: %d bytes\n", ESP.getPsramSize());
@@ -742,13 +742,20 @@ void uploadFrame(camera_fb_t *fb) {
 }
 
 void streamLoop() {
-  if (!streaming || millis() - lastFrameTime < 30) // 30ms = ~33 FPS
-    return;
-  lastFrameTime = millis();
-  camera_fb_t *fb = esp_camera_fb_get();
-  if (!fb)
+  if (!streaming)
     return;
 
+  // Adaptive timing: wait at least 50ms between frames
+  if (millis() - lastFrameTime < 50)
+    return;
+
+  camera_fb_t *fb = esp_camera_fb_get();
+  if (!fb) {
+    delay(10); // Brief wait if no frame ready
+    return;
+  }
+
+  lastFrameTime = millis();
   uploadFrame(fb);
   esp_camera_fb_return(fb);
 }
