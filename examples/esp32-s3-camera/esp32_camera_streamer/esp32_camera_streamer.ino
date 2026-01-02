@@ -26,7 +26,9 @@
 
 // Debug Configuration
 // Uncomment the following line to enable detailed debug logs
-// #define DEBUG_MODE
+// Debug Configuration
+// Uncomment the following line to enable detailed debug logs
+#define DEBUG_MODE
 
 #ifdef DEBUG_MODE
 #define DEBUG_PRINT(...) Serial.print(__VA_ARGS__)
@@ -50,6 +52,7 @@
 // ============================================================================
 #define FIRMWARE_VERSION "2.1.0"
 #define DEVICE_MODEL "datum-camera-s3"
+#define DEFAULT_SERVER_URL "https://datum.bezg.in"
 
 #define SETUP_AP_PREFIX "Datum-Camera-"
 #define SETUP_AP_PASSWORD ""
@@ -253,7 +256,10 @@ void updateLED() {
 void loadCredentials() {
   prefs.begin("datum", true);
   apiKey = prefs.getString("api_key", "");
-  serverURL = prefs.getString("server_url", "");
+  apiKey = prefs.getString("api_key", "");
+  serverURL = prefs.getString("server_url", DEFAULT_SERVER_URL);
+  if (serverURL.length() == 0)
+    serverURL = DEFAULT_SERVER_URL;
   wifiSSID = prefs.getString("wifi_ssid", "");
   wifiPass = prefs.getString("wifi_pass", "");
   deviceID = prefs.getString("device_id", "");
@@ -665,6 +671,8 @@ void streamLoop() {
 // Setup logic with late camera init
 void setup() {
   Serial.begin(115200);
+  delay(1000); // Wait for Serial
+  Serial.println("\n\n--- BOOTING DATUM CAMERA ---");
 #ifdef LED_GPIO_NUM
   pinMode(LED_GPIO_NUM, OUTPUT);
 #endif
