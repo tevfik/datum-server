@@ -759,8 +759,8 @@ void handleSnap() {
   // Save current setting
   framesize_t original_size = s->status.framesize;
 
-  // Switch to UXGA (1600x1200) - User requested high res (OV3660 support)
-  s->set_framesize(s, FRAMESIZE_UXGA);
+  // Switch to QXGA (2048x1536) - 3MP (Max for OV3660)
+  s->set_framesize(s, FRAMESIZE_QXGA);
   delay(500); // Allow sensor to adjust to new resolution and exposure
 
   // Clear buffer (cardinal rule for changing res)
