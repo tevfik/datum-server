@@ -472,9 +472,9 @@
                 }
                 log('Snap command sent. Waiting for image...');
 
-                // 2. Poll for snapshot (up to 15 seconds)
+                // 2. Poll for snapshot (up to 25 seconds for camera reinit)
                 let success = false;
-                for (let i = 0; i < 6; i++) {
+                for (let i = 0; i < 10; i++) {
                     await new Promise(r => setTimeout(r, 2500));
                     try {
                         const snapshotURL = `${serverURL}/devices/${deviceID}/stream/snapshot?token=${token}&t=${Date.now()}`;

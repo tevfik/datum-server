@@ -94,7 +94,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       if (!mounted) return;
       final token = Provider.of<AuthProvider>(context, listen: false).token;
       
-      for (int i = 0; i < 6; i++) { // 6 attempts * 2.5s = 15s max
+      for (int i = 0; i < 10; i++) { // 10 attempts * 2.5s = 25s max for camera reinit
         if (!mounted) return;
         
         await Future.delayed(const Duration(milliseconds: 2500));
