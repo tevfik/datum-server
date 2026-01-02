@@ -94,9 +94,9 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
               ],
             ),
           ),
-          Step(
-            title: const Text('Finish'),
-            content: const Text('Connect to device and upload credentials?'),
+          const Step(
+            title: Text('Finish'),
+            content: Text('Connect to device and upload credentials?'),
           ),
         ],
       ),
