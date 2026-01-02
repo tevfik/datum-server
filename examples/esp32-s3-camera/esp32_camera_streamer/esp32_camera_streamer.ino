@@ -359,13 +359,15 @@ bool initCamera() {
   config.grab_mode = CAMERA_GRAB_LATEST;
 
   if (psramFound()) {
+    Serial.printf("PSRAM Found! Size: %d bytes\n", ESP.getPsramSize());
     config.frame_size = FRAMESIZE_VGA;
-    config.jpeg_quality = 15; // Slightly lower quality for speed (10-63)
-    config.fb_count = 2;
+    config.jpeg_quality = 12; // Better quality for PSRAM
+    config.fb_count = 3;      // More buffers for high-res switching
     config.fb_location = CAMERA_FB_IN_PSRAM;
   } else {
+    Serial.println("WARNING: No PSRAM! High-res will fail.");
     config.frame_size = FRAMESIZE_QVGA;
-    config.jpeg_quality = 20; // Lower quality for No-PSRAM
+    config.jpeg_quality = 20;
     config.fb_count = 1;
     config.fb_location = CAMERA_FB_IN_DRAM;
   }
