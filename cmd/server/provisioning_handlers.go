@@ -147,19 +147,34 @@ func registerDeviceHandler(c *gin.Context) {
 	}
 
 	if err := store.CreateProvisioningRequest(provReq); err != nil {
-		logger.GetLogger().Warn().
-			Str("user_id", userID).
-			Str("device_uid", deviceUID).
-			Str("ip", c.ClientIP()).
-			Err(err).
-			Msg("Failed to create provisioning request")
-
-		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "already registered") {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		if strings.Contains(err.Error(), "already exists") {
+			// Check if duplicate request belongs to same user
+			existingReq, getErr := store.GetProvisioningRequestByUID(deviceUID)
+			if getErr == nil && existingReq.UserID == userID {
+				// Same user - update the existing request (overwrite it)
+				// We actually just delete the old one and retry creation
+				logger.GetLogger().Info().Str("device_uid", deviceUID).Msg("Overwriting existing provisioning request for same user")
+				store.CancelProvisioningRequest(existingReq.ID)
+				if err := store.CreateProvisioningRequest(provReq); err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to overwrite provisioning request"})
+					return
+				}
+				// Proceed to success response
+			} else {
+				// Different user or other error
+				c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+				return
+			}
+		} else {
+			logger.GetLogger().Warn().
+				Str("user_id", userID).
+				Str("device_uid", deviceUID).
+				Str("ip", c.ClientIP()).
+				Err(err).
+				Msg("Failed to create provisioning request")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create provisioning request"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create provisioning request"})
-		return
 	}
 
 	// Log successful provisioning registration

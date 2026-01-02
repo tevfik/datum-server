@@ -56,6 +56,7 @@ func main() {
 
 	// Command-line flags
 	port := flag.String("port", "", "Server port (default: 8000 or PORT env var)")
+	serverURL := flag.String("server-url", "", "Public server URL (default: http://localhost:8000 or SERVER_URL env var)")
 	dataDir := flag.String("data-dir", "", "Data directory path (default: ./data or DATA_DIR env var)")
 	retentionDays := flag.Int("retention-days", 0, "Data retention in days (default: 7 or RETENTION_MAX_DAYS env var)")
 	// retentionCheckHours is deprecated as retention is handled by storage engine
@@ -239,6 +240,16 @@ func main() {
 			serverPort = "8000"
 		}
 	}
+
+	// Configure public URL
+	publicURL := *serverURL
+	if publicURL == "" {
+		publicURL = os.Getenv("SERVER_URL")
+		if publicURL == "" {
+			publicURL = "http://localhost:" + serverPort
+		}
+	}
+	SetProvisioningServerURL(publicURL)
 
 	log.Info().
 		Str("port", serverPort).
