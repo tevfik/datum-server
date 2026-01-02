@@ -29,13 +29,15 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
       await Provider.of<DeviceProvider>(context, listen: false).createProvisioningRequest(
         _uidController.text,
         "New Camera",
-        _ssidController.text, // Optional: save WiFi to server for backup?
+        _ssidController.text,
         "",
       );
       
+      if (!mounted) return;
+
       setState(() {
         _isLoading = false;
-        _step++; // Move to next step
+        _step++;
         _statusMessage = null;
       });
       
