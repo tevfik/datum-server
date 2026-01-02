@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -50,13 +51,28 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 20),
             _isLoading
                 ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(50),
-                      backgroundColor: Colors.cyan,
-                    ),
-                    onPressed: _login,
-                    child: const Text('Login'),
+                : Column(
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                          backgroundColor: Colors.cyan,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: _login,
+                        child: const Text('Login'),
+                      ),
+                      const SizedBox(height: 10),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                          );
+                        },
+                        child: const Text('Create Account', style: TextStyle(color: Colors.cyan)),
+                      ),
+                    ],
                   ),
           ],
         ),

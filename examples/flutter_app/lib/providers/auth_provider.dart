@@ -36,6 +36,15 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> register(String email, String password) async {
+    try {
+      await _api.register(email, password);
+      return true; // Registration successful
+    } catch (e) {
+      return false; // Registration failed
+    }
+  }
+
   Future<void> logout() async {
     _token = null;
     _api.clearToken();

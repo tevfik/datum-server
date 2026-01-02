@@ -52,6 +52,27 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
     return Scaffold(
       appBar: AppBar(title: const Text('Add Device')),
       body: Stepper(
+        type: StepperType.vertical,
+        controlsBuilder: (context, details) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 20.0),
+            child: Row(
+              children: [
+                ElevatedButton(
+                  onPressed: details.onStepContinue,
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.cyan, foregroundColor: Colors.white),
+                  child: const Text('Continue'),
+                ),
+                const SizedBox(width: 10),
+                if (_step > 0)
+                  TextButton(
+                    onPressed: details.onStepCancel,
+                    child: const Text('Back', style: TextStyle(color: Colors.white70)),
+                  ),
+              ],
+            ),
+          );
+        },
         currentStep: _step,
         onStepContinue: () {
           if (_step < 2) {
