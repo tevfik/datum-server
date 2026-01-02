@@ -32,3 +32,47 @@ jobs:
 
       - name: Run tests
         run: flutter test
+
+  build-android:
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./examples/flutter_app
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.10.x'
+          channel: 'stable'
+      - run: flutter pub get
+      - name: Build APK
+        run: flutter build apk --release
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: datum-app-release-apk
+          path: examples/flutter_app/build/app/outputs/flutter-apk/app-release.apk
+
+  build-ios:
+    needs: test
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ./examples/flutter_app
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.10.x'
+          channel: 'stable'
+      - run: flutter pub get
+      - name: Build iOS (No Codesign)
+        run: flutter build ios --release --no-codesign
+      - name: Compress App
+        run: tar -czf datum-app-ios.tar.gz build/ios/iphoneos/Runner.app
+      - name: Upload iOS Build
+        uses: actions/upload-artifact@v3
+        with:
+          name: datum-app-ios-build
+          path: examples/flutter_app/datum-app-ios.tar.gz
