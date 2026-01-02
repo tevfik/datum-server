@@ -16,6 +16,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FORMAT=${LOG_FORMAT:-json}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - SERVER_URL=https://${DOMAIN:-datum.localhost}
     volumes:
       - ${DATA_DIR:-../data}:/root/data
     networks:
@@ -24,26 +25,26 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=${TRAEFIK_NETWORK:-proxy}"
-      
+
       # HTTP Router
       - "traefik.http.routers.datum-server.rule=Host(`${DOMAIN:-datum.localhost}`)"
       - "traefik.http.routers.datum-server.entrypoints=${TRAEFIK_ENTRYPOINT_HTTP:-web}"
-      
+
       # HTTPS Router
       - "traefik.http.routers.datum-server-secure.rule=Host(`${DOMAIN:-datum.localhost}`)"
       - "traefik.http.routers.datum-server-secure.entrypoints=${TRAEFIK_ENTRYPOINT_HTTPS:-websecure}"
       - "traefik.http.routers.datum-server-secure.tls=true"
       - "traefik.http.routers.datum-server-secure.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
-      
+
       # Service
       - "traefik.http.services.datum-server.loadbalancer.server.port=8000"
-      
+
       # WebSocket Support
       - "traefik.http.services.datum-server.loadbalancer.passhostheader=true"
       - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Connection=Upgrade"
       - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Upgrade=websocket"
       - "traefik.http.routers.datum-server-secure.middlewares=datum-ws"
-      
+
       # HTTP to HTTPS redirect
       - "traefik.http.middlewares.datum-redirect.redirectscheme.scheme=https"
       - "traefik.http.middlewares.datum-redirect.redirectscheme.permanent=true"
