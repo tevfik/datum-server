@@ -354,15 +354,16 @@ bool initCamera() {
   config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
+  config.xclk_freq_hz = 10000000; // Reduced to 10MHz for OV3660 stability
   config.pixel_format = PIXFORMAT_JPEG;
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY; // Only capture when buffer is free
 
   if (psramFound()) {
-    Serial.printf("PSRAM Found! Size: %d bytes\n", ESP.getPsramSize());
+    Serial.printf("PSRAM Found! Size: %d bytes, Free: %d bytes\n",
+                  ESP.getPsramSize(), ESP.getFreePsram());
     config.frame_size = FRAMESIZE_VGA;
-    config.jpeg_quality = 12; // Better quality for PSRAM
-    config.fb_count = 3;      // More buffers for high-res switching
+    config.jpeg_quality = 12;
+    config.fb_count = 1; // Single buffer for stability
     config.fb_location = CAMERA_FB_IN_PSRAM;
   } else {
     Serial.println("WARNING: No PSRAM! High-res will fail.");
