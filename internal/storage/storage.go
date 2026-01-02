@@ -111,8 +111,9 @@ type Device struct {
 	UserID    string    `json:"user_id"`
 	Name      string    `json:"name"`
 	Type      string    `json:"type"`
-	APIKey    string    `json:"api_key"` // Legacy API key (for backward compatibility)
-	Status    string    `json:"status"`  // "active", "banned", "suspended", "revoked"
+	DeviceUID string    `json:"device_uid,omitempty"` // Hardware UID
+	APIKey    string    `json:"api_key"`              // Legacy API key (for backward compatibility)
+	Status    string    `json:"status"`               // "active", "banned", "suspended", "revoked"
 	LastSeen  time.Time `json:"last_seen"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
@@ -1259,6 +1260,7 @@ func (s *Storage) CompleteProvisioningRequest(reqID string) (*Device, error) {
 			UserID:    req.UserID,
 			Name:      req.DeviceName,
 			Type:      req.DeviceType,
+			DeviceUID: req.DeviceUID,
 			APIKey:    req.APIKey,
 			Status:    "active",
 			CreatedAt: time.Now(),

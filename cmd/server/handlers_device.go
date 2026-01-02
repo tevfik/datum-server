@@ -21,6 +21,7 @@ type DeviceResponse struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	Type      string    `json:"type"`
+	DeviceUID string    `json:"device_uid"` // Add DeviceUID
 	LastSeen  time.Time `json:"last_seen"`
 	CreatedAt time.Time `json:"created_at"`
 	Status    string    `json:"status"`
@@ -88,6 +89,7 @@ func listDevicesHandler(c *gin.Context) {
 			ID:        d.ID,
 			Name:      d.Name,
 			Type:      d.Type,
+			DeviceUID: d.DeviceUID,
 			LastSeen:  d.LastSeen,
 			CreatedAt: d.CreatedAt,
 			Status:    status,

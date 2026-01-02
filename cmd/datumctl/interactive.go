@@ -707,6 +707,7 @@ func adminMenu() error {
 		Options: []string{
 			"List users",
 			"Create user",
+			"Update user role/status",
 			"Delete user",
 			"Reset user password",
 			"System statistics",
@@ -737,6 +738,9 @@ func adminMenu() error {
 	case "Create user":
 		return runCreateUser(nil, nil)
 
+	case "Update user role/status":
+		return promptAdminUpdateUser()
+
 	case "Delete user":
 		return promptAdminDeleteUser()
 
@@ -759,6 +763,56 @@ func adminMenu() error {
 	}
 
 	return nil
+}
+
+func promptAdminUpdateUser() error {
+	var identifier string
+	if err := survey.AskOne(&survey.Input{
+		Message: "User Email or ID:",
+	}, &identifier, survey.WithValidator(survey.Required)); err != nil {
+		return err
+	}
+
+	var action string
+	if err := survey.AskOne(&survey.Select{
+		Message: "What to update?",
+		Options: []string{"Role (Admin/User)", "Status (Active/Suspended)", "Both"},
+	}, &action); err != nil {
+		return err
+	}
+
+	var role string
+	if action == "Role (Admin/User)" || action == "Both" {
+		if err := survey.AskOne(&survey.Select{
+			Message: "New Role:",
+			Options: []string{"user", "admin"},
+		}, &role); err != nil {
+			return err
+		}
+		adminRole = role
+	}
+
+	var status string
+	if action == "Status (Active/Suspended)" || action == "Both" {
+		if err := survey.AskOne(&survey.Select{
+			Message: "New Status:",
+			Options: []string{"active", "suspended"},
+		}, &status); err != nil {
+			return err
+		}
+		adminStatus = status
+	}
+
+	cmdStr := fmt.Sprintf("datumctl admin update-user %s", identifier)
+	if role != "" {
+		cmdStr += fmt.Sprintf(" --role %s", role)
+	}
+	if status != "" {
+		cmdStr += fmt.Sprintf(" --status %s", status)
+	}
+	fmt.Printf("\n> %s\n", cmdStr)
+
+	return runUpdateUser(nil, []string{identifier})
 }
 
 func promptAdminDeleteUser() error {

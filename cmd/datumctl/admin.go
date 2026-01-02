@@ -17,6 +17,7 @@ var (
 	adminEmail       string
 	adminPassword    string
 	adminRole        string
+	adminStatus      string
 	adminForceDelete bool
 )
 
@@ -58,6 +59,21 @@ var listUsersCmd = &cobra.Command{
 	Short: "List all users",
 	Long:  `List all registered users. Admin authentication required.`,
 	RunE:  runListUsers,
+}
+
+var updateUserCmd = &cobra.Command{
+	Use:   "update-user [user_id or email]",
+	Short: "Update user role or status",
+	Long: `Update an existing user's role or status. Admin authentication required.
+
+You can specify the user by their ID or Email address (if using email, it will be resolved to ID first).`,
+	Example: `  # Promote user to admin
+  datumctl admin update-user user@example.com --role admin
+
+  # Suspend a user
+  datumctl admin update-user user@example.com --status suspended`,
+	Args: cobra.ExactArgs(1),
+	RunE: runUpdateUser,
 }
 
 var resetSystemCmd = &cobra.Command{
@@ -132,6 +148,11 @@ func init() {
 
 	// Toggle registration command
 	adminCmd.AddCommand(toggleRegistrationCmd)
+
+	// Update user command
+	adminCmd.AddCommand(updateUserCmd)
+	updateUserCmd.Flags().StringVar(&adminRole, "role", "", "New role (admin or user)")
+	updateUserCmd.Flags().StringVar(&adminStatus, "status", "", "New status (active or suspended)")
 }
 
 func runResetPassword(cmd *cobra.Command, args []string) error {
