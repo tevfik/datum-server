@@ -56,6 +56,15 @@ jobs:
           flutter-version: '3.10.x'
           channel: 'stable'
       - run: flutter pub get
+      
+      - name: Debug & Config Android SDK
+        run: |
+          echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
+          echo "ANDROID_HOME: $ANDROID_HOME"
+          flutter config --android-sdk $ANDROID_SDK_ROOT
+          yes | flutter doctor --android-licenses || true
+          flutter doctor -v
+
       - name: Build APK
         run: flutter build apk --release
       - name: Upload APK
