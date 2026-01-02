@@ -97,7 +97,7 @@ class ApiClient {
 
   Future<List<dynamic>> getDevices() async {
     final response = await _dio.get('/devices');
-    return response.data['devices'];
+    return response.data['devices'] ?? [];
   }
 
   Future<Map<String, dynamic>> getDevice(String id) async {
