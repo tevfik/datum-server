@@ -17,10 +17,13 @@
  * License: MIT
  */
 
-#include "Arduino.h"
 #include "esp_camera.h"
 #include <HTTPClient.h>
 #include <Preferences.h>
+
+// Forward define neopixelWrite if not available (safe for S3)
+extern void neopixelWrite(uint8_t pin, uint8_t red, uint8_t green,
+                          uint8_t blue);
 #include <WebServer.h>
 #include <WiFi.h>
 
@@ -152,6 +155,7 @@ unsigned long lastCommandCheck = 0;
 unsigned long setupStartTime = 0;
 unsigned long lastLedBlink = 0;
 bool ledState = false;
+bool torchState = false;
 
 HTTPClient httpCommand;
 HTTPClient httpStream;
@@ -238,12 +242,14 @@ void updateLED() {
     break;
   case STATE_ONLINE:
 #ifdef LED_GPIO_NUM
-    if (LED_GPIO_NUM == 48) {
-      // Solid Green for Online
-      neopixelWrite(LED_GPIO_NUM, 0, 10, 0);
-    } else {
-      digitalWrite(LED_GPIO_NUM, HIGH);
-    }
+#if LED_GPIO_NUM == 48
+    if (!torchState)
+      neopixelWrite(LED_GPIO_NUM, 0, 10, 0); // Green if no torch
+    else
+      neopixelWrite(LED_GPIO_NUM, 255, 255, 255);
+#else
+    digitalWrite(LED_GPIO_NUM, HIGH);
+#endif
 #endif
     return;
   default:
@@ -252,13 +258,18 @@ void updateLED() {
   if (now - lastLedBlink >= blinkInterval) {
     ledState = !ledState;
 #ifdef LED_GPIO_NUM
-    if (LED_GPIO_NUM == 48) {
-      // Freenove S3 WS2812 RGB LED
-      // Blue for status blink
+#if LED_GPIO_NUM == 48
+    // Freenove S3 WS2812 status blink (Blue)
+    // Only blink if torch is NOT on
+    if (!torchState) {
       neopixelWrite(LED_GPIO_NUM, 0, 0, ledState ? 10 : 0);
     } else {
-      digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
+      // Keep Torch White
+      neopixelWrite(LED_GPIO_NUM, 255, 255, 255);
     }
+#else
+    digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
+#endif
 #endif
     lastLedBlink = now;
   }
@@ -393,370 +404,375 @@ void handleAction() {
   String type = setupServer.arg("type");
   if (type == "led") {
 #ifdef LED_GPIO_NUM
-    if (LED_GPIO_NUM == 48) {
-      // Toggle Torch (White)
-      static bool torchState = false;
+    if (type == "led") {
+#ifdef LED_GPIO_NUM
+#if LED_GPIO_NUM == 48
       torchState = !torchState;
       neopixelWrite(LED_GPIO_NUM, torchState ? 255 : 0, torchState ? 255 : 0,
                     torchState ? 255 : 0);
-    } else {
+#else
       digitalWrite(LED_GPIO_NUM, HIGH);
       delay(200);
       digitalWrite(LED_GPIO_NUM, LOW);
-    }
 #endif
-    setupServer.send(200, "text/plain", "OK");
-  } else if (type == "restart") {
-    setupServer.send(200, "text/plain", "Restarting...");
-    delay(100);
+#endif
+      setupServer.send(200, "text/plain", "OK");
+    } else if (type == "restart") {
+      setupServer.send(200, "text/plain", "Restarting...");
+      delay(100);
+      ESP.restart();
+    } else
+      setupServer.send(400, "text/plain", "Unknown");
+  }
+
+  void handleDeviceInfo() {
+    String json = "{";
+    json += "\"device_uid\":\"" + deviceUID + "\",";
+    json += "\"mac_address\":\"" + deviceMAC + "\",";
+    json += "\"firmware_version\":\"" + String(FIRMWARE_VERSION) + "\",";
+    json += "\"status\":\"" +
+            String(isActivated() ? "configured" : "unconfigured") + "\"";
+    json += "}";
+    setupServer.send(200, "application/json", json);
+  }
+
+  void handleCapture() {
+    camera_fb_t *fb = esp_camera_fb_get();
+    if (!fb) {
+      setupServer.send(500, "text/plain", "Error");
+      return;
+    }
+    setupServer.sendHeader("Content-Disposition",
+                           "inline; filename=capture.jpg");
+    setupServer.send_P(200, "image/jpeg", (const char *)fb->buf, fb->len);
+    esp_camera_fb_return(fb);
+  }
+
+  // Handle JSON provisioning from Mobile App
+  void handleProvision() {
+    if (setupServer.method() != HTTP_POST) {
+      setupServer.send(405, "text/plain", "Method Not Allowed");
+      return;
+    }
+
+    String body = setupServer.arg("plain");
+    String u = extractJsonVal(body, "server_url");
+    String s = extractJsonVal(body, "wifi_ssid");
+    String p = extractJsonVal(body, "wifi_pass");
+
+    if (u.length() == 0 || s.length() == 0) {
+      setupServer.send(400, "application/json",
+                       "{\"error\":\"Missing fields\"}");
+      return;
+    }
+
+    saveCredentials(
+        u, s, p, "",
+        ""); // Clear user creds and name as they are not needed on device
+
+    setupServer.send(200, "application/json",
+                     "{\"status\":\"success\",\"message\":\"Credentials saved. "
+                     "Restarting...\"}");
+    delay(500);
     ESP.restart();
-  } else
-    setupServer.send(400, "text/plain", "Unknown");
-}
-
-void handleDeviceInfo() {
-  String json = "{";
-  json += "\"device_uid\":\"" + deviceUID + "\",";
-  json += "\"mac_address\":\"" + deviceMAC + "\",";
-  json += "\"firmware_version\":\"" + String(FIRMWARE_VERSION) + "\",";
-  json += "\"status\":\"" +
-          String(isActivated() ? "configured" : "unconfigured") + "\"";
-  json += "}";
-  setupServer.send(200, "application/json", json);
-}
-
-void handleCapture() {
-  camera_fb_t *fb = esp_camera_fb_get();
-  if (!fb) {
-    setupServer.send(500, "text/plain", "Error");
-    return;
-  }
-  setupServer.sendHeader("Content-Disposition", "inline; filename=capture.jpg");
-  setupServer.send_P(200, "image/jpeg", (const char *)fb->buf, fb->len);
-  esp_camera_fb_return(fb);
-}
-
-// Handle JSON provisioning from Mobile App
-void handleProvision() {
-  if (setupServer.method() != HTTP_POST) {
-    setupServer.send(405, "text/plain", "Method Not Allowed");
-    return;
   }
 
-  String body = setupServer.arg("plain");
-  String u = extractJsonVal(body, "server_url");
-  String s = extractJsonVal(body, "wifi_ssid");
-  String p = extractJsonVal(body, "wifi_pass");
-
-  if (u.length() == 0 || s.length() == 0) {
-    setupServer.send(400, "application/json", "{\"error\":\"Missing fields\"}");
-    return;
+  // Scan for WiFi networks and return JSON list
+  void handleScan() {
+    int n = WiFi.scanNetworks();
+    String json = "[";
+    for (int i = 0; i < n; ++i) {
+      if (i)
+        json += ",";
+      json += "{\"ssid\":\"" + WiFi.SSID(i) + "\",";
+      json += "\"rssi\":" + String(WiFi.RSSI(i)) + ",";
+      json +=
+          "\"auth\":" +
+          String(WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "false" : "true") +
+          "}";
+    }
+    json += "]";
+    setupServer.send(200, "application/json", json);
   }
 
-  saveCredentials(
-      u, s, p, "",
-      ""); // Clear user creds and name as they are not needed on device
+  void handleConfigure() {
+    String u = setupServer.arg("server_url");
+    String s = setupServer.arg("wifi_ssid");
+    String p = setupServer.arg("wifi_pass");
+    String token = setupServer.arg("user_token");
+    String name = setupServer.arg("device_name");
 
-  setupServer.send(200, "application/json",
-                   "{\"status\":\"success\",\"message\":\"Credentials saved. "
-                   "Restarting...\"}");
-  delay(500);
-  ESP.restart();
-}
+    if (u.length() == 0 || s.length() == 0 || token.length() == 0) {
+      setupServer.send(400, "text/plain", "Missing fields");
+      return;
+    }
+    // Save credentials including user token and device name for
+    // self-registration
+    saveCredentials(u, s, p, token, name);
 
-// Scan for WiFi networks and return JSON list
-void handleScan() {
-  int n = WiFi.scanNetworks();
-  String json = "[";
-  for (int i = 0; i < n; ++i) {
-    if (i)
-      json += ",";
-    json += "{\"ssid\":\"" + WiFi.SSID(i) + "\",";
-    json += "\"rssi\":" + String(WiFi.RSSI(i)) + ",";
-    json +=
-        "\"auth\":" +
-        String(WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "false" : "true") +
-        "}";
-  }
-  json += "]";
-  setupServer.send(200, "application/json", json);
-}
-
-void handleConfigure() {
-  String u = setupServer.arg("server_url");
-  String s = setupServer.arg("wifi_ssid");
-  String p = setupServer.arg("wifi_pass");
-  String token = setupServer.arg("user_token");
-  String name = setupServer.arg("device_name");
-
-  if (u.length() == 0 || s.length() == 0 || token.length() == 0) {
-    setupServer.send(400, "text/plain", "Missing fields");
-    return;
-  }
-  // Save credentials including user token and device name for self-registration
-  saveCredentials(u, s, p, token, name);
-
-  String html =
-      R"(<html><body style='background:#1b1b1b;color:white;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif'>
+    String html =
+        R"(<html><body style='background:#1b1b1b;color:white;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif'>
         <div style='background:#2d2d2d;padding:40px;border-radius:12px;text-align:center'>
         <h1>✅ Saved!</h1><p>Restarting...</p></div></body></html>)";
-  setupServer.send(200, "text/html", html);
-  delay(2000);
-  ESP.restart();
-}
-
-void handleNotFound() {
-  setupServer.sendHeader("Location", "/");
-  setupServer.send(302, "text/plain", "Redirect");
-}
-
-void startSetupMode() {
-  Serial.println("Starting Setup Mode"); // Always print critical state changes
-  currentState = STATE_SETUP_MODE;
-  setupStartTime = millis();
-  WiFi.mode(WIFI_AP);
-  String ap = String(SETUP_AP_PREFIX) + deviceUID.substring(8);
-  WiFi.softAP(ap.c_str(), SETUP_AP_PASSWORD);
-
-  setupServer.on("/", HTTP_GET, handleSetupRoot);
-  setupServer.on("/stream", HTTP_GET, handleStream);
-  setupServer.on("/capture", HTTP_GET, handleCapture);
-  setupServer.on("/info", HTTP_GET, handleDeviceInfo);
-  setupServer.on("/scan", HTTP_GET, handleScan); // Add scan endpoint
-  setupServer.on("/action", HTTP_GET, handleAction);
-  setupServer.on("/configure", HTTP_POST, handleConfigure);
-  setupServer.on("/provision", HTTP_POST, handleProvision);
-  setupServer.onNotFound(handleNotFound);
-  setupServer.begin();
-}
-
-void startCameraServer() {
-  setupServer.on("/", HTTP_GET, handleSetupRoot);
-  setupServer.on("/stream", HTTP_GET, handleStream);
-  setupServer.on("/capture", HTTP_GET, handleCapture);
-  setupServer.on("/info", HTTP_GET, handleDeviceInfo);
-  setupServer.on("/action", HTTP_GET, handleAction);
-  setupServer.on("/configure", HTTP_POST, handleConfigure);
-  setupServer.on("/provision", HTTP_POST, handleProvision);
-  setupServer.onNotFound(handleNotFound);
-  setupServer.begin();
-}
-
-bool connectToWiFi() {
-  Serial.printf("Connecting to %s\n", wifiSSID.c_str());
-  currentState = STATE_CONNECTING;
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(wifiSSID.c_str(), wifiPass.c_str());
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 40) {
-    Serial.print(".");
-    delay(500);
-    updateLED();
-    attempts++;
+    setupServer.send(200, "text/html", html);
+    delay(2000);
+    ESP.restart();
   }
-  Serial.println();
-  return WiFi.status() == WL_CONNECTED;
-}
 
-bool attemptSelfRegistration() {
-  if (userToken.length() == 0)
-    return false;
+  void handleNotFound() {
+    setupServer.sendHeader("Location", "/");
+    setupServer.send(302, "text/plain", "Redirect");
+  }
 
-  currentState = STATE_ACTIVATING;
-  HTTPClient http;
+  void startSetupMode() {
+    Serial.println(
+        "Starting Setup Mode"); // Always print critical state changes
+    currentState = STATE_SETUP_MODE;
+    setupStartTime = millis();
+    WiFi.mode(WIFI_AP);
+    String ap = String(SETUP_AP_PREFIX) + deviceUID.substring(8);
+    WiFi.softAP(ap.c_str(), SETUP_AP_PASSWORD);
 
-  // 1. Register Device directly using Token
-  DEBUG_PRINTLN("Attempting registration with token");
+    setupServer.on("/", HTTP_GET, handleSetupRoot);
+    setupServer.on("/stream", HTTP_GET, handleStream);
+    setupServer.on("/capture", HTTP_GET, handleCapture);
+    setupServer.on("/info", HTTP_GET, handleDeviceInfo);
+    setupServer.on("/scan", HTTP_GET, handleScan); // Add scan endpoint
+    setupServer.on("/action", HTTP_GET, handleAction);
+    setupServer.on("/configure", HTTP_POST, handleConfigure);
+    setupServer.on("/provision", HTTP_POST, handleProvision);
+    setupServer.onNotFound(handleNotFound);
+    setupServer.begin();
+  }
 
-  http.begin(serverURL + "/devices/register");
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("Authorization", "Bearer " + userToken); // Use User Token
+  void startCameraServer() {
+    setupServer.on("/", HTTP_GET, handleSetupRoot);
+    setupServer.on("/stream", HTTP_GET, handleStream);
+    setupServer.on("/capture", HTTP_GET, handleCapture);
+    setupServer.on("/info", HTTP_GET, handleDeviceInfo);
+    setupServer.on("/action", HTTP_GET, handleAction);
+    setupServer.on("/configure", HTTP_POST, handleConfigure);
+    setupServer.on("/provision", HTTP_POST, handleProvision);
+    setupServer.onNotFound(handleNotFound);
+    setupServer.begin();
+  }
 
-  String finalName = deviceName;
-  if (finalName.length() == 0)
-    finalName = String(DEVICE_MODEL);
-
-  String regPayload = "{";
-  regPayload += "\"device_uid\":\"" + deviceUID + "\",";
-  regPayload += "\"device_name\":\"" + finalName + "\",";
-  regPayload += "\"device_type\":\"camera\"";
-  regPayload += "}";
-
-  DEBUG_PRINTLN("Sending Registration Payload: ");
-  DEBUG_PRINTLN(regPayload);
-
-  int code = http.POST(regPayload);
-  DEBUG_PRINT("Registration Response Code: ");
-  DEBUG_PRINTLN(code);
-  String resp = http.getString();
-  DEBUG_PRINT("Registration Response Body: ");
-  DEBUG_PRINTLN(resp);
-  http.end();
-
-  DEBUG_PRINTLN("Register Code: " + String(code));
-
-  if (code == 201 || code == 200) {
-    String did = extractJsonVal(resp, "device_id");
-    String key = extractJsonVal(resp, "api_key");
-    if (did.length() > 0 && key.length() > 0) {
-      saveActivation(did, key);
-      return true;
+  bool connectToWiFi() {
+    Serial.printf("Connecting to %s\n", wifiSSID.c_str());
+    currentState = STATE_CONNECTING;
+    WiFi.setSleep(false); // Disable power saving to prevent connection crashes
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(wifiSSID.c_str(), wifiPass.c_str());
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 40) {
+      Serial.print(".");
+      delay(500);
+      updateLED();
+      attempts++;
     }
+    Serial.println();
+    return WiFi.status() == WL_CONNECTED;
   }
-  return false;
-}
 
-bool activateProvisioning() {
-  currentState = STATE_ACTIVATING;
-  HTTPClient http;
+  bool attemptSelfRegistration() {
+    if (userToken.length() == 0)
+      return false;
 
-  // Call /provisioning/activate endpoint with Device UID
-  // The server checks if there is a pending provisioning request for this UID
-  http.begin(serverURL + "/provisioning/activate");
-  http.addHeader("Content-Type", "application/json");
+    currentState = STATE_ACTIVATING;
+    HTTPClient http;
 
-  // We send UID, Firmware Version, and Model
-  String payload = "{";
-  payload += "\"device_uid\":\"" + deviceUID + "\",";
-  payload += "\"firmware_version\":\"" + String(FIRMWARE_VERSION) + "\",";
-  payload += "\"model\":\"" + String(DEVICE_MODEL) + "\"";
-  payload += "}";
+    // 1. Register Device directly using Token
+    DEBUG_PRINTLN("Attempting registration with token");
 
-  DEBUG_PRINTLN("Activating: " + payload);
+    http.begin(serverURL + "/devices/register");
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", "Bearer " + userToken); // Use User Token
 
-  int code = http.POST(payload);
-  String resp = http.getString();
-  http.end();
+    String finalName = deviceName;
+    if (finalName.length() == 0)
+      finalName = String(DEVICE_MODEL);
 
-  DEBUG_PRINTLN("Activation Code: " + String(code));
-  DEBUG_PRINTLN("Response: " + resp);
+    String regPayload = "{";
+    regPayload += "\"device_uid\":\"" + deviceUID + "\",";
+    regPayload += "\"device_name\":\"" + finalName + "\",";
+    regPayload += "\"device_type\":\"camera\"";
+    regPayload += "}";
 
-  if (code == 200) {
-    String did = extractJsonVal(resp, "device_id");
-    String key = extractJsonVal(resp, "api_key");
-    if (did.length() > 0 && key.length() > 0) {
-      saveActivation(did, key);
-      return true;
-    }
-  }
-  return false;
-}
+    DEBUG_PRINTLN("Sending Registration Payload: ");
+    DEBUG_PRINTLN(regPayload);
 
-void checkCommands() {
-  if (millis() - lastCommandCheck < 5000)
-    return;
-  lastCommandCheck = millis();
-  if (WiFi.status() != WL_CONNECTED || apiKey.length() == 0)
-    return;
+    int code = http.POST(regPayload);
+    DEBUG_PRINT("Registration Response Code: ");
+    DEBUG_PRINTLN(code);
+    String resp = http.getString();
+    DEBUG_PRINT("Registration Response Body: ");
+    DEBUG_PRINTLN(resp);
+    http.end();
 
-  HTTPClient http;
-  http.begin(serverURL + "/device/" + deviceID + "/commands");
-  http.addHeader("Authorization", "Bearer " + apiKey);
-  if (http.GET() == 200) {
-    String pl = http.getString();
-    if (pl.indexOf("start-stream") > 0)
-      streaming = true;
-    else if (pl.indexOf("stop-stream") > 0)
-      streaming = false;
-    else if (pl.indexOf("restart") > 0)
-      ESP.restart();
-    else if (pl.indexOf("led") > 0) {
-      ledState = !ledState;
-#ifdef LED_GPIO_NUM
-      if (LED_GPIO_NUM == 48) {
-        // Torch toggle
-        neopixelWrite(LED_GPIO_NUM, ledState ? 255 : 0, ledState ? 255 : 0,
-                      ledState ? 255 : 0);
-      } else {
-        digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
+    DEBUG_PRINTLN("Register Code: " + String(code));
+
+    if (code == 201 || code == 200) {
+      String did = extractJsonVal(resp, "device_id");
+      String key = extractJsonVal(resp, "api_key");
+      if (did.length() > 0 && key.length() > 0) {
+        saveActivation(did, key);
+        return true;
       }
-#endif
     }
+    return false;
   }
-  http.end();
-}
 
-void streamLoop() {
-  if (!streaming || millis() - lastFrameTime < 100)
-    return;
-  lastFrameTime = millis();
-  camera_fb_t *fb = esp_camera_fb_get();
-  if (!fb)
-    return;
+  bool activateProvisioning() {
+    currentState = STATE_ACTIVATING;
+    HTTPClient http;
 
-  HTTPClient http;
-  http.begin(serverURL + "/device/" + deviceID + "/stream/frame");
-  http.addHeader("Authorization", "Bearer " + apiKey);
-  http.addHeader("Content-Type", "image/jpeg");
-  http.POST(fb->buf, fb->len);
-  http.end();
-  esp_camera_fb_return(fb);
-}
+    // Call /provisioning/activate endpoint with Device UID
+    // The server checks if there is a pending provisioning request for this UID
+    http.begin(serverURL + "/provisioning/activate");
+    http.addHeader("Content-Type", "application/json");
 
-// Setup logic with late camera init
-void setup() {
-  Serial.begin(115200);
-  delay(1000); // Wait for Serial
-  Serial.println("\n\n--- BOOTING DATUM CAMERA ---");
+    // We send UID, Firmware Version, and Model
+    String payload = "{";
+    payload += "\"device_uid\":\"" + deviceUID + "\",";
+    payload += "\"firmware_version\":\"" + String(FIRMWARE_VERSION) + "\",";
+    payload += "\"model\":\"" + String(DEVICE_MODEL) + "\"";
+    payload += "}";
+
+    DEBUG_PRINTLN("Activating: " + payload);
+
+    int code = http.POST(payload);
+    String resp = http.getString();
+    http.end();
+
+    DEBUG_PRINTLN("Activation Code: " + String(code));
+    DEBUG_PRINTLN("Response: " + resp);
+
+    if (code == 200) {
+      String did = extractJsonVal(resp, "device_id");
+      String key = extractJsonVal(resp, "api_key");
+      if (did.length() > 0 && key.length() > 0) {
+        saveActivation(did, key);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void checkCommands() {
+    if (millis() - lastCommandCheck < 5000)
+      return;
+    lastCommandCheck = millis();
+    if (WiFi.status() != WL_CONNECTED || apiKey.length() == 0)
+      return;
+
+    HTTPClient http;
+    http.begin(serverURL + "/device/" + deviceID + "/commands");
+    http.addHeader("Authorization", "Bearer " + apiKey);
+    if (http.GET() == 200) {
+      String pl = http.getString();
+      if (pl.indexOf("start-stream") > 0)
+        streaming = true;
+      else if (pl.indexOf("stop-stream") > 0)
+        streaming = false;
+      else if (pl.indexOf("restart") > 0)
+        ESP.restart();
+      else if (pl.indexOf("led") > 0) {
 #ifdef LED_GPIO_NUM
-  pinMode(LED_GPIO_NUM, OUTPUT);
+#if LED_GPIO_NUM == 48
+        torchState = !torchState;
+        neopixelWrite(LED_GPIO_NUM, torchState ? 255 : 0, torchState ? 255 : 0,
+                      torchState ? 255 : 0);
+#else
+        ledState = !ledState;
+        digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
+#endif
+#endif
+      }
+    }
+    http.end();
+  }
+
+  void streamLoop() {
+    if (!streaming || millis() - lastFrameTime < 100)
+      return;
+    lastFrameTime = millis();
+    camera_fb_t *fb = esp_camera_fb_get();
+    if (!fb)
+      return;
+
+    HTTPClient http;
+    http.begin(serverURL + "/device/" + deviceID + "/stream/frame");
+    http.addHeader("Authorization", "Bearer " + apiKey);
+    http.addHeader("Content-Type", "image/jpeg");
+    http.POST(fb->buf, fb->len);
+    http.end();
+    esp_camera_fb_return(fb);
+  }
+
+  // Setup logic with late camera init
+  void setup() {
+    Serial.begin(115200);
+    delay(1000); // Wait for Serial
+    Serial.println("\n\n--- BOOTING DATUM CAMERA ---");
+#ifdef LED_GPIO_NUM
+    pinMode(LED_GPIO_NUM, OUTPUT);
 #endif
 
-  // checkFactoryReset(); // Removed: Calling this at boot triggers Download
-  // Mode. Moved to loop.
+    // checkFactoryReset(); // Removed: Calling this at boot triggers Download
+    // Mode. Moved to loop.
 
-  initDeviceUID();
-  loadCredentials();
+    initDeviceUID();
+    loadCredentials();
 
-  // If no credentials, start AP immediately (and init camera for preview)
-  if (wifiSSID.length() == 0) {
-    initCamera();
-    startSetupMode();
-    return;
-  }
+    // If no credentials, start AP immediately (and init camera for preview)
+    if (wifiSSID.length() == 0) {
+      initCamera();
+      startSetupMode();
+      return;
+    }
 
-  // Try to connect to WiFi FIRST (without camera active)
-  if (connectToWiFi()) {
-    // Connection successful, NOW init camera
-    initCamera();
+    // Try to connect to WiFi FIRST (without camera active)
+    if (connectToWiFi()) {
+      // Connection successful, NOW init camera
+      initCamera();
 
-    // Check activation
-    if (apiKey.length() > 0) {
-      currentState = STATE_ONLINE;
-      startCameraServer();
-      streaming = true;
-    } else if (attemptSelfRegistration()) { // Try self registration if we have
-                                            // user creds
-      currentState = STATE_ONLINE;
-      startCameraServer();
-      streaming = true;
-    } else if (activateProvisioning()) { // Fallback to old provisioning if
-                                         // pending request exists
-      currentState = STATE_ONLINE;
-      startCameraServer();
-      streaming = true;
+      // Check activation
+      if (apiKey.length() > 0) {
+        currentState = STATE_ONLINE;
+        startCameraServer();
+        streaming = true;
+      } else if (attemptSelfRegistration()) { // Try self registration if we
+                                              // have user creds
+        currentState = STATE_ONLINE;
+        startCameraServer();
+        streaming = true;
+      } else if (activateProvisioning()) { // Fallback to old provisioning if
+                                           // pending request exists
+        currentState = STATE_ONLINE;
+        startCameraServer();
+        streaming = true;
+      } else {
+        currentState = STATE_OFFLINE;
+        // Activation failed, go to setup mode
+        startSetupMode();
+      }
     } else {
-      currentState = STATE_OFFLINE;
-      // Activation failed, go to setup mode
+      // Connection failed
+      initCamera();
       startSetupMode();
     }
-  } else {
-    // Connection failed
-    initCamera();
-    startSetupMode();
   }
-}
 
-void loop() {
-  handleFactoryResetButton(); // Check button every loop
-  updateLED();
-  if (currentState == STATE_SETUP_MODE || currentState == STATE_ONLINE) {
-    setupServer.handleClient();
+  void loop() {
+    handleFactoryResetButton(); // Check button every loop
+    updateLED();
+    if (currentState == STATE_SETUP_MODE || currentState == STATE_ONLINE) {
+      setupServer.handleClient();
+    }
+    if (currentState == STATE_ONLINE) {
+      checkCommands();
+      streamLoop();
+    }
+    // Auto reconnect logic could be here
+    delay(1);
   }
-  if (currentState == STATE_ONLINE) {
-    checkCommands();
-    streamLoop();
-  }
-  // Auto reconnect logic could be here
-  delay(1);
-}
