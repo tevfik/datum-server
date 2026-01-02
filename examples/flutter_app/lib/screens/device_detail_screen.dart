@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_mjpeg/flutter_mjpeg.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 import '../providers/auth_provider.dart';
 import '../api_client.dart';
 import '../models/device.dart';
@@ -18,6 +19,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   final ApiClient _api = ApiClient();
   bool _isRunning = true; // For MJPEG stream
   bool _loadingAction = false;
+  List<File> _photos = [];
 
   @override
   void initState() {
@@ -26,6 +28,25 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     final token = Provider.of<AuthProvider>(context, listen: false).token;
     if (token != null) {
       _api.setToken(token);
+    }
+    _loadPhotos();
+  }
+
+  Future<void> _loadPhotos() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final photoDir = Directory('${directory.path}/photos');
+      if (await photoDir.exists()) {
+        setState(() {
+          _photos = photoDir.listSync()
+              .where((item) => item.path.endsWith(".jpg"))
+              .map((item) => File(item.path))
+              .toList()
+              ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+        });
+      }
+    } catch (e) {
+      print("Error loading photos: $e");
     }
   }
 
@@ -69,24 +90,47 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       // 2. Wait for upload (approx 3-4s)
       await Future.delayed(const Duration(seconds: 4));
 
-      // 3. Show Result
+      // 3. Fetch and Save
       if (mounted) {
         final token = Provider.of<AuthProvider>(context, listen: false).token;
         final imageUrl = 'https://datum.bezg.in/devices/${widget.device.id}/stream/snapshot?token=$token&t=${DateTime.now().millisecondsSinceEpoch}';
         
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text("Captured Photo"),
-            content: Image.network(imageUrl),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("Close"),
-              ),
-            ],
-          ),
-        );
+        // Fetch bytes
+        final request = await HttpClient().getUrl(Uri.parse(imageUrl));
+        final response = await request.close();
+        if (response.statusCode == 200) {
+            final bytes = await (await response.fold<BytesBuilder>(BytesBuilder(), (b, d) => b..add(d))).takeBytes();
+            
+            // Save to file
+            final directory = await getApplicationDocumentsDirectory();
+            final photoDir = Directory('${directory.path}/photos');
+            if (!await photoDir.exists()) await photoDir.create(recursive: true);
+            
+            final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+            final file = File('${photoDir.path}/snap_$timestamp.jpg');
+            await file.writeAsBytes(bytes);
+            
+            if (mounted) {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Saved to Gallery: ${file.path.split("/").last}')),
+                );
+                _loadPhotos(); // Refresh list
+                
+                // Show Dialog
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text("Captured"),
+                    content: Image.file(file),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close")),
+                    ],
+                  ),
+                );
+            }
+        } else {
+             throw Exception("Failed to fetch snapshot");
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -176,7 +220,51 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                     leading: const Icon(Icons.info_outline),
                     isThreeLine: true,
                   ),
-                )
+                ),
+                
+                if (_photos.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  const Text("Gallery", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 120,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _photos.length,
+                      itemBuilder: (ctx, index) {
+                        final file = _photos[index];
+                        final name = file.path.split("/").last.replaceAll("snap_", "").replaceAll(".jpg", "").replaceAll("T", " ");
+                        return GestureDetector(
+                          onTap: () {
+                             showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  content: Image.file(file),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close")),
+                                    TextButton(onPressed: () {
+                                         file.deleteSync();
+                                         Navigator.pop(ctx);
+                                         _loadPhotos();
+                                    }, child: const Text("Delete", style: TextStyle(color: Colors.red))),
+                                  ],
+                                ),
+                              );
+                          },
+                          child: Card(
+                            clipBehavior: Clip.antiAlias,
+                            child: Column(
+                            children: [
+                                Expanded(child: Image.file(file, fit: BoxFit.cover)),
+                                Padding(padding: const EdgeInsets.all(4), child: Text(name, style: const TextStyle(fontSize: 10)))
+                            ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                ],
               ],
             ),
           )

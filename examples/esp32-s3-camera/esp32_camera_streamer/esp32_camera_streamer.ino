@@ -759,8 +759,8 @@ void handleSnap() {
   // Save current setting
   framesize_t original_size = s->status.framesize;
 
-  // Switch to High Res
-  s->set_framesize(s, FRAMESIZE_UXGA); // 1600x1200
+  // Switch to High Res (HD 1280x720 is safer to avoid FB-OVF)
+  s->set_framesize(s, FRAMESIZE_HD);
   delay(500); // Allow sensor to adjust to new resolution and exposure
 
   // Clear buffer (discard one frame to ensure new resolution is applied)
