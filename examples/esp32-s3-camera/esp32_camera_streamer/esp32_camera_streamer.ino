@@ -759,19 +759,24 @@ void handleSnap() {
   // Save current setting
   framesize_t original_size = s->status.framesize;
 
-  // Switch to High Res (HD 1280x720 is safer to avoid FB-OVF)
-  s->set_framesize(s, FRAMESIZE_HD);
+  // Switch to UXGA (1600x1200) - User requested high res (OV3660 support)
+  s->set_framesize(s, FRAMESIZE_UXGA);
   delay(500); // Allow sensor to adjust to new resolution and exposure
 
-  // Clear buffer (discard one frame to ensure new resolution is applied)
+  // Clear buffer (cardinal rule for changing res)
   camera_fb_t *fb = esp_camera_fb_get();
   if (fb)
     esp_camera_fb_return(fb);
 
-  // Capture HD Frame
+  // Capture High-Res Frame
   fb = esp_camera_fb_get();
   if (fb) {
-    uploadFrame(fb);
+    if (fb->len < 1000) {
+      // OVF or failure check (very small frame usually means error)
+      Serial.println("Snapshot failed or OVF");
+    } else {
+      uploadFrame(fb);
+    }
     esp_camera_fb_return(fb);
   }
 
