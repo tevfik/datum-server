@@ -42,27 +42,7 @@ class ApiClient {
         _logger.log('RES: ${response.statusCode} ${response.statusMessage}');
         return handler.next(response);
       },
-[{
-  "StartLine": 45,
-  "EndLine": 45,
-  "TargetContent": "      onError: (DioError e, handler) {",
-  "ReplacementContent": "      onError: (DioException e, handler) {",
-  "AllowMultiple": true
-},
-{
-  "StartLine": 76,
-  "EndLine": 76,
-  "TargetContent": "      if (e is DioError && e.response != null) {",
-  "ReplacementContent": "      if (e is DioException && e.response != null) {",
-  "AllowMultiple": true
-},
-{
-  "StartLine": 91,
-  "EndLine": 91,
-  "TargetContent": "        if (e is DioError && e.response != null) {",
-  "ReplacementContent": "        if (e is DioException && e.response != null) {",
-  "AllowMultiple": true
-}]
+      onError: (DioException e, handler) {
         _logger.log('ERR: ${e.response?.statusCode} ${e.message}');
         if (e.response != null) _logger.log('RES DATA: ${e.response?.data}');
         return handler.next(e);
@@ -93,7 +73,7 @@ class ApiClient {
       });
       return response.data['token'];
     } catch (e) {
-      if (e is DioError && e.response != null) {
+      if (e is DioException && e.response != null) {
           throw Exception('Login failed: ${e.response?.data}');
       }
       throw Exception('Login failed: $e');
