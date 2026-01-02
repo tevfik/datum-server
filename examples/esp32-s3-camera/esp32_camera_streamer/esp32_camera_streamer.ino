@@ -714,6 +714,9 @@ void checkCommands() {
 #endif
 #endif
           ackCommand(cmdId);
+        } else if (action == "snap") {
+          ackCommand(cmdId);
+          handleSnap();
         } else {
           ackCommand(cmdId);
         }
@@ -725,6 +728,17 @@ void checkCommands() {
   http.end();
 }
 
+void uploadFrame(camera_fb_t *fb) {
+  HTTPClient http;
+  // Use a longer timeout for high-res images
+  http.setTimeout(10000);
+  http.begin(serverURL + "/device/" + deviceID + "/stream/frame");
+  http.addHeader("Authorization", "Bearer " + apiKey);
+  http.addHeader("Content-Type", "image/jpeg");
+  http.POST(fb->buf, fb->len);
+  http.end();
+}
+
 void streamLoop() {
   if (!streaming || millis() - lastFrameTime < 30) // 30ms = ~33 FPS
     return;
@@ -733,13 +747,36 @@ void streamLoop() {
   if (!fb)
     return;
 
-  HTTPClient http;
-  http.begin(serverURL + "/device/" + deviceID + "/stream/frame");
-  http.addHeader("Authorization", "Bearer " + apiKey);
-  http.addHeader("Content-Type", "image/jpeg");
-  http.POST(fb->buf, fb->len);
-  http.end();
+  uploadFrame(fb);
   esp_camera_fb_return(fb);
+}
+
+void handleSnap() {
+  sensor_t *s = esp_camera_sensor_get();
+  if (s == NULL)
+    return;
+
+  // Save current setting
+  framesize_t original_size = s->status.framesize;
+
+  // Switch to High Res
+  s->set_framesize(s, FRAMESIZE_UXGA); // 1600x1200
+  delay(500); // Allow sensor to adjust to new resolution and exposure
+
+  // Clear buffer (discard one frame to ensure new resolution is applied)
+  camera_fb_t *fb = esp_camera_fb_get();
+  if (fb)
+    esp_camera_fb_return(fb);
+
+  // Capture HD Frame
+  fb = esp_camera_fb_get();
+  if (fb) {
+    uploadFrame(fb);
+    esp_camera_fb_return(fb);
+  }
+
+  // Restore
+  s->set_framesize(s, original_size);
 }
 
 // Setup logic with late camera init
