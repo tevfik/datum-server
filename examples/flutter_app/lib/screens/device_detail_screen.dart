@@ -91,13 +91,15 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
 
       // 2. Poll for result (Try for 15 seconds)
       bool success = false;
+      final token = Provider.of<AuthProvider>(context, listen: false).token;
+      
       for (int i = 0; i < 6; i++) { // 6 attempts * 2.5s = 15s max
         if (!mounted) return;
         
         await Future.delayed(const Duration(milliseconds: 2500));
+        if (!mounted) return;
         
         try {
-          final token = Provider.of<AuthProvider>(context, listen: false).token;
           final imageUrl = 'https://datum.bezg.in/devices/${widget.device.id}/stream/snapshot?token=$token&t=${DateTime.now().millisecondsSinceEpoch}';
           
           final request = await HttpClient().getUrl(Uri.parse(imageUrl));
