@@ -130,8 +130,7 @@ String serverURL;
 String wifiSSID;
 String wifiPass;
 String deviceID;
-String userEmail;
-String userPass;
+String userToken; // Store token directly
 
 enum DeviceState {
   STATE_BOOT,
@@ -257,24 +256,21 @@ void loadCredentials() {
   wifiSSID = prefs.getString("wifi_ssid", "");
   wifiPass = prefs.getString("wifi_pass", "");
   deviceID = prefs.getString("device_id", "");
-  userEmail = prefs.getString("user_email", "");
-  userPass = prefs.getString("user_pass", "");
+  userToken = prefs.getString("user_token", "");
   prefs.end();
 }
 
-void saveCredentials(String u, String s, String p, String email, String pwd) {
+void saveCredentials(String u, String s, String p, String token) {
   prefs.begin("datum", false);
   prefs.putString("server_url", u);
   prefs.putString("wifi_ssid", s);
   prefs.putString("wifi_pass", p);
-  prefs.putString("user_email", email);
-  prefs.putString("user_pass", pwd);
+  prefs.putString("user_token", token);
   prefs.end();
   serverURL = u;
   wifiSSID = s;
   wifiPass = p;
-  userEmail = email;
-  userPass = pwd;
+  userToken = token;
 }
 
 void saveActivation(String id, String key) {
@@ -282,13 +278,13 @@ void saveActivation(String id, String key) {
   prefs.putString("device_id", id);
   prefs.putString("api_key", key);
   // Clear temp user creds
-  prefs.remove("user_email");
-  prefs.remove("user_pass");
+  prefs.putString("api_key", key);
+  // Clear temp user creds
+  prefs.remove("user_token");
   prefs.end();
   deviceID = id;
   apiKey = key;
-  userEmail = "";
-  userPass = "";
+  userToken = "";
 }
 
 // Use Low-Level MAC retrieval to ensure it works even if WiFi isn't ready
@@ -460,15 +456,14 @@ void handleConfigure() {
   String u = setupServer.arg("server_url");
   String s = setupServer.arg("wifi_ssid");
   String p = setupServer.arg("wifi_pass");
-  String email = setupServer.arg("user_email");
-  String pwd = setupServer.arg("user_password");
+  String token = setupServer.arg("user_token");
 
-  if (u.length() == 0 || s.length() == 0 || email.length() == 0) {
+  if (u.length() == 0 || s.length() == 0 || token.length() == 0) {
     setupServer.send(400, "text/plain", "Missing fields");
     return;
   }
-  // Save credentials including user email/pass for self-registration
-  saveCredentials(u, s, p, email, pwd);
+  // Save credentials including user token for self-registration
+  saveCredentials(u, s, p, token);
 
   String html =
       R"(<html><body style='background:#1b1b1b;color:white;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif'>
@@ -533,65 +528,37 @@ bool connectToWiFi() {
 }
 
 bool attemptSelfRegistration() {
-  if (userEmail.length() == 0 || userPass.length() == 0)
+  if (userToken.length() == 0)
     return false;
 
   currentState = STATE_ACTIVATING;
   HTTPClient http;
-  String token = "";
 
-  // 1. Login to get Token
-  DEBUG_PRINTLN("Attempting login for: " + userEmail);
-  http.begin(serverURL + "/auth/login");
-  http.addHeader("Content-Type", "application/json");
-  String loginPayload =
-      "{\"email\":\"" + userEmail + "\",\"password\":\"" + userPass + "\"}";
-  int code = http.POST(loginPayload);
+  // 1. Register Device directly using Token
+  DEBUG_PRINTLN("Attempting registration with token");
 
-  if (code == 200) {
-    String resp = http.getString();
-    token = extractJsonVal(resp, "token");
-    DEBUG_PRINTLN("Login Success. Token: " + token);
-  } else {
-    DEBUG_PRINTLN("Login Failed: " + String(code));
-    http.end();
-    return false;
-  }
-  http.end();
-
-  if (token.length() == 0)
-    return false;
-
-  // 2. Register Device
   http.begin(serverURL + "/devices/register");
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("Authorization", "Bearer " + token); // Use User Token
+  http.addHeader("Authorization", "Bearer " + userToken); // Use User Token
 
   String regPayload = "{";
   regPayload += "\"device_uid\":\"" + deviceUID + "\",";
-  regPayload +=
-      "\"device_name\":\"" + String(DEVICE_MODEL) + "\","; // Default name
+  regPayload += "\"device_name\":\"" + String(DEVICE_MODEL) + "\",";
   regPayload += "\"device_type\":\"camera\"";
   regPayload += "}";
 
-  code = http.POST(regPayload);
+  int code = http.POST(regPayload);
   String resp = http.getString();
   http.end();
 
   DEBUG_PRINTLN("Register Code: " + String(code));
 
-  if (code == 201 ||
-      code == 409) { // Created or Conflict (Conflict handled by server now?)
-    // Actually, if 201, we get API Key.
-    // If 409, it means already registered.
-    // BUT our server now auto-deletes old on conflict and returns 201!
-    if (code == 201) {
-      String did = extractJsonVal(resp, "device_id");
-      String key = extractJsonVal(resp, "api_key");
-      if (did.length() > 0 && key.length() > 0) {
-        saveActivation(did, key);
-        return true;
-      }
+  if (code == 201 || code == 200) {
+    String did = extractJsonVal(resp, "device_id");
+    String key = extractJsonVal(resp, "api_key");
+    if (did.length() > 0 && key.length() > 0) {
+      saveActivation(did, key);
+      return true;
     }
   }
   return false;
@@ -651,6 +618,12 @@ void checkCommands() {
       streaming = false;
     else if (pl.indexOf("restart") > 0)
       ESP.restart();
+    else if (pl.indexOf("led") > 0) {
+      ledState = !ledState;
+#ifdef LED_GPIO_NUM
+      digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
+#endif
+    }
   }
   http.end();
 }

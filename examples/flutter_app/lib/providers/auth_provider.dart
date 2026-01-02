@@ -5,6 +5,7 @@ import '../api_client.dart';
 class AuthProvider with ChangeNotifier {
   String? _token;
   bool get isAuthenticated => _token != null;
+  String? get token => _token;
 
   late final ApiClient _api;
 

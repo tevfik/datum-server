@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
+import '../providers/auth_provider.dart';
 
 class ProvisioningWizard extends StatefulWidget {
   const ProvisioningWizard({super.key});
@@ -11,8 +13,6 @@ class ProvisioningWizard extends StatefulWidget {
 class _ProvisioningWizardState extends State<ProvisioningWizard> {
   final _ssidController = TextEditingController();
   final _passController = TextEditingController();
-  final _userPassController = TextEditingController();
-  final _emailController = TextEditingController();
   
   String? _selectedSSID;
   List<dynamic> _networks = [];
@@ -30,8 +30,6 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
   void dispose() {
     _ssidController.dispose();
     _passController.dispose();
-    _userPassController.dispose();
-    _emailController.dispose();
     super.dispose();
   }
   
@@ -103,11 +101,30 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
   }
 
   // Step 3 Implementation
-  Future<void> _completeProvisioning(String email) async {
+  Future<void> _completeProvisioning() async {
      setState(() {
       _isLoading = true;
       _statusMessage = "Configuring device...";
     });
+    
+    // Get token from AuthProvider
+    // Note: In real app, make sure getter exists or use public field if comfortable.
+    // Based on previous file read, _token is private but there is `get isAuthenticated`.
+    // I need to update AuthProvider to expose token or hack it via reflection? 
+    // Wait, the file read of `auth_provider.dart` showed `String? _token;` and NO public getter for token string, only `isAuthenticated`.
+    // I MUST ADD A GETTER TO AuthProvider FIRST. 
+    // Assuming I will do that in next step or assuming I can modify it now.
+    // I will use `Provider.of<AuthProvider>(context, listen: false).token` and fix AuthProvider immediately after this tool call.
+    
+    final token = Provider.of<AuthProvider>(context, listen: false).token; 
+    
+    if (token == null) {
+       setState(() {
+         _isLoading = false;
+         _statusMessage = "Error: User not authenticated.";
+       });
+       return;
+    }
 
     try {
       final response = await _getDeviceDio().post(
@@ -116,8 +133,7 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
           "wifi_ssid": _ssidController.text,
           "wifi_pass": _passController.text,
           "server_url": "https://datum.bezg.in",
-          "user_email": email,
-          "user_password": _userPassController.text,
+          "user_token": token,
         }),
       );
 
@@ -177,11 +193,7 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
                 if (_step == 2) ...[
                    ElevatedButton(
                      onPressed: () {
-                        if (_userPassController.text.isEmpty) {
-                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Enter password to authorize device")));
-                           return;
-                        }
-                        _completeProvisioning(_emailController.text);
+                        _completeProvisioning();
                      },
                      style: ElevatedButton.styleFrom(backgroundColor: Colors.cyan, foregroundColor: Colors.white),
                      child: const Text('Provision Device'),
@@ -276,17 +288,7 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
                    Text("Device ID: $_deviceUID\nFirmware: ${_firmwareVersion ?? 'Unknown'}", style: const TextStyle(fontWeight: FontWeight.bold)),
                    const SizedBox(height: 10),
                 ],
-                const Text('Enter your account credentials to register this device.'),
-                 TextField(
-                   controller: _emailController,
-                   decoration: const InputDecoration(labelText: 'Your Email'),
-                   keyboardType: TextInputType.emailAddress,
-                 ),
-                TextField(
-                   controller: _userPassController,
-                   decoration: const InputDecoration(labelText: 'Your Password'),
-                   obscureText: true,
-                 ),
+                const Text('Device will be linked to your account automatically.'),
                  
                  if (_statusMessage != null) ...[
                     const SizedBox(height: 10),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/device_provider.dart';
 import 'provisioning_wizard.dart';
+import 'device_detail_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -56,6 +57,14 @@ class HomeScreen extends StatelessWidget {
                   title: Text(device.name),
                   subtitle: Text(device.uid),
                   trailing: Text(device.status.toUpperCase()),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DeviceDetailScreen(device: device),
+                      ),
+                    );
+                  },
                 );
               },
             ),
