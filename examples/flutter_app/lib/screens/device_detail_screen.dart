@@ -4,6 +4,8 @@ import 'package:flutter_mjpeg/flutter_mjpeg.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:gal/gal.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:open_file_plus/open_file_plus.dart';
 import 'dart:typed_data';
 import 'full_screen_stream.dart';
 import '../providers/auth_provider.dart';
@@ -23,7 +25,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   final ApiClient _api = ApiClient();
   bool _isRunning = true; // For MJPEG stream
   bool _loadingAction = false;
-  List<File> _photos = [];
+  List<File> _mediaFiles = [];
 
   @override
   void initState() {
@@ -33,24 +35,33 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     if (token != null) {
       _api.setToken(token);
     }
-    _loadPhotos();
+    _loadMedia();
   }
 
-  Future<void> _loadPhotos() async {
+  Future<void> _loadMedia() async {
     try {
       final directory = await getApplicationDocumentsDirectory();
       final photoDir = Directory('${directory.path}/photos');
       if (await photoDir.exists()) {
-        setState(() {
-          _photos = photoDir.listSync()
+        final photos = photoDir.listSync()
               .where((item) => item.path.endsWith(".jpg"))
               .map((item) => File(item.path))
-              .toList()
+              .toList();
+        
+        // Also check for videos in documents root (where we store them temporarily) or photos details?
+        // In FullScreenStream we used getApplicationDocumentsDirectory() root for videos.
+        final docs = directory.listSync()
+              .where((item) => item.path.endsWith(".mp4") || item.path.endsWith(".avi"))
+              .map((item) => File(item.path))
+              .toList();
+              
+        setState(() {
+          _mediaFiles = [...photos, ...docs]
               ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
         });
       }
     } catch (e) {
-      debugPrint("Error loading photos: $e");
+      debugPrint("Error loading media: $e");
     }
   }
 
@@ -314,8 +325,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                  final file = File('${photoDir.path}/snap_$timestamp.jpg');
                  await file.writeAsBytes(bytes);
                  
-
-
                  try {
                      await Gal.putImage(file.path);
                      if (mounted) {
@@ -332,7 +341,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                  }
                  
                   if (mounted) {
-                     _loadPhotos();
+                     _loadMedia();
                      
                      showDialog(
                        context: context,
@@ -415,6 +424,72 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     }
   }
 
+  void _openMedia(File file) {
+     final isVideo = file.path.endsWith('.mp4');
+     
+     showDialog(
+       context: context,
+       builder: (ctx) => AlertDialog(
+         contentPadding: EdgeInsets.zero,
+         content: Column(
+           mainAxisSize: MainAxisSize.min,
+           children: [
+             if (isVideo)
+               Container(
+                 color: Colors.black,
+                 height: 200, 
+                 width: double.infinity,
+                 child: const Center(child: Icon(Icons.play_circle_fill, size: 64, color: Colors.white)),
+               )
+             else 
+               Image.file(file),
+               
+             Padding(
+               padding: const EdgeInsets.all(8.0),
+               child: Text(file.path.split('/').last, style: const TextStyle(fontWeight: FontWeight.bold)),
+             )
+           ],
+         ),
+         actions: [
+            TextButton.icon(
+              icon: const Icon(Icons.share),
+              label: const Text("Share"),
+              onPressed: () {
+                 Share.shareXFiles([XFile(file.path)]);
+               },
+            ),
+            if (isVideo)
+              TextButton.icon(
+                icon: const Icon(Icons.open_in_new),
+                label: const Text("Open"),
+                onPressed: () {
+                  OpenFile.open(file.path);
+                },
+              )
+            else 
+               // For images, we already show it, but 'Open' can open in external viewer too
+              TextButton.icon(
+                icon: const Icon(Icons.open_in_new),
+                label: const Text("Open"),
+                onPressed: () {
+                  OpenFile.open(file.path);
+                },
+              ),
+              
+            TextButton(
+              onPressed: () {
+                 file.deleteSync();
+                 Navigator.pop(ctx);
+                 _loadMedia();
+              }, 
+              child: const Text("Delete", style: TextStyle(color: Colors.red))
+            ),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close")),
+         ],
+       ),
+     );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -477,8 +552,9 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                       Padding(
                         padding: const EdgeInsets.all(8.0),
                         child: IconButton(
-                          onPressed: () {
-                             Navigator.push(
+                          onPressed: () async {
+                             // Wait for return to reload gallery (in case video was recorded)
+                             await Navigator.push(
                                context,
                                MaterialPageRoute(
                                  builder: (_) => FullScreenStream(
@@ -487,6 +563,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                                  ),
                                ),
                              );
+                             _loadMedia();
                           },
                           icon: const Icon(Icons.fullscreen),
                           style: IconButton.styleFrom(
@@ -552,42 +629,44 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                   ),
                 ),
                 
-                if (_photos.isNotEmpty) ...[
+                if (_mediaFiles.isNotEmpty) ...[
                   const SizedBox(height: 20),
-                  const Text("Gallery", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text("Device Gallery", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
                   SizedBox(
                     height: 120,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      itemCount: _photos.length,
+                      itemCount: _mediaFiles.length,
                       itemBuilder: (ctx, index) {
-                        final file = _photos[index];
-                        final name = file.path.split("/").last.replaceAll("snap_", "").replaceAll(".jpg", "").replaceAll("T", " ");
+                        final file = _mediaFiles[index];
+                        final isVideo = file.path.endsWith(".mp4");
+                        final name = file.path.split("/").last.replaceAll("snap_", "").replaceAll(".jpg", "").replaceAll(".mp4", "");
+                        
                         return GestureDetector(
-                          onTap: () {
-                             showDialog(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  content: Image.file(file),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close")),
-                                    TextButton(onPressed: () {
-                                         file.deleteSync();
-                                         Navigator.pop(ctx);
-                                         _loadPhotos();
-                                    }, child: const Text("Delete", style: TextStyle(color: Colors.red))),
-                                  ],
-                                ),
-                              );
-                          },
+                          onTap: () => _openMedia(file),
                           child: Card(
                             clipBehavior: Clip.antiAlias,
-                            child: Column(
-                            children: [
-                                Expanded(child: Image.file(file, fit: BoxFit.cover)),
-                                Padding(padding: const EdgeInsets.all(4), child: Text(name, style: const TextStyle(fontSize: 10)))
-                            ],
+                            child: SizedBox(
+                              width: 120,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  if (isVideo)
+                                     Container(color: Colors.black, child: const Center(child: Icon(Icons.movie, color: Colors.white)))
+                                  else
+                                     Image.file(file, fit: BoxFit.cover),
+                                     
+                                  Positioned(
+                                    bottom: 0, left: 0, right: 0,
+                                    child: Container(
+                                      color: Colors.black54,
+                                      padding: const EdgeInsets.all(2),
+                                      child: Text(name, style: const TextStyle(color: Colors.white, fontSize: 10), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
+                                    ),
+                                  )
+                                ],
+                              ),
                             ),
                           ),
                         );
@@ -612,6 +691,7 @@ class _ActionButton extends StatelessWidget {
   final bool isLoading;
 
   const _ActionButton({
+    super.key,
     required this.icon,
     required this.label,
     required this.color,

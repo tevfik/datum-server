@@ -4,6 +4,8 @@ import 'dart:async';
 import 'dart:io';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:ffmpeg_kit_flutter_min_gpl/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_min_gpl/return_code.dart';
 
 class FullScreenStream extends StatefulWidget {
   final String streamUrl;
@@ -24,15 +26,16 @@ class _FullScreenStreamState extends State<FullScreenStream> {
   HttpClient? _httpClient;
   StreamSubscription<List<int>>? _streamSubscription;
   Uint8List? _imageBytes;
-  int _fps = 0;
-  int _frameCount = 0;
+  int _fps = 0; // Display FPS
+  int _frameCount = 0; // Counter for FPS calculation
   
   // Recording Logic
   bool _isRecording = false;
-  IOSink? _recordingSink;
-  File? _recordingFile;
+  bool _isProcessing = false; // Encoding status
   DateTime? _recordingStart;
   String _recDuration = "00:00";
+  String? _tempFramesPath;
+  int _recFrameCount = 0; // Frames captured for recording
 
   @override
   void initState() {
@@ -49,7 +52,8 @@ class _FullScreenStreamState extends State<FullScreenStream> {
       _updateTime();
       setState(() {
          _fps = _frameCount;
-         _frameCount = 0;
+         _frameCount = 0; // Reset counter every second
+         
          if (_isRecording && _recordingStart != null) {
             final duration = DateTime.now().difference(_recordingStart!);
             final m = duration.inMinutes.toString().padLeft(2, '0');
@@ -86,15 +90,11 @@ class _FullScreenStreamState extends State<FullScreenStream> {
       _streamSubscription = response.listen((data) {
         buffer.addAll(data);
         
-        // Simple MJPEG Parser: Find SOI (FF D8) and EOI (FF D9)
-        // Optimization: Don't scan from 0 every time, but for simplicity we do it here.
-        // Given network chunks, we might have multiple frames or partial frames.
-        
         while (true) {
           int start = -1;
           int end = -1;
           
-          // Find Start of Image
+          // Find Start of Image (FF D8)
           for (int i = 0; i < buffer.length - 1; i++) {
             if (buffer[i] == 0xFF && buffer[i+1] == 0xD8) {
               start = i;
@@ -103,25 +103,21 @@ class _FullScreenStreamState extends State<FullScreenStream> {
           }
           
           if (start == -1) {
-             // Keep a small tail in case split boundary, discard rest? 
-             // Ideally we just keep the buffer. But if it grows too large (error), clear it.
              if (buffer.length > 1000000) buffer.clear(); // Safety cap
              break;
           }
           
-          // Find End of Image
+          // Find End of Image (FF D9)
           for (int i = start; i < buffer.length - 1; i++) {
              if (buffer[i] == 0xFF && buffer[i+1] == 0xD9) {
-               end = i + 2; // Include the D9
+               end = i + 2;
                break;
              }
           }
           
           if (end != -1) {
-            // We have a full frame!
+            // Full frame found
             final frameBytes = Uint8List.fromList(buffer.sublist(start, end));
-            
-            // Remove this frame from buffer
             buffer.removeRange(0, end);
             
             // Update UI
@@ -132,17 +128,15 @@ class _FullScreenStreamState extends State<FullScreenStream> {
               });
             }
             
-            // Handle Recording
-            if (_isRecording && _recordingSink != null) {
-               _recordingSink!.add(frameBytes);
+            // Save Frame if Recording
+            if (_isRecording && _tempFramesPath != null) {
+               final fileName = "frame_${_recFrameCount.toString().padLeft(4, '0')}.jpg";
+               File("$_tempFramesPath/$fileName").writeAsBytes(frameBytes); // Fire and forgot write
+               _recFrameCount++;
             }
             
           } else {
-            // Frame not complete yet
-            // If we have leading garbage before start, clean it
-            if (start > 0) {
-               buffer.removeRange(0, start);
-            }
+            if (start > 0) buffer.removeRange(0, start);
             break;
           }
         }
@@ -159,58 +153,111 @@ class _FullScreenStreamState extends State<FullScreenStream> {
   }
 
   Future<void> _toggleRecording() async {
+     if (_isProcessing) return; // Prevent double click
+
      if (_isRecording) {
-       // Stop Recording
-       await _recordingSink?.flush();
-       await _recordingSink?.close();
-       _recordingSink = null;
+       // --- STOP RECORDING ---
+       final endTime = DateTime.now();
+       final durationVal = endTime.difference(_recordingStart!).inMilliseconds / 1000.0;
        
        setState(() {
          _isRecording = false;
-         _recordingStart = null;
+         _isProcessing = true; // Start processing UI
        });
        
-        if (_recordingFile != null) {
-           // Save to Gallery
-           try {
-             await Gal.putVideo(_recordingFile!.path);
-             if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Saved Video to Gallery!")),
-                );
-             }
-           } catch (e) {
-             if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Failed to Save Video: $e")),
-                );
-             }
+       // Calculate Real FPS
+       double realFps = 10.0; // Default fallback
+       if (durationVal > 0 && _recFrameCount > 0) {
+         realFps = _recFrameCount / durationVal;
+       }
+       debugPrint("Recording Stopped. Captured $_recFrameCount frames in ${durationVal}s. Real FPS: $realFps");
+       
+       if (_recFrameCount < 5) {
+          _showSnack("Video too short (needs > 5 frames). Discarded.");
+          _finishProcessing();
+          return;
+       }
+       
+       try {
+         final docDir = await getApplicationDocumentsDirectory();
+         final outputPath = "${docDir.path}/output_${DateTime.now().millisecondsSinceEpoch}.mp4";
+         
+         // FFmpeg Command
+         // -framerate: Input FPS
+         // -i: Input pattern
+         // -c:v libx264: H.264 Encoder (widely supported)
+         // -pix_fmt yuv420p: Required for Android compatibility
+         final command = "-framerate $realFps -i $_tempFramesPath/frame_%04d.jpg -c:v libx264 -pix_fmt yuv420p $outputPath";
+         
+         await FFmpegKit.execute(command).then((session) async {
+           final returnCode = await session.getReturnCode();
+           
+           if (ReturnCode.isSuccess(returnCode)) {
+              debugPrint("FFmpeg Success");
+              // Save to Gallery
+              try {
+                await Gal.putVideo(outputPath);
+                _showSnack("Video Saved to Gallery! (Standard MP4)");
+              } catch (e) {
+                _showSnack("Failed to save to Gallery: $e");
+              }
+           } else {
+              debugPrint("FFmpeg Failed");
+              final logs = await session.getLogs();
+              for (var log in logs) { debugPrint(log.getMessage()); }
+              _showSnack("Video Encoding Failed.");
            }
-           // Cleanup
-           // _recordingFile!.delete(); // Optional: keep in app cache or delete
-        }
+         });
+         
+         // Cleanup Temp Output
+         final outFile = File(outputPath);
+         if (await outFile.exists()) await outFile.delete();
+
+       } catch (e) {
+          _showSnack("Processing Error: $e");
+       } finally {
+         _finishProcessing();
+         // Cleanup Temp Frames
+         final dir = Directory(_tempFramesPath!);
+         if (await dir.exists()) await dir.delete(recursive: true);
+       }
        
      } else {
-       // Start Recording
+       // --- START RECORDING ---
        try {
-         final directory = await getApplicationDocumentsDirectory();
-         final timestamp = DateTime.now().millisecondsSinceEpoch;
-         // .mjpeg extension is rare, .avi is safer for containers but raw MJPEG is essentially .mjpeg
-         // GallerySaver might expect .mp4 or .avi. Let's try .avi as containerless MJPEG often works.
-         _recordingFile = File('${directory.path}/rec_$timestamp.avi'); 
+         final docDir = await getApplicationDocumentsDirectory();
+         final tempDir = Directory("${docDir.path}/temp_rec_frames");
          
-         _recordingSink = _recordingFile!.openWrite();
+         if (await tempDir.exists()) await tempDir.delete(recursive: true);
+         await tempDir.create();
          
          setState(() {
+           _tempFramesPath = tempDir.path;
+           _recFrameCount = 0;
            _isRecording = true;
            _recordingStart = DateTime.now();
            _recDuration = "00:00";
          });
          
        } catch (e) {
-         debugPrint("Data recording failed: $e");
+         _showSnack("Failed to init recording: $e");
        }
      }
+  }
+
+  void _finishProcessing() {
+    if (mounted) {
+       setState(() {
+         _isProcessing = false;
+         _recordingStart = null;
+       });
+    }
+  }
+
+  void _showSnack(String msg) {
+    if (mounted) {
+       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
   }
 
   @override
@@ -218,7 +265,6 @@ class _FullScreenStreamState extends State<FullScreenStream> {
     _timer.cancel();
     _streamSubscription?.cancel();
     _httpClient?.close();
-    _recordingSink?.close();
     
     // Restore UI
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -244,7 +290,7 @@ class _FullScreenStreamState extends State<FullScreenStream> {
               child: _imageBytes != null 
                   ? Image.memory(
                       _imageBytes!, 
-                      gaplessPlayback: true, // Prevents flickering
+                      gaplessPlayback: true, 
                       filterQuality: FilterQuality.medium,
                     ) 
                   : const CircularProgressIndicator(color: Colors.white),
@@ -272,7 +318,7 @@ class _FullScreenStreamState extends State<FullScreenStream> {
                  child: SafeArea(
                    child: IconButton(
                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                     onPressed: () => Navigator.pop(context),
+                     onPressed: _isProcessing ? null : () => Navigator.pop(context), // Disable back during processing
                    ),
                  ),
               ),
@@ -313,16 +359,25 @@ class _FullScreenStreamState extends State<FullScreenStream> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.redAccent.withValues(alpha: 0.8),
+                          color: _isProcessing 
+                             ? Colors.orangeAccent.withValues(alpha: 0.8)
+                             : Colors.redAccent.withValues(alpha: 0.8),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.circle, size: 10, color: Colors.white),
+                            if (_isProcessing)
+                               const SizedBox(
+                                 width: 10, height: 10, 
+                                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                               )
+                            else 
+                               const Icon(Icons.circle, size: 10, color: Colors.white),
+                            
                             const SizedBox(width: 5),
                             Text(
-                              "LIVE | $_fps FPS", 
+                              _isProcessing ? "PROCESSING..." : "LIVE | $_fps FPS", 
                               style: const TextStyle(
                                 color: Colors.white, 
                                 fontWeight: FontWeight.bold, 
@@ -352,7 +407,7 @@ class _FullScreenStreamState extends State<FullScreenStream> {
                 child: SafeArea(
                   child: FloatingActionButton(
                     heroTag: "rec_btn",
-                    onPressed: _toggleRecording,
+                    onPressed: _isProcessing ? null : _toggleRecording,
                     backgroundColor: _isRecording ? Colors.white : Colors.redAccent,
                     child: Icon(
                       _isRecording ? Icons.stop : Icons.fiber_manual_record, 
@@ -362,6 +417,22 @@ class _FullScreenStreamState extends State<FullScreenStream> {
                 ),
               )
             ],
+            
+            // Blocking Processing Overlay (Full Screen if needed, but we used small badge)
+            if (_isProcessing)
+               Container(
+                 color: Colors.black54,
+                 child: const Center(
+                   child: Column(
+                     mainAxisSize: MainAxisSize.min,
+                     children: [
+                       CircularProgressIndicator(color: Colors.white),
+                       SizedBox(height: 10),
+                       Text("Saving Video...", style: TextStyle(color: Colors.white, fontSize: 16))
+                     ],
+                   ),
+                 ),
+               )
           ],
         ),
       ),

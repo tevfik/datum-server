@@ -19,6 +19,9 @@ dependencies:
   flutter_mjpeg: ^2.0.4
   path_provider: ^2.0.0
   gal: ^2.3.0
+  ffmpeg_kit_flutter_min_gpl: ^6.0.3
+  share_plus: ^7.0.0
+  open_file_plus: ^3.3.0
 
 dev_dependencies:
   flutter_test:
