@@ -181,13 +181,95 @@ const char DASHBOARD_HTML[] PROGMEM =
 // ============================================================================
 // Core Functions
 // ============================================================================
+
 String extractJsonVal(String json, String key) {
-  int s = json.indexOf("\"" + key + "\":\"");
-  if (s < 0)
+  int keyIdx = json.indexOf("\"" + key + "\"");
+  if (keyIdx < 0)
     return "";
-  s += key.length() + 4;
-  int e = json.indexOf("\"", s);
-  return json.substring(s, e);
+
+  // Find the colon after key
+  int colonIdx = json.indexOf(":", keyIdx);
+  if (colonIdx < 0)
+    return "";
+
+  // Find start of value (first quote after colon)
+  int valStart = json.indexOf("\"", colonIdx);
+  if (valStart < 0)
+    return "";
+
+  // Find end of value
+  int valEnd = json.indexOf("\"", valStart + 1);
+  if (valEnd < 0)
+    return "";
+
+  return json.substring(valStart + 1, valEnd);
+}
+
+// Helper to extract nested JSON object
+String extractNestedJsonVal(String json, String parentKey, String childKey) {
+  int parentIdx = json.indexOf("\"" + parentKey + "\":");
+  if (parentIdx < 0)
+    return "";
+
+  // Find start of object (look for { after parent key)
+  int objStart = json.indexOf("{", parentIdx);
+  if (objStart < 0)
+    return "";
+
+  // Find end of object (simple heuristic: first })
+  int objEnd = json.indexOf("}", objStart);
+  if (objEnd < 0)
+    return "";
+
+  String nested = json.substring(objStart, objEnd + 1);
+  return extractJsonVal(nested, childKey);
+}
+
+// Helper to extract numeric JSON value (robust)
+int extractJsonInt(String json, String key) {
+  int keyIdx = json.indexOf("\"" + key + "\"");
+  if (keyIdx < 0)
+    return -1;
+
+  int colonIdx = json.indexOf(":", keyIdx);
+  if (colonIdx < 0)
+    return -1;
+
+  // Skip whitespace/quotes/brackets to find start of number
+  int s = colonIdx + 1;
+  while (s < json.length() && !isDigit(json.charAt(s)) &&
+         json.charAt(s) != '-') {
+    s++;
+  }
+
+  if (s >= json.length())
+    return -1;
+
+  int e = s;
+  while (e < json.length() &&
+         (isDigit(json.charAt(e)) || json.charAt(e) == '-')) {
+    e++;
+  }
+  return json.substring(s, e).toInt();
+}
+
+// Helper to extract boolean JSON value (true/false or 1/0)
+bool extractJsonBool(String json, String key) {
+  int keyIdx = json.indexOf("\"" + key + "\"");
+  if (keyIdx < 0)
+    return false;
+
+  int colonIdx = json.indexOf(":", keyIdx);
+  if (colonIdx < 0)
+    return false;
+
+  // Look ahead for "true", "1", or "false", "0"
+  String remainder = json.substring(colonIdx + 1);
+  remainder.trim(); // Trim leading whitespace
+
+  if (remainder.startsWith("true") || remainder.startsWith("1"))
+    return true;
+  return false;
 }
 
 // Check for Factory Reset (Boot Button held manually during runtime)
@@ -688,26 +770,6 @@ void ackCommand(String cmdId) {
   http.end();
 }
 
-// Helper to extract nested JSON object
-String extractNestedJsonVal(String json, String parentKey, String childKey) {
-  int parentIdx = json.indexOf("\"" + parentKey + "\":");
-  if (parentIdx < 0)
-    return "";
-
-  // Find start of object (look for { after parent key)
-  int objStart = json.indexOf("{", parentIdx);
-  if (objStart < 0)
-    return "";
-
-  // Find end of object (simple heuristic: first })
-  int objEnd = json.indexOf("}", objStart);
-  if (objEnd < 0)
-    return "";
-
-  String nested = json.substring(objStart, objEnd + 1);
-  return extractJsonVal(nested, childKey);
-}
-
 void checkCommands() {
   if (millis() - lastCommandCheck < 5000)
     return;
@@ -739,17 +801,71 @@ void checkCommands() {
         String color = "";
         int brightness = 0;
 
-        // Basic proximity check to ensure params belong to this command
-        if (paramsIdx > 0 &&
-            paramsIdx < pl.indexOf("\"command_id\":\"", endIdx)) {
-          // Parse parameters manually from the segment
+        // Determine where the NEXT command starts to bound our search
+        int nextCmdIdx = pl.indexOf("\"command_id\":\"", endIdx);
+        int boundary = (nextCmdIdx > 0) ? nextCmdIdx : pl.length();
+
+        if (paramsIdx > 0 && paramsIdx < boundary) {
           int segmentEnd = pl.indexOf("}", paramsIdx);
           String paramSegment = pl.substring(paramsIdx, segmentEnd + 1);
+
           resolution = extractJsonVal(paramSegment, "resolution");
-          color = extractJsonVal(paramSegment, "color");
-          String brStr = extractJsonVal(paramSegment, "brightness");
-          if (brStr.length() > 0)
-            brightness = brStr.toInt();
+          color = extractJsonVal(paramSegment, "led_color");
+          brightness = extractJsonInt(paramSegment, "led_brightness");
+          bool hmirror = extractJsonBool(paramSegment, "hmirror");
+          bool vflip = extractJsonBool(paramSegment, "vflip");
+
+          Serial.println("Params parsed: Res=" + resolution + " Col=" + color +
+                         " Bri=" + String(brightness) +
+                         " Mir=" + String(hmirror));
+
+          if (action == "update_settings") {
+            ackCommand(cmdId);
+
+            // 1. Handle Resolution (Change if different and valid)
+            if (resolution.length() > 0) {
+              framesize_t currentSize =
+                  esp_camera_sensor_get()->status.framesize;
+              framesize_t newSize = getFrameSizeFromName(resolution);
+              if (newSize != currentSize) {
+                Serial.println("Updating Resolution to: " + resolution);
+                bool wasStreaming = streaming;
+                streaming = false;
+                delay(100);
+                sensor_t *s = esp_camera_sensor_get();
+                s->set_framesize(s, newSize);
+                streaming = wasStreaming;
+              }
+            }
+
+            // 2. Handle Orientation
+            sensor_t *s = esp_camera_sensor_get();
+            if (s) {
+              s->set_hmirror(s, hmirror ? 1 : 0);
+              s->set_vflip(s, vflip ? 1 : 0);
+            }
+
+            // 3. Handle LED
+            if (color.length() > 0) {
+              long number = strtol(&color.c_str()[1], NULL, 16);
+              int r = number >> 16;
+              int g = number >> 8 & 0xFF;
+              int b = number & 0xFF;
+
+              if (brightness >= 0) {
+                r = (r * brightness) / 100; // Brightness is 0-100 now
+                g = (g * brightness) / 100;
+                b = (b * brightness) / 100;
+              }
+
+#if LED_GPIO_NUM == 48
+              neopixelWrite(LED_GPIO_NUM, r, g, b);
+              torchState = (r + g + b > 0);
+#else
+              digitalWrite(LED_GPIO_NUM, (r + g + b > 0) ? HIGH : LOW);
+#endif
+            }
+          }
         }
 
         Serial.println("Executing: " + action + " ID: " + cmdId);
@@ -764,57 +880,11 @@ void checkCommands() {
           ackCommand(cmdId);
           delay(500);
           ESP.restart();
-        } else if (action == "led") {
-          // LED Control with advanced parameters
-          if (color.length() > 0) {
-            // Hex color parsing (e.g. #FF0000)
-            long number = strtol(&color.c_str()[1], NULL, 16);
-            int r = number >> 16;
-            int g = number >> 8 & 0xFF;
-            int b = number & 0xFF;
-
-            // Apply brightness scaling if provided
-            if (brightness > 0) {
-              r = (r * brightness) / 255;
-              g = (g * brightness) / 255;
-              b = (b * brightness) / 255;
-            }
-
-#if LED_GPIO_NUM == 48
-            neopixelWrite(LED_GPIO_NUM, r, g, b);
-            torchState = (r + g + b > 0);
-#endif
-          } else {
-// Simple toggle fallback
-#if LED_GPIO_NUM == 48
-            torchState = !torchState;
-            neopixelWrite(LED_GPIO_NUM, torchState ? 255 : 0,
-                          torchState ? 255 : 0, torchState ? 255 : 0);
-#else
-            ledState = !ledState;
-            digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
-#endif
-          }
-          ackCommand(cmdId);
         } else if (action == "snap") {
           ackCommand(cmdId);
           handleSnap(resolution);
-        } else if (action == "set_resolution") {
-          ackCommand(cmdId);
-          // Change streaming resolution safely
-          if (resolution.length() > 0) {
-            bool wasStreaming = streaming;
-            streaming = false;
-            delay(100); // Allow current frame to finish
-
-            framesize_t size = getFrameSizeFromName(resolution);
-            sensor_t *s = esp_camera_sensor_get();
-            if (s) {
-              s->set_framesize(s, size);
-              Serial.println("Resolution changed to: " + resolution);
-            }
-            streaming = wasStreaming;
-          }
+        } else if (action == "update_settings") {
+          // Already handled above inside parsing block to access params
         } else {
           ackCommand(cmdId);
         }
@@ -946,8 +1016,8 @@ void handleSnap(String resolution = "UXGA") {
   // Apply Mirror/Flip to Snapshot too
   sensor_t *s = esp_camera_sensor_get();
   if (s) {
-    s->set_hmirror(s, 1);
-    s->set_vflip(s, 1);
+    s->set_hmirror(s, 0);
+    s->set_vflip(s, 0);
   }
 
   delay(500);
@@ -986,9 +1056,9 @@ void handleSnap(String resolution = "UXGA") {
   initCamera();
 
   // CRITICAL: Wait before resuming stream!
-  // The server only stores the "last frame". If we send a new low-res frame
-  // immediately, the client won't have time to fetch the high-res snapshot we
-  // just uploaded.
+  // The server only stores the "last frame". If we send a new low-res
+  // frame immediately, the client won't have time to fetch the high-res
+  // snapshot we just uploaded.
   if (wasStreaming) {
     Serial.println("[SNAP] Waiting for client to fetch image...");
     delay(4000); // Give client 4 seconds to download
@@ -1007,13 +1077,14 @@ void setup() {
   pinMode(LED_GPIO_NUM, OUTPUT);
 #endif
 
-  // checkFactoryReset(); // Removed: Calling this at boot triggers Download
-  // Mode. Moved to loop.
+  // checkFactoryReset(); // Removed: Calling this at boot triggers
+  // Download Mode. Moved to loop.
 
   initDeviceUID();
   loadCredentials();
 
-  // If no credentials, start AP immediately (and init camera for preview)
+  // If no credentials, start AP immediately (and init camera for
+  // preview)
   if (wifiSSID.length() == 0) {
     initCamera();
     startSetupMode();
@@ -1030,13 +1101,13 @@ void setup() {
       currentState = STATE_ONLINE;
       startCameraServer();
       streaming = true;
-    } else if (attemptSelfRegistration()) { // Try self registration if we
-                                            // have user creds
+    } else if (attemptSelfRegistration()) { // Try self registration if
+                                            // we have user creds
       currentState = STATE_ONLINE;
       startCameraServer();
       streaming = true;
-    } else if (activateProvisioning()) { // Fallback to old provisioning if
-                                         // pending request exists
+    } else if (activateProvisioning()) { // Fallback to old provisioning
+                                         // if pending request exists
       currentState = STATE_ONLINE;
       startCameraServer();
       streaming = true;

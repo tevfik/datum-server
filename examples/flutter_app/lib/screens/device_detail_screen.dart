@@ -57,13 +57,200 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     return 'https://datum.bezg.in/devices/${widget.device.id}/stream/mjpeg?token=$token';
   }
 
-  Future<void> _sendCommand(String action) async {
+  // State for settings
+  String _streamRes = "VGA";
+  String _snapRes = "UXGA"; 
+  Color _ledColor = Colors.white;
+  double _ledBrightness = 100;
+  bool _hmirror = false;
+  bool _vflip = false;
+  
+  void _sendSettings() {
+     // Convert Color to Hex string #RRGGBB
+     String hex = '#${_ledColor.value.toRadixString(16).substring(2).toUpperCase()}';
+     
+     final params = {
+       "resolution": _streamRes,
+       "led_color": hex,
+       "led_brightness": _ledBrightness.toInt(),
+       "hmirror": _hmirror,
+       "vflip": _vflip
+     };
+     
+     _sendCommand("update_settings", params: params);
+  }
+  
+  void _showSettingsDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              height: 600,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Device Settings", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
+                  
+                  const Text("Stream Resolution"),
+                  DropdownButton<String>(
+                    value: _streamRes,
+                    isExpanded: true,
+                    items: ["QVGA", "VGA", "SVGA", "HD"].map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    onChanged: (newValue) {
+                      if (newValue != null) {
+                        setModalState(() => _streamRes = newValue);
+                        setState(() => _streamRes = newValue);
+                        _sendSettings();
+                      }
+                    },
+                  ),
+                  
+                  const SizedBox(height: 15),
+                  const Text("Snapshot Resolution"),
+                  DropdownButton<String>(
+                    value: _snapRes,
+                    isExpanded: true,
+                    items: ["HD", "UXGA", "QXGA"].map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    onChanged: (newValue) {
+                      if (newValue != null) {
+                        setModalState(() => _snapRes = newValue);
+                        setState(() => _snapRes = newValue);
+                      }
+                    },
+                  ),
+
+                  const Divider(),
+                  const Text("Orientation"),
+                  SwitchListTile(
+                    title: const Text("Mirror Horizontal"),
+                    value: _hmirror,
+                    onChanged: (val) {
+                       setModalState(() => _hmirror = val);
+                       setState(() => _hmirror = val);
+                       _sendSettings();
+                    },
+                  ),
+                   SwitchListTile(
+                    title: const Text("Flip Vertical"),
+                    value: _vflip,
+                    onChanged: (val) {
+                       setModalState(() => _vflip = val);
+                       setState(() => _vflip = val);
+                       _sendSettings();
+                    },
+                  ),
+
+                  const Divider(),
+                  const Text("LED Control"),
+                  const SizedBox(height: 10),
+                  
+                  // Simple Color Picker (Red, Green, Blue, White)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _colorBtn(Colors.white, setModalState),
+                      _colorBtn(Colors.red, setModalState),
+                      _colorBtn(Colors.green, setModalState),
+                      _colorBtn(Colors.blue, setModalState),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 10),
+                  Text("Brightness: ${_ledBrightness.toInt()}%"),
+                  Slider(
+                    value: _ledBrightness,
+                    min: 0,
+                    max: 100,
+                    divisions: 10,
+                    label: _ledBrightness.round().toString(),
+                    onChanged: (double value) {
+                      setModalState(() => _ledBrightness = value);
+                    },
+                    onChangeEnd: (double value) {
+                       setState(() => _ledBrightness = value);
+                       _sendSettings();
+                    },
+                  ),
+                  
+                  ElevatedButton.icon(
+                      onPressed: _sendSettings,
+                      icon: const Icon(Icons.save),
+                      label: const Text("Apply Settings"),
+                      style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(40)),
+                  ),
+                  
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                      onPressed: () {
+                         // Toggle logic
+                         if (_ledBrightness > 0) {
+                           _ledBrightness = 0;
+                         } else {
+                           _ledBrightness = 100;
+                         }
+                         setState(() {}); // Update main UI
+                         setModalState(() {}); // Update modal UI
+                         _sendSettings();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[800],
+                        minimumSize: const Size.fromHeight(40)
+                      ),
+                      child: const Text("Toggle LED (On/Off)"),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+  
+  Widget _colorBtn(Color color, StateSetter setModalState) {
+    return GestureDetector(
+      onTap: () {
+        setModalState(() => _ledColor = color);
+        setState(() => _ledColor = color); // Sync with main state
+        _sendSettings();
+      },
+      child: Container(
+        width: 40, height: 40,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: _ledColor == color ? Colors.amber : Colors.grey, width: 3),
+        ),
+      ),
+    );
+  }
+
+
+
+  Future<void> _sendCommand(String action, {Map<String, dynamic>? params}) async {
     setState(() => _loadingAction = true);
     try {
-      await _api.sendCommand(widget.device.id, action);
+      await _api.sendCommand(widget.device.id, action, params: params);
       if (mounted) {
+        String msg = 'Command "$action" sent';
+        if (action == "set_resolution") msg = "Resolution set to ${params?['resolution']}";
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Command "$action" sent')),
+          SnackBar(content: Text(msg), duration: const Duration(seconds: 1)),
         );
       }
     } catch (e) {
@@ -80,12 +267,12 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   Future<void> _takePhoto() async {
     setState(() => _loadingAction = true);
     try {
-      // 1. Send Snap Command
-      await _api.sendCommand(widget.device.id, "snap");
+      // 1. Send Snap Command with resolution
+      await _api.sendCommand(widget.device.id, "snap", params: {"resolution": _snapRes});
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Requesting High-Res Photo...')),
+           SnackBar(content: Text('Capturing $_snapRes Photo...')),
         );
       }
 
@@ -94,10 +281,12 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       if (!mounted) return;
       final token = Provider.of<AuthProvider>(context, listen: false).token;
       
-      for (int i = 0; i < 10; i++) { // 10 attempts * 2.5s = 25s max for camera reinit
+      // Wait for ESP32 to upload (it takes ~2-5s)
+      // Poll faster (every 500ms) to catch the 4s window
+      for (int i = 0; i < 40; i++) { 
         if (!mounted) return;
         
-        await Future.delayed(const Duration(milliseconds: 2500));
+        await Future.delayed(const Duration(milliseconds: 500));
         if (!mounted) return;
         
         try {
@@ -167,6 +356,10 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         title: Text(widget.device.name),
         actions: [
           IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: _showSettingsDialog,
+          ),
+          IconButton(
             icon: Icon(_isRunning ? Icons.videocam : Icons.videocam_off),
             onPressed: () {
               setState(() {
@@ -208,7 +401,14 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                       icon: Icons.lightbulb,
                       label: "Toggle LED",
                       color: Colors.amber,
-                      onPressed: () => _sendCommand("led"),
+                      onPressed: () {
+                          if (_ledBrightness > 0) {
+                             setState(() => _ledBrightness = 0);
+                          } else {
+                             setState(() => _ledBrightness = 100);
+                          }
+                          _sendSettings();
+                      },
                       isLoading: _loadingAction,
                     ),
                     _ActionButton(
