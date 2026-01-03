@@ -836,27 +836,28 @@ void handleSnap() {
   Serial.printf("[SNAP] Captured: %d bytes (%dx%d) in %dms\n", fb->len,
                 fb->width, fb->height, millis() - startTime);
 
-  // Copy frame to heap so we can release camera
+  // Copy frame to heap so we can release camera buffer
   size_t frameLen = fb->len;
   uint8_t *frameCopy = (uint8_t *)ps_malloc(frameLen);
   if (frameCopy) {
     memcpy(frameCopy, fb->buf, frameLen);
     esp_camera_fb_return(fb);
 
-    // Restore camera BEFORE upload
+    // Deinit camera to free DMA resources
     esp_camera_deinit();
-    delay(50);
-    initCamera();
 
-    // Now upload from heap copy
-    Serial.printf("[SNAP] Uploading %d bytes...\n", frameLen);
+    // Upload FIRST - no streaming interference!
+    Serial.printf("[SNAP] Uploading %d bytes (stream paused)...\n", frameLen);
     unsigned long uploadStart = millis();
 
     HTTPClient http;
     http.setTimeout(30000);
+    http.setReuse(false); // Don't reuse connection
     http.begin(serverURL + "/device/" + deviceID + "/stream/frame");
     http.addHeader("Authorization", "Bearer " + apiKey);
     http.addHeader("Content-Type", "image/jpeg");
+    http.addHeader("Content-Length", String(frameLen));
+
     int httpCode = http.POST(frameCopy, frameLen);
 
     unsigned long uploadTime = millis() - uploadStart;
@@ -867,8 +868,11 @@ void handleSnap() {
       Serial.printf("[SNAP] Upload FAILED: HTTP %d\n", httpCode);
     }
     http.end();
-
     free(frameCopy);
+
+    // NOW restore camera after upload is complete
+    delay(50);
+    initCamera();
   } else {
     Serial.println("[SNAP] Failed to allocate heap memory!");
     esp_camera_fb_return(fb);
