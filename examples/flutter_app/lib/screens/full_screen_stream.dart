@@ -139,7 +139,7 @@ class _FullScreenStreamState extends State<FullScreenStream> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.redAccent.withOpacity(0.8),
+                      color: Colors.redAccent.withValues(alpha: 0.8),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Row(
