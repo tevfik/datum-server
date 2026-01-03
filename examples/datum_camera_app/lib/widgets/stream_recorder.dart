@@ -7,6 +7,7 @@ import 'package:flutter_quick_video_encoder/flutter_quick_video_encoder.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 
+class StreamRecorderController extends ChangeNotifier {
   bool _isRecording = false;
   bool _isProcessing = false;
   String _durationString = "00:00";
@@ -42,6 +43,7 @@ import 'package:path_provider/path_provider.dart';
   Future<void> Function()? takeSnapshot;
   
   void notify() => notifyListeners();
+}
 
 class StreamRecorder extends StatefulWidget {
   final String streamUrl;
