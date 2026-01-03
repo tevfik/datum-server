@@ -30,11 +30,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Build APK
+      - name: Build APK (Inject Version)
         working-directory: examples/datum_camera_app
         run: |
+          # Strip 'v' prefix from tag (v1.0.0 -> 1.0.0)
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "Building version: $VERSION"
+          
           flutter pub get
-          flutter build apk --release
+          flutter build apk --release --build-name=$VERSION --build-number=${{ github.run_number }}
           mkdir -p ../../build/release
           mv build/app/outputs/flutter-apk/app-release.apk ../../build/release/datum_camera_app.apk
       
