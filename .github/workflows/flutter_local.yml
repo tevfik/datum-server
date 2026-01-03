@@ -24,6 +24,12 @@ jobs:
             -e GITHUB_WORKSPACE=/app \
             datum-flutter-builder:latest \
             /bin/bash -c "
+              echo '📂 Debugging Container Paths:'
+              pwd
+              ls -la /app
+              ls -la /app/examples || echo 'e: examples not found'
+              ls -la /app/examples/datum_camera_app || echo 'e: datum_camera_app not found'
+              
               git config --global --add safe.directory '*' && \
               flutter pub get && \
               flutter pub run build_runner build --delete-conflicting-outputs && \
