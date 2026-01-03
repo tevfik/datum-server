@@ -255,7 +255,7 @@
                     <!-- Stream Resolution -->
                     <div class="control-group">
                         <label>Stream Resolution:</label>
-                        <select id="streamRes" onchange="changeStreamRes()"
+                        <select id="streamRes"
                             style="width: 100%; padding: 8px; margin-bottom: 10px; background: #374151; color: white; border: 1px solid #4b5563; border-radius: 4px;">
                             <option value="QVGA">QVGA (320x240)</option>
                             <option value="VGA" selected>VGA (640x480)</option>
@@ -275,6 +275,16 @@
                         </select>
                     </div>
 
+                    <!-- Orientation -->
+                    <div class="control-group" style="margin-bottom: 15px;">
+                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer;">
+                            <input type="checkbox" id="hmirror"> Mirror (L/R)
+                        </label>
+                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer; margin-left: 15px;">
+                            <input type="checkbox" id="vflip"> Flip (U/D)
+                        </label>
+                    </div>
+
                     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #444;">
 
                     <!-- LED Color & Brightness -->
@@ -291,14 +301,34 @@
                             oninput="document.getElementById('brightVal').innerText = this.value">
                     </div>
 
-                    <button onclick="updateLED()"
-                        style="background-color: #8b5cf6; width: 100%; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer; font-weight: bold; margin-bottom: 5px;">
-                        💡 Set LED
+                    <button onclick="syncSettings()"
+                        style="background-color: #3b82f6; width: 100%; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer; font-weight: bold; margin-bottom: 10px;">
+                        🔄 Sync Settings
                     </button>
-                    <button onclick="toggleLED()"
-                        style="background-color: #4b5563; width: 100%; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer;">
-                        Toggle LED (On/Off)
-                    </button>
+
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; background: #374151; padding: 10px; border-radius: 6px;">
+                        <span style="font-weight: bold;">LED Power</span>
+                        <label class="switch"
+                            style="position: relative; display: inline-block; width: 50px; height: 24px;">
+                            <input type="checkbox" id="ledToggle" checked onclick="toggleLED()">
+                            <span
+                                style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px;"></span>
+                            <span
+                                style="position: absolute; content: ''; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%;"
+                                id="ledSlider"></span>
+                        </label>
+                        <style>
+                            /* Quick Toggle Switch CSS */
+                            #ledToggle:checked+span {
+                                background-color: #2196F3;
+                            }
+
+                            #ledToggle:checked+span+span {
+                                transform: translateX(26px);
+                            }
+                        </style>
+                    </div>
                 </div>
             </div>
 
@@ -562,8 +592,8 @@
                         if (imgRes.ok) {
                             const blob = await imgRes.blob();
                             // Normal frames are ~25-50KB. Snapshot is >100KB.
-                            // Set threshold to 60KB to catch only high-res.
-                            if (blob.size > 60000) {
+                            // Set threshold to 20KB to be safe (dark images etc).
+                            if (blob.size > 20000) {
                                 const url = URL.createObjectURL(blob);
 
                                 // Create temporary link to trigger download
@@ -598,26 +628,48 @@
             }
         }
 
-        // LED Control Functions
-        function updateLED() {
+        // Unified Settings Logic
+
+        function syncSettings() {
+            const streamRes = document.getElementById('streamRes').value;
             const color = document.getElementById('ledColor').value;
-            const brightness = document.getElementById('ledBright').value;
-            log(`Setting LED: ${color} (Brightness: ${brightness}%)`);
-            sendCommand('led', {
-                color: color,
-                brightness: brightness
+            const brightness = parseInt(document.getElementById('ledBright').value);
+            const hmirror = document.getElementById('hmirror').checked;
+            const vflip = document.getElementById('vflip').checked;
+
+            // Ensure LED Switch is ON when Syncing
+            document.getElementById('ledToggle').checked = true;
+
+            log(`Syncing Settings: ${streamRes}, LED: ${color} (${brightness}%), Mirror: ${hmirror}, Flip: ${vflip}`);
+
+            sendCommand('update_settings', {
+                resolution: streamRes,
+                led_color: color,
+                led_brightness: brightness,
+                hmirror: hmirror,
+                vflip: vflip
             });
         }
 
         function toggleLED() {
-            log('Toggling LED...');
-            sendCommand('led', {}); // Empty params triggers toggle
-        }
+            const isOn = document.getElementById('ledToggle').checked;
+            const brightness = parseInt(document.getElementById('ledBright').value);
+            const color = document.getElementById('ledColor').value;
+            const streamRes = document.getElementById('streamRes').value;
+            const hmirror = document.getElementById('hmirror').checked;
+            const vflip = document.getElementById('vflip').checked;
 
-        function changeStreamRes() {
-            const res = document.getElementById('streamRes').value;
-            log(`Changing stream resolution to ${res}...`);
-            sendCommand('set_resolution', { resolution: res });
+            const targetBrightness = isOn ? brightness : 0;
+
+            log(`Toggling LED ${isOn ? 'ON' : 'OFF'} (${targetBrightness}%)`);
+
+            sendCommand('update_settings', {
+                resolution: streamRes,
+                led_color: color,
+                led_brightness: targetBrightness,
+                hmirror: hmirror,
+                vflip: vflip
+            });
         }
 
         // Initialize from URL params if present

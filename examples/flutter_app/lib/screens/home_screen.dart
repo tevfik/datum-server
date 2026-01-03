@@ -54,13 +54,20 @@ class HomeScreen extends StatelessWidget {
                   title: Text(device.name),
                   subtitle: Text(device.uid),
                   trailing: Text(device.status.toUpperCase()),
-                  onTap: () {
-                    Navigator.push(
+                  onTap: () async {
+                    final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => DeviceDetailScreen(device: device),
                       ),
                     );
+                    
+                    if (result == true) {
+                      // Refresh list if device was deleted
+                      if (context.mounted) {
+                        Provider.of<DeviceProvider>(context, listen: false).fetchDevices();
+                      }
+                    }
                   },
                 );
               },

@@ -64,15 +64,19 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   double _ledBrightness = 100;
   bool _hmirror = false;
   bool _vflip = false;
+  bool _ledOn = true; // LED Power state
   
   void _sendSettings() {
-     // Convert Color to Hex string #RRGGBB
-     String hex = '#${_ledColor.value.toRadixString(16).substring(2).toUpperCase()}';
+     // Convert Color to Hex string #RRGGBB using component accessors (Fix Deprecation)
+     int r = (_ledColor.r * 255).toInt();
+     int g = (_ledColor.g * 255).toInt();
+     int b = (_ledColor.b * 255).toInt();
+     String hex = '#${r.toRadixString(16).padLeft(2, '0')}${g.toRadixString(16).padLeft(2, '0')}${b.toRadixString(16).padLeft(2, '0')}'.toUpperCase();
      
      final params = {
        "resolution": _streamRes,
        "led_color": hex,
-       "led_brightness": _ledBrightness.toInt(),
+       "led_brightness": _ledOn ? _ledBrightness.toInt() : 0,
        "hmirror": _hmirror,
        "vflip": _vflip
      };
@@ -110,7 +114,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                       if (newValue != null) {
                         setModalState(() => _streamRes = newValue);
                         setState(() => _streamRes = newValue);
-                        _sendSettings();
+                        // Offline: Do not send immediately
                       }
                     },
                   ),
@@ -142,7 +146,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                     onChanged: (val) {
                        setModalState(() => _hmirror = val);
                        setState(() => _hmirror = val);
-                       _sendSettings();
+                       // Offline: Do not send immediately
                     },
                   ),
                    SwitchListTile(
@@ -151,7 +155,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                     onChanged: (val) {
                        setModalState(() => _vflip = val);
                        setState(() => _vflip = val);
-                       _sendSettings();
+                       // Offline: Do not send immediately
                     },
                   ),
 
@@ -183,35 +187,31 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                     },
                     onChangeEnd: (double value) {
                        setState(() => _ledBrightness = value);
-                       _sendSettings();
+                       // Offline: Do not send immediately
                     },
                   ),
                   
-                  ElevatedButton.icon(
                       onPressed: _sendSettings,
-                      icon: const Icon(Icons.save),
-                      label: const Text("Apply Settings"),
-                      style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(40)),
+                      icon: const Icon(Icons.send),
+                      label: const Text("Sync Settings"),
+                      style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(40),
+                          backgroundColor: Colors.blueAccent,
+                          foregroundColor: Colors.white,
+                      ),
                   ),
                   
                   const SizedBox(height: 10),
-                  ElevatedButton(
-                      onPressed: () {
-                         // Toggle logic
-                         if (_ledBrightness > 0) {
-                           _ledBrightness = 0;
-                         } else {
-                           _ledBrightness = 100;
-                         }
-                         setState(() {}); // Update main UI
-                         setModalState(() {}); // Update modal UI
-                         _sendSettings();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey[800],
-                        minimumSize: const Size.fromHeight(40)
-                      ),
-                      child: const Text("Toggle LED (On/Off)"),
+                  SwitchListTile(
+                    title: const Text("LED Power"),
+                    subtitle: const Text("Toggle Light On/Off"),
+                    value: _ledOn,
+                    activeColor: Colors.amber,
+                    onChanged: (val) {
+                        setModalState(() => _ledOn = val);
+                        setState(() => _ledOn = val);
+                        _sendSettings(); // Toggle sends immediately for responsiveness
+                    },
                   ),
                 ],
               ),
@@ -226,8 +226,8 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     return GestureDetector(
       onTap: () {
         setModalState(() => _ledColor = color);
-        setState(() => _ledColor = color); // Sync with main state
-        _sendSettings();
+        setState(() => _ledColor = color); 
+        // Offline: Do not send immediately
       },
       child: Container(
         width: 40, height: 40,
@@ -349,6 +349,53 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     }
   }
 
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Device?'),
+        content: Text('Are you sure you want to delete "${widget.device.name}"? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _loadingAction = true);
+      try {
+        await _api.deleteDevice(widget.device.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Device deleted successfully')),
+          );
+          Navigator.pop(context, true); // Return true to indicate deletion
+        }
+      } catch (e) {
+        if (mounted) {
+          if (e.toString().contains("204")) {
+             // Handle 204 No Content as success
+             Navigator.pop(context, true);
+             return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Delete failed: $e'), backgroundColor: Colors.red),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _loadingAction = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -356,17 +403,38 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         title: Text(widget.device.name),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: _showSettingsDialog,
-          ),
-          IconButton(
             icon: Icon(_isRunning ? Icons.videocam : Icons.videocam_off),
             onPressed: () {
               setState(() {
                 _isRunning = !_isRunning;
               });
             },
-          )
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: _showSettingsDialog,
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'delete') {
+                _confirmDelete();
+              }
+            },
+            itemBuilder: (BuildContext context) {
+              return [
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Delete Device', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ];
+            },
+          ),
         ],
       ),
       body: Column(

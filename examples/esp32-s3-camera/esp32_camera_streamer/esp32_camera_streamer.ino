@@ -114,6 +114,7 @@ extern void neopixelWrite(uint8_t pin, uint8_t red, uint8_t green,
 #define Y5_GPIO_NUM 21
 #define Y4_GPIO_NUM 19
 #define Y3_GPIO_NUM 18
+#define Y2_GPIO_NUM 18
 #define Y2_GPIO_NUM 5
 #define VSYNC_GPIO_NUM 25
 #define HREF_GPIO_NUM 23
@@ -166,6 +167,10 @@ unsigned long setupStartTime = 0;
 unsigned long lastLedBlink = 0;
 bool ledState = false;
 bool torchState = false;
+byte savedR = 255;
+byte savedG = 255;
+byte savedB = 255;
+int savedBrightness = 0;
 
 HTTPClient httpCommand;
 HTTPClient httpStream;
@@ -335,12 +340,17 @@ void updateLED() {
   case STATE_ONLINE:
 #ifdef LED_GPIO_NUM
 #if LED_GPIO_NUM == 48
-    // Only light up if explicitly enabled (Torch)
-    // Removed default green status light
-    if (torchState)
-      neopixelWrite(LED_GPIO_NUM, 255, 255, 255);
-    else
+    // Unified LED Logic:
+    // If Torch ON: Use Saved Color/Brightness
+    // If Torch OFF: Turn OFF completely (No status blink)
+    if (torchState) {
+      int r = (savedR * savedBrightness) / 100;
+      int g = (savedG * savedBrightness) / 100;
+      int b = (savedB * savedBrightness) / 100;
+      neopixelWrite(LED_GPIO_NUM, r, g, b);
+    } else {
       neopixelWrite(LED_GPIO_NUM, 0, 0, 0); // OFF
+    }
 #else
     digitalWrite(LED_GPIO_NUM, HIGH);
 #endif
@@ -353,13 +363,16 @@ void updateLED() {
     ledState = !ledState;
 #ifdef LED_GPIO_NUM
 #if LED_GPIO_NUM == 48
-    // Freenove S3 WS2812 status blink (Blue)
+    // Freenove S3 WS2812 status blink (Blue for Setup/Connecting)
     // Only blink if torch is NOT on
     if (!torchState) {
       neopixelWrite(LED_GPIO_NUM, 0, 0, ledState ? 10 : 0);
     } else {
-      // Keep Torch White
-      neopixelWrite(LED_GPIO_NUM, 255, 255, 255);
+      // Keep Torch Color
+      int r = (savedR * savedBrightness) / 100;
+      int g = (savedG * savedBrightness) / 100;
+      int b = (savedB * savedBrightness) / 100;
+      neopixelWrite(LED_GPIO_NUM, r, g, b);
     }
 #else
     digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
@@ -771,7 +784,8 @@ void ackCommand(String cmdId) {
 }
 
 void checkCommands() {
-  if (millis() - lastCommandCheck < 5000)
+  // Check every 1 second (was 5s) for better responsiveness
+  if (millis() - lastCommandCheck < 1000)
     return;
   lastCommandCheck = millis();
   if (WiFi.status() != WL_CONNECTED || apiKey.length() == 0)
@@ -783,144 +797,152 @@ void checkCommands() {
   if (http.GET() == 200) {
     String pl = http.getString();
 
-    // Parse simplified JSON list manually
-    int cmdIdx = pl.indexOf("\"command_id\":\"");
-    while (cmdIdx > 0) {
-      int endIdx = pl.indexOf("\"", cmdIdx + 14);
-      String cmdId = pl.substring(cmdIdx + 14, endIdx);
+    // Robust iteration over command objects
+    int startObj = pl.indexOf('{');
+    while (startObj >= 0) {
+      int endObj = startObj;
+      int braceCount = 1;
+      while (braceCount > 0 && endObj < pl.length() - 1) {
+        endObj++;
+        if (pl.charAt(endObj) == '{')
+          braceCount++;
+        else if (pl.charAt(endObj) == '}')
+          braceCount--;
+      }
+      if (braceCount != 0)
+        break;
+      String cmdJson = pl.substring(startObj, endObj + 1);
 
-      // Find action for this command
-      int actIdx = pl.indexOf("\"action\":\"", cmdIdx);
-      if (actIdx > 0) {
-        int actEnd = pl.indexOf("\"", actIdx + 10);
-        String action = pl.substring(actIdx + 10, actEnd);
+      String pid = extractJsonVal(cmdJson, "id");
+      if (pid.length() == 0)
+        pid = extractJsonVal(cmdJson, "command_id");
+      String action = extractJsonVal(cmdJson, "action");
 
-        // Find parameters for this command (search forward from action)
-        int paramsIdx = pl.indexOf("\"params\":", actEnd);
-        String resolution = "";
-        String color = "";
-        int brightness = 0;
-
-        // Determine where the NEXT command starts to bound our search
-        int nextCmdIdx = pl.indexOf("\"command_id\":\"", endIdx);
-        int boundary = (nextCmdIdx > 0) ? nextCmdIdx : pl.length();
-
-        if (paramsIdx > 0 && paramsIdx < boundary) {
-          int segmentEnd = pl.indexOf("}", paramsIdx);
-          String paramSegment = pl.substring(paramsIdx, segmentEnd + 1);
-
-          resolution = extractJsonVal(paramSegment, "resolution");
-          color = extractJsonVal(paramSegment, "led_color");
-          brightness = extractJsonInt(paramSegment, "led_brightness");
-          bool hmirror = extractJsonBool(paramSegment, "hmirror");
-          bool vflip = extractJsonBool(paramSegment, "vflip");
-
-          Serial.println("Params parsed: Res=" + resolution + " Col=" + color +
-                         " Bri=" + String(brightness) +
-                         " Mir=" + String(hmirror));
-
-          if (action == "update_settings") {
-            ackCommand(cmdId);
-
-            // 1. Handle Resolution (Change if different and valid)
-            if (resolution.length() > 0) {
-              framesize_t currentSize =
-                  esp_camera_sensor_get()->status.framesize;
-              framesize_t newSize = getFrameSizeFromName(resolution);
-              if (newSize != currentSize) {
-                Serial.println("Updating Resolution to: " + resolution);
-                bool wasStreaming = streaming;
-                streaming = false;
-                delay(100);
-                sensor_t *s = esp_camera_sensor_get();
-                s->set_framesize(s, newSize);
-                streaming = wasStreaming;
-              }
-            }
-
-            // 2. Handle Orientation
-            sensor_t *s = esp_camera_sensor_get();
-            if (s) {
-              s->set_hmirror(s, hmirror ? 1 : 0);
-              s->set_vflip(s, vflip ? 1 : 0);
-            }
-
-            // 3. Handle LED
-            if (color.length() > 0) {
-              long number = strtol(&color.c_str()[1], NULL, 16);
-              int r = number >> 16;
-              int g = number >> 8 & 0xFF;
-              int b = number & 0xFF;
-
-              if (brightness >= 0) {
-                r = (r * brightness) / 100; // Brightness is 0-100 now
-                g = (g * brightness) / 100;
-                b = (b * brightness) / 100;
-              }
-
-#if LED_GPIO_NUM == 48
-              neopixelWrite(LED_GPIO_NUM, r, g, b);
-              torchState = (r + g + b > 0);
-#else
-              digitalWrite(LED_GPIO_NUM, (r + g + b > 0) ? HIGH : LOW);
-#endif
-            }
+      String paramsBlock = "";
+      int pstart = cmdJson.indexOf("\"params\":");
+      if (pstart > 0) {
+        int pvalStart = cmdJson.indexOf('{', pstart);
+        if (pvalStart > 0) {
+          int pend = pvalStart;
+          int pcount = 1;
+          while (pcount > 0 && pend < cmdJson.length() - 1) {
+            pend++;
+            if (cmdJson.charAt(pend) == '{')
+              pcount++;
+            else if (cmdJson.charAt(pend) == '}')
+              pcount--;
           }
-        }
-
-        Serial.println("Executing: " + action + " ID: " + cmdId);
-
-        if (action == "start-stream") {
-          streaming = true;
-          ackCommand(cmdId);
-        } else if (action == "stop-stream") {
-          streaming = false;
-          ackCommand(cmdId);
-        } else if (action == "restart") {
-          ackCommand(cmdId);
-          delay(500);
-          ESP.restart();
-        } else if (action == "snap") {
-          ackCommand(cmdId);
-          handleSnap(resolution);
-        } else if (action == "update_settings") {
-          // Already handled above inside parsing block to access params
-        } else {
-          ackCommand(cmdId);
+          if (pcount == 0)
+            paramsBlock = cmdJson.substring(pvalStart, pend + 1);
         }
       }
-      // Look for next command
-      cmdIdx = pl.indexOf("\"command_id\":\"", endIdx);
+
+      if (pid.length() > 0 && action.length() > 0) {
+        Serial.println("Processing Command: " + pid + " Action: " + action);
+        if (action == "update_settings") {
+          ackCommand(pid);
+          String resolution = extractJsonVal(paramsBlock, "resolution");
+          String color = extractJsonVal(paramsBlock, "led_color");
+          int brightness = extractJsonInt(paramsBlock, "led_brightness");
+          bool hmirror = extractJsonBool(paramsBlock, "hmirror");
+          bool vflip = extractJsonBool(paramsBlock, "vflip");
+
+          Serial.println("Settings: Res=" + resolution + " Col=" + color +
+                         " Bri=" + String(brightness));
+
+          // Update Global LED State
+          if (color.length() > 0) {
+            long number = strtol(&color.c_str()[1], NULL, 16);
+            savedR = number >> 16;
+            savedG = number >> 8 & 0xFF;
+            savedB = number & 0xFF;
+          }
+          if (brightness != -1) {
+            savedBrightness = brightness;
+          }
+
+          if (resolution.length() > 0) {
+            framesize_t currentSize = esp_camera_sensor_get()->status.framesize;
+            framesize_t newSize = getFrameSizeFromName(resolution);
+            if (newSize != currentSize) {
+              bool wasStreaming = streaming;
+              streaming = false;
+              delay(100);
+              sensor_t *s = esp_camera_sensor_get();
+              s->set_framesize(s, newSize);
+              streaming = wasStreaming;
+            }
+          }
+          sensor_t *s = esp_camera_sensor_get();
+          if (s) {
+            s->set_hmirror(s, hmirror ? 1 : 0);
+            s->set_vflip(s, vflip ? 1 : 0);
+          }
+
+          // Apply LED State Unified
+          int r = (savedR * savedBrightness) / 100;
+          int g = (savedG * savedBrightness) / 100;
+          int b = (savedB * savedBrightness) / 100;
+
+#ifdef LED_GPIO_NUM
+#if LED_GPIO_NUM == 48
+          neopixelWrite(LED_GPIO_NUM, r, g, b);
+          torchState = (r + g + b > 0);
+#else
+          digitalWrite(LED_GPIO_NUM, (r + g + b > 0) ? HIGH : LOW);
+#endif
+#endif
+        } else if (action == "snap") {
+          ackCommand(pid);
+          String snapRes = extractJsonVal(paramsBlock, "resolution");
+          handleSnap(snapRes);
+        } else if (action == "restart") {
+          ackCommand(pid);
+          ESP.restart();
+        } else if (action == "start-stream") {
+          ackCommand(pid);
+          streaming = true;
+        } else if (action == "stop-stream") {
+          ackCommand(pid);
+          streaming = false;
+        } else {
+          ackCommand(pid);
+        }
+      }
+      startObj = pl.indexOf('{', endObj + 1);
     }
   }
   http.end();
 }
 
 void uploadFrame(camera_fb_t *fb) {
-  HTTPClient http;
-  http.setTimeout(15000); // 15s for high-res uploads
-  http.begin(serverURL + "/device/" + deviceID + "/stream/frame");
-  http.addHeader("Authorization", "Bearer " + apiKey);
-  http.addHeader("Content-Type", "image/jpeg");
+  // Use Global httpStream to allow Keep-Alive (reuse connection)
+  httpStream.setReuse(true);
+  httpStream.setTimeout(15000); // 15s for high-res uploads
+  httpStream.begin(serverURL + "/device/" + deviceID + "/stream/frame");
+  httpStream.addHeader("Authorization", "Bearer " + apiKey);
+  httpStream.addHeader("Content-Type", "image/jpeg");
 
-  int httpCode = http.POST(fb->buf, fb->len);
+  int httpCode = httpStream.POST(fb->buf, fb->len);
 
   if (httpCode == 200) {
-    Serial.printf("[UPLOAD] OK: %d bytes sent\n", fb->len);
+    // Only print verbose logs if debugging or occasionally to reduce Serial
+    // overhead? Serial.printf("[UPLOAD] OK: %d bytes sent\n", fb->len);
   } else {
     Serial.printf("[UPLOAD] FAILED! HTTP %d, size: %d bytes\n", httpCode,
                   fb->len);
   }
 
-  http.end();
+  // With setReuse(true), enc() should not close the TCP connection
+  httpStream.end();
 }
 
 void streamLoop() {
   if (!streaming)
     return;
 
-  // Adaptive timing: wait at least 50ms between frames
-  if (millis() - lastFrameTime < 50)
+  // Uncapped framerate
+  if (millis() - lastFrameTime < 1)
     return;
 
   camera_fb_t *fb = esp_camera_fb_get();
@@ -960,8 +982,22 @@ framesize_t getFrameSizeFromName(String name) {
 }
 
 void handleSnap(String resolution = "UXGA") {
+  if (resolution.length() == 0)
+    resolution = "UXGA";
   Serial.println("[SNAP] Starting high-res capture (full reinit)...");
   Serial.println("[SNAP] Target Resolution: " + resolution);
+
+  // Save current state
+  framesize_t savedSize = FRAMESIZE_VGA;
+  int savedMirror = 1;
+  int savedFlip = 1;
+
+  sensor_t *s = esp_camera_sensor_get();
+  if (s) {
+    savedSize = s->status.framesize;
+    savedMirror = s->status.hmirror;
+    savedFlip = s->status.vflip;
+  }
 
   framesize_t snapSize = getFrameSizeFromName(resolution);
 
@@ -1013,14 +1049,26 @@ void handleSnap(String resolution = "UXGA") {
     return;
   }
 
-  // Apply Mirror/Flip to Snapshot too
-  sensor_t *s = esp_camera_sensor_get();
+  // Force resolution explicitly (Fix for sticky resolution issue)
+  s = esp_camera_sensor_get();
   if (s) {
-    s->set_hmirror(s, 0);
-    s->set_vflip(s, 0);
+    s->set_framesize(s, snapSize);
+    s->set_hmirror(s, savedMirror);
+    s->set_vflip(s, savedFlip);
   }
 
-  delay(500);
+  // Skip a few frames to let the sensor settle and flush old buffers
+  // This is critical to ensure we get the NEW resolution, not a buffered OLD
+  // frame
+  Serial.println("[SNAP] Flushing buffer...");
+  for (int i = 0; i < 3; i++) {
+    camera_fb_t *fb = esp_camera_fb_get();
+    if (fb)
+      esp_camera_fb_return(fb);
+    delay(100);
+  }
+
+  delay(200);
 
   // Capture
   camera_fb_t *fb = esp_camera_fb_get();
@@ -1054,6 +1102,18 @@ void handleSnap(String resolution = "UXGA") {
   esp_camera_deinit();
   delay(50);
   initCamera();
+
+  // Restore Settings
+  s = esp_camera_sensor_get();
+  if (s) {
+    s->set_hmirror(s, savedMirror);
+    s->set_vflip(s, savedFlip);
+    if (s->status.framesize != savedSize) {
+      s->set_framesize(s, savedSize);
+    }
+    Serial.printf("[SNAP] Restored State: Res=%d Mirror=%d Flip=%d\n",
+                  savedSize, savedMirror, savedFlip);
+  }
 
   // CRITICAL: Wait before resuming stream!
   // The server only stores the "last frame". If we send a new low-res
@@ -1133,6 +1193,13 @@ void loop() {
     checkCommands();
     streamLoop();
   }
-  // Auto reconnect logic could be here
-  delay(1);
+
+  // Dynamic Delay for Performance vs Power
+  if (currentState == STATE_ONLINE && streaming) {
+    // Zero delay when streaming for max FPS
+    // (httpStream.POST yields internally)
+  } else {
+    // Delay when idle or setup to save power
+    delay(10);
+  }
 }

@@ -122,4 +122,16 @@ class ApiClient {
       'params': params ?? {},
     });
   }
+
+  Future<void> deleteDevice(String deviceId) async {
+    try {
+      await _dio.delete('/devices/$deviceId');
+      _logger.log('Device deleted: $deviceId');
+    } catch (e) {
+       if (e is DioException && e.response != null) {
+          throw Exception('Delete failed: ${e.response?.data}');
+      }
+      throw Exception('Delete failed: $e');
+    }
+  }
 }
