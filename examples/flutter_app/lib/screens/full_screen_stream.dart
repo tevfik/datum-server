@@ -193,7 +193,7 @@ class _FullScreenStreamState extends State<FullScreenStream> {
          final width = firstImage.width;
          final height = firstImage.height;
 
-         debugPrint("Initializing Encoder: ${width}x${height} @ $targetFps FPS");
+         debugPrint("Initializing Encoder: ${width}x$height @ $targetFps FPS");
 
          await FlutterQuickVideoEncoder.setup(
             width: width,
