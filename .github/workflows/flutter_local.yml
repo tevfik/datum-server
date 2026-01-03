@@ -13,30 +13,24 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    container: datum-flutter-builder:latest
-    defaults:
-      run:
-        working-directory: ./examples/datum_camera_app
     steps:
       - uses: actions/checkout@v3
 
-      - name: Fix Directory Safe
-        run: git config --global --add safe.directory '*'
-
-      - name: Install dependencies
-        run: flutter pub get
-      
-      - name: Generate Mocks
-        run: flutter pub run build_runner build --delete-conflicting-outputs
-
-      - name: Analyze
-        run: flutter analyze
-
-      - name: Run tests
-        run: flutter test
-
-      - name: Build APK
-        run: flutter build apk --release
+      - name: Build and Test in Container
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/app \
+            -w /app/examples/datum_camera_app \
+            -e GITHUB_WORKSPACE=/app \
+            datum-flutter-builder:latest \
+            /bin/bash -c "
+              git config --global --add safe.directory '*' && \
+              flutter pub get && \
+              flutter pub run build_runner build --delete-conflicting-outputs && \
+              flutter analyze && \
+              flutter test && \
+              flutter build apk --release
+            "
         
       - name: Upload APK
         uses: actions/upload-artifact@v3
