@@ -21,7 +21,7 @@ dependencies:
   gal: ^2.3.0
 
   share_plus: ^7.0.0
-  ffmpeg_kit_flutter_new: ^4.1.0
+  flutter_quick_video_encoder: ^1.7.2
   open_file_plus: ^3.3.0
 
 dev_dependencies:

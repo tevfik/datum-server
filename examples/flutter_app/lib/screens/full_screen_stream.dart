@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter_quick_video_encoder/flutter_quick_video_encoder.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 
 class FullScreenStream extends StatefulWidget {
   final String streamUrl;
@@ -165,13 +164,15 @@ class _FullScreenStreamState extends State<FullScreenStream> {
          _isProcessing = true; // Start processing UI
        });
        
-       // Calculate Real FPS
-       double realFps = 10.0; // Default fallback
+       // Calculate FPS
+       int targetFps = 10;
        if (durationVal > 0 && _recFrameCount > 0) {
-         realFps = _recFrameCount / durationVal;
+         targetFps = (_recFrameCount / durationVal).round();
        }
-       debugPrint("Recording Stopped. Captured $_recFrameCount frames in ${durationVal}s. Real FPS: $realFps");
+       if (targetFps < 1) targetFps = 1;
        
+       debugPrint("Processing Video. Frames: $_recFrameCount, Duration: ${durationVal}s, Target FPS: $targetFps");
+
        if (_recFrameCount < 5) {
           _showSnack("Video too short (needs > 5 frames). Discarded.");
           _finishProcessing();
@@ -182,39 +183,71 @@ class _FullScreenStreamState extends State<FullScreenStream> {
          final docDir = await getApplicationDocumentsDirectory();
          final outputPath = "${docDir.path}/output_${DateTime.now().millisecondsSinceEpoch}.mp4";
          
-         // FFmpeg Command
-         // -framerate: Input FPS
-         // -i: Input pattern
-         // -c:v libx264: H.264 Encoder (widely supported)
-         // -pix_fmt yuv420p: Required for Android compatibility
-         final command = "-framerate $realFps -i $_tempFramesPath/frame_%04d.jpg -c:v libx264 -pix_fmt yuv420p $outputPath";
+         // 1. Setup Encoder
+         // We need width/height from the first frame
+         final firstFrameFile = File("$_tempFramesPath/frame_0000.jpg");
+         if (!await firstFrameFile.exists()) throw Exception("First frame not found");
+
+         final firstImage = await decodeImageFromList(await firstFrameFile.readAsBytes());
+         final width = firstImage.width;
+         final height = firstImage.height;
+
+         debugPrint("Initializing Encoder: ${width}x${height} @ $targetFps FPS");
+
+         await FlutterQuickVideoEncoder.setup(
+            width: width,
+            height: height,
+            fps: targetFps,
+            videoBitrate: 2000000, // 2Mbps high quality
+            audioChannels: 0, // No audio
+            sampleRate: 0,
+            filepath: outputPath,
+         );
+
+         // 2. Loop and Append Frames
+         for (int i = 0; i < _recFrameCount; i++) {
+             final fileName = "frame_${i.toString().padLeft(4, '0')}.jpg";
+             final file = File("$_tempFramesPath/$fileName");
+             
+             if (await file.exists()) {
+                 final bytes = await file.readAsBytes();
+                 
+                 // Decode JPEG to raw pixels (RGBA)
+                 final codec = await ui.instantiateImageCodec(bytes);
+                 final frameInfo = await codec.getNextFrame();
+                 final rawBytes = await frameInfo.image.toByteData(format: ui.ImageByteFormat.rawRgba);
+                 
+                 if (rawBytes != null) {
+                    await FlutterQuickVideoEncoder.appendVideoFrame(rawBytes.buffer.asUint8List());
+                 }
+                 frameInfo.image.dispose();
+             }
+             
+             // Update progress occasionally
+             if (i % 5 == 0 && mounted) {
+                // Could update a progress bar here
+             }
+         }
+
+         // 3. Finish
+         await FlutterQuickVideoEncoder.finish();
+         debugPrint("Native Encoding Success");
          
-         await FFmpegKit.execute(command).then((session) async {
-           final returnCode = await session.getReturnCode();
-           
-           if (ReturnCode.isSuccess(returnCode)) {
-              debugPrint("FFmpeg Success");
-              // Save to Gallery
-              try {
-                await Gal.putVideo(outputPath);
-                _showSnack("Video Saved to Gallery! (Standard MP4)");
-              } catch (e) {
-                _showSnack("Failed to save to Gallery: $e");
-              }
-           } else {
-              debugPrint("FFmpeg Failed");
-              final logs = await session.getLogs();
-              for (var log in logs) { debugPrint(log.getMessage()); }
-              _showSnack("Video Encoding Failed.");
-           }
-         });
+         // Save to Gallery
+         try {
+            await Gal.putVideo(outputPath);
+            _showSnack("Video Saved to Gallery! (Native MP4)");
+         } catch (e) {
+            _showSnack("Failed to save to Gallery: $e");
+         }
          
-         // Cleanup Temp Output
+         // Cleanup Output
          final outFile = File(outputPath);
          if (await outFile.exists()) await outFile.delete();
 
        } catch (e) {
           _showSnack("Processing Error: $e");
+          debugPrint(e.toString());
        } finally {
          _finishProcessing();
          // Cleanup Temp Frames
