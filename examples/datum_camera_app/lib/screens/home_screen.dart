@@ -21,11 +21,17 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          // Wait for wizard to complete
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const ProvisioningWizard()),
           );
+          
+          // Refresh list if new device was added
+          if (result == true && context.mounted) {
+             Provider.of<DeviceProvider>(context, listen: false).fetchDevices();
+          }
         },
         child: const Icon(Icons.add),
       ),

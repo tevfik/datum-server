@@ -149,7 +149,7 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
           }
           
           await Future.delayed(const Duration(seconds: 3));
-          if (mounted) Navigator.pop(context);
+          if (mounted) Navigator.pop(context, true);
       }
     } catch (e) {
        if (mounted) {
