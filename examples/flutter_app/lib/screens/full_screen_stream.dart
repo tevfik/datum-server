@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter_quick_video_encoder/flutter_quick_video_encoder.dart';
 import 'package:gal/gal.dart';
@@ -199,8 +200,10 @@ class _FullScreenStreamState extends State<FullScreenStream> {
             height: height,
             fps: targetFps,
             videoBitrate: 2000000, // 2Mbps high quality
+            profileLevel: ProfileLevel.any,
+            audioBitrate: 0,
             audioChannels: 0, // No audio
-            sampleRate: 0,
+            sampleRate: 44100,
             filepath: outputPath,
          );
 
