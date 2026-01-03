@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_mjpeg/flutter_mjpeg.dart';
+
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:gal/gal.dart';
@@ -29,8 +29,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   bool _loadingAction = false;
   List<File> _mediaFiles = [];
 
-  bool _loadingAction = false;
-  List<File> _mediaFiles = [];
+
   
   // Stream Recording
   final StreamRecorderController _streamController = StreamRecorderController();
@@ -293,102 +292,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     }
   }
 
-  Future<void> _takePhoto() async {
-    setState(() => _loadingAction = true);
-    try {
-      // 1. Send Snap Command with resolution
-      await _api.sendCommand(widget.device.id, "snap", params: {"resolution": _snapRes});
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(content: Text('Capturing $_snapRes Photo...')),
-        );
-      }
 
-      // 2. Poll for result (Try for 15 seconds)
-      bool success = false;
-      if (!mounted) return;
-      final token = Provider.of<AuthProvider>(context, listen: false).token;
-      
-      // Wait for ESP32 to upload (it takes ~2-5s)
-      // Poll faster (every 500ms) to catch the 4s window
-      for (int i = 0; i < 40; i++) { 
-        if (!mounted) return;
-        
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (!mounted) return;
-        
-        try {
-          final imageUrl = 'https://datum.bezg.in/devices/${widget.device.id}/stream/snapshot?token=$token&t=${DateTime.now().millisecondsSinceEpoch}';
-          
-          final request = await HttpClient().getUrl(Uri.parse(imageUrl));
-          final response = await request.close();
-          
-          if (response.statusCode == 200) {
-              final bytes = (await response.fold<BytesBuilder>(BytesBuilder(), (b, d) => b..add(d))).takeBytes();
-              
-              // Verify size (Snapshots should be > 20KB usually, streams are smaller)
-              // This ensures we don't accidentally grab an old low-res frame if stream is active
-              if (bytes.length > 20000) { 
-                 final directory = await getApplicationDocumentsDirectory();
-                 final photoDir = Directory('${directory.path}/photos');
-                 if (!await photoDir.exists()) await photoDir.create(recursive: true);
-                 
-                 final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-                 final file = File('${photoDir.path}/snap_$timestamp.jpg');
-                 await file.writeAsBytes(bytes);
-                 
-                 try {
-                     await Gal.putImage(file.path);
-                     if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                           SnackBar(content: Text('Saved to Gallery: ${file.path.split("/").last}')),
-                         );
-                     }
-                 } catch (e) {
-                     if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                           SnackBar(content: Text('Saved to App Folder (Gallery Failed: $e)')),
-                         );
-                     }
-                 }
-                 
-                  if (mounted) {
-                     _loadMedia();
-                     
-                     showDialog(
-                       context: context,
-                       builder: (ctx) => AlertDialog(
-                         title: const Text("Captured"),
-                         content: Image.file(file),
-                         actions: [
-                           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close")),
-                         ],
-                       ),
-                     );
-                 }
-                 success = true;
-                 break; // Success!
-              }
-          }
-        } catch (e) {
-           debugPrint("Retry $i failed: $e");
-        }
-      }
-      
-      if (!success && mounted) {
-           throw Exception("Snapshot took too long or failed.");
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _loadingAction = false);
-    }
-  }
 
   Future<void> _confirmDelete() async {
     final confirmed = await showDialog<bool>(
@@ -599,7 +503,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                                  ),
                                ),
                              );
-                             _loadMedia();
+                             if (context.mounted) _loadMedia();
                           },
                           icon: const Icon(Icons.fullscreen),
                           style: IconButton.styleFrom(
@@ -644,8 +548,10 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                       onPressed: () async {
                          try {
                            await _streamController.takeSnapshot?.call();
-                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Photo Saved to Gallery")));
-                           _loadMedia();
+                           if (context.mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Photo Saved to Gallery")));
+                             _loadMedia();
+                           }
                          } catch (e) {
                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
                          }
@@ -661,12 +567,14 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                             try {
                               setState(() => _loadingAction = true);
                               await _streamController.stopRecording?.call();
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Video Saved to Gallery")));
-                              _loadMedia();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Video Saved to Gallery")));
+                                _loadMedia();
+                              }
                             } catch (e) {
                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
                             } finally {
-                              setState(() => _loadingAction = false);
+                              if (context.mounted) setState(() => _loadingAction = false);
                             }
                          } else {
                             _streamController.startRecording?.call();

@@ -7,16 +7,41 @@ import 'package:flutter_quick_video_encoder/flutter_quick_video_encoder.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 
-class StreamRecorderController extends ChangeNotifier {
-  bool isRecording = false;
-  bool isProcessing = false;
-  String durationString = "00:00";
-  int fps = 0;
+  bool _isRecording = false;
+  bool _isProcessing = false;
+  String _durationString = "00:00";
+  int _fps = 0;
+
+  bool get isRecording => _isRecording;
+  bool get isProcessing => _isProcessing;
+  String get durationString => _durationString;
+  int get fps => _fps;
+
+  set isRecording(bool value) {
+    _isRecording = value;
+    notifyListeners();
+  }
+
+  set isProcessing(bool value) {
+    _isProcessing = value;
+    notifyListeners();
+  }
+
+  set durationString(String value) {
+    _durationString = value;
+    notifyListeners();
+  }
+
+  set fps(int value) {
+    _fps = value;
+    notifyListeners();
+  }
 
   VoidCallback? startRecording;
   Future<void> Function()? stopRecording;
   Future<void> Function()? takeSnapshot;
-}
+  
+  void notify() => notifyListeners();
 
 class StreamRecorder extends StatefulWidget {
   final String streamUrl;
@@ -55,7 +80,7 @@ class _StreamRecorderState extends State<StreamRecorder> {
   @override
   void initState() {
     super.initState();
-    _ConnectController();
+    _connectController();
     _startStream();
     _fpsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
        if (widget.controller != null) {
@@ -65,14 +90,14 @@ class _StreamRecorderState extends State<StreamRecorder> {
               final m = duration.inMinutes.toString().padLeft(2, '0');
               final s = (duration.inSeconds % 60).toString().padLeft(2, '0');
               widget.controller!.durationString = "$m:$s";
-              widget.controller!.notifyListeners();
+              // widget.controller!.notifyListeners(); // Setters now handle notification
           }
        }
        _frameCount = 0;
     });
   }
 
-  void _ConnectController() {
+  void _connectController() {
     if (widget.controller != null) {
       widget.controller!.startRecording = _startRecording;
       widget.controller!.stopRecording = _stopRecording;
@@ -163,7 +188,7 @@ class _StreamRecorderState extends State<StreamRecorder> {
           _recordingStart = DateTime.now();
         });
         widget.controller!.isRecording = true;
-        widget.controller!.notifyListeners();
+        // widget.controller!.notifyListeners();
       }
     } catch (e) {
       debugPrint("Init Rec Error: $e");
@@ -176,7 +201,7 @@ class _StreamRecorderState extends State<StreamRecorder> {
     // Stop recording state first
     widget.controller!.isRecording = false;
     widget.controller!.isProcessing = true;
-    widget.controller!.notifyListeners();
+    // widget.controller!.notifyListeners();
 
     // Calculate details
     final endTime = DateTime.now();
@@ -256,7 +281,7 @@ class _StreamRecorderState extends State<StreamRecorder> {
        }
        
        widget.controller!.isProcessing = false;
-       widget.controller!.notifyListeners();
+       widget.controller!.notify();
     }
   }
 
