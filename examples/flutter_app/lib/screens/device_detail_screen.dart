@@ -691,7 +691,6 @@ class _ActionButton extends StatelessWidget {
   final bool isLoading;
 
   const _ActionButton({
-    super.key,
     required this.icon,
     required this.label,
     required this.color,

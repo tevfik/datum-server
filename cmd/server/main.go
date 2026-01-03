@@ -40,7 +40,7 @@ func securityHeadersMiddleware() gin.HandlerFunc {
 		// Referrer policy
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 		// Content security policy (basic)
-		c.Header("Content-Security-Policy", "default-src 'self'")
+		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data:;")
 		c.Next()
 	}
 }
