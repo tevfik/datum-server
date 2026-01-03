@@ -778,6 +778,17 @@ void checkCommands() {
         } else if (action == "snap") {
           ackCommand(cmdId);
           handleSnap(resolution);
+        } else if (action == "set_resolution") {
+          ackCommand(cmdId);
+          // Change streaming resolution on the fly
+          if (resolution.length() > 0) {
+            framesize_t size = getFrameSizeFromName(resolution);
+            sensor_t *s = esp_camera_sensor_get();
+            if (s) {
+              s->set_framesize(s, size);
+              Serial.println("Resolution changed to: " + resolution);
+            }
+          }
         } else {
           ackCommand(cmdId);
         }

@@ -248,6 +248,61 @@
                 </div>
             </div>
 
+            <!-- Advanced Controls -->
+            <div class="stream-box">
+                <h2>⚙️ Advanced Controls</h2>
+                <div class="control-panel" style="padding: 10px;">
+                    <!-- Stream Resolution (Future Implementation) -->
+                    <!-- 
+                    <div class="control-group">
+                        <label>Stream Resolution:</label>
+                        <select id="streamRes" onchange="changeStreamRes()">
+                            <option value="QVGA">QVGA (320x240)</option>
+                            <option value="VGA" selected>VGA (640x480)</option>
+                            <option value="SVGA">SVGA (800x600)</option>
+                            <option value="HD">HD (1280x720)</option>
+                        </select>
+                    </div>
+                    -->
+
+                    <!-- Snapshot Resolution -->
+                    <div class="control-group">
+                        <label>Snapshot Resolution:</label>
+                        <select id="snapRes"
+                            style="width: 100%; padding: 8px; margin-bottom: 10px; background: #374151; color: white; border: 1px solid #4b5563; border-radius: 4px;">
+                            <option value="HD">HD (1280x720)</option>
+                            <option value="UXGA" selected>UXGA (1600x1200)</option>
+                            <option value="QXGA">QXGA (2048x1536)</option>
+                        </select>
+                    </div>
+
+                    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #444;">
+
+                    <!-- LED Color & Brightness -->
+                    <div class="control-group">
+                        <label>LED Color:</label>
+                        <input type="color" id="ledColor" value="#FFFFFF"
+                            style="width: 100%; height: 40px; margin-bottom: 10px;">
+                    </div>
+
+                    <div class="control-group">
+                        <label>Brightness: <span id="brightVal">100</span>%</label>
+                        <input type="range" id="ledBright" min="0" max="100" value="100"
+                            style="width: 100%; margin-bottom: 10px;"
+                            oninput="document.getElementById('brightVal').innerText = this.value">
+                    </div>
+
+                    <button onclick="updateLED()"
+                        style="background-color: #8b5cf6; width: 100%; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer; font-weight: bold; margin-bottom: 5px;">
+                        💡 Set LED
+                    </button>
+                    <button onclick="toggleLED()"
+                        style="background-color: #4b5563; width: 100%; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer;">
+                        Toggle LED (On/Off)
+                    </button>
+                </div>
+            </div>
+
             <div class="stream-box">
                 <h2>Stream Information</h2>
                 <div class="stats">
@@ -447,29 +502,55 @@
         // Auto-connect on load (optional)
         // window.onload = () => setTimeout(connect, 1000);
 
-        async function takeSnapshot() {
+        // Helper to send command with parameters
+        async function sendCommand(action, params = {}) {
             const serverURL = document.getElementById('serverURL').value;
             const deviceID = document.getElementById('deviceID').value;
             const token = document.getElementById('token').value;
 
-            document.getElementById('snapBtn').disabled = true;
-            document.getElementById('snapBtn').textContent = '⏳ Capturing...';
-            log('Sending snap command...');
-
             try {
-                // 1. Send snap command
-                const cmdRes = await fetch(`${serverURL}/devices/${deviceID}/commands`, {
+                const res = await fetch(`${serverURL}/devices/${deviceID}/commands`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ action: 'snap' })
+                    body: JSON.stringify({
+                        action: action,
+                        params: params
+                    })
                 });
 
-                if (!cmdRes.ok) {
-                    throw new Error('Failed to send snap command: ' + await cmdRes.text());
+                if (res.ok) {
+                    const json = await res.json();
+                    log(`Command sent: ${action} (${json.command_id})`);
+                } else {
+                    log(`Command failed: ${res.status}`);
                 }
+            } catch (e) {
+                log(`Error sending command: ${e.message}`);
+            }
+        }
+
+        async function takeSnapshot() {
+            const serverURL = document.getElementById('serverURL').value;
+            const deviceID = document.getElementById('deviceID').value;
+            const token = document.getElementById('token').value;
+            const resolution = document.getElementById('snapRes').value;
+
+            if (!serverURL || !deviceID || !token) {
+                alert('Please check connection details');
+                return;
+            }
+
+            document.getElementById('snapBtn').disabled = true;
+            document.getElementById('snapBtn').textContent = '⏳ Capturing...';
+            log(`Requesting snapshot (${resolution})...`);
+
+            try {
+                // 1. Send snap command with resolution parameter
+                await sendCommand('snap', { resolution: resolution });
+
                 log('Snap command sent. Waiting for image...');
 
                 // 2. Poll for snapshot (faster polling to catch the 4s window)
@@ -489,7 +570,7 @@
                                 // Create temporary link to trigger download
                                 const a = document.createElement('a');
                                 a.href = url;
-                                a.download = `snapshot-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+                                a.download = `snapshot-${resolution}-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
                                 document.body.appendChild(a);
                                 a.click();
                                 document.body.removeChild(a);
@@ -502,21 +583,46 @@
                             }
                         }
                     } catch (e) {
-                        log('Retry ' + (i + 1) + ': ' + e.message);
+                        console.error(e);
                     }
                 }
+
                 if (!success) {
-                    throw new Error('Snapshot took too long or failed.');
+                    log('Snapshot failed: Too small or timed out.');
                 }
-            } catch (e) {
-                log('Snapshot Error: ' + e.message);
-                alert('Snapshot failed: ' + e.message);
+
+            } catch (err) {
+                log('Snapshot Error: ' + err.message);
             } finally {
                 document.getElementById('snapBtn').disabled = false;
                 document.getElementById('snapBtn').textContent = '📸 Snap';
             }
         }
+
+        // LED Control Functions
+        function updateLED() {
+            const color = document.getElementById('ledColor').value;
+            const brightness = document.getElementById('ledBright').value;
+            log(`Setting LED: ${color} (Brightness: ${brightness}%)`);
+            sendCommand('led', {
+                color: color,
+                brightness: brightness
+            });
+        }
+
+        function toggleLED() {
+            log('Toggling LED...');
+            sendCommand('led', {}); // Empty params triggers toggle
+            // Or explicit: sendCommand('led', { color: "#FFFFFF", brightness: 0 }); if logic differs
+        }
+
+        // Initialize from URL params if present
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('device')) document.getElementById('deviceID').value = urlParams.get('device');
+        if (urlParams.has('token')) document.getElementById('token').value = urlParams.get('token');
+        if (urlParams.has('server')) document.getElementById('serverURL').value = urlParams.get('server');
     </script>
 </body>
 
 </html>
+```
