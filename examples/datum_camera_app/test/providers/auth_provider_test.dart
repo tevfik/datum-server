@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
-import 'package:datum_app/providers/auth_provider.dart';
-import 'package:datum_app/api_client.dart';
+import 'package:datum_camera_app/providers/auth_provider.dart';
+import 'package:datum_camera_app/api_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Generate Mocks

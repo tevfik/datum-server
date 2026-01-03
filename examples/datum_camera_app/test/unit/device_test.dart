@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:datum_app/models/device.dart';
+import 'package:datum_camera_app/models/device.dart';
 
 void main() {
   group('Device Model Tests', () {
