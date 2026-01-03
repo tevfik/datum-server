@@ -114,3 +114,17 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
+
+      - name: Upload to Package Registry
+        run: |
+          echo "Uploading assets to Gitea Generic Package Registry..."
+          for file in assets/*; do
+            filename=$(basename "$file")
+            echo "Processing $filename..."
+            # API URL: <server>/api/packages/<owner>/generic/<package_name>/<version>/<filename>
+            # We use 'datum-release' as the package name to group all artifacts.
+            curl -v --fail -X PUT \
+              --user "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+              "${{ github.server_url }}/api/packages/${{ github.repository_owner }}/generic/datum-release/${{ github.ref_name }}/$filename" \
+              --upload-file "$file"
+          done
