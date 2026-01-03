@@ -3,6 +3,7 @@ allprojects {
         google()
         mavenCentral()
         maven { url = uri("https://jitpack.io") }
+        jcenter() // Fallback for older artifacts
     }
 }
 
@@ -24,6 +25,8 @@ subprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+        jcenter()
     }
 }
 
