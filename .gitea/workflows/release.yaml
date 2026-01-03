@@ -61,8 +61,40 @@ jobs:
           name: mobile-apk
           path: build/release/datum_camera_app.apk
 
+  build-firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Arduino CLI
+        uses: arduino/actions/setup-arduino-cli@v1
+
+      - name: Install ESP32 Core
+        run: |
+          arduino-cli config init
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+
+      - name: Compile Firmware
+        run: |
+          mkdir -p build/release
+          # Freenove S3 uses OPI PSRAM and 8MB Flash usually. Target: esp32s3
+          arduino-cli compile \
+            --fqbn esp32:esp32:esp32s3:PSRAM=opi,FlashMode=qio,FlashSize=8M \
+            --output-dir build/release \
+            --build-property "build.extra_flags=-DARDUINO_USB_CDC_ON_BOOT=1" \
+            examples/esp32-s3-camera/esp32_camera_streamer/esp32_camera_streamer.ino
+          
+          mv build/release/esp32_camera_streamer.ino.bin build/release/firmware-esp32s3.bin
+          
+      - name: Upload Firmware Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: firmware
+          path: build/release/firmware-esp32s3.bin
+
   create-release:
-    needs: [build-backend, build-mobile]
+    needs: [build-backend, build-mobile, build-firmware]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v3
@@ -72,6 +104,7 @@ jobs:
           mkdir -p assets
           cp backend-binaries/* assets/
           cp mobile-apk/* assets/
+          cp firmware/* assets/
           ls -R assets/
 
       - name: Create Release
