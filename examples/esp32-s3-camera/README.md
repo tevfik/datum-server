@@ -229,7 +229,33 @@ vlc http://your-server:8080/devices/esp32-cam-01/stream/mjpeg?token=YOUR_JWT
 
 ---
 
-## 📱 Mobile App (Datum Camera App)
+## � Firmware OTA Update
+
+You can wirelessly update the ESP32 firmware using `datumctl`.
+
+### 1. Build & Host Firmware
+Export your compiled binary (e.g., `firmware.bin`) and host it on a local server or cloud storage (HTTP) that the ESP32 can access.
+```bash
+python3 -m http.server 8000
+# Available at http://192.168.1.100:8000/firmware.bin
+```
+
+### 2. Trigger Update
+```bash
+datumctl device update-firmware <device-id> http://192.168.1.100:8000/firmware.bin
+```
+
+The device will:
+1. Stop streaming (to free memory).
+2. Download the binary.
+3. Verify and flash.
+4. Auto-restart.
+
+Note: Provides progress logs on Serial Monitor. 
+
+---
+
+## �📱 Mobile App (Datum Camera App)
 
 The easiest way to set up and view your camera is using the official **Datum Camera App**.
 
