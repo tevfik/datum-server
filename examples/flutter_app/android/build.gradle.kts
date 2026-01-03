@@ -20,6 +20,13 @@ subprojects {
 }
 
 subprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+subprojects {
     val configureNamespace = {
         val android = extensions.findByName("android")
         if (android != null) {
