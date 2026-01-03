@@ -191,6 +191,9 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                     },
                   ),
                   
+                  const SizedBox(height: 20),
+                  
+                  ElevatedButton.icon(
                       onPressed: _sendSettings,
                       icon: const Icon(Icons.send),
                       label: const Text("Sync Settings"),
