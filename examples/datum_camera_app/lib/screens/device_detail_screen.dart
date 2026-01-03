@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 
-import 'package:share_plus/share_plus.dart';
-import 'package:open_file_plus/open_file_plus.dart';
+
+
 
 import 'full_screen_stream.dart';
 import '../providers/auth_provider.dart';
 import '../api_client.dart';
-import 'package:video_player/video_player.dart';
+
 import '../models/device.dart';
 import '../widgets/stream_recorder.dart';
 
