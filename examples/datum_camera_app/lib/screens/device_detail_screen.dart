@@ -27,7 +27,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   final ApiClient _api = ApiClient();
   bool _isRunning = true; // For MJPEG stream
   bool _loadingAction = false;
-  List<File> _mediaFiles = [];
+
 
 
   
@@ -42,7 +42,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     if (token != null) {
       _api.setToken(token);
     }
-    _loadMedia();
+
     
     // Listen to recording state changes for UI updates
     _streamController.addListener(() {
@@ -50,38 +50,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     });
   }
 
-  Future<void> _loadMedia() async {
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      List<File> allFiles = [];
 
-      // 1. Load Photos
-      final photoDir = Directory('${directory.path}/photos');
-      if (await photoDir.exists()) {
-        final photos = photoDir.listSync()
-              .where((item) => item.path.endsWith(".jpg"))
-              .map((item) => File(item.path))
-              .toList();
-        allFiles.addAll(photos);
-      }
-      
-      // 2. Load Videos (from root)
-      final videos = directory.listSync()
-            .where((item) => item.path.endsWith(".mp4") || item.path.endsWith(".avi"))
-            .map((item) => File(item.path))
-            .toList();
-      allFiles.addAll(videos);
-
-      if (mounted) {
-        setState(() {
-          _mediaFiles = allFiles
-              ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
-        });
-      }
-    } catch (e) {
-      debugPrint("Error loading media: $e");
-    }
-  }
 
   String _getStreamUrl() {
     final token = Provider.of<AuthProvider>(context, listen: false).token;
@@ -347,80 +316,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     }
   }
 
-  void _openMedia(File file) {
-     final isVideo = file.path.endsWith('.mp4');
-     
-     showDialog(
-       context: context,
-       builder: (ctx) => AlertDialog(
-         contentPadding: EdgeInsets.zero,
-         content: Column(
-           mainAxisSize: MainAxisSize.min,
-           children: [
-             if (isVideo)
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    if (File(file.path.replaceAll(".mp4", ".jpg")).existsSync())
-                      Image.file(File(file.path.replaceAll(".mp4", ".jpg")), height: 200, width: double.infinity, fit: BoxFit.cover)
-                    else
-                      Container(
-                        color: Colors.black,
-                        height: 200, 
-                        width: double.infinity,
-                      ),
-                    const Icon(Icons.play_circle_fill, size: 64, color: Colors.white70),
-                  ],
-                )
-             else 
-               Image.file(file),
-               
-             Padding(
-               padding: const EdgeInsets.all(8.0),
-               child: Text(file.path.split('/').last, style: const TextStyle(fontWeight: FontWeight.bold)),
-             )
-           ],
-         ),
-         actions: [
-            TextButton.icon(
-              icon: const Icon(Icons.share),
-              label: const Text("Share"),
-              onPressed: () {
-                 Share.shareXFiles([XFile(file.path)]);
-               },
-            ),
-              if (isVideo)
-                TextButton.icon(
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text("Play Preview"),
-                  onPressed: () {
-                    Navigator.pop(ctx); // Close dialog
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => VideoPreviewScreen(videoFile: file)));
-                  },
-                )
-            else 
-               // For images, we already show it, but 'Open' can open in external viewer too
-              TextButton.icon(
-                icon: const Icon(Icons.open_in_new),
-                label: const Text("Open"),
-                onPressed: () {
-                  OpenFile.open(file.path);
-                },
-              ),
-              
-            TextButton(
-              onPressed: () {
-                 file.deleteSync();
-                 Navigator.pop(ctx);
-                 _loadMedia();
-              }, 
-              child: const Text("Delete", style: TextStyle(color: Colors.red))
-            ),
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close")),
-         ],
-       ),
-     );
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -509,7 +405,9 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                                  ),
                                ),
                              );
-                             if (context.mounted) _loadMedia();
+                             if (context.mounted) {
+                                // Just return context, removed loadMedia
+                             }
                           },
                           icon: const Icon(Icons.fullscreen),
                           style: IconButton.styleFrom(
@@ -556,7 +454,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                            await _streamController.takeSnapshot?.call();
                            if (context.mounted) {
                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Photo Saved to Gallery")));
-                             _loadMedia();
                            }
                          } catch (e) {
                            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
@@ -575,7 +472,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                               await _streamController.stopRecording?.call();
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Video Saved to Gallery")));
-                                _loadMedia();
                               }
                             } catch (e) {
                               if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
@@ -609,61 +505,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                   ),
                 ),
                 
-                if (_mediaFiles.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  const Text("Device Gallery", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    height: 120,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _mediaFiles.length,
-                      itemBuilder: (ctx, index) {
-                        final file = _mediaFiles[index];
-                        final isVideo = file.path.endsWith(".mp4");
-                        final name = file.path.split("/").last.replaceAll("snap_", "").replaceAll(".jpg", "").replaceAll(".mp4", "");
-                        
-                        return GestureDetector(
-                          onTap: () => _openMedia(file),
-                          child: Card(
-                            clipBehavior: Clip.antiAlias,
-                            child: SizedBox(
-                              width: 120,
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  if (isVideo)
 
-                                     Stack(
-                                       fit: StackFit.expand,
-                                       children: [
-                                          if (File(file.path.replaceAll(".mp4", ".jpg")).existsSync())
-                                            Image.file(File(file.path.replaceAll(".mp4", ".jpg")), fit: BoxFit.cover)
-                                          else
-                                            Container(color: Colors.black),
-                                          const Center(child: Icon(Icons.play_circle_outline, color: Colors.white, size: 40)),
-                                       ],
-                                     )
-                                  else
-                                     Image.file(file, fit: BoxFit.cover),
-                                     
-                                  Positioned(
-                                    bottom: 0, left: 0, right: 0,
-                                    child: Container(
-                                      color: Colors.black54,
-                                      padding: const EdgeInsets.all(2),
-                                      child: Text(name, style: const TextStyle(color: Colors.white, fontSize: 10), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
-                                    ),
-                                  )
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  )
-                ],
               ],
             ),
           )
@@ -711,72 +553,4 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-class VideoPreviewScreen extends StatefulWidget {
-  final File videoFile;
 
-  const VideoPreviewScreen({super.key, required this.videoFile});
-
-  @override
-  State<VideoPreviewScreen> createState() => _VideoPreviewScreenState();
-}
-
-class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
-  late VideoPlayerController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = VideoPlayerController.file(widget.videoFile)
-      ..initialize().then((_) {
-        setState(() {});
-        _controller.play();
-      });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: Center(
-        child: _controller.value.isInitialized
-            ? AspectRatio(
-                aspectRatio: _controller.value.aspectRatio,
-                child: Stack(
-                  alignment: Alignment.bottomCenter,
-                  children: [
-                    VideoPlayer(_controller),
-                    VideoProgressIndicator(_controller, allowScrubbing: true),
-                    Center(
-                      child: IconButton(
-                        icon: Icon(
-                          _controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle,
-                          color: Colors.white.withValues(alpha: 0.5),
-                          size: 64,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _controller.value.isPlaying
-                                ? _controller.pause()
-                                : _controller.play();
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            : const CircularProgressIndicator(),
-      ),
-    );
-  }
-}
