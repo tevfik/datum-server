@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:io';
-import 'package:gallery_saver/gallery_saver.dart';
+import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 
 class FullScreenStream extends StatefulWidget {
@@ -170,17 +170,25 @@ class _FullScreenStreamState extends State<FullScreenStream> {
          _recordingStart = null;
        });
        
-       if (_recordingFile != null) {
-          // Save to Gallery
-          final result = await GallerySaver.saveVideo(_recordingFile!.path);
-          if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(
-               SnackBar(content: Text(result == true ? "Saved Video to Gallery!" : "Failed to Save Video")),
-             );
-          }
-          // Cleanup
-          // _recordingFile!.delete(); // Optional: keep in app cache or delete
-       }
+        if (_recordingFile != null) {
+           // Save to Gallery
+           try {
+             await Gal.putVideo(_recordingFile!.path);
+             if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Saved Video to Gallery!")),
+                );
+             }
+           } catch (e) {
+             if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Failed to Save Video: $e")),
+                );
+             }
+           }
+           // Cleanup
+           // _recordingFile!.delete(); // Optional: keep in app cache or delete
+        }
        
      } else {
        // Start Recording
