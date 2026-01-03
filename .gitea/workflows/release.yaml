@@ -1,0 +1,66 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      
+      - name: Build Cross-Platform Binaries
+        run: |
+          make build-release VERSION=${{ github.ref_name }}
+
+      - name: Upload Backend Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-binaries
+          path: build/release/*
+
+  build-mobile:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/cirruslabs/flutter:3.16.9
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build APK
+        working-directory: examples/datum_camera_app
+        run: |
+          flutter pub get
+          flutter build apk --release
+          mkdir -p ../../build/release
+          mv build/app/outputs/flutter-apk/app-release.apk ../../build/release/datum_camera_app.apk
+      
+      - name: Upload Mobile Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: mobile-apk
+          path: build/release/datum_camera_app.apk
+
+  create-release:
+    needs: [build-backend, build-mobile]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v3
+      
+      - name: Prepare Assets
+        run: |
+          mkdir -p assets
+          cp backend-binaries/* assets/
+          cp mobile-apk/* assets/
+          ls -R assets/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: assets/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true

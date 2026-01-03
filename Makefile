@@ -130,6 +130,23 @@ build-cli: ## Build datumctl CLI tool
 
 build-all: build-server build-cli ## Build server and CLI
 
+# Cross-platform build targets
+build-linux: ## Build Linux binaries (AMD64)
+	@echo "🔨 Building Linux binaries..."
+	@mkdir -p build/release
+	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datum-server-linux-amd64 ./cmd/server
+	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datumctl-linux-amd64 ./cmd/datumctl
+	@echo "✅ Linux binaries created in build/release/"
+
+build-windows: ## Build Windows binaries (AMD64)
+	@echo "🔨 Building Windows binaries..."
+	@mkdir -p build/release
+	@GOOS=windows GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datum-server-windows-amd64.exe ./cmd/server
+	@GOOS=windows GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datumctl-windows-amd64.exe ./cmd/datumctl
+	@echo "✅ Windows binaries created in build/release/"
+
+build-release: build-linux build-windows ## Build release binaries for all platforms
+
 run-server: build-server ## Build and run server locally
 	@echo "🚀 Starting server..."
 	@./$(SERVER_BINARY)
