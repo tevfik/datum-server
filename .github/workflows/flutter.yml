@@ -3,47 +3,19 @@ name: Flutter App
 on:
   push:
     paths:
-      - 'examples/flutter_app/**'
+      - 'examples/datum_camera_app/**'
       - '.github/workflows/flutter.yml'
   pull_request:
     paths:
-      - 'examples/flutter_app/**'
+      - 'examples/datum_camera_app/**'
       - '.github/workflows/flutter.yml'
 
 jobs:
-  test-flutter:
+  build-and-test:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./examples/flutter_app
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.27.x'
-          channel: 'stable'
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Generate Mocks
-        run: flutter pub run build_runner build --delete-conflicting-outputs
-
-      - name: Analyze
-        run: flutter analyze
-
-      - name: Run tests
-        run: flutter test
-
-  build-android:
-    needs: test-flutter
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./examples/flutter_app
+        working-directory: ./examples/datum_camera_app
     steps:
       - uses: actions/checkout@v3
       
@@ -60,7 +32,7 @@ jobs:
         with:
           flutter-version: '3.27.x'
           channel: 'stable'
-          cache: true # Cache Flutter SDK
+          cache: true
       
       - name: Cache Pub dependencies
         uses: actions/cache@v3
@@ -82,23 +54,26 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - run: flutter pub get
+      - name: Install dependencies
+        run: flutter pub get
       
-      - name: Debug & Config Android SDK
-        run: |
-          echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
-          echo "ANDROID_HOME: $ANDROID_HOME"
-          flutter config --android-sdk $ANDROID_SDK_ROOT
-          yes | flutter doctor --android-licenses || true
-          flutter doctor -v
+      - name: Generate Mocks
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
 
       - name: Build APK
         run: flutter build apk --release
+        
       - name: Upload APK
         uses: actions/upload-artifact@v3
         with:
           name: datum-app-release-apk
-          path: examples/flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          path: examples/datum_camera_app/build/app/outputs/flutter-apk/app-release.apk
 
 #  build-ios:
 #    needs: test
