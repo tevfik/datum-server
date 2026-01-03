@@ -833,9 +833,9 @@ void ackCommand(String cmdId) {
 
 void checkCommands() {
   // Check every 1 second (was 5s) for better responsiveness
-  if (millis() - lastCommandCheck < 1000)
+  if (millis() - lastCommandPoll < 1000)
     return;
-  lastCommandCheck = millis();
+  lastCommandPoll = millis();
   if (WiFi.status() != WL_CONNECTED || apiKey.length() == 0)
     return;
 
