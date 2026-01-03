@@ -140,14 +140,39 @@ func registerDeviceHandler(c *gin.Context) {
 	deviceID := generateProvisioningID("dev")
 	apiKey := generateProvisioningAPIKey()
 
-	// Create provisioning request
+	// Create device directly (Auto-Activation for User-Authenticated Registration)
+	device := &storage.Device{
+		ID:              deviceID,
+		UserID:          userID,
+		Name:            req.DeviceName,
+		Type:            req.DeviceType,
+		DeviceUID:       deviceUID,
+		APIKey:          apiKey,
+		Status:          "active",
+		CreatedAt:       time.Now(),
+		LastSeen:        time.Now(), // Mark as seen
+		FirmwareVersion: "unknown",  // Will be updated on first ping
+	}
+
+	if err := store.CreateDevice(device); err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			c.JSON(http.StatusConflict, gin.H{"error": "device already registered to another user"})
+			return
+		}
+		logger.GetLogger().Error().Err(err).Msg("Failed to create device")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create device"})
+		return
+	}
+
+	// We no longer creation a pending provisioning request because we auto-activated.
+	// But we keep the response format consistent for the firmware.
 	provReq := &storage.ProvisioningRequest{
 		ID:         requestID,
 		DeviceUID:  deviceUID,
 		UserID:     userID,
 		DeviceName: req.DeviceName,
 		DeviceType: req.DeviceType,
-		Status:     "pending",
+		Status:     "active", // Changed from pending
 		DeviceID:   deviceID,
 		APIKey:     apiKey,
 		ServerURL:  provisioningConfig.ServerURL,

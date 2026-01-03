@@ -108,16 +108,17 @@ func (s *Storage) GetUserByID(userID string) (*User, error) {
 // ============ Device operations (BuntDB) ============
 
 type Device struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"user_id"`
-	Name      string    `json:"name"`
-	Type      string    `json:"type"`
-	DeviceUID string    `json:"device_uid,omitempty"` // Hardware UID
-	APIKey    string    `json:"api_key"`              // Legacy API key (for backward compatibility)
-	Status    string    `json:"status"`               // "active", "banned", "suspended", "revoked"
-	LastSeen  time.Time `json:"last_seen"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at,omitempty"`
+	ID              string    `json:"id"`
+	UserID          string    `json:"user_id"`
+	Name            string    `json:"name"`
+	Type            string    `json:"type"`
+	DeviceUID       string    `json:"device_uid,omitempty"` // Hardware UID
+	APIKey          string    `json:"api_key"`              // Legacy API key (for backward compatibility)
+	Status          string    `json:"status"`               // "active", "banned", "suspended", "revoked"
+	LastSeen        time.Time `json:"last_seen"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at,omitempty"`
+	FirmwareVersion string    `json:"firmware_version,omitempty"` // Current firmware version
 
 	// Token-based authentication (Hybrid SAS system)
 	MasterSecret   string    `json:"master_secret,omitempty"`    // Device's master secret for token generation
