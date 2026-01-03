@@ -278,6 +278,10 @@ func streamSnapshotHandler(c *gin.Context) {
 		return
 	}
 
+	// Force no-cache to ensure fresh frame
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
 	c.Data(http.StatusOK, "image/jpeg", frame)
 }
 
