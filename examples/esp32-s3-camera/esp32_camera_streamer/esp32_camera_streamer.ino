@@ -19,6 +19,7 @@
 
 #include "esp_camera.h"
 #include <HTTPClient.h>
+#include <HTTPUpdate.h>
 #include <Preferences.h>
 
 // Forward define neopixelWrite if not available (safe for S3)
@@ -162,7 +163,53 @@ framesize_t getFrameSizeFromName(String name);
 
 // Task handles
 TaskHandle_t streamTask;
-unsigned long lastCommandCheck = 0;
+const int COMMAND_POLL_INTERVAL_MS = 5000;
+unsigned long lastCommandPoll = 0;
+
+void updateFirmware(String url) {
+  if (url.length() == 0)
+    return;
+
+  DEBUG_PRINTLN("Starting OTA Update...");
+  DEBUG_PRINT("Firmware URL: ");
+  DEBUG_PRINTLN(url);
+
+  // Stop camera to free memory
+  esp_camera_deinit();
+
+  // Disable WDT to prevent timeouts during large downloads
+  disableCore0WDT();
+
+  WiFiClient client;
+  // Set 60s timeout for download
+  client.setTimeout(60);
+
+  // Add progress callback
+  httpUpdate.onProgress([](int cur, int total) {
+    Serial.printf("OTA Progress: %d%%\n", (cur * 100) / total);
+  });
+
+  t_httpUpdate_return ret = httpUpdate.update(client, url);
+
+  switch (ret) {
+  case HTTP_UPDATE_FAILED:
+    Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n",
+                  httpUpdate.getLastError(),
+                  httpUpdate.getLastErrorString().c_str());
+    // Reboot to try to recover camera
+    ESP.restart();
+    break;
+
+  case HTTP_UPDATE_NO_UPDATES:
+    Serial.println("HTTP_UPDATE_NO_UPDATES");
+    break;
+
+  case HTTP_UPDATE_OK:
+    Serial.println("HTTP_UPDATE_OK");
+    // Auto-restarts on success
+    break;
+  }
+}
 unsigned long setupStartTime = 0;
 unsigned long lastLedBlink = 0;
 bool ledState = false;
@@ -897,6 +944,10 @@ void checkCommands() {
           ackCommand(pid);
           String snapRes = extractJsonVal(paramsBlock, "resolution");
           handleSnap(snapRes);
+        } else if (action == "update_firmware") {
+          ackCommand(pid);
+          String firmwareUrl = extractJsonVal(paramsBlock, "url");
+          updateFirmware(firmwareUrl);
         } else if (action == "restart") {
           ackCommand(pid);
           ESP.restart();
