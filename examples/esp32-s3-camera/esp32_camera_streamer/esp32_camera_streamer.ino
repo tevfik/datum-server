@@ -253,10 +253,12 @@ void updateLED() {
   case STATE_ONLINE:
 #ifdef LED_GPIO_NUM
 #if LED_GPIO_NUM == 48
-    if (!torchState)
-      neopixelWrite(LED_GPIO_NUM, 0, 10, 0); // Green if no torch
-    else
+    // Only light up if explicitly enabled (Torch)
+    // Removed default green status light
+    if (torchState)
       neopixelWrite(LED_GPIO_NUM, 255, 255, 255);
+    else
+      neopixelWrite(LED_GPIO_NUM, 0, 0, 0); // OFF
 #else
     digitalWrite(LED_GPIO_NUM, HIGH);
 #endif
@@ -382,7 +384,16 @@ bool initCamera() {
     config.fb_count = 1;
     config.fb_location = CAMERA_FB_IN_DRAM;
   }
-  return esp_camera_init(&config) == ESP_OK;
+
+  esp_err_t err = esp_camera_init(&config);
+  if (err == ESP_OK) {
+    sensor_t *s = esp_camera_sensor_get();
+    if (s) {
+      s->set_hmirror(s, 1);
+      s->set_vflip(s, 1);
+    }
+  }
+  return err == ESP_OK;
 }
 
 // ============================================================================
@@ -790,14 +801,19 @@ void checkCommands() {
           handleSnap(resolution);
         } else if (action == "set_resolution") {
           ackCommand(cmdId);
-          // Change streaming resolution on the fly
+          // Change streaming resolution safely
           if (resolution.length() > 0) {
+            bool wasStreaming = streaming;
+            streaming = false;
+            delay(100); // Allow current frame to finish
+
             framesize_t size = getFrameSizeFromName(resolution);
             sensor_t *s = esp_camera_sensor_get();
             if (s) {
               s->set_framesize(s, size);
               Serial.println("Resolution changed to: " + resolution);
             }
+            streaming = wasStreaming;
           }
         } else {
           ackCommand(cmdId);
@@ -925,6 +941,13 @@ void handleSnap(String resolution = "UXGA") {
     initCamera();
     streaming = wasStreaming;
     return;
+  }
+
+  // Apply Mirror/Flip to Snapshot too
+  sensor_t *s = esp_camera_sensor_get();
+  if (s) {
+    s->set_hmirror(s, 1);
+    s->set_vflip(s, 1);
   }
 
   delay(500);
