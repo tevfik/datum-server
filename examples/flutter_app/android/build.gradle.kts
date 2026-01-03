@@ -20,7 +20,7 @@ subprojects {
 }
 
 subprojects {
-    afterEvaluate {
+    val configureNamespace = {
         val android = extensions.findByName("android")
         if (android != null) {
             try {
@@ -37,8 +37,16 @@ subprojects {
                 }
             } catch (e: Exception) {
                 // Ignore reflection errors or mismatched AGP versions
-                println("Failed to set namespace for ${project.name}: $e")
+                // println("Failed to set namespace for ${project.name}: $e")
             }
+        }
+    }
+
+    if (state.executed) {
+        configureNamespace()
+    } else {
+        afterEvaluate {
+            configureNamespace()
         }
     }
 }
