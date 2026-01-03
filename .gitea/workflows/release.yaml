@@ -77,7 +77,23 @@ jobs:
         run: |
           arduino-cli config init
           arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-          arduino-cli core install esp32:esp32@3.0.7 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          
+          # Retry loop for flaky downloads
+          n=0
+          until [ "$n" -ge 5 ]
+          do
+             echo "Attempting to install ESP32 core ($((n+1))/5)..."
+             arduino-cli core install esp32:esp32@3.0.7 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json && break
+             n=$((n+1)) 
+             echo "Install failed. Retrying in 10s..."
+             sleep 10
+          done
+          
+          # Fail if still not installed
+          if [ "$n" -ge 5 ]; then
+            echo "Failed to install ESP32 core after 5 attempts."
+            exit 1
+          fi
 
       - name: Compile Firmware
         run: |
