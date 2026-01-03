@@ -19,7 +19,9 @@ info:
     name: MIT
 
 servers:
-  - url: http://localhost:8007
+  - url: https://datum.bezg.in
+    description: Production Server
+  - url: http://localhost:8000
     description: Local development
 
 components:
