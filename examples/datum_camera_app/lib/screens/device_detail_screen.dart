@@ -12,6 +12,7 @@ import '../providers/auth_provider.dart';
 import '../api_client.dart';
 import 'package:video_player/video_player.dart';
 import '../models/device.dart';
+import '../widgets/stream_recorder.dart';
 
 class DeviceDetailScreen extends StatefulWidget {
   final Device device;
@@ -28,6 +29,12 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   bool _loadingAction = false;
   List<File> _mediaFiles = [];
 
+  bool _loadingAction = false;
+  List<File> _mediaFiles = [];
+  
+  // Stream Recording
+  final StreamRecorderController _streamController = StreamRecorderController();
+
   @override
   void initState() {
     super.initState();
@@ -37,6 +44,11 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       _api.setToken(token);
     }
     _loadMedia();
+    
+    // Listen to recording state changes for UI updates
+    _streamController.addListener(() {
+       if (mounted) setState(() {});
+    });
   }
 
   Future<void> _loadMedia() async {
@@ -552,13 +564,27 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                 ? Stack(
                     alignment: Alignment.bottomRight,
                     children: [
-                      Mjpeg(
-                        isLive: true,
-                        stream: _getStreamUrl(),
-                        error: (context, error, stack) => Center(
-                              child: Text("Stream Error: $error", style: const TextStyle(color: Colors.red)),
-                            ),
+                      StreamRecorder(
+                        streamUrl: _getStreamUrl(),
+                        controller: _streamController,
+                        fit: BoxFit.contain,
+                        onError: (err) => Center(child: Text("Error: $err", style: const TextStyle(color: Colors.red))),
                       ),
+                      
+                      // Recording Indicator (Top Right)
+                      if (_streamController.isRecording)
+                        Positioned(
+                          top: 10, right: 10,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
+                            child: Text(
+                              "REC ${_streamController.durationString}",
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+
                       Padding(
                         padding: const EdgeInsets.all(8.0),
                         child: IconButton(
@@ -613,10 +639,40 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                     ),
                     _ActionButton(
                       icon: Icons.camera_alt,
-                      label: "Take Photo",
+                      label: "Photo",
                       color: Colors.blueAccent,
-                      onPressed: _takePhoto,
+                      onPressed: () async {
+                         try {
+                           await _streamController.takeSnapshot?.call();
+                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Photo Saved to Gallery")));
+                           _loadMedia();
+                         } catch (e) {
+                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                         }
+                      },
                       isLoading: _loadingAction,
+                    ),
+                    _ActionButton(
+                      icon: _streamController.isRecording ? Icons.stop_circle : Icons.videocam,
+                      label: _streamController.isRecording ? "Stop" : "Record",
+                      color: _streamController.isRecording ? Colors.red : Colors.green,
+                      onPressed: () async {
+                         if (_streamController.isRecording) {
+                            try {
+                              setState(() => _loadingAction = true);
+                              await _streamController.stopRecording?.call();
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Video Saved to Gallery")));
+                              _loadMedia();
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                            } finally {
+                              setState(() => _loadingAction = false);
+                            }
+                         } else {
+                            _streamController.startRecording?.call();
+                         }
+                      },
+                      isLoading: _loadingAction || _streamController.isProcessing,
                     ),
                     _ActionButton(
                       icon: Icons.restart_alt,
