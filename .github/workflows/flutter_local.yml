@@ -18,17 +18,16 @@ jobs:
 
       - name: Build and Test in Container
         run: |
+          echo "Test Hostname: $HOSTNAME"
           docker run --rm \
-            -v ${{ github.workspace }}:/app \
-            -w /app/examples/datum_camera_app \
-            -e GITHUB_WORKSPACE=/app \
+            --volumes-from $HOSTNAME \
+            -w ${{ github.workspace }}/examples/datum_camera_app \
+            -e GITHUB_WORKSPACE=${{ github.workspace }} \
             datum-flutter-builder:latest \
             /bin/bash -c "
-              echo '📂 Debugging Container Paths:'
+              echo '📂 Debugging Paths (Volumes From):'
               pwd
-              ls -la /app
-              ls -la /app/examples || echo 'e: examples not found'
-              ls -la /app/examples/datum_camera_app || echo 'e: datum_camera_app not found'
+              ls -la
               
               git config --global --add safe.directory '*' && \
               flutter pub get && \
