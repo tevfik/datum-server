@@ -230,6 +230,9 @@ func main() {
 	r.GET("/public/data/:device_id", getPublicDataHandler)
 	r.GET("/public/data/:device_id/history", getPublicDataHistoryHandler)
 
+	// Serve firmware updates (static files)
+	r.Static("/firmware", "./firmware")
+
 	// Swagger UI documentation
 	setupSwagger(r)
 

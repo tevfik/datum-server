@@ -338,10 +338,22 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             onSelected: (value) {
               if (value == 'delete') {
                 _confirmDelete();
+              } else if (value == 'update') {
+                _showUpdateDialog();
               }
             },
             itemBuilder: (BuildContext context) {
               return [
+                const PopupMenuItem<String>(
+                  value: 'update',
+                  child: Row(
+                    children: [
+                      Icon(Icons.system_update),
+                      SizedBox(width: 8),
+                      Text('Update Firmware'),
+                    ],
+                  ),
+                ),
                 const PopupMenuItem<String>(
                   value: 'delete',
                   child: Row(
