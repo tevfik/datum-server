@@ -25,10 +25,13 @@ jobs:
 
   build-mobile:
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/cirruslabs/flutter:3.16.9
     steps:
       - uses: actions/checkout@v3
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.9'
+          channel: 'stable'
       
       - name: Build APK (Inject Version)
         working-directory: examples/datum_camera_app
