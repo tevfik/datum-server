@@ -836,59 +836,23 @@ void handleSnap() {
   Serial.printf("[SNAP] Captured: %d bytes (%dx%d) in %dms\n", fb->len,
                 fb->width, fb->height, millis() - startTime);
 
-  // Copy frame to heap so we can release camera buffer
-  size_t frameLen = fb->len;
-  uint8_t *frameCopy = (uint8_t *)ps_malloc(frameLen);
-  if (frameCopy) {
-    memcpy(frameCopy, fb->buf, frameLen);
-    esp_camera_fb_return(fb);
+  // Upload directly from camera buffer (streaming is paused)
+  Serial.printf("[SNAP] Uploading %d bytes...\n", fb->len);
+  unsigned long uploadStart = millis();
 
-    // Deinit camera to free DMA resources
-    esp_camera_deinit();
+  // Use same uploadFrame function that works for stream
+  uploadFrame(fb);
 
-    // Optimize WiFi for upload
-    WiFi.setTxPower(WIFI_POWER_19_5dBm); // Max TX power
-    delay(50);
+  unsigned long uploadTime = millis() - uploadStart;
+  Serial.printf("[SNAP] Upload completed in %dms (%.1f KB/s)\n", uploadTime,
+                (fb->len / 1024.0) / (uploadTime / 1000.0));
 
-    // Upload FIRST - no streaming interference!
-    Serial.printf("[SNAP] Uploading %d bytes (stream paused)...\n", frameLen);
-    Serial.printf("[SNAP] Free heap: %d, PSRAM: %d\n", ESP.getFreeHeap(),
-                  ESP.getFreePsram());
-    unsigned long uploadStart = millis();
+  esp_camera_fb_return(fb);
 
-    HTTPClient http;
-    http.setTimeout(60000); // 60 second timeout
-    http.setReuse(false);
-
-    String url = serverURL + "/device/" + deviceID + "/stream/frame";
-    Serial.printf("[SNAP] URL: %s\n", url.c_str());
-
-    http.begin(url);
-    http.addHeader("Authorization", "Bearer " + apiKey);
-    http.addHeader("Content-Type", "image/jpeg");
-    http.addHeader("Content-Length", String(frameLen));
-
-    int httpCode = http.POST(frameCopy, frameLen);
-
-    unsigned long uploadTime = millis() - uploadStart;
-    if (httpCode == 200) {
-      Serial.printf("[SNAP] Upload OK in %dms (%.1f KB/s)\n", uploadTime,
-                    (frameLen / 1024.0) / (uploadTime / 1000.0));
-    } else {
-      Serial.printf("[SNAP] Upload FAILED: HTTP %d\n", httpCode);
-    }
-    http.end();
-    free(frameCopy);
-
-    // NOW restore camera after upload is complete
-    delay(50);
-    initCamera();
-  } else {
-    Serial.println("[SNAP] Failed to allocate heap memory!");
-    esp_camera_fb_return(fb);
-    esp_camera_deinit();
-    initCamera();
-  }
+  // Deinit high-res and restore normal camera
+  esp_camera_deinit();
+  delay(50);
+  initCamera();
 
   streaming = wasStreaming;
   Serial.printf("[SNAP] Complete. Total time: %dms\n", millis() - startTime);
