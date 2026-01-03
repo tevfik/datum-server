@@ -151,6 +151,16 @@ DeviceState currentState = STATE_BOOT;
 
 bool streaming = false; // Cloud streaming state
 unsigned long lastFrameTime = 0;
+const char *ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 0;
+const int daylightOffset_sec = 0;
+
+// Forward Declarations
+void handleSnap(String resolution);
+framesize_t getFrameSizeFromName(String name);
+
+// Task handles
+TaskHandle_t streamTask;
 unsigned long lastCommandCheck = 0;
 unsigned long setupStartTime = 0;
 unsigned long lastLedBlink = 0;

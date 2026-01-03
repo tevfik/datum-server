@@ -252,18 +252,17 @@
             <div class="stream-box">
                 <h2>⚙️ Advanced Controls</h2>
                 <div class="control-panel" style="padding: 10px;">
-                    <!-- Stream Resolution (Future Implementation) -->
-                    <!-- 
+                    <!-- Stream Resolution -->
                     <div class="control-group">
                         <label>Stream Resolution:</label>
-                        <select id="streamRes" onchange="changeStreamRes()">
+                        <select id="streamRes" onchange="changeStreamRes()"
+                            style="width: 100%; padding: 8px; margin-bottom: 10px; background: #374151; color: white; border: 1px solid #4b5563; border-radius: 4px;">
                             <option value="QVGA">QVGA (320x240)</option>
                             <option value="VGA" selected>VGA (640x480)</option>
                             <option value="SVGA">SVGA (800x600)</option>
                             <option value="HD">HD (1280x720)</option>
                         </select>
                     </div>
-                    -->
 
                     <!-- Snapshot Resolution -->
                     <div class="control-group">
@@ -613,7 +612,12 @@
         function toggleLED() {
             log('Toggling LED...');
             sendCommand('led', {}); // Empty params triggers toggle
-            // Or explicit: sendCommand('led', { color: "#FFFFFF", brightness: 0 }); if logic differs
+        }
+
+        function changeStreamRes() {
+            const res = document.getElementById('streamRes').value;
+            log(`Changing stream resolution to ${res}...`);
+            sendCommand('set_resolution', { resolution: res });
         }
 
         // Initialize from URL params if present
