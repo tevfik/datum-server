@@ -178,7 +178,9 @@ const char* ssid = "YOUR_WIFI_SSID";
 const char* password = "YOUR_WIFI_PASSWORD";
 const char* serverURL = "http://192.168.1.100:8080";
 const char* deviceID = "esp32-cam-01";
-const char* apiKey = "your-device-api-key";
+const char* deviceID = "esp32-cam-01";
+// Use either API Key OR Token (dk_...)
+const char* apiKey = "your-device-api-key-or-token";
 ```
 
 5. Upload to ESP32
@@ -426,12 +428,19 @@ X-API-Key: {device_api_key}
 {
   "commands": [
     {
-      "id": "cmd_abc123",
-      "action": "start-stream",
-      "params": {
-        "fps": 10,
-        "quality": 12
-      }
+      "id": "cmd_1",
+      "action": "update_settings",
+      "params": { "resolution": "VGA", "led": true, "mirror": false, "vflip": true }
+    },
+    {
+      "id": "cmd_2",
+      "action": "snap",
+      "params": { "resolution": "UXGA" }
+    },
+    {
+      "id": "cmd_3",
+      "action": "update_firmware",
+      "params": { "url": "http://server/firmware.bin" }
     }
   ]
 }

@@ -5,11 +5,11 @@ High-performance IoT data collection and management platform built with Go.
 ## 🚀 Features
 
 - **Time-Series Storage**: Optimized for IoT sensor data with 347K inserts/sec
-- **Real-time Streaming**: Server-Sent Events (SSE) for live data
-- **Device Management**: Multi-user device provisioning and API key auth
-- **CLI Tool**: `datumctl` - powerful command-line interface
-- **REST API**: Complete HTTP API for data ingestion and querying
-- **Data Retention**: Automatic cleanup of old time-series partitions
+- **Real-time Streaming**: Server-Sent Events (SSE) & WebSockets for live video/data
+- **Device Management**: Multi-user provisioning, Token-based Auth (`dk_...`), and OTA Updates
+- **Mobile App**: Production-ready Flutter app for provisioning, streaming, and control
+- **Admin Control**: Role-Based Access Control (RBAC) and Admin Management CLI
+- **CLI Tool**: `datumctl` - powerful interactive command-line interface
 - **Performance**: 633 req/s with 10K concurrent users, 5.6% CPU usage
 
 ## 📊 Performance
@@ -20,7 +20,7 @@ High-performance IoT data collection and management platform built with Go.
 - **Memory**: 430 bytes per device metadata
 - **CPU**: 5.6% at 10K concurrent connections
 
-See [docs/FINAL_PERFORMANCE_REPORT.md](docs/FINAL_PERFORMANCE_REPORT.md) for detailed benchmarks.
+See [docs/performance/FINAL_PERFORMANCE_REPORT.md](docs/performance/FINAL_PERFORMANCE_REPORT.md) for detailed benchmarks.
 
 ## 🏗️ Architecture
 
@@ -39,10 +39,11 @@ See [docs/FINAL_PERFORMANCE_REPORT.md](docs/FINAL_PERFORMANCE_REPORT.md) for det
 ### Components
 
 - `cmd/server/` - HTTP server and handlers
-- `internal/auth/` - Authentication & rate limiting
-- `internal/storage/` - Dual storage layer
-- `docs/` - Comprehensive documentation
-- `examples/` - Arduino & MicroPython clients
+- `cmd/datumctl/` - CLI tool source code
+- `internal/auth/` - Authentication & rate limiting (JWT + API Keys)
+- `internal/storage/` - Dual storage layer (BuntDB + TStorage)
+- `examples/datum_camera_app/` - Flutter Mobile App
+- `examples/esp32-s3-camera/` - ESP32-S3 Firmware (C++)
 
 ## 🛠️ Quick Start
 
@@ -88,17 +89,14 @@ Powerful command-line interface for managing devices and querying data:
 # Build CLI
 make build-cli
 
-# Login
+# Interactive Mode (Recommended)
+./datumctl interactive
+# Follow the on-screen wizard to login, manage devices, and view system status.
+
+# One-off Commands
 ./datumctl login --email admin@example.com
-
-# List devices
 ./datumctl device list
-
-# Query data
-./datumctl data get --device my-sensor --last 1h
-
-# Create device
-./datumctl device create --name "Temperature Sensor"
+./datumctl device create --name "Living Room Cam" --type camera
 ```
 
 See [CLI Tutorial](docs/tutorials/CLI.md) for complete CLI documentation.
@@ -322,7 +320,22 @@ void sendData(float temp, float humidity) {
 }
 ```
 
-See [examples/arduino/](examples/arduino/) for complete examples.
+See [examples/arduino/](examples/arduino/) for simple sensor examples.
+
+### 📱 Mobile App (Flutter)
+
+The **Datum Camera App** (`examples/datum_camera_app`) provides a complete mobile experience:
+- **Provisioning**: Zero-touch WiFi configuration via BLE / SoftAP.
+- **Streaming**: Low-latency MJPEG and WebSocket viewing.
+- **Recording**: Save videos and snapshots to local gallery.
+- **Control**: Toggle LED, flip/mirror stream, restart device.
+- **OTA Updates**: Trigger firmware updates directly from the app.
+
+To build:
+```bash
+cd examples/datum_camera_app
+flutter run
+```
 
 ### ESP32-S3 Camera (Features)
 

@@ -25,9 +25,10 @@ The official mobile companion app for the Datum IoT Platform, designed to manage
      - "Share" and "Open Externally" options.
 
 ### 4. **Device Management**
-   - "Toggle LED" control.
-   - "Restart" command.
-   - Delete device.
+   - **Unified Settings**: Sync resolution, LED, mirror/flip, and FPS in one command.
+   - **Offline Sync**: Change settings while offline; changes auto-sync when reconnected.
+   - **OTA Firmware Update**: Check for and flash new firmware versions directly from the app.
+   - **Delete Device**: Remove device from account and app.
 
 ## 🏗 Architecture
 

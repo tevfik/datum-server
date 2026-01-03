@@ -182,37 +182,6 @@ func registerDeviceHandler(c *gin.Context) {
 		CreatedAt:  time.Now(),
 	}
 
-	if err := store.CreateProvisioningRequest(provReq); err != nil {
-		if strings.Contains(err.Error(), "already exists") {
-			// Check if duplicate request belongs to same user
-			existingReq, getErr := store.GetProvisioningRequestByUID(deviceUID)
-			if getErr == nil && existingReq.UserID == userID {
-				// Same user - update the existing request (overwrite it)
-				// We actually just delete the old one and retry creation
-				logger.GetLogger().Info().Str("device_uid", deviceUID).Msg("Overwriting existing provisioning request for same user")
-				store.CancelProvisioningRequest(existingReq.ID)
-				if err := store.CreateProvisioningRequest(provReq); err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to overwrite provisioning request"})
-					return
-				}
-				// Proceed to success response
-			} else {
-				// Different user or other error
-				c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-				return
-			}
-		} else {
-			logger.GetLogger().Warn().
-				Str("user_id", userID).
-				Str("device_uid", deviceUID).
-				Str("ip", c.ClientIP()).
-				Err(err).
-				Msg("Failed to create provisioning request")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create provisioning request"})
-			return
-		}
-	}
-
 	// Log successful provisioning registration
 	logger.GetLogger().Info().
 		Str("event", "provisioning_registration").
@@ -222,7 +191,7 @@ func registerDeviceHandler(c *gin.Context) {
 		Str("device_id", deviceID).
 		Str("ip", c.ClientIP()).
 		Time("expires_at", provReq.ExpiresAt).
-		Msg("Provisioning request created")
+		Msg("Device registered and activated")
 
 	c.JSON(http.StatusCreated, RegisterDeviceResponse{
 		RequestID:   requestID,
@@ -233,7 +202,7 @@ func registerDeviceHandler(c *gin.Context) {
 		WiFiSSID:    req.WiFiSSID,
 		WiFiPass:    req.WiFiPass,
 		ExpiresAt:   provReq.ExpiresAt,
-		Status:      "pending",
+		Status:      "active",
 		ActivateURL: fmt.Sprintf("%s/provisioning/activate", provisioningConfig.ServerURL),
 	})
 }
