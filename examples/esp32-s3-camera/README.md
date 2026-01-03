@@ -229,6 +229,24 @@ vlc http://your-server:8080/devices/esp32-cam-01/stream/mjpeg?token=YOUR_JWT
 
 ---
 
+## 📱 Mobile App (Datum Camera App)
+
+The easiest way to set up and view your camera is using the official **Datum Camera App**.
+
+### Features
+- **Auto-Provisioning**: Connects to the ESP32 via BLE to send WiFi credentials.
+- **QR Code Registration**: Automatically registers the device with the server.
+- **Native Streaming**: View low-latency video on your phone.
+
+### Provisioning Flow
+1. Flash the firmware (ensure `ALLOW_BLE_PROVISIONING` is enabled).
+2. Open the App and tap "Add Device".
+3. Select your device from the BLE scan list (`PROV_...`).
+4. Enter your WiFi credentials.
+5. The app configures the device, which then connects to Datum Server.
+
+---
+
 ## WebSocket vs MJPEG Comparison
 
 | Feature | WebSocket | MJPEG over HTTP |
