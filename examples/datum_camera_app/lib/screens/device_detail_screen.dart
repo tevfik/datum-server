@@ -316,6 +316,41 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
 
 
 
+  void _showUpdateDialog() {
+    final TextEditingController urlController = TextEditingController(text: "https://datum.bezg.in/firmware/firmware.bin");
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Update Firmware"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Enter the URL of the new firmware .bin file. The device will download it and restart."),
+            const SizedBox(height: 10),
+            TextField(
+              controller: urlController,
+              decoration: const InputDecoration(
+                labelText: "Firmware URL",
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+          ElevatedButton(
+            onPressed: () {
+               Navigator.pop(ctx);
+               _sendCommand("update_firmware", params: {"url": urlController.text});
+            },
+            child: const Text("Update"),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
