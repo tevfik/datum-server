@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_mjpeg/flutter_mjpeg.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'package:gallery_saver/gallery_saver.dart';
 import 'dart:typed_data';
 import 'full_screen_stream.dart';
 import '../providers/auth_provider.dart';
@@ -313,10 +314,21 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                  final file = File('${photoDir.path}/snap_$timestamp.jpg');
                  await file.writeAsBytes(bytes);
                  
-                 if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                       SnackBar(content: Text('Saved to Gallery: ${file.path.split("/").last}')),
-                     );
+                 if (await GallerySaver.saveImage(file.path) == true) {
+                     if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                           SnackBar(content: Text('Saved to Gallery: ${file.path.split("/").last}')),
+                         );
+                     }
+                 } else {
+                     if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                           const SnackBar(content: Text('Saved to App Folder (Gallery Failed)')),
+                         );
+                     }
+                 }
+                 
+                  if (mounted) {
                      _loadPhotos();
                      
                      showDialog(
