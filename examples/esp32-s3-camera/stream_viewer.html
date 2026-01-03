@@ -485,8 +485,16 @@
                             // Set threshold to 60KB to catch only high-res.
                             if (blob.size > 60000) {
                                 const url = URL.createObjectURL(blob);
-                                window.open(url, '_blank');
-                                log(`Snapshot captured! Size: ${(blob.size / 1024).toFixed(1)} KB`);
+
+                                // Create temporary link to trigger download
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `snapshot-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+
+                                log(`Snapshot downloaded! Size: ${(blob.size / 1024).toFixed(1)} KB`);
                                 success = true;
                                 break;
                             } else {
