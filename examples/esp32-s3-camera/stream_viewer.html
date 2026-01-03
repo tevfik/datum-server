@@ -481,12 +481,16 @@
                         const imgRes = await fetch(snapshotURL);
                         if (imgRes.ok) {
                             const blob = await imgRes.blob();
-                            if (blob.size > 20000) {
+                            // Normal frames are ~25-50KB. Snapshot is >100KB.
+                            // Set threshold to 60KB to catch only high-res.
+                            if (blob.size > 60000) {
                                 const url = URL.createObjectURL(blob);
                                 window.open(url, '_blank');
                                 log(`Snapshot captured! Size: ${(blob.size / 1024).toFixed(1)} KB`);
                                 success = true;
                                 break;
+                            } else {
+                                log(`Retry ${i + 1}: Got small frame (${(blob.size / 1024).toFixed(1)} KB)`);
                             }
                         }
                     } catch (e) {
