@@ -72,8 +72,18 @@ func createDeviceHandler(c *gin.Context) {
 // GET /devices
 func listDevicesHandler(c *gin.Context) {
 	userID, _ := auth.GetUserID(c)
+	role, _ := auth.GetUserRole(c)
 
-	devices, err := store.GetUserDevices(userID)
+	var devices []storage.Device
+	var err error
+
+	// Admins see all devices, regular users see only theirs
+	if role == "admin" {
+		devices, err = store.GetAllDevices()
+	} else {
+		devices, err = store.GetUserDevices(userID)
+	}
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

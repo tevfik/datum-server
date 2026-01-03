@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/nakabonne/tstorage"
@@ -793,6 +794,34 @@ func (s *Storage) UpdateDeviceLastSeen(deviceID string) error {
 		tx.Set(deviceKey, string(data), nil)
 		return nil
 	})
+}
+
+// GetAllDevices returns all devices in the system (for admin)
+func (s *Storage) GetAllDevices() ([]Device, error) {
+	var devices []Device
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		tx.Ascend("", func(key, value string) bool {
+			// Key format: device:<ID>
+			// Must exclude device:uid:..., device:...:commands, etc.
+			// ID always starts with 'dev_'
+			if strings.HasPrefix(key, "device:dev_") {
+				// Check if it's a subkey (e.g. device:dev_xxx:commands)
+				// The ID itself shouldn't have colons, so if there is a colon after "device:", it's a subkey
+				// "device:".Len() = 7
+				// But wait, key is "device:dev_xyz".
+				// So we check if key[7:] contains ":"
+				if !strings.Contains(key[7:], ":") {
+					var device Device
+					if err := json.Unmarshal([]byte(value), &device); err == nil {
+						devices = append(devices, device)
+					}
+				}
+			}
+			return true
+		})
+		return nil
+	})
+	return devices, err
 }
 
 // ForceDeleteDevice deletes a device by admin (bypasses user ownership check)

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"datum-go/internal/auth"
+	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -57,7 +58,22 @@ func uploadFrameHandler(c *gin.Context) {
 		return
 	}
 
-	device, err := store.GetDeviceByAPIKey(apiKey.(string))
+	var device *storage.Device
+	var err error
+
+	isToken, _ := c.Get("is_token")
+	if isToken == true {
+		// Token-based auth (Device uses DK token)
+		var isGracePeriod bool
+		device, isGracePeriod, err = store.GetDeviceByToken(apiKey.(string))
+		if err == nil && isGracePeriod {
+			// Optional: Log warning if using grace period token for high-bandwidth stream
+		}
+	} else {
+		// API Key-based auth (Legacy)
+		device, err = store.GetDeviceByAPIKey(apiKey.(string))
+	}
+
 	if err != nil || device.ID != deviceID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Device not found or unauthorized"})
 		return
