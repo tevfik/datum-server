@@ -854,7 +854,16 @@ void handleSnap() {
   delay(50);
   initCamera();
 
-  streaming = wasStreaming;
+  // CRITICAL: Wait before resuming stream!
+  // The server only stores the "last frame". If we send a new low-res frame
+  // immediately, the client won't have time to fetch the high-res snapshot we
+  // just uploaded.
+  if (wasStreaming) {
+    Serial.println("[SNAP] Waiting for client to fetch image...");
+    delay(4000); // Give client 4 seconds to download
+    streaming = true;
+  }
+
   Serial.printf("[SNAP] Complete. Total time: %dms\n", millis() - startTime);
 }
 
