@@ -667,6 +667,26 @@ void ackCommand(String cmdId) {
   http.end();
 }
 
+// Helper to extract nested JSON object
+String extractNestedJsonVal(String json, String parentKey, String childKey) {
+  int parentIdx = json.indexOf("\"" + parentKey + "\":");
+  if (parentIdx < 0)
+    return "";
+
+  // Find start of object (look for { after parent key)
+  int objStart = json.indexOf("{", parentIdx);
+  if (objStart < 0)
+    return "";
+
+  // Find end of object (simple heuristic: first })
+  int objEnd = json.indexOf("}", objStart);
+  if (objEnd < 0)
+    return "";
+
+  String nested = json.substring(objStart, objEnd + 1);
+  return extractJsonVal(nested, childKey);
+}
+
 void checkCommands() {
   if (millis() - lastCommandCheck < 5000)
     return;
@@ -681,7 +701,6 @@ void checkCommands() {
     String pl = http.getString();
 
     // Parse simplified JSON list manually
-    // Format: {"commands":[{"command_id":"cmd_xxx","action":"restart"}]}
     int cmdIdx = pl.indexOf("\"command_id\":\"");
     while (cmdIdx > 0) {
       int endIdx = pl.indexOf("\"", cmdIdx + 14);
@@ -693,6 +712,25 @@ void checkCommands() {
         int actEnd = pl.indexOf("\"", actIdx + 10);
         String action = pl.substring(actIdx + 10, actEnd);
 
+        // Find parameters for this command (search forward from action)
+        int paramsIdx = pl.indexOf("\"params\":", actEnd);
+        String resolution = "";
+        String color = "";
+        int brightness = 0;
+
+        // Basic proximity check to ensure params belong to this command
+        if (paramsIdx > 0 &&
+            paramsIdx < pl.indexOf("\"command_id\":\"", endIdx)) {
+          // Parse parameters manually from the segment
+          int segmentEnd = pl.indexOf("}", paramsIdx);
+          String paramSegment = pl.substring(paramsIdx, segmentEnd + 1);
+          resolution = extractJsonVal(paramSegment, "resolution");
+          color = extractJsonVal(paramSegment, "color");
+          String brStr = extractJsonVal(paramSegment, "brightness");
+          if (brStr.length() > 0)
+            brightness = brStr.toInt();
+        }
+
         Serial.println("Executing: " + action + " ID: " + cmdId);
 
         if (action == "start-stream") {
@@ -702,24 +740,44 @@ void checkCommands() {
           streaming = false;
           ackCommand(cmdId);
         } else if (action == "restart") {
-          ackCommand(cmdId); // ACK BEFORE RESTART is critical
+          ackCommand(cmdId);
           delay(500);
           ESP.restart();
         } else if (action == "led") {
-#ifdef LED_GPIO_NUM
+          // LED Control with advanced parameters
+          if (color.length() > 0) {
+            // Hex color parsing (e.g. #FF0000)
+            long number = strtol(&color.c_str()[1], NULL, 16);
+            int r = number >> 16;
+            int g = number >> 8 & 0xFF;
+            int b = number & 0xFF;
+
+            // Apply brightness scaling if provided
+            if (brightness > 0) {
+              r = (r * brightness) / 255;
+              g = (g * brightness) / 255;
+              b = (b * brightness) / 255;
+            }
+
 #if LED_GPIO_NUM == 48
-          torchState = !torchState;
-          neopixelWrite(LED_GPIO_NUM, torchState ? 255 : 0,
-                        torchState ? 255 : 0, torchState ? 255 : 0);
+            neopixelWrite(LED_GPIO_NUM, r, g, b);
+            torchState = (r + g + b > 0);
+#endif
+          } else {
+// Simple toggle fallback
+#if LED_GPIO_NUM == 48
+            torchState = !torchState;
+            neopixelWrite(LED_GPIO_NUM, torchState ? 255 : 0,
+                          torchState ? 255 : 0, torchState ? 255 : 0);
 #else
-          ledState = !ledState;
-          digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
+            ledState = !ledState;
+            digitalWrite(LED_GPIO_NUM, ledState ? HIGH : LOW);
 #endif
-#endif
+          }
           ackCommand(cmdId);
         } else if (action == "snap") {
           ackCommand(cmdId);
-          handleSnap();
+          handleSnap(resolution);
         } else {
           ackCommand(cmdId);
         }
@@ -769,8 +827,37 @@ void streamLoop() {
   esp_camera_fb_return(fb);
 }
 
-void handleSnap() {
+// Helper to get framesize from string
+framesize_t getFrameSizeFromName(String name) {
+  if (name == "QCIF")
+    return FRAMESIZE_QCIF;
+  if (name == "QVGA")
+    return FRAMESIZE_QVGA;
+  if (name == "CIF")
+    return FRAMESIZE_CIF;
+  if (name == "VGA")
+    return FRAMESIZE_VGA;
+  if (name == "SVGA")
+    return FRAMESIZE_SVGA;
+  if (name == "XGA")
+    return FRAMESIZE_XGA;
+  if (name == "HD")
+    return FRAMESIZE_HD;
+  if (name == "SXGA")
+    return FRAMESIZE_SXGA;
+  if (name == "UXGA")
+    return FRAMESIZE_UXGA;
+  if (name == "QXGA")
+    return FRAMESIZE_QXGA;
+  return FRAMESIZE_VGA; // Default
+}
+
+void handleSnap(String resolution = "UXGA") {
   Serial.println("[SNAP] Starting high-res capture (full reinit)...");
+  Serial.println("[SNAP] Target Resolution: " + resolution);
+
+  framesize_t snapSize = getFrameSizeFromName(resolution);
+
   unsigned long startTime = millis();
 
   // Pause streaming
@@ -802,11 +889,11 @@ void handleSnap() {
   config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
+  config.xclk_freq_hz = 10000000; // Lower XCLK for stability
   config.pixel_format = PIXFORMAT_JPEG;
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
 
-  config.frame_size = FRAMESIZE_UXGA;
+  config.frame_size = snapSize; // Use requested resolution
   config.jpeg_quality = 10;
   config.fb_count = 1;
   config.fb_location = CAMERA_FB_IN_PSRAM;
