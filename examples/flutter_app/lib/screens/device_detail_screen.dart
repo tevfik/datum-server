@@ -4,6 +4,7 @@ import 'package:flutter_mjpeg/flutter_mjpeg.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:typed_data';
+import 'full_screen_stream.dart';
 import '../providers/auth_provider.dart';
 import '../api_client.dart';
 import '../models/device.dart';
@@ -448,12 +449,38 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             constraints: const BoxConstraints(maxHeight: 300),
             width: double.infinity,
             child: _isRunning
-                ? Mjpeg(
-                    isLive: true,
-                    stream: _getStreamUrl(),
-                    error: (context, error, stack) => Center(
-                          child: Text("Stream Error: $error", style: const TextStyle(color: Colors.red)),
+                ? Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      Mjpeg(
+                        isLive: true,
+                        stream: _getStreamUrl(),
+                        error: (context, error, stack) => Center(
+                              child: Text("Stream Error: $error", style: const TextStyle(color: Colors.red)),
+                            ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: IconButton(
+                          onPressed: () {
+                             Navigator.push(
+                               context,
+                               MaterialPageRoute(
+                                 builder: (_) => FullScreenStream(
+                                   streamUrl: _getStreamUrl(), 
+                                   deviceName: widget.device.name
+                                 ),
+                               ),
+                             );
+                          },
+                          icon: const Icon(Icons.fullscreen),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.black54,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
+                      ),
+                    ],
                   )
                 : const Center(child: Text("Stream Paused", style: TextStyle(color: Colors.white))),
           ),

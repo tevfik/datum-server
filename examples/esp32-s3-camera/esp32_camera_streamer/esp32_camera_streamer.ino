@@ -470,8 +470,9 @@ bool initCamera() {
                   ESP.getPsramSize(), ESP.getFreePsram());
     config.frame_size = FRAMESIZE_VGA;
     config.jpeg_quality = 12;
-    config.fb_count = 1; // Single buffer for stability
+    config.fb_count = 2; // Double buffering to prevent tearing/overflow
     config.fb_location = CAMERA_FB_IN_PSRAM;
+    config.grab_mode = CAMERA_GRAB_LATEST; // Always get the freshest frame
   } else {
     Serial.println("WARNING: No PSRAM! High-res will fail.");
     config.frame_size = FRAMESIZE_QVGA;
