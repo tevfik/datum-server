@@ -1,0 +1,45 @@
+name: Flutter App (Container)
+
+on:
+  push:
+    paths:
+      - 'examples/datum_camera_app/**'
+      - '.github/workflows/flutter_local.yml'
+  pull_request:
+    paths:
+      - 'examples/datum_camera_app/**'
+      - '.github/workflows/flutter_local.yml'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    container: datum-flutter-builder:latest
+    defaults:
+      run:
+        working-directory: ./examples/datum_camera_app
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Fix Directory Safe
+        run: git config --global --add safe.directory '*'
+
+      - name: Install dependencies
+        run: flutter pub get
+      
+      - name: Generate Mocks
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build APK
+        run: flutter build apk --release
+        
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: datum-app-release-apk
+          path: examples/datum_camera_app/build/app/outputs/flutter-apk/app-release.apk
