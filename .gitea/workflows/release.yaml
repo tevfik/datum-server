@@ -68,6 +68,7 @@ jobs:
 
       - name: Install Arduino CLI
         run: |
+          mkdir -p bin
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=./bin sh
           echo "$(pwd)/bin" >> $GITHUB_PATH
 
