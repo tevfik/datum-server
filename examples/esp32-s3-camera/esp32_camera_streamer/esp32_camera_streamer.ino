@@ -846,14 +846,24 @@ void handleSnap() {
     // Deinit camera to free DMA resources
     esp_camera_deinit();
 
+    // Optimize WiFi for upload
+    WiFi.setTxPower(WIFI_POWER_19_5dBm); // Max TX power
+    delay(50);
+
     // Upload FIRST - no streaming interference!
     Serial.printf("[SNAP] Uploading %d bytes (stream paused)...\n", frameLen);
+    Serial.printf("[SNAP] Free heap: %d, PSRAM: %d\n", ESP.getFreeHeap(),
+                  ESP.getFreePsram());
     unsigned long uploadStart = millis();
 
     HTTPClient http;
-    http.setTimeout(30000);
-    http.setReuse(false); // Don't reuse connection
-    http.begin(serverURL + "/device/" + deviceID + "/stream/frame");
+    http.setTimeout(60000); // 60 second timeout
+    http.setReuse(false);
+
+    String url = serverURL + "/device/" + deviceID + "/stream/frame";
+    Serial.printf("[SNAP] URL: %s\n", url.c_str());
+
+    http.begin(url);
     http.addHeader("Authorization", "Bearer " + apiKey);
     http.addHeader("Content-Type", "image/jpeg");
     http.addHeader("Content-Length", String(frameLen));
