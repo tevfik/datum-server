@@ -3,10 +3,10 @@ import 'package:provider/provider.dart';
 
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import 'package:gal/gal.dart';
+
 import 'package:share_plus/share_plus.dart';
 import 'package:open_file_plus/open_file_plus.dart';
-import 'dart:typed_data';
+
 import 'full_screen_stream.dart';
 import '../providers/auth_provider.dart';
 import '../api_client.dart';
@@ -553,7 +553,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                              _loadMedia();
                            }
                          } catch (e) {
-                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                           if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
                          }
                       },
                       isLoading: _loadingAction,
@@ -572,7 +572,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                                 _loadMedia();
                               }
                             } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
                             } finally {
                               if (context.mounted) setState(() => _loadingAction = false);
                             }
