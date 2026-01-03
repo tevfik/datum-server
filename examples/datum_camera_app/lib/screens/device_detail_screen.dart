@@ -53,22 +53,28 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   Future<void> _loadMedia() async {
     try {
       final directory = await getApplicationDocumentsDirectory();
+      List<File> allFiles = [];
+
+      // 1. Load Photos
       final photoDir = Directory('${directory.path}/photos');
       if (await photoDir.exists()) {
         final photos = photoDir.listSync()
               .where((item) => item.path.endsWith(".jpg"))
               .map((item) => File(item.path))
               .toList();
-        
-        // Also check for videos in documents root (where we store them temporarily) or photos details?
-        // In FullScreenStream we used getApplicationDocumentsDirectory() root for videos.
-        final docs = directory.listSync()
-              .where((item) => item.path.endsWith(".mp4") || item.path.endsWith(".avi"))
-              .map((item) => File(item.path))
-              .toList();
-              
+        allFiles.addAll(photos);
+      }
+      
+      // 2. Load Videos (from root)
+      final videos = directory.listSync()
+            .where((item) => item.path.endsWith(".mp4") || item.path.endsWith(".avi"))
+            .map((item) => File(item.path))
+            .toList();
+      allFiles.addAll(videos);
+
+      if (mounted) {
         setState(() {
-          _mediaFiles = [...photos, ...docs]
+          _mediaFiles = allFiles
               ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
         });
       }
