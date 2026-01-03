@@ -1384,6 +1384,15 @@ func (s *Storage) IsDeviceUIDRegistered(deviceUID string) (bool, string, error) 
 	return registered, deviceID, err
 }
 
+// DeleteDeviceUIDIndex removes a specific UID mapping (useful for cleaning up orphans)
+func (s *Storage) DeleteDeviceUIDIndex(deviceUID string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		key := fmt.Sprintf("device:uid:%s", deviceUID)
+		_, err := tx.Delete(key)
+		return err
+	})
+}
+
 // CleanupExpiredProvisioningRequests removes expired provisioning requests
 func (s *Storage) CleanupExpiredProvisioningRequests() (int, error) {
 	var cleaned int

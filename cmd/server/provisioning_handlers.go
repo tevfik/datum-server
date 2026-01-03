@@ -118,9 +118,20 @@ func registerDeviceHandler(c *gin.Context) {
 			Msg("Re-registering existing device - deleting old record")
 
 		if err := store.ForceDeleteDevice(existingDeviceID); err != nil {
-			logger.GetLogger().Error().Err(err).Str("device_id", existingDeviceID).Msg("Failed to delete old device during re-registration")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clean up old device registration"})
-			return
+			// If device not found, it means we have an orphaned UID index. Clean it up directly.
+			if err.Error() == "device not found" {
+				logger.GetLogger().Warn().Str("device_uid", deviceUID).Msg("Orphaned UID index found, cleaning up manually")
+				if err := store.DeleteDeviceUIDIndex(deviceUID); err != nil {
+					logger.GetLogger().Error().Err(err).Msg("Failed to remove orphaned UID index")
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clean up orphaned device registration"})
+					return
+				}
+				// Cleanup successful, proceed to registration
+			} else {
+				logger.GetLogger().Error().Err(err).Str("device_id", existingDeviceID).Msg("Failed to delete old device during re-registration")
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clean up old device registration"})
+				return
+			}
 		}
 	}
 
