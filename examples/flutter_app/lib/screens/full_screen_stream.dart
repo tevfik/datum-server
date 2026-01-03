@@ -236,6 +236,12 @@ class _FullScreenStreamState extends State<FullScreenStream> {
          await FlutterQuickVideoEncoder.finish();
          debugPrint("Native Encoding Success");
          
+         // 4. Save Thumbnail (First Frame)
+         final thumbPath = outputPath.replaceAll(".mp4", ".jpg");
+         if (await firstFrameFile.exists()) {
+            await firstFrameFile.copy(thumbPath);
+         }
+
          // Save to Gallery
          try {
             await Gal.putVideo(outputPath);

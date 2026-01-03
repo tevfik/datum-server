@@ -10,6 +10,7 @@ import 'dart:typed_data';
 import 'full_screen_stream.dart';
 import '../providers/auth_provider.dart';
 import '../api_client.dart';
+import 'package:video_player/video_player.dart';
 import '../models/device.dart';
 
 class DeviceDetailScreen extends StatefulWidget {
@@ -435,12 +436,20 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
            mainAxisSize: MainAxisSize.min,
            children: [
              if (isVideo)
-               Container(
-                 color: Colors.black,
-                 height: 200, 
-                 width: double.infinity,
-                 child: const Center(child: Icon(Icons.play_circle_fill, size: 64, color: Colors.white)),
-               )
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    if (File(file.path.replaceAll(".mp4", ".jpg")).existsSync())
+                      Image.file(File(file.path.replaceAll(".mp4", ".jpg")), height: 200, width: double.infinity, fit: BoxFit.cover)
+                    else
+                      Container(
+                        color: Colors.black,
+                        height: 200, 
+                        width: double.infinity,
+                      ),
+                    const Icon(Icons.play_circle_fill, size: 64, color: Colors.white70),
+                  ],
+                )
              else 
                Image.file(file),
                
@@ -458,14 +467,15 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                  Share.shareXFiles([XFile(file.path)]);
                },
             ),
-            if (isVideo)
-              TextButton.icon(
-                icon: const Icon(Icons.open_in_new),
-                label: const Text("Open"),
-                onPressed: () {
-                  OpenFile.open(file.path);
-                },
-              )
+              if (isVideo)
+                TextButton.icon(
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text("Play Preview"),
+                  onPressed: () {
+                    Navigator.pop(ctx); // Close dialog
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => VideoPreviewScreen(videoFile: file)));
+                  },
+                )
             else 
                // For images, we already show it, but 'Open' can open in external viewer too
               TextButton.icon(
@@ -653,7 +663,17 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                                 fit: StackFit.expand,
                                 children: [
                                   if (isVideo)
-                                     Container(color: Colors.black, child: const Center(child: Icon(Icons.movie, color: Colors.white)))
+
+                                     Stack(
+                                       fit: StackFit.expand,
+                                       children: [
+                                          if (File(file.path.replaceAll(".mp4", ".jpg")).existsSync())
+                                            Image.file(File(file.path.replaceAll(".mp4", ".jpg")), fit: BoxFit.cover)
+                                          else
+                                            Container(color: Colors.black),
+                                          const Center(child: Icon(Icons.play_circle_outline, color: Colors.white, size: 40)),
+                                       ],
+                                     )
                                   else
                                      Image.file(file, fit: BoxFit.cover),
                                      
@@ -717,6 +737,76 @@ class _ActionButton extends StatelessWidget {
         const SizedBox(height: 8),
         Text(label),
       ],
+    );
+  }
+}
+
+class VideoPreviewScreen extends StatefulWidget {
+  final File videoFile;
+
+  const VideoPreviewScreen({super.key, required this.videoFile});
+
+  @override
+  State<VideoPreviewScreen> createState() => _VideoPreviewScreenState();
+}
+
+class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
+  late VideoPlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(widget.videoFile)
+      ..initialize().then((_) {
+        setState(() {});
+        _controller.play();
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Center(
+        child: _controller.value.isInitialized
+            ? AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: Stack(
+                  alignment: Alignment.bottomCenter,
+                  children: [
+                    VideoPlayer(_controller),
+                    VideoProgressIndicator(_controller, allowScrubbing: true),
+                    Center(
+                      child: IconButton(
+                        icon: Icon(
+                          _controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle,
+                          color: Colors.white.withValues(alpha: 0.5),
+                          size: 64,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _controller.value.isPlaying
+                                ? _controller.pause()
+                                : _controller.play();
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : const CircularProgressIndicator(),
+      ),
     );
   }
 }
