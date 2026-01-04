@@ -167,6 +167,41 @@ func main() {
 		authGroup.POST("/reset-password", completeResetPasswordHandler)
 	}
 
+	// Password Reset Web Page (for deep linking fallback)
+	r.GET("/reset-password", func(c *gin.Context) {
+		token := c.Query("token")
+		c.Header("Content-Type", "text/html")
+		c.String(http.StatusOK, fmt.Sprintf(`
+			<!DOCTYPE html>
+			<html>
+			<head>
+				<title>Reset Password</title>
+				<meta name="viewport" content="width=device-width, initial-scale=1">
+				<style>
+					body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f4f4; }
+					.container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+					h2 { color: #333; }
+					p { color: #666; }
+					.btn { display: inline-block; background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin-top: 20px; font-weight: bold; }
+				</style>
+			</head>
+			<body>
+				<div class="container">
+					<h2>Reset Password</h2>
+					<p>To reset your password, please open this link in the Datum Mobile App.</p>
+					
+					<!-- Attempt to launch app via custom scheme if you had one, or just universal link again -->
+					<p>If the app did not open automatically, tap the button below:</p>
+					<a href="https://datum.localhost/reset-password?token=%s" class="btn">Open in App</a>
+				</div>
+				<script>
+					// Optional: Attempt specific scheme redirect if defined
+				</script>
+			</body>
+			</html>
+		`, token))
+	})
+
 	// Authenticated user routes (password change, self-deletion)
 	authProtectedGroup := r.Group("/auth")
 	authProtectedGroup.Use(auth.AuthMiddleware())
