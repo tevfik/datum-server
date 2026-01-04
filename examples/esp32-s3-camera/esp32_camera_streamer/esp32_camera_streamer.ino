@@ -914,7 +914,7 @@ void reportTelemetry(bool isBoot, bool isConnect) {
     return;
 
   HTTPClient http;
-  http.begin(serverURL + "/device/" + deviceID + "/data");
+  http.begin(serverURL + "/data/" + deviceID);
   http.addHeader("Authorization", "Bearer " + apiKey);
   http.addHeader("Content-Type", "application/json");
 

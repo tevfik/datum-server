@@ -267,7 +267,7 @@ void sendData(bool isBoot, bool isConnect) {
 
   client.setInsecure();
   HTTPClient http;
-  String url = String(config.server_url) + "/data";
+  String url = String(config.server_url) + "/data/" + String(config.device_id);
 
   if (http.begin(client, url)) {
     http.addHeader("Content-Type", "application/json");
@@ -315,7 +315,7 @@ void checkCommands() {
   HTTPClient http;
 
   // Endpoint: GET /devices/:id/commands
-  String url = String(config.server_url) + "/devices/" +
+  String url = String(config.server_url) + "/device/" +
                String(config.device_id) + "/commands";
 
   if (http.begin(client, url)) {
