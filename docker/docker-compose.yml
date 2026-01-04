@@ -45,6 +45,8 @@ services:
       - LOG_FORMAT=${LOG_FORMAT:-json}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
       - SERVER_URL=https://${DOMAIN:-datum.localhost}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - EMAIL_FROM=${EMAIL_FROM}
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:8000/health" ]
       interval: 30s
