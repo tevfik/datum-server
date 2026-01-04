@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:flutter_oss_licenses/flutter_oss_licenses.dart';
+
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -59,11 +59,12 @@ class _AboutScreenState extends State<AboutScreen> {
             subtitle: const Text('View licenses of third-party libraries'),
             trailing: const Icon(Icons.arrow_forward_ios),
             onTap: () {
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => OssLicensesMenu(
-                  appIcon:  const Icon(Icons.info_outline, size: 48, color: Colors.blue),
-                ),
-              ));
+              showLicensePage(
+                context: context,
+                applicationName: _packageInfo.appName,
+                applicationVersion: '${_packageInfo.version} (${_packageInfo.buildNumber})',
+                applicationIcon: const Icon(Icons.info_outline, size: 48, color: Colors.blue),
+              );
             },
           ),
           ListTile(
