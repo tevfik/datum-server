@@ -107,7 +107,7 @@ void setupProvisioning() {
   provisioningMode = true;
   WiFi.mode(WIFI_AP);
   String apName = "Datum-Relay-" + String(ESP.getChipId(), HEX);
-  WiFi.softAP(apName.c_str(), "datum123");
+  WiFi.softAP(apName.c_str(), NULL);
 
   // Web Server Routes
   server.on("/info", HTTP_GET, []() {
