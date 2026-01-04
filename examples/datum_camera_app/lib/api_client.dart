@@ -202,4 +202,20 @@ class ApiClient {
       throw Exception('Reset failed: $e');
     }
   }
+
+  // --- API Key Management ---
+
+  Future<List<dynamic>> getApiKeys() async {
+    final response = await _dio.get('/auth/keys');
+    return response.data['keys'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> createApiKey(String name) async {
+    final response = await _dio.post('/auth/keys', data: {'name': name});
+    return response.data;
+  }
+
+  Future<void> deleteApiKey(String id) async {
+    await _dio.delete('/auth/keys/$id');
+  }
 }

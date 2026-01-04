@@ -141,13 +141,6 @@ String deviceID;
 String userToken;  // Store token directly
 String deviceName; // Custom device name
 
-// LED State Globals
-byte savedR = 255;
-byte savedG = 255;
-byte savedB = 255;
-int savedBrightness = 100;
-bool torchState = false;
-
 enum DeviceState {
   STATE_BOOT,
   STATE_SETUP_MODE,
@@ -228,16 +221,16 @@ void updateFirmware(String url) {
 unsigned long setupStartTime = 0;
 unsigned long lastLedBlink = 0;
 bool ledState = false;
-
-unsigned long lastTelemetryTime = 0; // Telemetry timer
+bool torchState = false;
+byte savedR = 255;
+byte savedG = 255;
+byte savedB = 255;
+int savedBrightness = 0;
 
 HTTPClient httpCommand;
 HTTPClient httpStream;
 
-bool requestRestart = false;
 bool isActivated() { return apiKey.length() > 0; }
-bool justConnected = false;
-bool initialBoot = true;
 
 // ============================================================================
 // Web Interface (ESP-DASH Style)
@@ -337,59 +330,6 @@ bool extractJsonBool(String json, String key) {
   if (remainder.startsWith("true") || remainder.startsWith("1"))
     return true;
   return false;
-}
-
-// Helper to get framesize from string
-framesize_t getFrameSizeFromName(String name) {
-  if (name == "QCIF")
-    return FRAMESIZE_QCIF;
-  if (name == "QVGA")
-    return FRAMESIZE_QVGA;
-  if (name == "CIF")
-    return FRAMESIZE_CIF;
-  if (name == "VGA")
-    return FRAMESIZE_VGA;
-  if (name == "SVGA")
-    return FRAMESIZE_SVGA;
-  if (name == "XGA")
-    return FRAMESIZE_XGA;
-  if (name == "HD")
-    return FRAMESIZE_HD;
-  if (name == "SXGA")
-    return FRAMESIZE_SXGA;
-  if (name == "UXGA")
-    return FRAMESIZE_UXGA;
-  if (name == "QXGA")
-    return FRAMESIZE_QXGA;
-  return FRAMESIZE_VGA; // Default
-}
-
-// Helper to get string name from framesize
-String getFrameSizeName(framesize_t size) {
-  switch (size) {
-  case FRAMESIZE_QCIF:
-    return "QCIF";
-  case FRAMESIZE_QVGA:
-    return "QVGA";
-  case FRAMESIZE_CIF:
-    return "CIF";
-  case FRAMESIZE_VGA:
-    return "VGA";
-  case FRAMESIZE_SVGA:
-    return "SVGA";
-  case FRAMESIZE_XGA:
-    return "XGA";
-  case FRAMESIZE_HD:
-    return "HD";
-  case FRAMESIZE_SXGA:
-    return "SXGA";
-  case FRAMESIZE_UXGA:
-    return "UXGA";
-  case FRAMESIZE_QXGA:
-    return "QXGA";
-  default:
-    return "Unknown";
-  }
 }
 
 // Check for Factory Reset (Boot Button held manually during runtime)
@@ -664,37 +604,10 @@ void handleDeviceInfo() {
   json += "\"device_uid\":\"" + deviceUID + "\",";
   json += "\"mac_address\":\"" + deviceMAC + "\",";
   json += "\"firmware_version\":\"" + String(FIRMWARE_VERSION) + "\",";
-  json += "\"device_type\":\"camera\","; // Added for Unified Onboarding
   json += "\"status\":\"" +
           String(isActivated() ? "configured" : "unconfigured") + "\"";
   json += "}";
   setupServer.send(200, "application/json", json);
-}
-
-// WoT (Web of Things) Discovery Endpoint
-void handleThingDescription() {
-  String json = "{";
-  json += "\"@context\": \"https://www.w3.org/2019/wot/td/v1\",";
-  json += "\"id\": \"urn:dev:ops:" + deviceUID + "\",";
-  json += "\"title\": \"Datum Camera\",";
-  json += "\"device_type\": \"camera\","; // Custom extension for App Factory
-  json +=
-      "\"securityDefinitions\": {\"bearer_sec\": {\"scheme\": \"bearer\"}},";
-  json += "\"security\": \"bearer_sec\",";
-  json += "\"properties\": {";
-  json += "  \"status\": {\"type\": \"string\", \"description\": \"Device "
-          "Status\"},";
-  json += "  \"rssi\": {\"type\": \"integer\", \"description\": \"WiFi Signal "
-          "Strength\"}";
-  json += "},";
-  json += "\"actions\": {";
-  json += "  \"snapshot\": {\"description\": \"Take a photo\"},";
-  json += "  \"stream\": {\"description\": \"Start video stream\"},";
-  json += "  \"toggle_led\": {\"description\": \"Toggle Flashlight\"},";
-  json += "  \"update_firmware\": {\"description\": \"OTA Update\"}";
-  json += "}";
-  json += "}";
-  setupServer.send(200, "application/td+json", json);
 }
 
 void handleCapture() {
@@ -795,8 +708,6 @@ void startSetupMode() {
   setupServer.on("/stream", HTTP_GET, handleStream);
   setupServer.on("/capture", HTTP_GET, handleCapture);
   setupServer.on("/info", HTTP_GET, handleDeviceInfo);
-  setupServer.on("/.well-known/wot-thing-description", HTTP_GET,
-                 handleThingDescription);        // WoT Discovery
   setupServer.on("/scan", HTTP_GET, handleScan); // Add scan endpoint
   setupServer.on("/action", HTTP_GET, handleAction);
   setupServer.on("/configure", HTTP_POST, handleConfigure);
@@ -810,8 +721,6 @@ void startCameraServer() {
   setupServer.on("/stream", HTTP_GET, handleStream);
   setupServer.on("/capture", HTTP_GET, handleCapture);
   setupServer.on("/info", HTTP_GET, handleDeviceInfo);
-  setupServer.on("/.well-known/wot-thing-description", HTTP_GET,
-                 handleThingDescription); // WoT Discovery
   setupServer.on("/action", HTTP_GET, handleAction);
   setupServer.on("/configure", HTTP_POST, handleConfigure);
   setupServer.on("/provision", HTTP_POST, handleProvision);
@@ -833,11 +742,7 @@ bool connectToWiFi() {
     attempts++;
   }
   Serial.println();
-  if (WiFi.status() == WL_CONNECTED) {
-    justConnected = true;
-    return true;
-  }
-  return false;
+  return WiFi.status() == WL_CONNECTED;
 }
 
 bool attemptSelfRegistration() {
@@ -934,98 +839,8 @@ void ackCommand(String cmdId) {
   http.end();
 }
 
-// Telemetry Configuration
-const unsigned long TELEMETRY_INTERVAL = 60000; // 60s
-
-String getResetReasonString() {
-  esp_reset_reason_t reason = esp_reset_reason();
-  switch (reason) {
-  case ESP_RST_POWERON:
-    return "Power On";
-  case ESP_RST_SW:
-    return "Software Reset";
-  case ESP_RST_PANIC:
-    return "Exception/Panic";
-  case ESP_RST_INT_WDT:
-    return "Watchdog (Interrupt)";
-  case ESP_RST_TASK_WDT:
-    return "Watchdog (Task)";
-  case ESP_RST_WDT:
-    return "Watchdog (Other)";
-  case ESP_RST_DEEPSLEEP:
-    return "Deep Sleep";
-  case ESP_RST_BROWNOUT:
-    return "Brownout";
-  case ESP_RST_SDIO:
-    return "SDIO";
-  default:
-    return "Unknown";
-  }
-}
-
-void reportTelemetry(bool isBoot, bool isConnect) {
-  if (deviceID.length() == 0 || apiKey.length() == 0)
-    return;
-  if (!WiFi.isConnected())
-    return;
-
-  HTTPClient http;
-  http.begin(serverURL + "/data/" + deviceID);
-  http.addHeader("Authorization", "Bearer " + apiKey);
-  http.addHeader("Content-Type", "application/json");
-
-  // Base Heartbeat Data (Always Sent)
-  String json = "{";
-  json += "\"rssi\":" + String(WiFi.RSSI()) + ",";
-  json += "\"uptime\":" + String(millis() / 1000) + ",";
-  json += "\"free_heap\":" + String(ESP.getFreeHeap()) + ",";
-  json += "\"status\":\"online\"";
-
-  // Connection Event Data
-  if (isConnect) {
-    json += ",";
-    json += "\"local_ip\":\"" + WiFi.localIP().toString() + "\",";
-    json += "\"ssid\":\"" + WiFi.SSID() + "\",";
-    json += "\"bssid\":\"" + WiFi.BSSIDstr() + "\",";
-    json += "\"channel\":" + String(WiFi.channel()) + "";
-  }
-
-  // Boot Event Data (Send Full State)
-  if (isBoot) {
-    json += ",";
-    json += "\"fw_ver\":\"" + String(FIRMWARE_VERSION) + "\",";
-    json += "\"reset_reason\":\"" + getResetReasonString() + "\",";
-
-    // Settings State
-    char hexColor[8];
-    sprintf(hexColor, "#%02X%02X%02X", savedR, savedG, savedB);
-    json += "\"led_color\":\"" + String(hexColor) + "\",";
-    json += "\"led_brightness\":" + String(savedBrightness) + ",";
-    json += "\"led_on\":" + String(torchState ? "true" : "false") + ",";
-
-    sensor_t *s = esp_camera_sensor_get();
-    if (s) {
-      json +=
-          "\"resolution\":\"" + getFrameSizeName(s->status.framesize) + "\",";
-      json +=
-          "\"hmirror\":" + String(s->status.hmirror ? "true" : "false") + ",";
-      json += "\"vflip\":" + String(s->status.vflip ? "true" : "false");
-    } else {
-      // Fallback defaults
-      json += "\"resolution\":\"VGA\",\"hmirror\":false,\"vflip\":false";
-    }
-  }
-
-  json += "}";
-
-  DEBUG_PRINTLN("Sending Telemetry (Boot=" + String(isBoot) +
-                ", Connect=" + String(isConnect) + "): " + json);
-  int code = http.POST(json);
-  http.end();
-}
-
 void checkCommands() {
-  // Check every 1 second
+  // Check every 1 second (was 5s) for better responsiveness
   if (millis() - lastCommandPoll < 1000)
     return;
   lastCommandPoll = millis();
@@ -1038,7 +853,7 @@ void checkCommands() {
   if (http.GET() == 200) {
     String pl = http.getString();
 
-    // Iterate over command objects
+    // Robust iteration over command objects
     int startObj = pl.indexOf('{');
     while (startObj >= 0) {
       int endObj = startObj;
@@ -1080,7 +895,6 @@ void checkCommands() {
 
       if (pid.length() > 0 && action.length() > 0) {
         Serial.println("Processing Command: " + pid + " Action: " + action);
-
         if (action == "update_settings") {
           ackCommand(pid);
           String resolution = extractJsonVal(paramsBlock, "resolution");
@@ -1089,21 +903,44 @@ void checkCommands() {
           bool hmirror = extractJsonBool(paramsBlock, "hmirror");
           bool vflip = extractJsonBool(paramsBlock, "vflip");
 
-          // LED Logic
+          Serial.println("Settings: Res=" + resolution + " Col=" + color +
+                         " Bri=" + String(brightness));
+
+          // Update Global LED State
           if (color.length() > 0) {
             long number = strtol(&color.c_str()[1], NULL, 16);
             savedR = number >> 16;
             savedG = number >> 8 & 0xFF;
             savedB = number & 0xFF;
           }
-          if (brightness != -1)
+          if (brightness != -1) {
             savedBrightness = brightness;
+          }
 
-// Apply LED
-#ifdef LED_GPIO_NUM
+          if (resolution.length() > 0) {
+            framesize_t currentSize = esp_camera_sensor_get()->status.framesize;
+            framesize_t newSize = getFrameSizeFromName(resolution);
+            if (newSize != currentSize) {
+              bool wasStreaming = streaming;
+              streaming = false;
+              delay(100);
+              sensor_t *s = esp_camera_sensor_get();
+              s->set_framesize(s, newSize);
+              streaming = wasStreaming;
+            }
+          }
+          sensor_t *s = esp_camera_sensor_get();
+          if (s) {
+            s->set_hmirror(s, hmirror ? 1 : 0);
+            s->set_vflip(s, vflip ? 1 : 0);
+          }
+
+          // Apply LED State Unified
           int r = (savedR * savedBrightness) / 100;
           int g = (savedG * savedBrightness) / 100;
           int b = (savedB * savedBrightness) / 100;
+
+#ifdef LED_GPIO_NUM
 #if LED_GPIO_NUM == 48
           neopixelWrite(LED_GPIO_NUM, r, g, b);
           torchState = (r + g + b > 0);
@@ -1111,46 +948,23 @@ void checkCommands() {
           digitalWrite(LED_GPIO_NUM, (r + g + b > 0) ? HIGH : LOW);
 #endif
 #endif
-
-          // Camera Logic
-          sensor_t *s = esp_camera_sensor_get();
-          if (s) {
-            if (resolution.length() > 0) {
-              framesize_t newSize = getFrameSizeFromName(resolution);
-              if (s->status.framesize != newSize) {
-                bool wasStreaming = streaming;
-                streaming = false;
-                delay(100);
-                s->set_framesize(s, newSize);
-                streaming = wasStreaming;
-              }
-            }
-            if (paramsBlock.indexOf("hmirror") != -1)
-              s->set_hmirror(s, hmirror ? 1 : 0);
-            if (paramsBlock.indexOf("vflip") != -1)
-              s->set_vflip(s, vflip ? 1 : 0);
-          }
-
         } else if (action == "snap") {
-          // Handle Snap
           ackCommand(pid);
           String snapRes = extractJsonVal(paramsBlock, "resolution");
           handleSnap(snapRes);
+        } else if (action == "update_firmware") {
+          ackCommand(pid);
+          String firmwareUrl = extractJsonVal(paramsBlock, "url");
+          updateFirmware(firmwareUrl);
         } else if (action == "restart") {
           ackCommand(pid);
           ESP.restart();
-        } else if (action == "led") {
+        } else if (action == "start-stream") {
           ackCommand(pid);
-// Toggle Logic
-#ifdef LED_GPIO_NUM
-#if LED_GPIO_NUM == 48
-          torchState = !torchState;
-          if (torchState)
-            neopixelWrite(LED_GPIO_NUM, 255, 255, 255);
-          else
-            neopixelWrite(LED_GPIO_NUM, 0, 0, 0);
-#endif
-#endif
+          streaming = true;
+        } else if (action == "stop-stream") {
+          ackCommand(pid);
+          streaming = false;
         } else {
           ackCommand(pid);
         }
@@ -1200,6 +1014,31 @@ void streamLoop() {
   lastFrameTime = millis();
   uploadFrame(fb);
   esp_camera_fb_return(fb);
+}
+
+// Helper to get framesize from string
+framesize_t getFrameSizeFromName(String name) {
+  if (name == "QCIF")
+    return FRAMESIZE_QCIF;
+  if (name == "QVGA")
+    return FRAMESIZE_QVGA;
+  if (name == "CIF")
+    return FRAMESIZE_CIF;
+  if (name == "VGA")
+    return FRAMESIZE_VGA;
+  if (name == "SVGA")
+    return FRAMESIZE_SVGA;
+  if (name == "XGA")
+    return FRAMESIZE_XGA;
+  if (name == "HD")
+    return FRAMESIZE_HD;
+  if (name == "SXGA")
+    return FRAMESIZE_SXGA;
+  if (name == "UXGA")
+    return FRAMESIZE_UXGA;
+  if (name == "QXGA")
+    return FRAMESIZE_QXGA;
+  return FRAMESIZE_VGA; // Default
 }
 
 void handleSnap(String resolution = "UXGA") {
@@ -1405,46 +1244,22 @@ void setup() {
 }
 
 void loop() {
-  if (currentState == STATE_SETUP_MODE) {
+  handleFactoryResetButton(); // Check button every loop
+  updateLED();
+  if (currentState == STATE_SETUP_MODE || currentState == STATE_ONLINE) {
     setupServer.handleClient();
-    updateLED();
-    handleFactoryResetButton();
-  } else if (currentState == STATE_ONLINE) {
-    unsigned long now = millis();
+  }
+  if (currentState == STATE_ONLINE) {
+    checkCommands();
+    streamLoop();
+  }
 
-    // Check for "Just Connected" event
-    if (justConnected) {
-      reportTelemetry(initialBoot, true);
-      justConnected = false;
-      initialBoot = false; // Boot info consumed
-      lastTelemetryTime = now;
-    }
-
-    // Periodic Heartbeat (Standard Telemetry)
-    if (now - lastTelemetryTime > TELEMETRY_INTERVAL) {
-      reportTelemetry(false, false);
-      lastTelemetryTime = now;
-    }
-
-    // Command Poll
-    if (now - lastCommandPoll > COMMAND_POLL_INTERVAL_MS) {
-      checkCommands();
-      lastCommandPoll = now;
-    }
-
-    if (streaming) {
-      streamLoop();
-    }
-
-    updateLED();
-    handleFactoryResetButton();
+  // Dynamic Delay for Performance vs Power
+  if (currentState == STATE_ONLINE && streaming) {
+    // Zero delay when streaming for max FPS
+    // (httpStream.POST yields internally)
   } else {
-    updateLED();
-    handleFactoryResetButton();
-    // Reconnection logic if needed
-    if (WiFi.status() != WL_CONNECTED && currentState != STATE_SETUP_MODE) {
-      // Auto reconnect handling by ESP32 usually works, but we can restart if
-      // long offline
-    }
+    // Delay when idle or setup to save power
+    delay(10);
   }
 }

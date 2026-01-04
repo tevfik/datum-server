@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'about_screen.dart';
 import 'login_screen.dart';
+import 'api_keys_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -111,6 +112,14 @@ class SettingsScreen extends StatelessWidget {
             leading: const Icon(Icons.lock),
             title: const Text('Change Password'),
             onTap: () => _showChangePasswordDialog(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.vpn_key),
+            title: const Text('API Keys'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+               Navigator.push(context, MaterialPageRoute(builder: (_) => const ApiKeysScreen()));
+            },
           ),
           ListTile(
             leading: const Icon(Icons.info),

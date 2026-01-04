@@ -67,6 +67,9 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         if (_deviceData.containsKey('led_brightness')) {
            _ledBrightness = (_deviceData['led_brightness'] as num).toDouble();
         }
+        if (_deviceData.containsKey('led_on')) {
+           _ledOn = _deviceData['led_on'];
+        }
         if (_deviceData.containsKey('resolution')) {
           _streamRes = _deviceData['resolution'];
         }
@@ -135,7 +138,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                     DropdownButton<String>(
                       value: _streamRes,
                       isExpanded: true,
-                      items: ["QVGA", "VGA", "SVGA", "HD"].map((String value) {
+                      items: ["QVGA", "VGA", "SVGA", "HD", "SXGA", "UXGA", "QXGA"].map((String value) {
                         return DropdownMenuItem<String>(
                           value: value,
                           child: Text(value),
@@ -534,17 +537,19 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _ActionButton(
-                      icon: Icons.lightbulb,
-                      label: "Toggle LED",
-                      color: Colors.amber,
+                      icon: _ledOn ? Icons.lightbulb : Icons.lightbulb_outline,
+                      label: _ledOn ? "LED: ON" : "LED: OFF",
+                      color: _ledOn ? Colors.amber : Colors.grey,
                       onPressed: () {
-                          // Toggle logic: If brightness > 0, set to 0. Else max.
-                          if (_ledBrightness > 0) {
+                          // Toggle logic: If On, Turn Off. If Off, Turn On.
+                          if (_ledOn) {
+                             setState(() => _ledOn = false);
                              setState(() => _ledBrightness = 0);
                           } else {
-                             setState(() => _ledBrightness = 100);
                              setState(() => _ledOn = true);
+                             setState(() => _ledBrightness = 100);
                           }
+
                           _sendSettings();
                       },
                       isLoading: _loadingAction,
