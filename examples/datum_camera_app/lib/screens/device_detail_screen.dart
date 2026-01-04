@@ -1,3 +1,4 @@
+// Legacy Features Restored (Full Screen, LED, Settings)
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
