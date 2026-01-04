@@ -499,9 +499,9 @@ func generateProvisioningID(prefix string) string {
 	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(bytes))
 }
 
-// generateProvisioningAPIKey generates a secure API key for provisioning
+// generateProvisioningAPIKey generates a secure API key for provisioning (Standardized 32 hex)
 func generateProvisioningAPIKey() string {
-	bytes := make([]byte, 8)
+	bytes := make([]byte, 16)
 	rand.Read(bytes)
 	return "dk_" + hex.EncodeToString(bytes)
 }

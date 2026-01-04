@@ -94,11 +94,21 @@ func ValidateToken(tokenString string) (*Claims, error) {
 	return nil, ErrInvalidToken
 }
 
-// GenerateAPIKey generates a random API key for devices (shorter for easier use)
+// GenerateAPIKey generates a random API key for devices (sk_ prefix)
+// Standardized to 16 bytes (32 hex chars)
 func GenerateAPIKey() (string, error) {
-	bytes := make([]byte, 12) // 12 bytes = 24 hex chars
+	bytes := make([]byte, 16) // 16 bytes = 32 hex chars
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
 	}
 	return "sk_" + hex.EncodeToString(bytes), nil
+}
+
+// GenerateUserAPIKey generates a persistent API key for users (ak_ prefix)
+func GenerateUserAPIKey() (string, error) {
+	bytes := make([]byte, 16) // 16 bytes = 32 hex chars
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return "ak_" + hex.EncodeToString(bytes), nil
 }

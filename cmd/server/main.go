@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	Version   = "1.0.0"
+	Version   = "1.1.0"
 	BuildDate = "unknown"
 )
 
@@ -206,15 +206,20 @@ func main() {
 
 	// Authenticated user routes (password change, self-deletion)
 	authProtectedGroup := r.Group("/auth")
-	authProtectedGroup.Use(auth.AuthMiddleware())
+	authProtectedGroup.Use(UserAuthMiddleware(store))
 	{
 		authProtectedGroup.PUT("/password", changePasswordHandler)
 		authProtectedGroup.DELETE("/user", deleteSelfHandler)
+
+		// User API Key Management
+		authProtectedGroup.POST("/keys", createKeyHandler)
+		authProtectedGroup.GET("/keys", listKeysHandler)
+		authProtectedGroup.DELETE("/keys/:id", deleteKeyHandler)
 	}
 
 	// Device management routes (require user auth)
 	devicesGroup := r.Group("/devices")
-	devicesGroup.Use(auth.AuthMiddleware())
+	devicesGroup.Use(UserAuthMiddleware(store))
 	{
 		devicesGroup.POST("", createDeviceHandler)
 		devicesGroup.GET("", listDevicesHandler)
@@ -248,12 +253,12 @@ func main() {
 
 	// Data query routes (require user auth)
 	dataQueryGroup := r.Group("/data")
-	dataQueryGroup.Use(auth.AuthMiddleware())
+	dataQueryGroup.Use(UserAuthMiddleware(store))
 	{
 
 		// Video streaming routes (require user auth)
 		streamGroup := r.Group("/devices")
-		streamGroup.Use(auth.AuthMiddleware())
+		streamGroup.Use(UserAuthMiddleware(store))
 		{
 			streamGroup.GET("/:device_id/stream/mjpeg", mjpegStreamHandler)       // MJPEG over HTTP (SSE-like)
 			streamGroup.GET("/:device_id/stream/snapshot", streamSnapshotHandler) // Current frame snapshot

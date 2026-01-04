@@ -193,7 +193,7 @@ datumctl device create --name "ESP32 Camera" --type camera
 
 # Output:
 # Device ID: esp32-cam-01
-# API Key: dev_xxxxxxxxxxxxxxxx
+# API Key: dk_a1b2c3d4e5f67890 (Save this key!)
 ```
 
 Update firmware with the API key.
@@ -231,33 +231,42 @@ vlc http://your-server:8080/devices/esp32-cam-01/stream/mjpeg?token=YOUR_JWT
 
 ---
 
-## � Firmware OTA Update
+## 🔄 Firmware OTA Update (Secured)
 
-You can wirelessly update the ESP32 firmware using `datumctl`.
+You can wirelessly update the ESP32 firmware using `datumctl` or `curl`. The update process is secured: the firmware automatically authenticates with the server using its device token.
 
 ### 1. Build & Host Firmware
-Export your compiled binary (e.g., `firmware.bin`) and host it on a local server or cloud storage (HTTP) that the ESP32 can access.
-```bash
-python3 -m http.server 8000
-# Available at http://192.168.1.100:8000/firmware.bin
-```
+1.  **Export Binary**: In Arduino IDE, use **Sketch > Export Compiled Binary**.
+2.  **Upload to Server**: Copy the `.bin` file to the `firmware/` directory on your server.
+    *   This directory is mounted to the Docker container.
+    *   Example: `cp build/esp32.bin ~/scripts/services/datum-server/firmware/my_fw.bin`
 
 ### 2. Trigger Update
+Send the `update_firmware` command. The URL should point to your server's protected firmware endpoint.
+
+**Using curl:**
 ```bash
-datumctl device update-firmware <device-id> http://192.168.1.100:8000/firmware.bin
+curl -X POST https://datum.bezg.in/devices/<DEVICE_ID>/commands \
+  -H "Authorization: Bearer <USER_TOKEN>" \
+  -d '{
+    "action": "update_firmware",
+    "params": {
+        "url": "https://datum.bezg.in/devices/firmware/my_fw.bin"
+    }
+}'
 ```
 
-The device will:
-1. Stop streaming (to free memory).
-2. Download the binary.
-3. Verify and flash.
-4. Auto-restart.
+**Note**: You do not need to add `?token=...` to the URL manually. The firmware will automatically append its own authentication token to the request.
 
-Note: Provides progress logs on Serial Monitor. 
+### 3. Process
+1.  Device receives command.
+2.  Device stops streaming (if active).
+3.  Device downloads authenticated firmware from server.
+4.  Device flashes and reboots.
 
 ---
 
-## �📱 Mobile App (Datum Camera App)
+## 📱 Mobile App (Datum Camera App)
 
 The easiest way to set up and view your camera is using the official **Datum Camera App**.
 

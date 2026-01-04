@@ -1505,3 +1505,129 @@ func (s *Storage) CleanupExpiredProvisioningRequests() (int, error) {
 	})
 	return cleaned, err
 }
+
+// ============ User API Key operations (BuntDB) ============
+
+type APIKey struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Name      string    `json:"name"`
+	Key       string    `json:"key"` // ak_xxxx
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (s *Storage) CreateUserAPIKey(key *APIKey) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		// Store key metadata
+		keyID := fmt.Sprintf("apikey_meta:%s", key.ID)
+		data, _ := json.Marshal(key)
+		tx.Set(keyID, string(data), nil)
+
+		// Index by User ID (for listing)
+		userKeysKey := fmt.Sprintf("user:%s:apikeys", key.UserID)
+		keysJSON, err := tx.Get(userKeysKey)
+		var keys []string
+		if err == nil {
+			json.Unmarshal([]byte(keysJSON), &keys)
+		}
+		keys = append(keys, key.ID)
+		keysData, _ := json.Marshal(keys)
+		tx.Set(userKeysKey, string(keysData), nil)
+
+		// Index by Key string (for lookup)
+		keyIndex := fmt.Sprintf("apikey_lookup:%s", key.Key)
+		tx.Set(keyIndex, key.UserID, nil)
+
+		return nil
+	})
+}
+
+func (s *Storage) GetUserAPIKeys(userID string) ([]APIKey, error) {
+	var keys []APIKey
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		userKeysKey := fmt.Sprintf("user:%s:apikeys", userID)
+		keysJSON, err := tx.Get(userKeysKey)
+		if err != nil {
+			return nil // No keys found
+		}
+
+		var keyIDs []string
+		json.Unmarshal([]byte(keysJSON), &keyIDs)
+
+		for _, id := range keyIDs {
+			keyID := fmt.Sprintf("apikey_meta:%s", id)
+			data, err := tx.Get(keyID)
+			if err != nil {
+				continue
+			}
+			var key APIKey
+			json.Unmarshal([]byte(data), &key)
+			keys = append(keys, key)
+		}
+		return nil
+	})
+	return keys, err
+}
+
+func (s *Storage) DeleteUserAPIKey(userID, keyID string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		// Get key metadata to find the key string
+		metaKey := fmt.Sprintf("apikey_meta:%s", keyID)
+		data, err := tx.Get(metaKey)
+		if err != nil {
+			return fmt.Errorf("key not found")
+		}
+
+		var key APIKey
+		json.Unmarshal([]byte(data), &key)
+
+		// Check ownership
+		if key.UserID != userID {
+			return fmt.Errorf("unauthorized")
+		}
+
+		// Delete metadata
+		tx.Delete(metaKey)
+
+		// Delete lookup index
+		tx.Delete(fmt.Sprintf("apikey_lookup:%s", key.Key))
+
+		// Remove from user list
+		userKeysKey := fmt.Sprintf("user:%s:apikeys", userID)
+		keysJSON, _ := tx.Get(userKeysKey)
+		var keyIDs []string
+		json.Unmarshal([]byte(keysJSON), &keyIDs)
+
+		var newKeyIDs []string
+		for _, id := range keyIDs {
+			if id != keyID {
+				newKeyIDs = append(newKeyIDs, id)
+			}
+		}
+		keysData, _ := json.Marshal(newKeyIDs)
+		tx.Set(userKeysKey, string(keysData), nil)
+
+		return nil
+	})
+}
+
+func (s *Storage) GetUserByUserAPIKey(apiKey string) (*User, error) {
+	var user User
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		// Lookup UserID from key
+		keyIndex := fmt.Sprintf("apikey_lookup:%s", apiKey)
+		userID, err := tx.Get(keyIndex)
+		if err != nil {
+			return fmt.Errorf("invalid api key")
+		}
+
+		// Get User details
+		userKey := fmt.Sprintf("user:%s", userID)
+		userData, err := tx.Get(userKey)
+		if err != nil {
+			return fmt.Errorf("user not found")
+		}
+		return json.Unmarshal([]byte(userData), &user)
+	})
+	return &user, err
+}

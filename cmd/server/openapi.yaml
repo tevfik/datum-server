@@ -30,7 +30,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: User JWT token
+      description: User JWT token or Persistent API Key (ak_...)
     ApiKeyAuth:
       type: http
       scheme: bearer
@@ -62,6 +62,44 @@ components:
           type: string
         password:
           type: string
+
+    CreateKeyRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    KeyResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        key:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, new_password]
+      properties:
+        token:
+          type: string
+        new_password:
+          type: string
+          minLength: 8
 
     AuthResponse:
       type: object
@@ -153,6 +191,115 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
           description: Invalid credentials
+
+  /auth/keys:
+    post:
+      summary: Create User API Key
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateKeyRequest'
+      responses:
+        '201':
+          description: Key created (Save the key!)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyResponse'
+    get:
+      summary: List User API Keys
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of keys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/KeyResponse'
+
+  /auth/keys/{id}:
+    delete:
+      summary: Revoke User API Key
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Key deleted
+
+  /auth/forgot-password:
+    post:
+      summary: Request password reset email
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Email sent (if user exists)
+
+  /auth/reset-password:
+    post:
+      summary: Complete password reset
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password updated
+
+  /devices/firmware/{filename}:
+    get:
+      summary: Download Firmware (Secured)
+      tags: [Devices]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Device API key
+      responses:
+        '200':
+          description: Firmware binary
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
 
   /devices:
     post:
