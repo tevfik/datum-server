@@ -165,6 +165,8 @@ func main() {
 	r.Use(gin.Recovery())
 	// Use our custom structured logger for requests which filters noisy endpoints
 	r.Use(logger.GinLogger())
+	// Metrics middleware
+	r.Use(metricsMiddleware())
 
 	r.Use(securityHeadersMiddleware())
 	// CORS setup
@@ -190,6 +192,7 @@ func main() {
 	r.GET("/healthz", healthHandler)
 	r.GET("/live", livenessHandler)
 	r.GET("/ready", readinessHandler)
+	r.GET("/metrics", metricsHandler) // Prometheus metrics
 
 	// Auth routes
 	authGroup := r.Group("/auth")
@@ -293,6 +296,12 @@ func main() {
 
 		c.File(filePath)
 	})
+
+	// Admin routes
+	setupAdminRoutes(r, store)
+
+	// Provisioning routes (Mobile App & Device Activation)
+	RegisterProvisioningRoutes(r, UserAuthMiddleware(store))
 
 	// Swagger UI documentation
 	setupSwagger(r)
