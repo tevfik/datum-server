@@ -607,19 +607,34 @@
 
                 // 2. Poll for snapshot (faster polling to catch the 4s window)
                 let success = false;
-                for (let i = 0; i < 60; i++) {
+                const expectedWidth = {
+                    "QVGA": 320, "VGA": 640, "SVGA": 800, "XGA": 1024,
+                    "HD": 1280, "SXGA": 1280, "UXGA": 1600, "QXGA": 2048
+                }[resolution] || 640;
+
+                log(`Waiting for ${resolution} image (min width: ${expectedWidth})...`);
+
+                for (let i = 0; i < 20; i++) {
                     await new Promise(r => setTimeout(r, 500));
                     try {
                         const snapshotURL = `${serverURL}/devices/${deviceID}/stream/snapshot?token=${token}&t=${Date.now()}`;
                         const imgRes = await fetch(snapshotURL);
                         if (imgRes.ok) {
                             const blob = await imgRes.blob();
-                            // Normal frames are ~25-50KB. Snapshot is >100KB.
-                            // Set threshold to 20KB to be safe (dark images etc).
-                            if (blob.size > 20000) {
-                                const url = URL.createObjectURL(blob);
 
-                                // Create temporary link to trigger download
+                            // Load into Image to check dimensions
+                            const imgCheck = new Image();
+                            const checkPromise = new Promise(resolve => {
+                                imgCheck.onload = () => resolve(true);
+                                imgCheck.onerror = () => resolve(false);
+                            });
+                            imgCheck.src = URL.createObjectURL(blob);
+                            await checkPromise;
+
+                            log(`Retry ${i + 1}: Received ${imgCheck.naturalWidth}x${imgCheck.naturalHeight} (${(blob.size / 1024).toFixed(1)} KB)`);
+
+                            if (imgCheck.naturalWidth >= expectedWidth) {
+                                const url = imgCheck.src;
                                 const a = document.createElement('a');
                                 a.href = url;
                                 a.download = `snapshot-${resolution}-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
@@ -627,11 +642,9 @@
                                 a.click();
                                 document.body.removeChild(a);
 
-                                log(`Snapshot downloaded! Size: ${(blob.size / 1024).toFixed(1)} KB`);
+                                log('Snapshot downloaded successfully!');
                                 success = true;
                                 break;
-                            } else {
-                                log(`Retry ${i + 1}: Got small frame (${(blob.size / 1024).toFixed(1)} KB)`);
                             }
                         }
                     } catch (e) {
