@@ -25,7 +25,7 @@ dependencies:
   video_player: ^2.8.1
   open_file_plus: ^3.3.0
   package_info_plus: ^5.0.1
-  app_links: ^3.4.5
+  app_links: ^6.3.0
 
 
 dev_dependencies:
