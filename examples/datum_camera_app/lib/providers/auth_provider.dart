@@ -23,13 +23,17 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String email, String password, {bool rememberMe = false}) async {
     try {
       final token = await _api.login(email, password);
       _token = token;
       _api.setToken(token);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('auth_token', token);
+      
+      if (rememberMe) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', token);
+      }
+      
       notifyListeners();
       return true;
     } catch (e) {
@@ -52,5 +56,14 @@ class AuthProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     notifyListeners();
+  }
+
+  Future<void> changePassword(String oldPassword, String newPassword) async {
+    await _api.changePassword(oldPassword, newPassword);
+  }
+
+  Future<void> deleteAccount() async {
+    await _api.deleteAccount();
+    await logout();
   }
 }

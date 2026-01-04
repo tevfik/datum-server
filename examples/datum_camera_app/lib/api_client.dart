@@ -134,4 +134,30 @@ class ApiClient {
       throw Exception('Delete failed: $e');
     }
   }
+  Future<void> changePassword(String oldPassword, String newPassword) async {
+    try {
+      await _dio.put('/auth/password', data: {
+        'old_password': oldPassword,
+        'new_password': newPassword,
+      });
+      _logger.log('Password changed successfully');
+    } catch (e) {
+      if (e is DioException && e.response != null) {
+        throw Exception('Password change failed: ${e.response?.data}');
+      }
+      throw Exception('Password change failed: $e');
+    }
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      await _dio.delete('/auth/user');
+      _logger.log('Account deleted successfully');
+    } catch (e) {
+      if (e is DioException && e.response != null) {
+        throw Exception('Account deletion failed: ${e.response?.data}');
+      }
+      throw Exception('Account deletion failed: $e');
+    }
+  }
 }

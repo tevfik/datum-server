@@ -34,7 +34,6 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _rememberMe = true;
           _emailController.text = prefs.getString('saved_email') ?? '';
-          _passwordController.text = prefs.getString('saved_pass') ?? '';
         });
       }
     }
@@ -43,20 +42,18 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     setState(() => _isLoading = true);
     final success = await Provider.of<AuthProvider>(context, listen: false)
-        .login(_emailController.text, _passwordController.text);
+        .login(_emailController.text, _passwordController.text, rememberMe: _rememberMe);
     setState(() => _isLoading = false);
 
     if (success) {
-      // Handle Remember Me
+      // Save email for next time if Remember Me is checked
       final prefs = await SharedPreferences.getInstance();
       if (_rememberMe) {
          await prefs.setBool('remember_me', true);
          await prefs.setString('saved_email', _emailController.text);
-         await prefs.setString('saved_pass', _passwordController.text);
       } else {
          await prefs.remove('remember_me');
          await prefs.remove('saved_email');
-         await prefs.remove('saved_pass');
       }
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

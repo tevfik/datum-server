@@ -173,6 +173,14 @@ func main() {
 		authGroup.POST("/login", loginHandler)
 	}
 
+	// Authenticated user routes (password change, self-deletion)
+	authProtectedGroup := r.Group("/auth")
+	authProtectedGroup.Use(auth.AuthMiddleware())
+	{
+		authProtectedGroup.PUT("/password", changePasswordHandler)
+		authProtectedGroup.DELETE("/user", deleteSelfHandler)
+	}
+
 	// Device management routes (require user auth)
 	devicesGroup := r.Group("/devices")
 	devicesGroup.Use(auth.AuthMiddleware())

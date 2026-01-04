@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../providers/device_provider.dart';
 import 'provisioning_wizard.dart';
 import 'device_detail_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -15,8 +16,13 @@ class HomeScreen extends StatelessWidget {
         title: const Text('Datum Dashboard'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => Provider.of<AuthProvider>(context, listen: false).logout(),
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+               Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
           ),
         ],
       ),
