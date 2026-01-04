@@ -132,4 +132,22 @@ func TestProvisioningFlowIntegration(t *testing.T) {
 	*/
 
 	assert.Equal(t, "active", checkMap["status"])
+
+	// ==========================================
+	// Step 3: Mobile App Polls Request Status
+	// ==========================================
+	// This was causing 404s before because the request wasn't saved
+	w3 := httptest.NewRecorder()
+	req3, _ := http.NewRequest("GET", "/devices/provisioning/"+regResp.RequestID, nil)
+	r.ServeHTTP(w3, req3)
+
+	assert.Equal(t, http.StatusOK, w3.Code)
+	var statusMap map[string]interface{}
+	err = json.Unmarshal(w3.Body.Bytes(), &statusMap)
+	assert.NoError(t, err)
+
+	// We expect "completed" since we auto-completed the specific provisioning request
+	// Ideally the mobile app handles "completed" as success just like "active"
+	assert.Equal(t, "completed", statusMap["status"])
+	assert.Equal(t, regResp.DeviceID, statusMap["device_id"])
 }

@@ -136,43 +136,19 @@ func registerDeviceHandler(c *gin.Context) {
 	}
 
 	// Generate IDs and keys
+	// Generate IDs and keys
 	requestID := generateProvisioningID("prov")
 	deviceID := generateProvisioningID("dev")
 	apiKey := generateProvisioningAPIKey()
 
-	// Create device directly (Auto-Activation for User-Authenticated Registration)
-	device := &storage.Device{
-		ID:              deviceID,
-		UserID:          userID,
-		Name:            req.DeviceName,
-		Type:            req.DeviceType,
-		DeviceUID:       deviceUID,
-		APIKey:          apiKey,
-		Status:          "active",
-		CreatedAt:       time.Now(),
-		LastSeen:        time.Now(), // Mark as seen
-		FirmwareVersion: "unknown",  // Will be updated on first ping
-	}
-
-	if err := store.CreateDevice(device); err != nil {
-		if strings.Contains(err.Error(), "already exists") {
-			c.JSON(http.StatusConflict, gin.H{"error": "device already registered to another user"})
-			return
-		}
-		logger.GetLogger().Error().Err(err).Msg("Failed to create device")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create device"})
-		return
-	}
-
-	// We no longer creation a pending provisioning request because we auto-activated.
-	// But we keep the response format consistent for the firmware.
+	// 1. Create Provisioning Request (Pending)
 	provReq := &storage.ProvisioningRequest{
 		ID:         requestID,
 		DeviceUID:  deviceUID,
 		UserID:     userID,
 		DeviceName: req.DeviceName,
 		DeviceType: req.DeviceType,
-		Status:     "active", // Changed from pending
+		Status:     "pending", // Start as pending, then complete
 		DeviceID:   deviceID,
 		APIKey:     apiKey,
 		ServerURL:  provisioningConfig.ServerURL,
@@ -180,6 +156,20 @@ func registerDeviceHandler(c *gin.Context) {
 		WiFiPass:   req.WiFiPass,
 		ExpiresAt:  time.Now().Add(provisioningConfig.DefaultExpiration),
 		CreatedAt:  time.Now(),
+	}
+
+	if err := store.CreateProvisioningRequest(provReq); err != nil {
+		logger.GetLogger().Error().Err(err).Msg("Failed to create provisioning request")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create provisioning request"})
+		return
+	}
+
+	// 2. Complete Provisioning Request (Creates Device)
+	// This simulates the full flow: request -> complete -> device active
+	if _, err := store.CompleteProvisioningRequest(requestID); err != nil {
+		logger.GetLogger().Error().Err(err).Msg("Failed to complete provisioning request")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to complete provisioning"})
+		return
 	}
 
 	// Log successful provisioning registration
