@@ -141,6 +141,13 @@ String deviceID;
 String userToken;  // Store token directly
 String deviceName; // Custom device name
 
+// LED State Globals
+byte savedR = 255;
+byte savedG = 255;
+byte savedB = 255;
+int savedBrightness = 100;
+bool torchState = false;
+
 enum DeviceState {
   STATE_BOOT,
   STATE_SETUP_MODE,
@@ -934,11 +941,29 @@ void reportTelemetry(bool isBoot, bool isConnect) {
     json += "\"channel\":" + String(WiFi.channel()) + "";
   }
 
-  // Boot Event Data
+  // Boot Event Data (Send Full State)
   if (isBoot) {
     json += ",";
     json += "\"fw_ver\":\"" + String(FIRMWARE_VERSION) + "\",";
-    json += "\"reset_reason\":\"" + getResetReasonString() + "\"";
+    json += "\"reset_reason\":\"" + getResetReasonString() + "\",";
+
+    // Settings State
+    char hexColor[8];
+    sprintf(hexColor, "#%02X%02X%02X", savedR, savedG, savedB);
+    json += "\"led_color\":\"" + String(hexColor) + "\",";
+    json += "\"led_brightness\":" + String(savedBrightness) + ",";
+
+    sensor_t *s = esp_camera_sensor_get();
+    if (s) {
+      json +=
+          "\"resolution\":\"" + getFrameSizeName(s->status.framesize) + "\",";
+      json +=
+          "\"hmirror\":" + String(s->status.hmirror ? "true" : "false") + ",";
+      json += "\"vflip\":" + String(s->status.vflip ? "true" : "false");
+    } else {
+      // Fallback defaults
+      json += "\"resolution\":\"VGA\",\"hmirror\":false,\"vflip\":false";
+    }
   }
 
   json += "}";
@@ -949,8 +974,140 @@ void reportTelemetry(bool isBoot, bool isConnect) {
   http.end();
 }
 
+// Helper to extract numeric JSON value (robust)
+int extractJsonInt(String json, String key) {
+  int keyIdx = json.indexOf("\"" + key + "\"");
+  if (keyIdx < 0)
+    return -1;
+  int colonIdx = json.indexOf(":", keyIdx);
+  if (colonIdx < 0)
+    return -1;
+  int s = colonIdx + 1;
+  while (s < json.length() && !isDigit(json.charAt(s)) && json.charAt(s) != '-')
+    s++;
+  if (s >= json.length())
+    return -1;
+  int e = s;
+  while (e < json.length() &&
+         (isDigit(json.charAt(e)) || json.charAt(e) == '-'))
+    e++;
+  return json.substring(s, e).toInt();
+}
+
+// Helper to extract boolean JSON value (true/false or 1/0)
+bool extractJsonBool(String json, String key) {
+  int keyIdx = json.indexOf("\"" + key + "\"");
+  if (keyIdx < 0)
+    return false;
+  int colonIdx = json.indexOf(":", keyIdx);
+  if (colonIdx < 0)
+    return false;
+  String remainder = json.substring(colonIdx + 1);
+  remainder.trim();
+  if (remainder.startsWith("true") || remainder.startsWith("1"))
+    return true;
+  return false;
+}
+
+// Helper to get framesize from string
+framesize_t getFrameSizeFromName(String name) {
+  if (name == "QCIF")
+    return FRAMESIZE_QCIF;
+  if (name == "QVGA")
+    return FRAMESIZE_QVGA;
+  if (name == "CIF")
+    return FRAMESIZE_CIF;
+  if (name == "VGA")
+    return FRAMESIZE_VGA;
+  if (name == "SVGA")
+    return FRAMESIZE_SVGA;
+  if (name == "XGA")
+    return FRAMESIZE_XGA;
+  if (name == "HD")
+    return FRAMESIZE_HD;
+  if (name == "SXGA")
+    return FRAMESIZE_SXGA;
+  if (name == "UXGA")
+    return FRAMESIZE_UXGA;
+  if (name == "QXGA")
+    return FRAMESIZE_QXGA;
+  return FRAMESIZE_VGA; // Default
+}
+
+// Global LED State
+byte savedR = 255;
+byte savedG = 255;
+byte savedB = 255;
+int savedBrightness = 100;
+bool torchState = false;
+
+// Helper to upload frame
+void uploadFrame(camera_fb_t *fb) {
+  HTTPClient http;
+  http.setReuse(true);
+  http.setTimeout(15000);
+  http.begin(serverURL + "/device/" + deviceID + "/stream/frame");
+  http.addHeader("Authorization", "Bearer " + apiKey);
+  http.addHeader("Content-Type", "image/jpeg");
+  http.POST(fb->buf, fb->len);
+  http.end();
+}
+
+void handleSnap(String resolution) {
+  if (resolution.length() == 0)
+    resolution = "UXGA";
+  Serial.println("[SNAP] Target: " + resolution);
+
+  framesize_t snapSize = getFrameSizeFromName(resolution);
+  framesize_t savedSize = FRAMESIZE_VGA;
+  sensor_t *s = esp_camera_sensor_get();
+  if (s)
+    savedSize = s->status.framesize;
+
+  bool wasStreaming = streaming;
+  streaming = false;
+  delay(200);
+
+  // Switch to high res (simplified for stability)
+  if (s)
+    s->set_framesize(s, snapSize);
+  delay(500); // Wait for sensor to settle
+
+  // Capture
+  camera_fb_t *fb = esp_camera_fb_get();
+  if (fb) {
+    uploadFrame(fb);
+    esp_camera_fb_return(fb);
+  } else {
+    Serial.println("[SNAP] Capture failed in fast mode");
+    // Just in case, try one more time
+    delay(500);
+    fb = esp_camera_fb_get();
+    if (fb) {
+      uploadFrame(fb);
+      esp_camera_fb_return(fb);
+    }
+  }
+
+  // Restore
+  if (s)
+    s->set_framesize(s, savedSize);
+  streaming = wasStreaming;
+}
+
+void ackCommand(String cmdId) {
+  if (apiKey.length() == 0)
+    return;
+  HTTPClient http;
+  http.begin(serverURL + "/device/" + deviceID + "/commands/" + cmdId + "/ack");
+  http.addHeader("Authorization", "Bearer " + apiKey);
+  http.addHeader("Content-Type", "application/json");
+  http.POST("{\"status\":\"executed\"}");
+  http.end();
+}
+
 void checkCommands() {
-  // Check every 1 second (was 5s) for better responsiveness
+  // Check every 1 second
   if (millis() - lastCommandPoll < 1000)
     return;
   lastCommandPoll = millis();
@@ -963,7 +1120,7 @@ void checkCommands() {
   if (http.GET() == 200) {
     String pl = http.getString();
 
-    // Robust iteration over command objects
+    // Iterate over command objects
     int startObj = pl.indexOf('{');
     while (startObj >= 0) {
       int endObj = startObj;
@@ -1005,6 +1162,7 @@ void checkCommands() {
 
       if (pid.length() > 0 && action.length() > 0) {
         Serial.println("Processing Command: " + pid + " Action: " + action);
+
         if (action == "update_settings") {
           ackCommand(pid);
           String resolution = extractJsonVal(paramsBlock, "resolution");
@@ -1013,44 +1171,21 @@ void checkCommands() {
           bool hmirror = extractJsonBool(paramsBlock, "hmirror");
           bool vflip = extractJsonBool(paramsBlock, "vflip");
 
-          Serial.println("Settings: Res=" + resolution + " Col=" + color +
-                         " Bri=" + String(brightness));
-
-          // Update Global LED State
+          // LED Logic
           if (color.length() > 0) {
             long number = strtol(&color.c_str()[1], NULL, 16);
             savedR = number >> 16;
             savedG = number >> 8 & 0xFF;
             savedB = number & 0xFF;
           }
-          if (brightness != -1) {
+          if (brightness != -1)
             savedBrightness = brightness;
-          }
 
-          if (resolution.length() > 0) {
-            framesize_t currentSize = esp_camera_sensor_get()->status.framesize;
-            framesize_t newSize = getFrameSizeFromName(resolution);
-            if (newSize != currentSize) {
-              bool wasStreaming = streaming;
-              streaming = false;
-              delay(100);
-              sensor_t *s = esp_camera_sensor_get();
-              s->set_framesize(s, newSize);
-              streaming = wasStreaming;
-            }
-          }
-          sensor_t *s = esp_camera_sensor_get();
-          if (s) {
-            s->set_hmirror(s, hmirror ? 1 : 0);
-            s->set_vflip(s, vflip ? 1 : 0);
-          }
-
-          // Apply LED State Unified
+// Apply LED
+#ifdef LED_GPIO_NUM
           int r = (savedR * savedBrightness) / 100;
           int g = (savedG * savedBrightness) / 100;
           int b = (savedB * savedBrightness) / 100;
-
-#ifdef LED_GPIO_NUM
 #if LED_GPIO_NUM == 48
           neopixelWrite(LED_GPIO_NUM, r, g, b);
           torchState = (r + g + b > 0);
@@ -1058,23 +1193,46 @@ void checkCommands() {
           digitalWrite(LED_GPIO_NUM, (r + g + b > 0) ? HIGH : LOW);
 #endif
 #endif
+
+          // Camera Logic
+          sensor_t *s = esp_camera_sensor_get();
+          if (s) {
+            if (resolution.length() > 0) {
+              framesize_t newSize = getFrameSizeFromName(resolution);
+              if (s->status.framesize != newSize) {
+                bool wasStreaming = streaming;
+                streaming = false;
+                delay(100);
+                s->set_framesize(s, newSize);
+                streaming = wasStreaming;
+              }
+            }
+            if (paramsBlock.indexOf("hmirror") != -1)
+              s->set_hmirror(s, hmirror ? 1 : 0);
+            if (paramsBlock.indexOf("vflip") != -1)
+              s->set_vflip(s, vflip ? 1 : 0);
+          }
+
         } else if (action == "snap") {
+          // Handle Snap
           ackCommand(pid);
           String snapRes = extractJsonVal(paramsBlock, "resolution");
           handleSnap(snapRes);
-        } else if (action == "update_firmware") {
-          ackCommand(pid);
-          String firmwareUrl = extractJsonVal(paramsBlock, "url");
-          updateFirmware(firmwareUrl);
         } else if (action == "restart") {
           ackCommand(pid);
           ESP.restart();
-        } else if (action == "start-stream") {
+        } else if (action == "led") {
           ackCommand(pid);
-          streaming = true;
-        } else if (action == "stop-stream") {
-          ackCommand(pid);
-          streaming = false;
+// Toggle Logic
+#ifdef LED_GPIO_NUM
+#if LED_GPIO_NUM == 48
+          torchState = !torchState;
+          if (torchState)
+            neopixelWrite(LED_GPIO_NUM, 255, 255, 255);
+          else
+            neopixelWrite(LED_GPIO_NUM, 0, 0, 0);
+#endif
+#endif
         } else {
           ackCommand(pid);
         }
@@ -1083,6 +1241,112 @@ void checkCommands() {
     }
   }
   http.end();
+}
+
+String pid = extractJsonVal(cmdJson, "id");
+if (pid.length() == 0)
+  pid = extractJsonVal(cmdJson, "command_id");
+String action = extractJsonVal(cmdJson, "action");
+
+String paramsBlock = "";
+int pstart = cmdJson.indexOf("\"params\":");
+if (pstart > 0) {
+  int pvalStart = cmdJson.indexOf('{', pstart);
+  if (pvalStart > 0) {
+    int pend = pvalStart;
+    int pcount = 1;
+    while (pcount > 0 && pend < cmdJson.length() - 1) {
+      pend++;
+      if (cmdJson.charAt(pend) == '{')
+        pcount++;
+      else if (cmdJson.charAt(pend) == '}')
+        pcount--;
+    }
+    if (pcount == 0)
+      paramsBlock = cmdJson.substring(pvalStart, pend + 1);
+  }
+}
+
+if (pid.length() > 0 && action.length() > 0) {
+  Serial.println("Processing Command: " + pid + " Action: " + action);
+  if (action == "update_settings") {
+    ackCommand(pid);
+    String resolution = extractJsonVal(paramsBlock, "resolution");
+    String color = extractJsonVal(paramsBlock, "led_color");
+    int brightness = extractJsonInt(paramsBlock, "led_brightness");
+    bool hmirror = extractJsonBool(paramsBlock, "hmirror");
+    bool vflip = extractJsonBool(paramsBlock, "vflip");
+
+    Serial.println("Settings: Res=" + resolution + " Col=" + color +
+                   " Bri=" + String(brightness));
+
+    // Update Global LED State
+    if (color.length() > 0) {
+      long number = strtol(&color.c_str()[1], NULL, 16);
+      savedR = number >> 16;
+      savedG = number >> 8 & 0xFF;
+      savedB = number & 0xFF;
+    }
+    if (brightness != -1) {
+      savedBrightness = brightness;
+    }
+
+    if (resolution.length() > 0) {
+      framesize_t currentSize = esp_camera_sensor_get()->status.framesize;
+      framesize_t newSize = getFrameSizeFromName(resolution);
+      if (newSize != currentSize) {
+        bool wasStreaming = streaming;
+        streaming = false;
+        delay(100);
+        sensor_t *s = esp_camera_sensor_get();
+        s->set_framesize(s, newSize);
+        streaming = wasStreaming;
+      }
+    }
+    sensor_t *s = esp_camera_sensor_get();
+    if (s) {
+      s->set_hmirror(s, hmirror ? 1 : 0);
+      s->set_vflip(s, vflip ? 1 : 0);
+    }
+
+    // Apply LED State Unified
+    int r = (savedR * savedBrightness) / 100;
+    int g = (savedG * savedBrightness) / 100;
+    int b = (savedB * savedBrightness) / 100;
+
+#ifdef LED_GPIO_NUM
+#if LED_GPIO_NUM == 48
+    neopixelWrite(LED_GPIO_NUM, r, g, b);
+    torchState = (r + g + b > 0);
+#else
+    digitalWrite(LED_GPIO_NUM, (r + g + b > 0) ? HIGH : LOW);
+#endif
+#endif
+  } else if (action == "snap") {
+    ackCommand(pid);
+    String snapRes = extractJsonVal(paramsBlock, "resolution");
+    handleSnap(snapRes);
+  } else if (action == "update_firmware") {
+    ackCommand(pid);
+    String firmwareUrl = extractJsonVal(paramsBlock, "url");
+    updateFirmware(firmwareUrl);
+  } else if (action == "restart") {
+    ackCommand(pid);
+    ESP.restart();
+  } else if (action == "start-stream") {
+    ackCommand(pid);
+    streaming = true;
+  } else if (action == "stop-stream") {
+    ackCommand(pid);
+    streaming = false;
+  } else {
+    ackCommand(pid);
+  }
+}
+startObj = pl.indexOf('{', endObj + 1);
+}
+}
+http.end();
 }
 
 void uploadFrame(camera_fb_t *fb) {
