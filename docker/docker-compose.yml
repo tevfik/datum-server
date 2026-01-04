@@ -33,7 +33,11 @@ services:
       dockerfile: docker/Dockerfile
     container_name: datum-server
     volumes:
-      - ${DATA_DIR:-../data}:/root/data
+      - ${DATA_DIR:-./data}:/app/data
+      - ../firmware:/app/firmware
+    depends_on:
+      - redis
+      - minio
     env_file:
       - .env
     environment:
