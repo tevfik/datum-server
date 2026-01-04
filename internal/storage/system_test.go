@@ -210,6 +210,32 @@ func TestUpdateDataRetentionMultipleTimes(t *testing.T) {
 	}
 }
 
+// ============ Registration Config Update Tests ============
+
+func TestUpdateRegistrationConfig(t *testing.T) {
+	storage := createTestStorageForSystem(t)
+	defer storage.Close()
+
+	// Initialize system
+	storage.InitializeSystem("Test Platform", false, 7)
+
+	// Update registration allowed
+	err := storage.UpdateRegistrationConfig(true)
+	require.NoError(t, err)
+
+	config, err := storage.GetSystemConfig()
+	require.NoError(t, err)
+	assert.True(t, config.AllowRegister)
+
+	// Update registration disallowed
+	err = storage.UpdateRegistrationConfig(false)
+	require.NoError(t, err)
+
+	config, err = storage.GetSystemConfig()
+	require.NoError(t, err)
+	assert.False(t, config.AllowRegister)
+}
+
 // ============ System Reset Tests ============
 
 func TestResetSystem(t *testing.T) {
