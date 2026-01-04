@@ -1,6 +1,10 @@
 name: Flutter App
 
 on:
+  push:
+    paths:
+      - 'examples/datum_camera_app/**'
+      - '.github/workflows/flutter.yml'
   workflow_dispatch:
   pull_request:
     paths:
