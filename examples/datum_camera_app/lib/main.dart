@@ -23,12 +23,59 @@ void main() {
   );
 }
 
-class DatumApp extends StatelessWidget {
+import 'package:app_links/app_links.dart';
+import 'screens/reset_password_screen.dart';
+
+class DatumApp extends StatefulWidget {
   const DatumApp({super.key});
+
+  @override
+  State<DatumApp> createState() => _DatumAppState();
+}
+
+class _DatumAppState extends State<DatumApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  late AppLinks _appLinks;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinks();
+  }
+
+  Future<void> _initDeepLinks() async {
+    _appLinks = AppLinks();
+
+    // Check initial link
+    final uri = await _appLinks.getInitialLink();
+    if (uri != null) {
+      _handleDeepLink(uri);
+    }
+
+    // Listen for future links
+    _appLinks.uriLinkStream.listen((uri) {
+      _handleDeepLink(uri);
+    });
+  }
+
+  void _handleDeepLink(Uri uri) {
+    // Expected link: https://datum.localhost/reset-password?token=...
+    if (uri.path.contains('reset-password')) {
+      final token = uri.queryParameters['token'];
+      if (token != null) {
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (_) => ResetPasswordScreen(initialToken: token),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'Datum IoT',
       theme: ThemeData.dark().copyWith(
         primaryColor: const Color(0xFF00BCD4),

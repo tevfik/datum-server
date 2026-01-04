@@ -160,4 +160,32 @@ class ApiClient {
       throw Exception('Account deletion failed: $e');
     }
   }
+
+  Future<void> forgotPassword(String email) async {
+    try {
+      await _dio.post('/auth/forgot-password', data: {'email': email});
+      _logger.log('Forgot password request sent for: $email');
+    } catch (e) {
+      // 200 OK is returned even if email not found (security), so this catches actual errors
+      if (e is DioException && e.response != null) {
+         throw Exception('Request failed: ${e.response?.data}');
+      }
+      throw Exception('Request failed: $e');
+    }
+  }
+
+  Future<void> resetPassword(String token, String newPassword) async {
+    try {
+      await _dio.post('/auth/reset-password', data: {
+        'token': token,
+        'new_password': newPassword,
+      });
+      _logger.log('Password reset successfully');
+    } catch (e) {
+      if (e is DioException && e.response != null) {
+        throw Exception('Reset failed: ${e.response?.data}');
+      }
+      throw Exception('Reset failed: $e');
+    }
+  }
 }

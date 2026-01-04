@@ -32,6 +32,10 @@ class AuthProvider with ChangeNotifier {
       if (rememberMe) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('auth_token', token);
+      } else {
+        // Safety: Ensure it's not saved if they didn't ask for it
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('auth_token');
       }
       
       notifyListeners();
@@ -65,5 +69,13 @@ class AuthProvider with ChangeNotifier {
   Future<void> deleteAccount() async {
     await _api.deleteAccount();
     await logout();
+  }
+
+  Future<void> forgotPassword(String email) async {
+    await _api.forgotPassword(email);
+  }
+
+  Future<void> resetPassword(String token, String newPassword) async {
+    await _api.resetPassword(token, newPassword);
   }
 }
