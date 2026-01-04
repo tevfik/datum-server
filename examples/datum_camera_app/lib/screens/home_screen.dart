@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
+
 import '../providers/device_provider.dart';
 import 'provisioning_wizard.dart';
 import 'device_detail_screen.dart';
