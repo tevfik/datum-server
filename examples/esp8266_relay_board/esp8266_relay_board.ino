@@ -435,7 +435,7 @@ void loop() {
       unsigned long now = millis();
 
       if (now - lastDataReport > REPORT_INTERVAL) {
-        sendData();
+        sendData(false, false);
         lastDataReport = now;
       }
 
