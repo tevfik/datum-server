@@ -446,6 +446,16 @@ func deviceCheckHandler(c *gin.Context) {
 
 	deviceUID := normalizeUID(uid)
 
+	// Check if device is already registered
+	registered, _, _ := store.IsDeviceUIDRegistered(deviceUID)
+	if registered {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "active",
+			"message": "Device is already registered and active",
+		})
+		return
+	}
+
 	// Check if there's a pending request
 	provReq, err := store.GetProvisioningRequestByUID(deviceUID)
 	if err != nil {
