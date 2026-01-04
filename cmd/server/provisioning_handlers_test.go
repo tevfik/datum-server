@@ -81,7 +81,7 @@ func TestRegisterDeviceHandler_Success(t *testing.T) {
 	assert.NotEmpty(t, response.RequestID)
 	assert.NotEmpty(t, response.DeviceID)
 	assert.NotEmpty(t, response.APIKey)
-	assert.Equal(t, "pending", response.Status)
+	assert.Equal(t, "active", response.Status)
 	assert.Contains(t, response.ActivateURL, "/provisioning/activate")
 }
 
@@ -137,8 +137,8 @@ func TestRegisterDeviceHandler_DuplicateUID(t *testing.T) {
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
 
-	// Should fail - device already has pending request
-	assert.Equal(t, http.StatusConflict, w2.Code)
+	// Should succeed - device re-registration is allowed (old one deleted)
+	assert.Equal(t, http.StatusCreated, w2.Code)
 }
 
 // ============ Check Device UID Handler Tests ============

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
 	"time"
 
@@ -191,4 +193,94 @@ func deleteSelfHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Account deleted successfully"})
+}
+
+// ============ Password Reset Handlers ============
+
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type TokenResetPasswordRequest struct {
+	Token       string `json:"token" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=8"`
+}
+
+// forgotPasswordHandler handles password reset requests
+// POST /auth/forgot-password
+func forgotPasswordHandler(c *gin.Context) {
+	var req ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Always return 200 to prevent user enumeration
+	// We only log errors internally
+	user, err := store.GetUserByEmail(req.Email)
+	if err != nil {
+		// User not found - simulate timing to avoid side-channel attacks (simple sleep)
+		time.Sleep(100 * time.Millisecond)
+		c.JSON(http.StatusOK, gin.H{"message": "If an account exists with this email, a reset link has been sent."})
+		return
+	}
+
+	// Generate a random token (32 bytes = 64 hex chars)
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+	token := hex.EncodeToString(tokenBytes)
+
+	// Save token with 1 hour TTL
+	if err := store.SavePasswordResetToken(user.ID, token, 1*time.Hour); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save reset token"})
+		return
+	}
+
+	// Send email
+	if emailService != nil {
+		go func() {
+			if err := emailService.SendResetEmail(user.Email, token); err != nil {
+				// Just log it, we can't return error to user now
+			}
+		}()
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "If an account exists with this email, a reset link has been sent."})
+}
+
+// completeResetPasswordHandler handles the actual password reset using a token
+// POST /auth/reset-password
+func completeResetPasswordHandler(c *gin.Context) {
+	var req TokenResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := store.GetUserByResetToken(req.Token)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+		return
+	}
+
+	// Hash new password
+	hashedPassword, err := auth.HashPassword(req.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	// Update password
+	if err := store.UpdateUserPassword(user.ID, hashedPassword); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+		return
+	}
+
+	// Delete token (so it can't be reused)
+	store.DeleteResetToken(req.Token)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully. You can now login."})
 }

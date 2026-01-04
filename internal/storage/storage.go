@@ -797,6 +797,50 @@ func (s *Storage) UpdateDeviceLastSeen(deviceID string) error {
 	})
 }
 
+// ============ Password Reset operations ============
+
+// SavePasswordResetToken stores a reset token for a user with a TTL
+func (s *Storage) SavePasswordResetToken(userID, token string, ttl time.Duration) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		key := fmt.Sprintf("reset_token:%s", token)
+		opts := &buntdb.SetOptions{Expires: true, TTL: ttl}
+		_, _, err := tx.Set(key, userID, opts)
+		return err
+	})
+}
+
+// GetUserByResetToken retrieves a user ID by reset token
+func (s *Storage) GetUserByResetToken(token string) (*User, error) {
+	var user *User
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		key := fmt.Sprintf("reset_token:%s", token)
+		userID, err := tx.Get(key)
+		if err != nil {
+			return fmt.Errorf("invalid or expired token")
+		}
+
+		// Get user details
+		userKey := fmt.Sprintf("user:%s", userID)
+		userData, err := tx.Get(userKey)
+		if err != nil {
+			return fmt.Errorf("user not found")
+		}
+
+		user = &User{}
+		return json.Unmarshal([]byte(userData), user)
+	})
+	return user, err
+}
+
+// DeleteResetToken removes a used reset token
+func (s *Storage) DeleteResetToken(token string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		key := fmt.Sprintf("reset_token:%s", token)
+		_, err := tx.Delete(key)
+		return err
+	})
+}
+
 // GetAllDevices returns all devices in the system (for admin)
 func (s *Storage) GetAllDevices() ([]Device, error) {
 	var devices []Device
