@@ -111,68 +111,86 @@ class _StreamRecorderState extends State<StreamRecorder> {
     _httpClient = HttpClient();
     _httpClient!.connectionTimeout = const Duration(seconds: 10);
     
-    try {
-      final request = await _httpClient!.getUrl(Uri.parse(widget.streamUrl));
-      final response = await request.close();
-      
-      List<int> buffer = [];
-      
-      _streamSubscription = response.listen((data) {
-        buffer.addAll(data);
+    // Retry loop
+    while (mounted) {
+      try {
+        final request = await _httpClient!.getUrl(Uri.parse(widget.streamUrl));
+        final response = await request.close();
         
-        while (true) {
-          int start = -1;
-          int end = -1;
+        if (response.statusCode != 200) {
+           throw HttpException("Status ${response.statusCode}");
+        }
+
+        List<int> buffer = [];
+        final completer = Completer<void>();
+        
+        _streamSubscription = response.listen((data) {
+          buffer.addAll(data);
           
-          // Find Start (FF D8)
-          for (int i = 0; i < buffer.length - 1; i++) {
-            if (buffer[i] == 0xFF && buffer[i+1] == 0xD8) {
-              start = i;
+          while (true) {
+            int start = -1;
+            int end = -1;
+            
+            // Find Start (FF D8)
+            for (int i = 0; i < buffer.length - 1; i++) {
+              if (buffer[i] == 0xFF && buffer[i+1] == 0xD8) {
+                start = i;
+                break;
+              }
+            }
+            
+            if (start == -1) {
+               if (buffer.length > 5000000) buffer.clear(); // Safety cap
+               break;
+            }
+            
+            // Find End (FF D9)
+            for (int i = start; i < buffer.length - 1; i++) {
+               if (buffer[i] == 0xFF && buffer[i+1] == 0xD9) {
+                 end = i + 2;
+                 break;
+               }
+            }
+            
+            if (end != -1) {
+              final frameBytes = Uint8List.fromList(buffer.sublist(start, end));
+              buffer.removeRange(0, end);
+              
+              if (mounted) {
+                setState(() {
+                  _imageBytes = frameBytes;
+                  _frameCount++;
+                });
+              }
+              
+              if (widget.controller?.isRecording == true && _tempFramesPath != null) {
+                 final fileName = "frame_${_recFrameCount.toString().padLeft(4, '0')}.jpg";
+                 File("$_tempFramesPath/$fileName").writeAsBytes(frameBytes); 
+                 _recFrameCount++;
+              }
+              
+            } else {
+              if (start > 0) buffer.removeRange(0, start);
               break;
             }
           }
-          
-          if (start == -1) {
-             if (buffer.length > 1000000) buffer.clear(); 
-             break;
-          }
-          
-          // Find End (FF D9)
-          for (int i = start; i < buffer.length - 1; i++) {
-             if (buffer[i] == 0xFF && buffer[i+1] == 0xD9) {
-               end = i + 2;
-               break;
-             }
-          }
-          
-          if (end != -1) {
-            final frameBytes = Uint8List.fromList(buffer.sublist(start, end));
-            buffer.removeRange(0, end);
-            
-            if (mounted) {
-              setState(() {
-                _imageBytes = frameBytes;
-                _frameCount++;
-              });
-            }
-            
-            if (widget.controller?.isRecording == true && _tempFramesPath != null) {
-               final fileName = "frame_${_recFrameCount.toString().padLeft(4, '0')}.jpg";
-               File("$_tempFramesPath/$fileName").writeAsBytes(frameBytes); 
-               _recFrameCount++;
-            }
-            
-          } else {
-            if (start > 0) buffer.removeRange(0, start);
-            break;
-          }
-        }
-      }, onError: (e) {
-         if (widget.onError != null) widget.onError!(e.toString());
-      });
+        }, onError: (e) {
+           // debugPrint("Stream error: $e");
+           if (!completer.isCompleted) completer.complete();
+        }, onDone: () {
+           // debugPrint("Stream closed");
+           if (!completer.isCompleted) completer.complete();
+        });
+
+        await completer.future; // Wait for stream to end/error
+        
+      } catch (e) {
+        // debugPrint("Connection failed: $e");
+        if (widget.onError != null) widget.onError!(e.toString());
+      }
       
-    } catch (e) {
-      if (widget.onError != null) widget.onError!(e.toString());
+      // Wait before reconnecting
+      if (mounted) await Future.delayed(const Duration(seconds: 2));
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 import 'full_screen_stream.dart';
 import '../providers/auth_provider.dart';
@@ -118,130 +119,136 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
           builder: (context, setModalState) {
             return Container(
               padding: const EdgeInsets.all(20),
-              height: 600,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text("Device Settings", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 20),
-                  
-                  const Text("Stream Resolution"),
-                  DropdownButton<String>(
-                    value: _streamRes,
-                    isExpanded: true,
-                    items: ["QVGA", "VGA", "SVGA", "HD"].map((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    }).toList(),
-                    onChanged: (newValue) {
-                      if (newValue != null) {
-                        setModalState(() => _streamRes = newValue);
-                        setState(() => _streamRes = newValue);
-                        // Offline: Do not send immediately
-                      }
-                    },
-                  ),
-                  
-                  const SizedBox(height: 15),
-                  const Text("Snapshot Resolution"),
-                  DropdownButton<String>(
-                    value: _snapRes,
-                    isExpanded: true,
-                    items: ["HD", "UXGA", "QXGA"].map((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    }).toList(),
-                    onChanged: (newValue) {
-                      if (newValue != null) {
-                        setModalState(() => _snapRes = newValue);
-                        setState(() => _snapRes = newValue);
-                      }
-                    },
-                  ),
-
-                  const Divider(),
-                  const Text("Orientation"),
-                  SwitchListTile(
-                    title: const Text("Mirror Horizontal"),
-                    value: _hmirror,
-                    onChanged: (val) {
-                       setModalState(() => _hmirror = val);
-                       setState(() => _hmirror = val);
-                    },
-                  ),
-                   SwitchListTile(
-                    title: const Text("Flip Vertical"),
-                    value: _vflip,
-                    onChanged: (val) {
-                       setModalState(() => _vflip = val);
-                       setState(() => _vflip = val);
-                    },
-                  ),
-
-                  const Divider(),
-                  const Text("LED Control"),
-                  const SizedBox(height: 10),
-                  
-                  // Simple Color Picker
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _colorBtn(Colors.white, setModalState),
-                      _colorBtn(Colors.red, setModalState),
-                      _colorBtn(Colors.green, setModalState),
-                      _colorBtn(Colors.blue, setModalState),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 10),
-                  Text("Brightness: ${_ledBrightness.toInt()}%"),
-                  Slider(
-                    value: _ledBrightness,
-                    min: 0,
-                    max: 100,
-                    divisions: 10,
-                    label: _ledBrightness.round().toString(),
-                    onChanged: (double value) {
-                      setModalState(() => _ledBrightness = value);
-                    },
-                    onChangeEnd: (double value) {
-                       setState(() => _ledBrightness = value);
-                    },
-                  ),
-                  
-                  const SizedBox(height: 20),
-                  
-                  ElevatedButton.icon(
-                      onPressed: () {
-                         Navigator.pop(context);
-                         _sendSettings();
+              height: 700, // Increased height for ColorPicker
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Device Settings", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 20),
+                    
+                    const Text("Stream Resolution"),
+                    DropdownButton<String>(
+                      value: _streamRes,
+                      isExpanded: true,
+                      items: ["QVGA", "VGA", "SVGA", "HD"].map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (newValue) {
+                        if (newValue != null) {
+                          setModalState(() => _streamRes = newValue);
+                          setState(() => _streamRes = newValue);
+                          // Offline: Do not send immediately
+                        }
                       },
-                      icon: const Icon(Icons.send),
-                      label: const Text("Sync Settings"),
-                      style: ElevatedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(40),
-                          backgroundColor: Colors.blueAccent,
-                          foregroundColor: Colors.white,
-                      ),
-                  ),
-                  
-                  const SizedBox(height: 10),
-                  SwitchListTile(
-                    title: const Text("LED Power"),
-                    subtitle: const Text("Toggle Light On/Off"),
-                    value: _ledOn,
-                    activeColor: Colors.amber,
-                    onChanged: (val) {
-                        setModalState(() => _ledOn = val);
-                        setState(() => _ledOn = val);
-                        _sendSettings(); // Toggle sends immediately
-                    },
-                  ),
-                ],
+                    ),
+                    
+                    const SizedBox(height: 15),
+                    const Text("Snapshot Resolution"),
+                    DropdownButton<String>(
+                      value: _snapRes,
+                      isExpanded: true,
+                      items: ["HD", "UXGA", "QXGA"].map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (newValue) {
+                        if (newValue != null) {
+                          setModalState(() => _snapRes = newValue);
+                          setState(() => _snapRes = newValue);
+                        }
+                      },
+                    ),
+
+                    const Divider(),
+                    const Text("Orientation"),
+                    SwitchListTile(
+                      title: const Text("Mirror Horizontal"),
+                      value: _hmirror,
+                      onChanged: (val) {
+                         setModalState(() => _hmirror = val);
+                         setState(() => _hmirror = val);
+                      },
+                    ),
+                     SwitchListTile(
+                      title: const Text("Flip Vertical"),
+                      value: _vflip,
+                      onChanged: (val) {
+                         setModalState(() => _vflip = val);
+                         setState(() => _vflip = val);
+                      },
+                    ),
+
+                    const Divider(),
+                    const Text("LED Control"),
+                    const SizedBox(height: 10),
+                    
+                    // Full Color Picker
+                    ColorPicker(
+                      pickerColor: _ledColor,
+                      onColorChanged: (color) {
+                         setModalState(() => _ledColor = color);
+                         setState(() => _ledColor = color); // Update parent state too
+                      },
+                      colorPickerWidth: 300,
+                      pickerAreaHeightPercent: 0.7,
+                      enableAlpha: false,
+                      labelTypes: const [], // Hide hex input
+                      paletteType: PaletteType.hueWheel,
+                    ),
+                    
+                    const SizedBox(height: 10),
+                    Text("Brightness: ${_ledBrightness.toInt()}%"),
+                    Slider(
+                      value: _ledBrightness,
+                      min: 0,
+                      max: 100,
+                      divisions: 10,
+                      label: _ledBrightness.round().toString(),
+                      onChanged: (double value) {
+                        setModalState(() => _ledBrightness = value);
+                      },
+                      onChangeEnd: (double value) {
+                         setState(() => _ledBrightness = value);
+                      },
+                    ),
+                    
+                    const SizedBox(height: 20),
+                    
+                    ElevatedButton.icon(
+                        onPressed: () {
+                           Navigator.pop(context);
+                           _sendSettings();
+                        },
+                        icon: const Icon(Icons.send),
+                        label: const Text("Sync Settings"),
+                        style: ElevatedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(40),
+                            backgroundColor: Colors.blueAccent,
+                            foregroundColor: Colors.white,
+                        ),
+                    ),
+                    
+                    const SizedBox(height: 10),
+                    SwitchListTile(
+                      title: const Text("LED Power"),
+                      subtitle: const Text("Toggle Light On/Off"),
+                      value: _ledOn,
+                      activeColor: Colors.amber,
+                      onChanged: (val) {
+                          setModalState(() => _ledOn = val);
+                          setState(() => _ledOn = val);
+                          _sendSettings(); // Toggle sends immediately
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             );
           },
@@ -250,23 +257,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     );
   }
   
-  Widget _colorBtn(Color color, StateSetter setModalState) {
-    return GestureDetector(
-      onTap: () {
-        setModalState(() => _ledColor = color);
-        setState(() => _ledColor = color); 
-      },
-      child: Container(
-        width: 40, height: 40,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(color: _ledColor == color ? Colors.amber : Colors.grey, width: 3),
-        ),
-      ),
-    );
-  }
-
   Future<void> _sendCommand(String action, {Map<String, dynamic>? params}) async {
     setState(() => _loadingAction = true);
     try {
@@ -554,8 +544,13 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                      spacing: 10, runSpacing: 10,
                      children: _deviceData.entries.map((e) {
                         return Chip(
-                          label: Text("${e.key}: ${e.value}"),
-                          backgroundColor: Colors.grey.shade200,
+                          label: Text(
+                             "${e.key}: ${e.value}", 
+                             style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w500)
+                          ),
+                          backgroundColor: Colors.white,
+                          shape: const StadiumBorder(side: BorderSide(color: Colors.grey)),
+                          elevation: 1,
                         );
                      }).toList(),
                    ),
