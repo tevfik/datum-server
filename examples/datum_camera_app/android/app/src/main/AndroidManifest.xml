@@ -37,6 +37,8 @@
                 <data android:scheme="http" android:host="datum.localhost" />
                 <data android:scheme="https" android:host="datum.localhost" />
                 <data android:scheme="https" android:host="datum.bezg.in" />
+                <!-- Custom scheme to force app open without domain verification -->
+                <data android:scheme="datum" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

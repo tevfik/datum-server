@@ -270,5 +270,8 @@ func TestResetPasswordWebHandler(t *testing.T) {
 
 	body := w.Body.String()
 	assert.Contains(t, body, "Reset Password")
-	assert.Contains(t, body, "test.datum.local/reset-password?token="+token)
+	// Verify custom scheme link
+	assert.Contains(t, body, "datum://test.datum.local/reset-password?token="+token)
+	// Verify universal link fallback
+	assert.Contains(t, body, "https://test.datum.local/reset-password?token="+token)
 }
