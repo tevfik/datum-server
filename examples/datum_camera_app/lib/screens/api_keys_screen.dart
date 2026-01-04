@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../api_client.dart';
 
 class ApiKeysScreen extends StatefulWidget {
@@ -17,6 +19,10 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
   @override
   void initState() {
     super.initState();
+    final token = Provider.of<AuthProvider>(context, listen: false).token;
+    if (token != null) {
+      _api.setToken(token);
+    }
     _loadKeys();
   }
 

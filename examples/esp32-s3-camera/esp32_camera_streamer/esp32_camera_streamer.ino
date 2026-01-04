@@ -991,29 +991,25 @@ void reportTelemetry(bool isBoot, bool isConnect) {
   }
 
   // Boot Event Data (Send Full State)
-  if (isBoot) {
-    json += ",";
-    json += "\"fw_ver\":\"" + String(FIRMWARE_VERSION) + "\",";
-    json += "\"reset_reason\":\"" + getResetReasonString() + "\",";
+  json += ",";
+  json += "\"fw_ver\":\"" + String(FIRMWARE_VERSION) + "\",";
+  json += "\"reset_reason\":\"" + getResetReasonString() + "\",";
 
-    // Settings State
-    char hexColor[8];
-    sprintf(hexColor, "#%02X%02X%02X", savedR, savedG, savedB);
-    json += "\"led_color\":\"" + String(hexColor) + "\",";
-    json += "\"led_brightness\":" + String(savedBrightness) + ",";
-    json += "\"led_on\":" + String(torchState ? "true" : "false") + ",";
+  // Settings State
+  char hexColor[8];
+  sprintf(hexColor, "#%02X%02X%02X", savedR, savedG, savedB);
+  json += "\"led_color\":\"" + String(hexColor) + "\",";
+  json += "\"led_brightness\":" + String(savedBrightness) + ",";
+  json += "\"led_on\":" + String(torchState ? "true" : "false") + ",";
 
-    sensor_t *s = esp_camera_sensor_get();
-    if (s) {
-      json +=
-          "\"resolution\":\"" + getFrameSizeName(s->status.framesize) + "\",";
-      json +=
-          "\"hmirror\":" + String(s->status.hmirror ? "true" : "false") + ",";
-      json += "\"vflip\":" + String(s->status.vflip ? "true" : "false");
-    } else {
-      // Fallback defaults
-      json += "\"resolution\":\"VGA\",\"hmirror\":false,\"vflip\":false";
-    }
+  sensor_t *s = esp_camera_sensor_get();
+  if (s) {
+    json += "\"resolution\":\"" + getFrameSizeName(s->status.framesize) + "\",";
+    json += "\"hmirror\":" + String(s->status.hmirror ? "true" : "false") + ",";
+    json += "\"vflip\":" + String(s->status.vflip ? "true" : "false");
+  } else {
+    // Fallback defaults
+    json += "\"resolution\":\"VGA\",\"hmirror\":false,\"vflip\":false";
   }
 
   json += "}";
