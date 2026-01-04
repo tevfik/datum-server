@@ -54,6 +54,31 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     });
 
     _pollData();
+    _startStream();
+  }
+
+  @override
+  void dispose() {
+    _stopStream();
+    _streamController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startStream() async {
+    try {
+      await _api.sendCommand(widget.device.id, "stream", params: {"state": "on"});
+    } catch (e) {
+      debugPrint("Start Stream Error: $e");
+    }
+  }
+
+  Future<void> _stopStream() async {
+    try {
+      // Fire and forget, no await to avoid blocking dispose
+       _api.sendCommand(widget.device.id, "stream", params: {"state": "off"});
+    } catch (e) {
+      debugPrint("Stop Stream Error: $e");
+    }
   }
 
   Future<void> _pollData() async {

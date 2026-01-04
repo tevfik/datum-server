@@ -1129,6 +1129,16 @@ void checkCommands() {
               s->set_vflip(s, vflip ? 1 : 0);
           }
 
+        } else if (action == "stream") {
+          ackCommand(pid);
+          String state = extractJsonVal(paramsBlock, "state");
+          if (state == "on") {
+            streaming = true;
+            Serial.println("Streaming STARTED via command");
+          } else {
+            streaming = false;
+            Serial.println("Streaming STOPPED via command");
+          }
         } else if (action == "snap") {
           // Handle Snap
           ackCommand(pid);
@@ -1379,17 +1389,17 @@ void setup() {
     if (apiKey.length() > 0) {
       currentState = STATE_ONLINE;
       startCameraServer();
-      streaming = true;
+      streaming = false;
     } else if (attemptSelfRegistration()) { // Try self registration if
                                             // we have user creds
       currentState = STATE_ONLINE;
       startCameraServer();
-      streaming = true;
+      streaming = false;
     } else if (activateProvisioning()) { // Fallback to old provisioning
                                          // if pending request exists
       currentState = STATE_ONLINE;
       startCameraServer();
-      streaming = true;
+      streaming = false;
     } else {
       currentState = STATE_OFFLINE;
       // Activation failed, go to setup mode
