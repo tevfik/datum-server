@@ -578,8 +578,9 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                            
                            bool success = false;
                            final dio = Dio();
+                           if (!context.mounted) return;
                            final token = Provider.of<AuthProvider>(context, listen: false).token;
-                           final url = "${widget.device.serverUrl}/devices/${widget.device.id}/stream/snapshot";
+                           final url = "https://datum.bezg.in/devices/${widget.device.id}/stream/snapshot";
                            
                            for (int i = 0; i < 20; i++) { // Retry 20 times (approx 10s)
                               await Future.delayed(const Duration(milliseconds: 500));
