@@ -4,6 +4,8 @@ import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'providers/auth_provider.dart';
 import 'providers/device_provider.dart';
+import 'package:app_links/app_links.dart';
+import 'screens/reset_password_screen.dart';
 
 void main() {
   runApp(
@@ -23,8 +25,7 @@ void main() {
   );
 }
 
-import 'package:app_links/app_links.dart';
-import 'screens/reset_password_screen.dart';
+
 
 class DatumApp extends StatefulWidget {
   const DatumApp({super.key});
@@ -47,7 +48,7 @@ class _DatumAppState extends State<DatumApp> {
     _appLinks = AppLinks();
 
     // Check initial link
-    final uri = await _appLinks.getInitialLink();
+    final uri = await _appLinks.getInitialUri();
     if (uri != null) {
       _handleDeepLink(uri);
     }

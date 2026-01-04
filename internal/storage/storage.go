@@ -16,6 +16,9 @@ type Storage struct {
 	ts tstorage.Storage // For time-series data points
 }
 
+// Ensure Storage implements Provider interface
+var _ Provider = (*Storage)(nil)
+
 func New(metaPath, dataPath string, retention time.Duration) (*Storage, error) {
 	// Open BuntDB for metadata
 	db, err := buntdb.Open(metaPath)
