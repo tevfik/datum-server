@@ -992,8 +992,10 @@ void reportTelemetry(bool isBoot, bool isConnect) {
 
   // Boot Event Data (Send Full State)
   json += ",";
-  json += "\"fw_ver\":\"" + String(FIRMWARE_VERSION) + "\",";
-  json += "\"reset_reason\":\"" + getResetReasonString() + "\",";
+  if (isBoot) {
+    json += "\"fw_ver\":\"" + String(FIRMWARE_VERSION) + "\",";
+    json += "\"reset_reason\":\"" + getResetReasonString() + "\",";
+  }
 
   // Settings State
   char hexColor[8];
