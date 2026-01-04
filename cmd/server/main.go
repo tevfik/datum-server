@@ -18,6 +18,7 @@ import (
 	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 var (
@@ -50,6 +51,13 @@ func securityHeadersMiddleware() gin.HandlerFunc {
 }
 
 func main() {
+	// Load environment variables from .env file if it exists
+	if err := godotenv.Load(); err != nil {
+		// Just log, don't fail, as env vars might be set in the environment (e.g. Docker)
+		// Use fmt here since logger is not initialized yet
+		// fmt.Println("No .env file found or error loading it")
+	}
+
 	// Ensure we log if main exits unexpectedly
 	defer func() {
 		if r := recover(); r != nil {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"datum-go/internal/auth"
+	"datum-go/internal/logger"
 	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -243,7 +244,7 @@ func forgotPasswordHandler(c *gin.Context) {
 	if emailService != nil {
 		go func() {
 			if err := emailService.SendResetEmail(user.Email, token); err != nil {
-				// Just log it, we can't return error to user now
+				logger.GetLogger().Error().Err(err).Str("email", user.Email).Msg("Failed to send password reset email")
 			}
 		}()
 	}
