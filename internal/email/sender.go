@@ -88,6 +88,17 @@ func (s *EmailSender) SendResetEmail(to, token string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
+		var errorResponse map[string]interface{}
+		// Try to parse JSON error
+		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err == nil {
+			// If message field exists, use it
+			if msg, ok := errorResponse["message"].(string); ok {
+				return fmt.Errorf("email API error: %s (status: %d)", msg, resp.StatusCode)
+			}
+			// Or just log the whole map
+			return fmt.Errorf("email API error: %v (status: %d)", errorResponse, resp.StatusCode)
+		}
+		// Fallback for non-JSON or unparseable errors
 		return fmt.Errorf("email API returned status: %d", resp.StatusCode)
 	}
 
