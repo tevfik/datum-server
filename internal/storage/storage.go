@@ -277,10 +277,10 @@ type DataPoint struct {
 	Data      map[string]interface{} `json:"data"`
 }
 
-// StoreData stores each numeric field as a separate metric
+// StoreData stores data in both time-series storage and as a "shadow" in metadata storage
 func (s *Storage) StoreData(point *DataPoint) error {
+	// 1. Store in Time-Series (History)
 	ts := point.Timestamp.UnixNano()
-
 	var rows []tstorage.Row
 	for key, val := range point.Data {
 		var floatVal float64
@@ -294,7 +294,8 @@ func (s *Storage) StoreData(point *DataPoint) error {
 		case int64:
 			floatVal = float64(v)
 		default:
-			continue // Skip non-numeric values
+			// Non-numeric values (strings, bools) are skipped for TSDB
+			continue
 		}
 
 		metricName := fmt.Sprintf("%s.%s", point.DeviceID, key)
@@ -304,50 +305,96 @@ func (s *Storage) StoreData(point *DataPoint) error {
 		})
 	}
 
-	if len(rows) == 0 {
-		return nil
+	if len(rows) > 0 {
+		if err := s.ts.InsertRows(rows); err != nil {
+			return err
+		}
 	}
 
-	return s.ts.InsertRows(rows)
+	// 2. Update Device Shadow (Latest State) in BuntDB
+	// This merges new data with existing state to ensure "split telemetry" works correctly.
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		shadowKey := fmt.Sprintf("device:%s:shadow", point.DeviceID)
+
+		// Get existing shadow
+		var shadowData map[string]interface{}
+		existingJSON, err := tx.Get(shadowKey)
+		if err == nil {
+			json.Unmarshal([]byte(existingJSON), &shadowData)
+		} else {
+			shadowData = make(map[string]interface{})
+		}
+
+		// Merge new data
+		for k, v := range point.Data {
+			shadowData[k] = v
+		}
+		// Always update timestamp
+		shadowData["timestamp"] = point.Timestamp.Unix()
+		shadowData["_last_updated"] = time.Now().Format(time.RFC3339)
+
+		// Save back
+		newJSON, _ := json.Marshal(shadowData)
+		_, _, err = tx.Set(shadowKey, string(newJSON), nil)
+
+		// Also update device LastSeen
+		deviceKey := fmt.Sprintf("device:%s", point.DeviceID)
+		if deviceVal, err := tx.Get(deviceKey); err == nil {
+			var device Device
+			if err := json.Unmarshal([]byte(deviceVal), &device); err == nil {
+				device.LastSeen = time.Now()
+				// Store public IP if present in data
+				if ip, ok := point.Data["public_ip"].(string); ok {
+					if device.Type == "camera" || device.Type == "relay" {
+						// Optionally store it in device struct if needed,
+						// but shadow is sufficient for display.
+					}
+					_ = ip
+				}
+
+				devJSON, _ := json.Marshal(device)
+				tx.Set(deviceKey, string(devJSON), nil)
+			}
+		}
+
+		return err
+	})
 }
 
-// GetLatestData retrieves the most recent data point for a device
+// GetLatestData retrieves the merged shadow state from BuntDB
 func (s *Storage) GetLatestData(deviceID string) (*DataPoint, error) {
-	end := time.Now()
-	start := end.Add(-24 * time.Hour) // Last 24 hours
+	var point DataPoint
+	point.DeviceID = deviceID
+	point.Data = make(map[string]interface{})
+	point.Timestamp = time.Now() // Default to now if not found
 
-	// Get all metrics for this device
-	data := make(map[string]interface{})
-	var latestTs int64
-
-	// We need to query each metric separately
-	// This is a limitation - we'll query known metrics or scan
-	metrics := []string{"temperature", "humidity", "pressure", "battery", "value"}
-
-	for _, metric := range metrics {
-		metricName := fmt.Sprintf("%s.%s", deviceID, metric)
-		points, err := s.ts.Select(metricName, nil, start.UnixNano(), end.UnixNano())
-		if err != nil || len(points) == 0 {
-			continue
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		shadowKey := fmt.Sprintf("device:%s:shadow", deviceID)
+		shadowJSON, err := tx.Get(shadowKey)
+		if err != nil {
+			return fmt.Errorf("no data found")
 		}
 
-		// Get most recent
-		latest := points[len(points)-1]
-		data[metric] = latest.Value
-		if latest.Timestamp > latestTs {
-			latestTs = latest.Timestamp
+		if err := json.Unmarshal([]byte(shadowJSON), &point.Data); err != nil {
+			return err
 		}
-	}
 
-	if len(data) == 0 {
-		return nil, fmt.Errorf("no data found")
-	}
+		// Extract timestamp if present
+		if ts, ok := point.Data["timestamp"].(float64); ok {
+			point.Timestamp = time.Unix(int64(ts), 0)
+		} else if tsStr, ok := point.Data["_last_updated"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, tsStr); err == nil {
+				point.Timestamp = t
+			}
+		}
 
-	return &DataPoint{
-		DeviceID:  deviceID,
-		Timestamp: time.Unix(0, latestTs),
-		Data:      data,
-	}, nil
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return &point, nil
 }
 
 // GetDataHistoryWithRange retrieves historical data with time range filtering

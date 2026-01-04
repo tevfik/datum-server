@@ -101,6 +101,37 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     }
   }
 
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Device?'),
+        content: Text('Are you sure you want to delete "${widget.device.name}"? This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _api.deleteDevice(widget.device.id);
+        if (mounted) {
+           Navigator.pop(context, true); // Return true to indicate deletion
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     bool isCamera = widget.device.type == 'camera';
@@ -110,6 +141,19 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         title: Text(widget.device.name),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _pollData),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'delete') _confirmDelete();
+            },
+            itemBuilder: (BuildContext context) {
+              return [
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Delete Device', style: TextStyle(color: Colors.red)),
+                ),
+              ];
+            },
+          ),
         ],
       ),
       body: Column(
