@@ -27,7 +27,12 @@
 // Address Map (Dynamic by struct)
 
 // Helper Struct for EEPROM
+// Magic Number to detect struct changes
+#define CONFIG_MAGIC 0xD4701102 // Increment this when modifying struct
+
+// Helper Struct for EEPROM
 struct Config {
+  uint32_t magic;
   char wifi_ssid[32];
   char wifi_pass[64];
   char api_key[33];
@@ -57,6 +62,7 @@ const unsigned long COMMAND_INTERVAL = 5000; // 5s
 
 // Helper: Save Config
 void saveConfig() {
+  config.magic = CONFIG_MAGIC; // Ensure magic is set before saving
   EEPROM.put(0, config);
   EEPROM.commit();
 }
@@ -64,9 +70,12 @@ void saveConfig() {
 // Helper: Load Config
 void loadConfig() {
   EEPROM.get(0, config);
-  // Sanity check empty EEPROM
-  if (config.wifi_ssid[0] == 0xFF) {
+  // Check Magic Number vs Current Version
+  if (config.magic != CONFIG_MAGIC) {
+    Serial.println("Invalid Config Magic! Wiping EEPROM...");
     memset(&config, 0, sizeof(Config));
+    config.magic = CONFIG_MAGIC;
+    saveConfig(); // Commit the wipe
   }
 }
 
