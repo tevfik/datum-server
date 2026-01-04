@@ -1160,7 +1160,6 @@ void checkCommands() {
   http.end();
 }
 
-
 void uploadFrame(camera_fb_t *fb) {
   // Use Global httpStream to allow Keep-Alive (reuse connection)
   httpStream.setReuse(true);
@@ -1200,31 +1199,6 @@ void streamLoop() {
   lastFrameTime = millis();
   uploadFrame(fb);
   esp_camera_fb_return(fb);
-}
-
-// Helper to get framesize from string
-framesize_t getFrameSizeFromName(String name) {
-  if (name == "QCIF")
-    return FRAMESIZE_QCIF;
-  if (name == "QVGA")
-    return FRAMESIZE_QVGA;
-  if (name == "CIF")
-    return FRAMESIZE_CIF;
-  if (name == "VGA")
-    return FRAMESIZE_VGA;
-  if (name == "SVGA")
-    return FRAMESIZE_SVGA;
-  if (name == "XGA")
-    return FRAMESIZE_XGA;
-  if (name == "HD")
-    return FRAMESIZE_HD;
-  if (name == "SXGA")
-    return FRAMESIZE_SXGA;
-  if (name == "UXGA")
-    return FRAMESIZE_UXGA;
-  if (name == "QXGA")
-    return FRAMESIZE_QXGA;
-  return FRAMESIZE_VGA; // Default
 }
 
 void handleSnap(String resolution = "UXGA") {
