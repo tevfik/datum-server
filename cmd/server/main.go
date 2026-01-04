@@ -192,14 +192,14 @@ func main() {
 					
 					<!-- Attempt to launch app via custom scheme if you had one, or just universal link again -->
 					<p>If the app did not open automatically, tap the button below:</p>
-					<a href="https://datum.localhost/reset-password?token=%s" class="btn">Open in App</a>
+					<a href="%s/reset-password?token=%s" class="btn">Open in App</a>
 				</div>
 				<script>
 					// Optional: Attempt specific scheme redirect if defined
 				</script>
 			</body>
 			</html>
-		`, token))
+		`, publicURL, token))
 	})
 
 	// Authenticated user routes (password change, self-deletion)
