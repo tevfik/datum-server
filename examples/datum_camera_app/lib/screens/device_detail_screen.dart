@@ -500,8 +500,30 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                       label: "Photo",
                       color: Colors.blueAccent,
                       onPressed: () async {
-                         // Send "snap" command with resolution from settings
-                         _sendCommand("snap", params: {"resolution": _snapRes});
+                         setState(() => _loadingAction = true);
+                         try {
+                           // 1. Send Command
+                           await _api.sendCommand(widget.device.id, "snap", params: {"resolution": _snapRes});
+                           
+                           // 2. Wait for FW to process and Frame to arrive (FW takes ~2s, waits 4s)
+                           if (context.mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Capturing High-Res..."), duration: Duration(seconds: 2)));
+                           }
+                           await Future.delayed(const Duration(seconds: 3));
+                           
+                           // 3. Save the frame currently on stream (which should be the high-res one)
+                           await _streamController.takeSnapshot?.call();
+                           
+                           if (context.mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("High-Res Photo Saved to Gallery!")));
+                           }
+                         } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Capture Failed: $e"), backgroundColor: Colors.red));
+                            }
+                         } finally {
+                            if (mounted) setState(() => _loadingAction = false);
+                         }
                       },
                       isLoading: _loadingAction,
                     ),
@@ -510,14 +532,20 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                       label: _streamController.isRecording ? "Stop Rec" : "Record",
                       color: _streamController.isRecording ? Colors.red : Colors.green,
                       onPressed: () async {
-                         // Local recording from stream
-                         if (_streamController.isRecording) {
-                            await _streamController.stopRecording?.call();
+                         try {
+                           // Local recording from stream
+                           if (_streamController.isRecording) {
+                              await _streamController.stopRecording?.call();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Video Saved to Gallery")));
+                              }
+                           } else {
+                              _streamController.startRecording?.call();
+                           }
+                         } catch (e) {
                             if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Video Saved to Gallery")));
+                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Recording Error: $e"), backgroundColor: Colors.red));
                             }
-                         } else {
-                            _streamController.startRecording?.call();
                          }
                       },
                       isLoading: _loadingAction,
