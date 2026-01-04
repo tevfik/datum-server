@@ -19,6 +19,7 @@ services:
       - SERVER_URL=https://${DOMAIN:-datum.localhost}
       - RESEND_API_KEY=${RESEND_API_KEY}
       - EMAIL_FROM=${EMAIL_FROM}
+      - DATA_DIR=./data
     volumes:
       - ${DATA_DIR:-../data}:/root/data
     env_file:

@@ -49,6 +49,7 @@ services:
       - SERVER_URL=https://${DOMAIN:-datum.localhost}
       - RESEND_API_KEY=${RESEND_API_KEY}
       - EMAIL_FROM=${EMAIL_FROM}
+      - DATA_DIR=./data
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:8000/health" ]
       interval: 30s
