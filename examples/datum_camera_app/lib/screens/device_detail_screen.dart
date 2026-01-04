@@ -618,19 +618,35 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                 if (_deviceData.isEmpty)
                    const Center(child: Text("Waiting for data..."))
                 else
-                   Wrap(
-                     spacing: 10, runSpacing: 10,
-                     children: _deviceData.entries.map((e) {
-                        return Chip(
-                          label: Text(
-                             "${e.key}: ${e.value}", 
-                             style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w500)
-                          ),
-                          backgroundColor: Colors.white,
-                          shape: const StadiumBorder(side: BorderSide(color: Colors.grey)),
-                          elevation: 1,
-                        );
-                     }).toList(),
+                   Container(
+                     decoration: BoxDecoration(
+                       border: Border.all(color: Colors.grey.shade300),
+                       borderRadius: BorderRadius.circular(8),
+                     ),
+                     child: Column(
+                       children: _deviceData.entries.map((e) {
+                         // Simplify Keys for display
+                         String keyDisplay = e.key.replaceAll('_', ' ').toUpperCase();
+                         
+                         return Container(
+                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                           decoration: BoxDecoration(
+                             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                             color: Colors.white,
+                           ),
+                           child: Row(
+                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                             children: [
+                               Text(keyDisplay, style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold, fontSize: 13)),
+                               SelectableText(
+                                 e.value.toString(), 
+                                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.black87)
+                               ),
+                             ],
+                           ),
+                         );
+                       }).toList(),
+                     ),
                    ),
 
               ],
