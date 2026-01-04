@@ -19,6 +19,8 @@ services:
       - SERVER_URL=https://${DOMAIN:-datum.localhost}
     volumes:
       - ${DATA_DIR:-../data}:/root/data
+    env_file:
+      - .env
     networks:
       - default
       - int_docker
