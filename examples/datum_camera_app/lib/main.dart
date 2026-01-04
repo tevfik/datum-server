@@ -48,7 +48,7 @@ class _DatumAppState extends State<DatumApp> {
     _appLinks = AppLinks();
 
     // Check initial link
-    final uri = await _appLinks.getInitialUri();
+    final uri = await _appLinks.getInitialLink(); // In v6+, this returns Uri? (or String? based on confusing docs, but we test Uri)
     if (uri != null) {
       _handleDeepLink(uri);
     }
