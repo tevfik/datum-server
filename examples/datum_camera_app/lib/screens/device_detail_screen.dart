@@ -593,7 +593,7 @@ class _ActionButton extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             shape: const CircleBorder(),
             padding: const EdgeInsets.all(20),
-            backgroundColor: color.withOpacity(0.1), 
+            backgroundColor: color.withValues(alpha: 0.2), 
             foregroundColor: color, 
             elevation: 0,
           ),
