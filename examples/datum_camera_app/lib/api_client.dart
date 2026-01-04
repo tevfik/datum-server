@@ -105,6 +105,11 @@ class ApiClient {
     return response.data;
   }
 
+  Future<Map<String, dynamic>> getDeviceData(String id) async {
+    final response = await _dio.get('/data/$id');
+    return response.data;
+  }
+
   Future<Map<String, dynamic>> createProvisioningRequest(
       String uid, String name, String ssid, String pass) async {
     final response = await _dio.post('/devices/register', data: {

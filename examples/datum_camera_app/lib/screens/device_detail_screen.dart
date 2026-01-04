@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'full_screen_stream.dart';
 import '../providers/auth_provider.dart';
 import '../api_client.dart';
 import '../models/device.dart';
@@ -25,7 +24,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   late ThingDescription _td;
   Timer? _pollTimer;
   Map<String, dynamic> _deviceData = {};
-  bool _isRunning = true; 
+  final bool _isRunning = true; 
   
   // Camera specific (only used if device type is camera)
   final StreamRecorderController _streamController = StreamRecorderController();
@@ -90,10 +89,12 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   Future<void> _sendCommand(String action, {Map<String, dynamic>? params}) async {
     try {
       await _api.sendCommand(widget.device.id, action, params: params);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Command "$action" sent'), duration: const Duration(seconds: 1)),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
       );
