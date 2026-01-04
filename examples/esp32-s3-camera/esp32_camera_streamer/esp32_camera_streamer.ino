@@ -1053,48 +1053,6 @@ void uploadFrame(camera_fb_t *fb) {
   http.end();
 }
 
-void handleSnap(String resolution) {
-  if (resolution.length() == 0)
-    resolution = "UXGA";
-  Serial.println("[SNAP] Target: " + resolution);
-
-  framesize_t snapSize = getFrameSizeFromName(resolution);
-  framesize_t savedSize = FRAMESIZE_VGA;
-  sensor_t *s = esp_camera_sensor_get();
-  if (s)
-    savedSize = s->status.framesize;
-
-  bool wasStreaming = streaming;
-  streaming = false;
-  delay(200);
-
-  // Switch to high res (simplified for stability)
-  if (s)
-    s->set_framesize(s, snapSize);
-  delay(500); // Wait for sensor to settle
-
-  // Capture
-  camera_fb_t *fb = esp_camera_fb_get();
-  if (fb) {
-    uploadFrame(fb);
-    esp_camera_fb_return(fb);
-  } else {
-    Serial.println("[SNAP] Capture failed in fast mode");
-    // Just in case, try one more time
-    delay(500);
-    fb = esp_camera_fb_get();
-    if (fb) {
-      uploadFrame(fb);
-      esp_camera_fb_return(fb);
-    }
-  }
-
-  // Restore
-  if (s)
-    s->set_framesize(s, savedSize);
-  streaming = wasStreaming;
-}
-
 void ackCommand(String cmdId) {
   if (apiKey.length() == 0)
     return;
