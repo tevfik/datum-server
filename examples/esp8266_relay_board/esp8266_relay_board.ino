@@ -22,22 +22,17 @@
 #define DEVICE_FRIENDLY_NAME "ESP8266 Relay"
 
 // ======== STORAGE CONFIG ========
-#define EEPROM_SIZE 512
-// Address Map
-// 0-31: SSID (32 chars)
-// 32-95: Pass (64 chars)
-// 96-127: API Key (32 chars) - dk_... or empty
-// 128-191: Server URL (64 chars) - https://...
-// 192-255: User Token (64 chars) - Temporary provisioning token
-// 256-287: Device Name (32 chars)
+// ======== STORAGE CONFIG ========
+#define EEPROM_SIZE 2048
+// Address Map (Dynamic by struct)
 
 // Helper Struct for EEPROM
 struct Config {
   char wifi_ssid[32];
   char wifi_pass[64];
   char api_key[33];
-  char server_url[65];
-  char user_token[65];
+  char server_url[128];  // Increased for long URLs
+  char user_token[1024]; // Increased for JWT
   char device_name[33];
   char device_id[37]; // UUID is 36 chars + null terminator
 };
