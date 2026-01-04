@@ -153,10 +153,44 @@ func main() {
 	// Initialize Email Service
 	emailService = email.NewEmailSender(publicURL)
 
+	// Set global PublicURL for handlers that need it (e.g. web fallback)
+	GlobalPublicURL = publicURL
+
 	// Setup router
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	// ... (lines 125-171 omitted for brevity if possible, keeping Context) ...
+
+	// Middleware setup
+	r.Use(gin.Recovery())
+	// Use our custom structured logger for requests if available, or basic gin logger
+	// For now, let's stick to standard gin logger which writes to stdout
+	r.Use(gin.Logger())
+
+	r.Use(securityHeadersMiddleware())
+	// CORS setup
+	r.Use(func(c *gin.Context) {
+		// Basic CORS for development
+		// In production, configure stricter rules
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	})
+
+	// Root handler
+	r.GET("/", rootHandler)
+	r.GET("/health", healthHandler)
+	r.GET("/healthz", healthHandler)
+	r.GET("/live", livenessHandler)
+	r.GET("/ready", readinessHandler)
+
 	// Auth routes
 	authGroup := r.Group("/auth")
 	{
@@ -168,39 +202,7 @@ func main() {
 	}
 
 	// Password Reset Web Page (for deep linking fallback)
-	r.GET("/reset-password", func(c *gin.Context) {
-		token := c.Query("token")
-		c.Header("Content-Type", "text/html")
-		c.String(http.StatusOK, fmt.Sprintf(`
-			<!DOCTYPE html>
-			<html>
-			<head>
-				<title>Reset Password</title>
-				<meta name="viewport" content="width=device-width, initial-scale=1">
-				<style>
-					body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f4f4; }
-					.container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
-					h2 { color: #333; }
-					p { color: #666; }
-					.btn { display: inline-block; background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin-top: 20px; font-weight: bold; }
-				</style>
-			</head>
-			<body>
-				<div class="container">
-					<h2>Reset Password</h2>
-					<p>To reset your password, please open this link in the Datum Mobile App.</p>
-					
-					<!-- Attempt to launch app via custom scheme if you had one, or just universal link again -->
-					<p>If the app did not open automatically, tap the button below:</p>
-					<a href="%s/reset-password?token=%s" class="btn">Open in App</a>
-				</div>
-				<script>
-					// Optional: Attempt specific scheme redirect if defined
-				</script>
-			</body>
-			</html>
-		`, publicURL, token))
-	})
+	r.GET("/reset-password", resetPasswordWebHandler)
 
 	// Authenticated user routes (password change, self-deletion)
 	authProtectedGroup := r.Group("/auth")
@@ -275,8 +277,9 @@ func main() {
 
 	log.Info().
 		Str("port", serverPort).
+		Str("public_url", publicURL).
 		Str("endpoints", "/auth, /devices, /data, /public/data, /provisioning").
-		Str("docs", "http://localhost:"+serverPort+"/docs").
+		Str("docs", publicURL+"/docs").
 		Msg("🚀 Datum IoT Platform starting")
 
 	// Start server

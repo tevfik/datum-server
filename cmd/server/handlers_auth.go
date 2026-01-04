@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -194,6 +195,40 @@ func deleteSelfHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Account deleted successfully"})
+}
+
+var GlobalPublicURL string
+
+// resetPasswordWebHandler serves the HTML page for password reset (deep link fallback)
+func resetPasswordWebHandler(c *gin.Context) {
+	token := c.Query("token")
+	c.Header("Content-Type", "text/html")
+	c.String(http.StatusOK, fmt.Sprintf(`
+			<!DOCTYPE html>
+			<html>
+			<head>
+				<title>Reset Password</title>
+				<meta name="viewport" content="width=device-width, initial-scale=1">
+				<style>
+					body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f4f4; }
+					.container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+					h2 { color: #333; }
+					p { color: #666; }
+					.btn { display: inline-block; background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin-top: 20px; font-weight: bold; }
+				</style>
+			</head>
+			<body>
+				<div class="container">
+					<h2>Reset Password</h2>
+					<p>To reset your password, please open this link in the Datum Mobile App.</p>
+					
+					<!-- Attempt to launch app via custom scheme if you had one, or just universal link again -->
+					<p>If the app did not open automatically, tap the button below:</p>
+					<a href="%s/reset-password?token=%s" class="btn">Open in App</a>
+				</div>
+			</body>
+			</html>
+		`, GlobalPublicURL, token))
 }
 
 // ============ Password Reset Handlers ============

@@ -244,3 +244,31 @@ func TestForgotPasswordFlow(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 	})
 }
+
+func TestResetPasswordWebHandler(t *testing.T) {
+	// Setup
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	// Mock global URL
+	originalURL := GlobalPublicURL
+	GlobalPublicURL = "https://test.datum.local"
+	defer func() { GlobalPublicURL = originalURL }()
+
+	// Construct request with token
+	token := "abcdef123456"
+	req, _ := http.NewRequest("GET", "/reset-password?token="+token, nil)
+	c.Request = req
+
+	// Execute
+	resetPasswordWebHandler(c)
+
+	// Verify
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "text/html", w.Header().Get("Content-Type"))
+
+	body := w.Body.String()
+	assert.Contains(t, body, "Reset Password")
+	assert.Contains(t, body, "test.datum.local/reset-password?token="+token)
+}
