@@ -189,9 +189,60 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                 // Camera Specific Legacy Controls (Only if camera)
                 if (isCamera) ...[
                    const Divider(),
-                   ElevatedButton(
-                     onPressed: () => _sendCommand("action", params: {"type": "led"}), // Legacy LED toggle
-                     child: const Text("Use Camera Flash"),
+                   const Divider(),
+                   const Text("Camera Controls", style: TextStyle(fontWeight: FontWeight.bold)),
+                   const SizedBox(height: 10),
+                   Wrap(
+                     spacing: 10,
+                     runSpacing: 10,
+                     alignment: WrapAlignment.center,
+                     children: [
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.camera_alt),
+                          label: const Text("Take Photo"),
+                          onPressed: () => _sendCommand("action", params: {"type": "snap", "resolution": "UXGA"}),
+                        ),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.videocam),
+                          label: const Text("Record Video"), // Mobile-side recording
+                          onPressed: () { 
+                             // Show snackbar for now, native recording logic is inside StreamRecorder
+                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Use the Record button on the video stream!")));
+                          },
+                        ),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.flashlight_on),
+                          label: const Text("Toggle Flash"),
+                          onPressed: () => _sendCommand("action", params: {"type": "led"}),
+                        ),
+                     ],
+                   ),
+                   const SizedBox(height: 10),
+                   // Settings Expansion Tile
+                   ExpansionTile(
+                     title: const Text("Camera Settings"),
+                     children: [
+                       ListTile(
+                         title: const Text("Resolution"),
+                         trailing: DropdownButton<String>(
+                           value: "VGA", // Default, could be bound to state
+                           items: ["QVGA", "VGA", "SVGA", "HD", "UXGA"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                           onChanged: (val) {
+                             if (val != null) _sendCommand("update_settings", params: {"resolution": val});
+                           },
+                         ),
+                       ),
+                       SwitchListTile(
+                         title: const Text("Horizontal Mirror"),
+                         value: true, // Default
+                         onChanged: (val) => _sendCommand("update_settings", params: {"hmirror": val}),
+                       ),
+                       SwitchListTile(
+                         title: const Text("Vertical Flip"),
+                         value: true, // Default
+                         onChanged: (val) => _sendCommand("update_settings", params: {"vflip": val}),
+                       ),
+                     ],
                    )
                 ],
 

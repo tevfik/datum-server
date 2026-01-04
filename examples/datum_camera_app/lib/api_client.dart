@@ -107,7 +107,16 @@ class ApiClient {
 
   Future<Map<String, dynamic>> getDeviceData(String id) async {
     final response = await _dio.get('/data/$id');
-    return response.data;
+    final Map<String, dynamic> raw = response.data;
+    
+    // Server returns { "data": {...}, "timestamp": "...", "device_id": "..." }
+    // We want to flatten it for the UI: { ...data, "timestamp": "..." }
+    
+    final Map<String, dynamic> flattened = Map<String, dynamic>.from(raw['data'] ?? {});
+    if (raw.containsKey('timestamp')) {
+      flattened['timestamp'] = raw['timestamp'];
+    }
+    return flattened;
   }
 
   Future<Map<String, dynamic>> createProvisioningRequest(
