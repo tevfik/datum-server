@@ -1,4 +1,46 @@
-#include "includes.h"
+#include <ArduinoJson.h>
+#include <EEPROM.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266httpUpdate.h>
+#include <WiFiClient.h>
+
+// ======== HARDWARE CONFIG ========
+// Relay Pins (Active Low/High depends on board, typically Low for Relay Boards)
+#define GPIO_RELAY_0 16
+#define GPIO_RELAY_1 5
+#define GPIO_RELAY_2 4
+#define GPIO_RELAY_3 0 // Be careful, GPIO0 is boot mode pin
+
+// Battery Voltage ADC
+#define ADC_BATTERY A0
+
+// ======== FIRMWARE CONFIG ========
+#define FIRMWARE_VER "1.0.0"
+#define DEVICE_TYPE_NAME "relay_board"
+#define DEVICE_FRIENDLY_NAME "ESP8266 Relay"
+
+// ======== STORAGE CONFIG ========
+#define EEPROM_SIZE 512
+// Address Map
+// 0-31: SSID (32 chars)
+// 32-95: Pass (64 chars)
+// 96-127: API Key (32 chars) - dk_... or empty
+// 128-191: Server URL (64 chars) - https://...
+// 192-255: User Token (64 chars) - Temporary provisioning token
+// 256-287: Device Name (32 chars)
+
+// Helper Struct for EEPROM
+struct Config {
+  char wifi_ssid[32];
+  char wifi_pass[64];
+  char api_key[33];
+  char server_url[65];
+  char user_token[65];
+  char device_name[33];
+  char device_id[37]; // UUID is 36 chars + null terminator
+};
 
 // Global Objects
 ESP8266WebServer server(80);
@@ -72,9 +114,44 @@ void setupProvisioning() {
     StaticJsonDocument<200> doc;
     doc["device_uid"] = String(ESP.getChipId());
     doc["firmware_version"] = FIRMWARE_VER;
+    doc["device_type"] = DEVICE_TYPE_NAME; // "relay_board" from includes
     String response;
     serializeJson(doc, response);
     server.send(200, "application/json", response);
+  });
+
+  // WoT (Web of Things) Discovery Endpoint
+  server.on("/.well-known/wot-thing-description", HTTP_GET, []() {
+    String json = "{";
+    json += "\"@context\": \"https://www.w3.org/2019/wot/td/v1\",";
+    json += "\"id\": \"urn:dev:ops:" + String(ESP.getChipId()) + "\",";
+    json += "\"title\": \"ESP8266 Relay\",";
+    json +=
+        "\"device_type\": \"relay_board\","; // Custom extension for App Factory
+    json +=
+        "\"securityDefinitions\": {\"bearer_sec\": {\"scheme\": \"bearer\"}},";
+    json += "\"security\": \"bearer_sec\",";
+    json += "\"properties\": {";
+    json +=
+        "  \"relay_0\": {\"type\": \"boolean\", \"description\": \"Relay 1\"},";
+    json +=
+        "  \"relay_1\": {\"type\": \"boolean\", \"description\": \"Relay 2\"},";
+    json +=
+        "  \"relay_2\": {\"type\": \"boolean\", \"description\": \"Relay 3\"},";
+    json +=
+        "  \"relay_3\": {\"type\": \"boolean\", \"description\": \"Relay 4\"},";
+    json += "  \"wifi_rssi\": {\"type\": \"integer\", \"description\": "
+            "\"Signal Strength\"},";
+    json += "  \"battery_adc\": {\"type\": \"integer\", \"description\": "
+            "\"Battery Level\"}";
+    json += "},";
+    json += "\"actions\": {";
+    json +=
+        "  \"relay_control\": {\"description\": \"Toggle a specific relay\"},";
+    json += "  \"update_firmware\": {\"description\": \"OTA Update\"}";
+    json += "}";
+    json += "}";
+    server.send(200, "application/td+json", json);
   });
 
   server.on("/scan", HTTP_GET, []() {
@@ -184,47 +261,48 @@ void registerDevice() {
   }
 }
 
-void sendData() {
+void sendData(bool isBoot, bool isConnect) {
   if (strlen(config.api_key) == 0)
     return;
 
   client.setInsecure();
   HTTPClient http;
-  // Get Device ID (assuming we stored it or ID is not needed if using API Key
-  // auth which identifies device?) Wait, standard Datum API is
-  // /devices/:id/data OR /data (if key identifies device). Current Server
-  // `handlers_data.go` supports `POST /data` where device is inferred from
-  // `dk_` key. PERFECT.
-
   String url = String(config.server_url) + "/data";
 
   if (http.begin(client, url)) {
     http.addHeader("Content-Type", "application/json");
-    http.addHeader(
-        "X-API-Key",
-        String(config.api_key)); // Legacy Header or Header based auth
-    // OR "Authorization: Bearer <sk_...>"
-    // The server middleware checks "Authorization: Bearer" or "token" query
-    // param. Let's use Bearer.
     http.addHeader("Authorization", "Bearer " + String(config.api_key));
 
-    StaticJsonDocument<200> doc;
-    // Map relays to generic names or just custom JSON
+    StaticJsonDocument<512> doc;
+    // Base Metrics (Dynamic)
     doc["relay_0"] = relays[0];
     doc["relay_1"] = relays[1];
     doc["relay_2"] = relays[2];
     doc["relay_3"] = relays[3];
     doc["battery_adc"] = analogRead(ADC_BATTERY);
+    doc["wifi_rssi"] = WiFi.RSSI();
+    doc["free_heap"] = ESP.getFreeHeap();
+    doc["uptime"] = millis() / 1000;
+
+    // Connect Event
+    if (isConnect) {
+      doc["local_ip"] = WiFi.localIP().toString();
+      doc["ssid"] = WiFi.SSID();
+      doc["bssid"] = WiFi.BSSIDstr();
+      doc["channel"] = WiFi.channel();
+    }
+
+    // Boot Event
+    if (isBoot) {
+      doc["fw_ver"] = FIRMWARE_VER;
+      doc["reset_reason"] = ESP.getResetReason();
+    }
 
     String payload;
     serializeJson(doc, payload);
 
     int code = http.POST(payload);
-    if (code == 200) {
-      Serial.println("Data sent.");
-    } else {
-      Serial.printf("Data send failed: %d\n", code);
-    }
+    // Serial.println("Data sent: " + String(code));
     http.end();
   }
 }
@@ -268,6 +346,14 @@ void checkCommands() {
         } else if (type == "update_firmware") {
           String fwUrl = params["url"];
           Serial.println("Command: OTA Update -> " + fwUrl);
+
+          // Secure OTA: Append token
+          if (fwUrl.indexOf('?') == -1) {
+            fwUrl += "?token=" + String(config.api_key);
+          } else {
+            fwUrl += "&token=" + String(config.api_key);
+          }
+
           // Simple OTA Implementation (Blocking)
           t_httpUpdate_return ret = ESPhttpUpdate.update(client, fwUrl);
           switch (ret) {
@@ -347,11 +433,6 @@ void loop() {
   } else {
     if (WiFi.status() == WL_CONNECTED) {
       unsigned long now = millis();
-
-      if (now - lastDataReport > REPORT_INTERVAL) {
-        sendData();
-        lastDataReport = now;
-      }
 
       if (now - lastDataReport > REPORT_INTERVAL) {
         sendData();

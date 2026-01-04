@@ -40,6 +40,15 @@ func postDataHandler(c *gin.Context) {
 		return
 	}
 
+	// ---------------------------------------------------------
+	// Enrichment: Server-Side Tagging
+	// ---------------------------------------------------------
+	// User requested Public IP (Gateway IP).
+	// We inject it here so the device doesn't need to look it up.
+	data["public_ip"] = c.ClientIP()
+	data["server_time"] = time.Now().Unix() // Also useful debugging
+	// ---------------------------------------------------------
+
 	point := &storage.DataPoint{
 		DeviceID:  deviceID,
 		Timestamp: time.Now(),

@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
 import '../providers/auth_provider.dart';
 
+import '../utils/thing_description_registry.dart'; // Import Registry
+
 class ProvisioningWizard extends StatefulWidget {
   const ProvisioningWizard({super.key});
 
@@ -22,6 +24,7 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
   // Device Info
   String? _deviceUID;
   String? _firmwareVersion;
+  String? _deviceType;
 
   int _step = 0;
   bool _isLoading = false;
@@ -58,6 +61,7 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
         setState(() {
           _deviceUID = data['device_uid'];
           _firmwareVersion = data['firmware_version'];
+          _deviceType = data['device_type']; // Get type from firmware
           _isLoading = false;
            _statusMessage = null;
           _step++; // Move to next step
@@ -129,12 +133,13 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
     }
 
     try {
+      final defaultName = ThingDescriptionRegistry.get(_deviceType ?? '').title;
       final response = await _getDeviceDio().post(
         '/configure',
         data: FormData.fromMap({
           "wifi_ssid": _ssidController.text,
           "wifi_pass": _passController.text,
-          "device_name": _nameController.text.isNotEmpty ? _nameController.text : "Camera",
+          "device_name": _nameController.text.isNotEmpty ? _nameController.text : defaultName,
           "server_url": "https://datum.bezg.in",
           "user_token": token,
         }),
@@ -288,15 +293,16 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                   if (_deviceUID != null) ...[
-                     Text("Device ID: $_deviceUID\nFirmware: ${_firmwareVersion ?? 'Unknown'}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                     Text("Found: ${ThingDescriptionRegistry.get(_deviceType ?? '').title}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                     Text("ID: $_deviceUID\nFW: ${_firmwareVersion ?? 'Unknown'}", style: const TextStyle(color: Colors.grey)),
                      const SizedBox(height: 10),
                   ],
                   TextField(
                     controller: _nameController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Device Name', 
-                      hintText: 'e.g. Living Room Camera',
-                      border: OutlineInputBorder()
+                      hintText: ThingDescriptionRegistry.get(_deviceType ?? '').title, // Dynamic Hint
+                      border: const OutlineInputBorder()
                     ),
                   ),
                   const SizedBox(height: 10),

@@ -226,6 +226,7 @@ byte savedR = 255;
 byte savedG = 255;
 byte savedB = 255;
 int savedBrightness = 0;
+unsigned long lastTelemetryTime = 0; // Telemetry timer
 
 HTTPClient httpCommand;
 HTTPClient httpStream;
@@ -604,10 +605,37 @@ void handleDeviceInfo() {
   json += "\"device_uid\":\"" + deviceUID + "\",";
   json += "\"mac_address\":\"" + deviceMAC + "\",";
   json += "\"firmware_version\":\"" + String(FIRMWARE_VERSION) + "\",";
+  json += "\"device_type\":\"camera\","; // Added for Unified Onboarding
   json += "\"status\":\"" +
           String(isActivated() ? "configured" : "unconfigured") + "\"";
   json += "}";
   setupServer.send(200, "application/json", json);
+}
+
+// WoT (Web of Things) Discovery Endpoint
+void handleThingDescription() {
+  String json = "{";
+  json += "\"@context\": \"https://www.w3.org/2019/wot/td/v1\",";
+  json += "\"id\": \"urn:dev:ops:" + deviceUID + "\",";
+  json += "\"title\": \"Datum Camera\",";
+  json += "\"device_type\": \"camera\","; // Custom extension for App Factory
+  json +=
+      "\"securityDefinitions\": {\"bearer_sec\": {\"scheme\": \"bearer\"}},";
+  json += "\"security\": \"bearer_sec\",";
+  json += "\"properties\": {";
+  json += "  \"status\": {\"type\": \"string\", \"description\": \"Device "
+          "Status\"},";
+  json += "  \"rssi\": {\"type\": \"integer\", \"description\": \"WiFi Signal "
+          "Strength\"}";
+  json += "},";
+  json += "\"actions\": {";
+  json += "  \"snapshot\": {\"description\": \"Take a photo\"},";
+  json += "  \"stream\": {\"description\": \"Start video stream\"},";
+  json += "  \"toggle_led\": {\"description\": \"Toggle Flashlight\"},";
+  json += "  \"update_firmware\": {\"description\": \"OTA Update\"}";
+  json += "}";
+  json += "}";
+  setupServer.send(200, "application/td+json", json);
 }
 
 void handleCapture() {
@@ -708,6 +736,8 @@ void startSetupMode() {
   setupServer.on("/stream", HTTP_GET, handleStream);
   setupServer.on("/capture", HTTP_GET, handleCapture);
   setupServer.on("/info", HTTP_GET, handleDeviceInfo);
+  setupServer.on("/.well-known/wot-thing-description", HTTP_GET,
+                 handleThingDescription);        // WoT Discovery
   setupServer.on("/scan", HTTP_GET, handleScan); // Add scan endpoint
   setupServer.on("/action", HTTP_GET, handleAction);
   setupServer.on("/configure", HTTP_POST, handleConfigure);
@@ -721,6 +751,8 @@ void startCameraServer() {
   setupServer.on("/stream", HTTP_GET, handleStream);
   setupServer.on("/capture", HTTP_GET, handleCapture);
   setupServer.on("/info", HTTP_GET, handleDeviceInfo);
+  setupServer.on("/.well-known/wot-thing-description", HTTP_GET,
+                 handleThingDescription); // WoT Discovery
   setupServer.on("/action", HTTP_GET, handleAction);
   setupServer.on("/configure", HTTP_POST, handleConfigure);
   setupServer.on("/provision", HTTP_POST, handleProvision);
@@ -742,7 +774,11 @@ bool connectToWiFi() {
     attempts++;
   }
   Serial.println();
-  return WiFi.status() == WL_CONNECTED;
+  if (WiFi.status() == WL_CONNECTED) {
+    justConnected = true;
+    return true;
+  }
+  return false;
 }
 
 bool attemptSelfRegistration() {
@@ -836,6 +872,79 @@ void ackCommand(String cmdId) {
   http.addHeader("Authorization", "Bearer " + apiKey);
   http.addHeader("Content-Type", "application/json");
   http.POST("{\"status\":\"executed\"}");
+  http.end();
+}
+
+// Telemetry Configuration
+const unsigned long TELEMETRY_INTERVAL = 60000; // 60s
+bool initialBoot = true;
+bool justConnected = false;
+
+String getResetReasonString() {
+  esp_reset_reason_t reason = esp_reset_reason();
+  switch (reason) {
+  case ESP_RST_POWERON:
+    return "Power On";
+  case ESP_RST_SW:
+    return "Software Reset";
+  case ESP_RST_PANIC:
+    return "Exception/Panic";
+  case ESP_RST_INT_WDT:
+    return "Watchdog (Interrupt)";
+  case ESP_RST_TASK_WDT:
+    return "Watchdog (Task)";
+  case ESP_RST_WDT:
+    return "Watchdog (Other)";
+  case ESP_RST_DEEPSLEEP:
+    return "Deep Sleep";
+  case ESP_RST_BROWNOUT:
+    return "Brownout";
+  case ESP_RST_SDIO:
+    return "SDIO";
+  default:
+    return "Unknown";
+  }
+}
+
+void reportTelemetry(bool isBoot, bool isConnect) {
+  if (deviceID.length() == 0 || apiKey.length() == 0)
+    return;
+  if (!WiFi.isConnected())
+    return;
+
+  HTTPClient http;
+  http.begin(serverURL + "/device/" + deviceID + "/data");
+  http.addHeader("Authorization", "Bearer " + apiKey);
+  http.addHeader("Content-Type", "application/json");
+
+  // Base Heartbeat Data (Always Sent)
+  String json = "{";
+  json += "\"rssi\":" + String(WiFi.RSSI()) + ",";
+  json += "\"uptime\":" + String(millis() / 1000) + ",";
+  json += "\"free_heap\":" + String(ESP.getFreeHeap()) + ",";
+  json += "\"status\":\"online\"";
+
+  // Connection Event Data
+  if (isConnect) {
+    json += ",";
+    json += "\"local_ip\":\"" + WiFi.localIP().toString() + "\",";
+    json += "\"ssid\":\"" + WiFi.SSID() + "\",";
+    json += "\"bssid\":\"" + WiFi.BSSIDstr() + "\",";
+    json += "\"channel\":" + String(WiFi.channel()) + "";
+  }
+
+  // Boot Event Data
+  if (isBoot) {
+    json += ",";
+    json += "\"fw_ver\":\"" + String(FIRMWARE_VERSION) + "\",";
+    json += "\"reset_reason\":\"" + getResetReasonString() + "\"";
+  }
+
+  json += "}";
+
+  DEBUG_PRINTLN("Sending Telemetry (Boot=" + String(isBoot) +
+                ", Connect=" + String(isConnect) + "): " + json);
+  int code = http.POST(json);
   http.end();
 }
 
@@ -1251,6 +1360,7 @@ void loop() {
   }
   if (currentState == STATE_ONLINE) {
     checkCommands();
+    reportTelemetry(); // Added Telemetry
     streamLoop();
   }
 
