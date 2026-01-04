@@ -231,7 +231,10 @@ unsigned long lastTelemetryTime = 0; // Telemetry timer
 HTTPClient httpCommand;
 HTTPClient httpStream;
 
+bool requestRestart = false;
 bool isActivated() { return apiKey.length() > 0; }
+bool justConnected = false;
+bool initialBoot = true;
 
 // ============================================================================
 // Web Interface (ESP-DASH Style)
@@ -877,8 +880,6 @@ void ackCommand(String cmdId) {
 
 // Telemetry Configuration
 const unsigned long TELEMETRY_INTERVAL = 60000; // 60s
-bool initialBoot = true;
-bool justConnected = false;
 
 String getResetReasonString() {
   esp_reset_reason_t reason = esp_reset_reason();
@@ -1353,23 +1354,46 @@ void setup() {
 }
 
 void loop() {
-  handleFactoryResetButton(); // Check button every loop
-  updateLED();
-  if (currentState == STATE_SETUP_MODE || currentState == STATE_ONLINE) {
+  if (currentState == STATE_SETUP_MODE) {
     setupServer.handleClient();
-  }
-  if (currentState == STATE_ONLINE) {
-    checkCommands();
-    reportTelemetry(); // Added Telemetry
-    streamLoop();
-  }
+    updateLED();
+    handleFactoryResetButton();
+  } else if (currentState == STATE_ONLINE) {
+    unsigned long now = millis();
 
-  // Dynamic Delay for Performance vs Power
-  if (currentState == STATE_ONLINE && streaming) {
-    // Zero delay when streaming for max FPS
-    // (httpStream.POST yields internally)
+    // Check for "Just Connected" event
+    if (justConnected) {
+      reportTelemetry(initialBoot, true);
+      justConnected = false;
+      initialBoot = false; // Boot info consumed
+      lastTelemetryTime = now;
+    }
+
+    // Periodic Heartbeat (Standard Telemetry)
+    if (now - lastTelemetryTime > TELEMETRY_INTERVAL) {
+      reportTelemetry(false, false);
+      lastTelemetryTime = now;
+    }
+
+    // Command Poll
+    if (now - lastCommandPoll > COMMAND_POLL_INTERVAL_MS) {
+      checkCommands();
+      lastCommandPoll = now;
+    }
+
+    if (streaming) {
+      streamLoop();
+    }
+
+    updateLED();
+    handleFactoryResetButton();
   } else {
-    // Delay when idle or setup to save power
-    delay(10);
+    updateLED();
+    handleFactoryResetButton();
+    // Reconnection logic if needed
+    if (WiFi.status() != WL_CONNECTED && currentState != STATE_SETUP_MODE) {
+      // Auto reconnect handling by ESP32 usually works, but we can restart if
+      // long offline
+    }
   }
 }
