@@ -189,47 +189,53 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                     const SizedBox(height: 10),
                     
                     // Quick Presets
-                    BlockPicker(
-                      pickerColor: _ledColor,
-                      availableColors: const [
-                        Colors.white,
-                        Colors.red,
-                        Colors.green,
-                        Colors.blue,
-                        Colors.amber,
-                        Colors.purple,
-                      ],
-                      onColorChanged: (color) {
-                         setModalState(() => _ledColor = color);
-                         setState(() => _ledColor = color);
-                      },
-                      layoutBuilder: (context, colors, child) {
-                        return SizedBox(
-                          height: 60,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: colors.length,
-                            itemBuilder: (context, index) {
-                              return GestureDetector(
-                                onTap: () => child.onColorChanged(colors[index]),
-                                child: Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 5),
-                                  width: 40, height: 40,
-                                  decoration: BoxDecoration(
-                                    color: colors[index],
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.grey),
-                                    boxShadow: [
-                                      if (_ledColor.value == colors[index].value)
-                                         BoxShadow(color: colors[index].withValues(alpha: 0.5), blurRadius: 8, spreadRadius: 2)
-                                    ]
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+                    // Quick Presets
+                    Builder(
+                      builder: (ctx) {
+                        void changeColor(Color color) {
+                           setModalState(() => _ledColor = color);
+                           setState(() => _ledColor = color);
+                        }
+                        return BlockPicker(
+                          pickerColor: _ledColor,
+                          availableColors: const [
+                            Colors.white,
+                            Colors.red,
+                            Colors.green,
+                            Colors.blue,
+                            Colors.amber,
+                            Colors.purple,
+                          ],
+                          onColorChanged: changeColor,
+                          layoutBuilder: (context, colors, child) {
+                            return SizedBox(
+                              height: 60,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: colors.length,
+                                itemBuilder: (context, index) {
+                                  return GestureDetector(
+                                    onTap: () => changeColor(colors[index]),
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 5),
+                                      width: 40, height: 40,
+                                      decoration: BoxDecoration(
+                                        color: colors[index],
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.grey),
+                                        boxShadow: [
+                                          if (_ledColor == colors[index])
+                                             BoxShadow(color: colors[index].withValues(alpha: 0.5), blurRadius: 8, spreadRadius: 2)
+                                        ]
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          },
                         );
-                      },
+                      }
                     ),
 
                     // Full Color Picker
