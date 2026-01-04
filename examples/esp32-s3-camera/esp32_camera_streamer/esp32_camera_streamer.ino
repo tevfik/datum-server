@@ -171,6 +171,14 @@ void updateFirmware(String url) {
     return;
 
   DEBUG_PRINTLN("Starting OTA Update...");
+
+  // Append auth token for secured download
+  if (url.indexOf('?') == -1) {
+    url += "?token=" + apiKey;
+  } else {
+    url += "&token=" + apiKey;
+  }
+
   DEBUG_PRINT("Firmware URL: ");
   DEBUG_PRINTLN(url);
 

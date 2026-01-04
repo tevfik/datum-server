@@ -54,8 +54,11 @@ func DeviceAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			// Fallback: check query parameter (for testing)
+			// Fallback: check query parameter (for testing or OTA)
 			apiKey := c.Query("key")
+			if apiKey == "" {
+				apiKey = c.Query("token")
+			}
 			if apiKey != "" {
 				c.Set("api_key", apiKey)
 				c.Next()

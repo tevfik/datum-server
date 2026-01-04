@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -268,8 +269,25 @@ func main() {
 	r.GET("/public/data/:device_id", getPublicDataHandler)
 	r.GET("/public/data/:device_id/history", getPublicDataHistoryHandler)
 
-	// Serve firmware updates (static files)
-	r.Static("/firmware", "./firmware")
+	// Serve firmware updates (protected)
+	// Devices must provide ?token=<API_KEY> query parameter
+	// This replaces public static serving
+	r.GET("/devices/firmware/:filename", auth.DeviceAuthMiddleware(), func(c *gin.Context) {
+		filename := c.Param("filename")
+		// Prevent directory traversal
+		if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filename"})
+			return
+		}
+
+		filePath := "./firmware/" + filename
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Firmware not found"})
+			return
+		}
+
+		c.File(filePath)
+	})
 
 	// Swagger UI documentation
 	setupSwagger(r)
