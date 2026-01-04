@@ -96,6 +96,11 @@ func GinLogger() gin.HandlerFunc {
 			return
 		}
 
+		// Skip logging for command polling to avoid spamming logs
+		if strings.HasSuffix(path, "/commands") && c.Request.Method == "GET" {
+			return
+		}
+
 		end := time.Now()
 		latency := end.Sub(start)
 

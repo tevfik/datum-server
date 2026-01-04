@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"datum-go/internal/auth"
@@ -202,6 +203,13 @@ var GlobalPublicURL string
 // resetPasswordWebHandler serves the HTML page for password reset (deep link fallback)
 func resetPasswordWebHandler(c *gin.Context) {
 	token := c.Query("token")
+
+	// Create custom scheme URL (datum://...) from the PublicURL
+	// Assuming GlobalPublicURL is e.g. "https://datum.bezg.in" -> "datum://datum.bezg.in"
+	// This ensures the "Open in App" button forces the app to open via Scheme, bypassing HTTPS verification issues.
+	appSchemeURL := strings.Replace(GlobalPublicURL, "https://", "datum://", 1)
+	appSchemeURL = strings.Replace(appSchemeURL, "http://", "datum://", 1)
+
 	c.Header("Content-Type", "text/html")
 	c.String(http.StatusOK, fmt.Sprintf(`
 			<!DOCTYPE html>
@@ -215,6 +223,7 @@ func resetPasswordWebHandler(c *gin.Context) {
 					h2 { color: #333; }
 					p { color: #666; }
 					.btn { display: inline-block; background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin-top: 20px; font-weight: bold; }
+					.footer-link { display: block; margin-top: 15px; color: #999; font-size: 12px; text-decoration: none; }
 				</style>
 			</head>
 			<body>
@@ -222,13 +231,20 @@ func resetPasswordWebHandler(c *gin.Context) {
 					<h2>Reset Password</h2>
 					<p>To reset your password, please open this link in the Datum Mobile App.</p>
 					
-					<!-- Attempt to launch app via custom scheme if you had one, or just universal link again -->
+					<!-- Primary Action: Custom Scheme (forces app open) -->
 					<p>If the app did not open automatically, tap the button below:</p>
 					<a href="%s/reset-password?token=%s" class="btn">Open in App</a>
+					
+					<!-- Fallback: Universal Link -->
+					<a href="%s/reset-password?token=%s" class="footer-link">Or try universal link</a>
 				</div>
+				<script>
+					// Auto-redirect to custom scheme
+					window.location.href = "%s/reset-password?token=%s";
+				</script>
 			</body>
 			</html>
-		`, GlobalPublicURL, token))
+		`, appSchemeURL, token, GlobalPublicURL, token, appSchemeURL, token))
 }
 
 // ============ Password Reset Handlers ============
