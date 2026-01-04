@@ -162,9 +162,8 @@ func main() {
 
 	// Middleware setup
 	r.Use(gin.Recovery())
-	// Use our custom structured logger for requests if available, or basic gin logger
-	// For now, let's stick to standard gin logger which writes to stdout
-	r.Use(gin.Logger())
+	// Use our custom structured logger for requests which filters noisy endpoints
+	r.Use(logger.GinLogger())
 
 	r.Use(securityHeadersMiddleware())
 	// CORS setup

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -77,4 +78,46 @@ func InitLogger() {
 // GetLogger returns the configured logger instance
 func GetLogger() *zerolog.Logger {
 	return &Logger
+}
+
+// GinLogger is a middleware that logs request details using zerolog
+// It filters out noisy endpoints like /stream/frame
+func GinLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		path := c.Request.URL.Path
+		raw := c.Request.URL.RawQuery
+
+		// Process request
+		c.Next()
+
+		// Skip logging for stream frames to avoid spamming logs
+		if strings.Contains(path, "/stream/frame") {
+			return
+		}
+
+		end := time.Now()
+		latency := end.Sub(start)
+
+		msg := "Request"
+		if len(c.Errors) > 0 {
+			msg = c.Errors.String()
+		}
+
+		logger := log.Logger
+		event := logger.Info()
+
+		if c.Writer.Status() >= 400 {
+			event = logger.Error()
+		}
+
+		event.
+			Str("method", c.Request.Method).
+			Str("path", path).
+			Str("query", raw).
+			Int("status", c.Writer.Status()).
+			Dur("latency", latency).
+			Str("ip", c.ClientIP()).
+			Msg(msg)
+	}
 }
