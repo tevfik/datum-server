@@ -1,6 +1,10 @@
+import 'dart:ui' as ui;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:dio/dio.dart';
+import 'package:gal/gal.dart';
 
 import 'full_screen_stream.dart';
 import '../providers/auth_provider.dart';
@@ -549,23 +553,70 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                       icon: Icons.camera_alt,
                       label: "Photo",
                       color: Colors.blueAccent,
-                      onPressed: () async {
+                       onPressed: () async {
                          setState(() => _loadingAction = true);
                          try {
                            // 1. Send Command
                            await _api.sendCommand(widget.device.id, "snap", params: {"resolution": _snapRes});
                            
-                           // 2. Wait for FW to process and Frame to arrive (FW takes ~2s, waits 4s)
                            if (context.mounted) {
-                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Capturing High-Res..."), duration: Duration(seconds: 2)));
+                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Requesting High-Res Snapshot..."), duration: Duration(seconds: 1)));
                            }
-                           await Future.delayed(const Duration(seconds: 3));
+
+                           // 2. Poll for snapshot with dimension check
+                           // Map Resolution Name to Min Width
+                           final resMap = {
+                             "QVGA": 320, "VGA": 640, "SVGA": 800, "XGA": 1024,
+                             "HD": 1280, "SXGA": 1280, "UXGA": 1600, "QXGA": 2048
+                           };
+                           final expectedWidth = resMap[_snapRes] ?? 640;
                            
-                           // 3. Save the frame currently on stream (which should be the high-res one)
-                           await _streamController.takeSnapshot?.call();
+                           bool success = false;
+                           final dio = Dio();
+                           final token = Provider.of<AuthProvider>(context, listen: false).token;
+                           final url = "${widget.device.serverUrl}/devices/${widget.device.id}/stream/snapshot";
+                           
+                           for (int i = 0; i < 20; i++) { // Retry 20 times (approx 10s)
+                              await Future.delayed(const Duration(milliseconds: 500));
+                              try {
+                                 final response = await dio.get(
+                                   url, 
+                                   options: Options(
+                                     responseType: ResponseType.bytes,
+                                     headers: {"Authorization": "Bearer $token"}
+                                   ),
+                                   queryParameters: {"t": DateTime.now().millisecondsSinceEpoch}
+                                 );
+                                 
+                                 if (response.statusCode == 200) {
+                                   final Uint8List bytes = Uint8List.fromList(response.data);
+                                   
+                                   // Decode image to check dimensions
+                                   final codec = await ui.instantiateImageCodec(bytes);
+                                   final frame = await codec.getNextFrame();
+                                   final width = frame.image.width;
+                                   frame.image.dispose();
+                                   
+                                   debugPrint("Snapshot Poll $i: Got ${width}px (Expected >= $expectedWidth)");
+
+                                   if (width >= expectedWidth) {
+                                      // Save to Gallery
+                                      await Gal.putImageBytes(bytes);
+                                      success = true;
+                                      break;
+                                   }
+                                 }
+                              } catch (e) {
+                                debugPrint("Poll Error: $e");
+                              }
+                           }
                            
                            if (context.mounted) {
-                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("High-Res Photo Saved to Gallery!")));
+                             if (success) {
+                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("High-Res Photo Saved to Gallery!"), backgroundColor: Colors.green));
+                             } else {
+                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Capture Timed Out or Low Resolution received."), backgroundColor: Colors.orange));
+                             }
                            }
                          } catch (e) {
                             if (context.mounted) {
