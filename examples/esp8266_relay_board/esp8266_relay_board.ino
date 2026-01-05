@@ -162,11 +162,11 @@ boolean connectMQTT() {
 
   mqttHost = getHostFromUrl(String(config.server_url));
 
-  espClient.setTimeout(10);                     // Increase timeout
+  espClient.setTimeout(10000);                  // 10s (Unit is ms!)
   mqttClient.setServer(mqttHost.c_str(), 1883); // Use global buffer
   mqttClient.setCallback(mqttCallback);
-  mqttClient.setBufferSize(1024); // Increase buffer for OTA URLs/Commands
-  mqttClient.setKeepAlive(60);    // 60s Keep Alive
+  mqttClient.setBufferSize(512); // 512 bytes is safer for ESP8266 RAM
+  mqttClient.setKeepAlive(60);   // 60s Keep Alive
 
   String clientId = String(config.device_id);
   String user = String(config.device_id);
