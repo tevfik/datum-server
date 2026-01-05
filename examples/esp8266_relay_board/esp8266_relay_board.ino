@@ -313,7 +313,6 @@ void registerDevice() {
     return;
   }
 
-  HTTPClient http;
   String srv = String(config.server_url);
   if (srv.endsWith("/"))
     srv.remove(srv.length() - 1);
