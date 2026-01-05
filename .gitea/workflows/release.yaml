@@ -123,6 +123,9 @@ jobs:
   create-release:
     needs: [build-backend, build-mobile, build-firmware]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
       - uses: actions/download-artifact@v3
       
