@@ -140,6 +140,7 @@ components:
       properties:
         action:
           type: string
+        params:
           type: object
     
     ChangePasswordRequest:
