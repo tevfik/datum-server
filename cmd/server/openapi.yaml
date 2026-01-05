@@ -479,7 +479,7 @@ paths:
         '201':
           description: Command queued
 
-  /device/{device_id}/commands:
+  /devices/{device_id}/commands/pending:
     get:
       summary: Poll for commands (device)
       tags: [Commands]
@@ -495,7 +495,7 @@ paths:
         '200':
           description: Pending commands
 
-  /device/{device_id}/commands/poll:
+  /devices/{device_id}/commands/poll:
     get:
       summary: Long poll for commands
       tags: [Commands]
@@ -518,7 +518,7 @@ paths:
         '200':
           description: Commands or timeout
 
-  /device/{device_id}/commands/{command_id}/ack:
+  /devices/{device_id}/commands/{command_id}/ack:
     post:
       summary: Acknowledge command execution
       tags: [Commands]
@@ -539,7 +539,7 @@ paths:
         '200':
           description: Command acknowledged
 
-  /device/{device_id}/push:
+  /devices/{device_id}/push:
     get:
       summary: Push data via GET (for constrained devices)
       description: |
@@ -592,14 +592,28 @@ paths:
                     description: Number of sensor values stored
                   commands_pending:
                     type: integer
-        '400':
-          description: No data parameters provided
-        '401':
-          description: Invalid device credentials
-        '403':
-          description: Device is banned
 
-  /data/{device_id}:
+  /devices/{device_id}/stream/frame:
+    post:
+      summary: Upload video frame
+      tags: [Streaming]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Frame processed
     post:
       summary: Send data (device)
       tags: [Data]

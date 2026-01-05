@@ -261,10 +261,11 @@ func main() {
 	}
 
 	// Device command polling (device auth)
-	deviceCommandGroup := r.Group("/device")
+	deviceCommandGroup := r.Group("/devices")
 	deviceCommandGroup.Use(auth.DeviceAuthMiddleware())
 	{
-		deviceCommandGroup.GET("/:device_id/commands", pollCommandsHandler)
+		// Renamed from /:device_id/commands to /:device_id/commands/pending to avoid collision with User List Commands
+		deviceCommandGroup.GET("/:device_id/commands/pending", pollCommandsHandler)
 		deviceCommandGroup.GET("/:device_id/commands/stream", sseCommandsHandler) // SSE long polling
 		deviceCommandGroup.GET("/:device_id/commands/poll", webhookPollHandler)   // HTTP long polling
 		deviceCommandGroup.POST("/:device_id/commands/:command_id/ack", ackCommandHandler)
