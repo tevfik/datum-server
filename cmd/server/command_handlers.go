@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"datum-go/internal/auth"
+	"datum-go/internal/logger"
 	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -70,7 +71,14 @@ func sendCommandHandler(c *gin.Context) {
 	status := "pending"
 	message := "Command queued for device (offline)"
 
-	if mqttBroker != nil && mqttBroker.IsDeviceConnected(deviceID) {
+	isConnected := false
+	if mqttBroker != nil {
+		isConnected = mqttBroker.IsDeviceConnected(deviceID)
+		// Debug log
+		logger.GetLogger().Info().Str("device_id", deviceID).Bool("connected", isConnected).Msg("Checking MQTT connection for command delivery")
+	}
+
+	if isConnected {
 		// Construct payload
 		payload := map[string]interface{}{
 			"command_id": cmdID,
@@ -83,8 +91,9 @@ func sendCommandHandler(c *gin.Context) {
 			if err := mqttBroker.PublishCommand(deviceID, jsonBytes); err == nil {
 				status = "sent"
 				message = "Command sent to device via MQTT"
-				// Optionally mark as "sent" or "delivered" in DB if you track that state
-				// store.UpdateCommandStatus(cmdID, "sent")
+				logger.GetLogger().Info().Str("command_id", cmdID).Msg("Command successfully published to MQTT")
+			} else {
+				logger.GetLogger().Error().Err(err).Str("command_id", cmdID).Msg("Failed to publish command to MQTT")
 			}
 		}
 	}
