@@ -4,6 +4,7 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266httpUpdate.h>
+#include <PubSubClient.h> // MQTT Support
 #include <WiFiClient.h>
 
 // ======== HARDWARE CONFIG ========
@@ -17,65 +18,54 @@
 #define ADC_BATTERY A0
 
 // ======== FIRMWARE CONFIG ========
-#define FIRMWARE_VER "1.0.0"
+#define FIRMWARE_VER "1.1.0" // Bumped version for MQTT
 #define DEVICE_TYPE_NAME "relay_board"
 #define DEVICE_FRIENDLY_NAME "ESP8266 Relay"
 
 // ======== STORAGE CONFIG ========
-// ======== STORAGE CONFIG ========
 #define EEPROM_SIZE 2048
-// Address Map (Dynamic by struct)
-
-// Helper Struct for EEPROM
-// Magic Number to detect struct changes
 #define CONFIG_MAGIC 0xD4701102 // Increment this when modifying struct
 
-// Helper Struct for EEPROM
 struct Config {
   uint32_t magic;
   char wifi_ssid[32];
   char wifi_pass[64];
   char api_key[33];
-  char server_url[128];  // Increased for long URLs
-  char user_token[1024]; // Increased for JWT
+  char server_url[128];
+  char user_token[1024];
   char device_name[33];
-  char device_id[37]; // UUID is 36 chars + null terminator
+  char device_id[37];
 };
 
 // Global Objects
 ESP8266WebServer server(80);
 Config config;
 bool provisioningMode = false;
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+String mqttHost; // Global for PubSubClient pointer safety
 
 // Global State
 bool relays[4] = {false, false, false, false}; // State tracking
 unsigned long lastDataReport = 0;
-unsigned long lastCommandCheck = 0;
-const char *fingerprint =
-    "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
-    "00"; // Should be real cert FP, but we use insecure client
-          // for simplicity in example
-
-// Intervals
+// const unsigned long COMMAND_INTERVAL = 5000; // Not needed for MQTT (Push)
 const unsigned long REPORT_INTERVAL = 30000; // 30s
-const unsigned long COMMAND_INTERVAL = 5000; // 5s
+unsigned long lastReconnectAttempt = 0;
 
-// Helper: Save Config
+// Helper: Save/Load Config
 void saveConfig() {
-  config.magic = CONFIG_MAGIC; // Ensure magic is set before saving
+  config.magic = CONFIG_MAGIC;
   EEPROM.put(0, config);
   EEPROM.commit();
 }
 
-// Helper: Load Config
 void loadConfig() {
   EEPROM.get(0, config);
-  // Check Magic Number vs Current Version
   if (config.magic != CONFIG_MAGIC) {
     Serial.println("Invalid Config Magic! Wiping EEPROM...");
     memset(&config, 0, sizeof(Config));
     config.magic = CONFIG_MAGIC;
-    saveConfig(); // Commit the wipe
+    saveConfig();
   }
 }
 
@@ -98,64 +88,157 @@ void setRelay(int index, bool state) {
   case 3:
     pin = GPIO_RELAY_3;
     break;
+  default:
+    return;
   }
-  // Active LOW for most relay boards
-  digitalWrite(pin, state ? LOW : HIGH);
+  digitalWrite(pin, state ? LOW : HIGH); // Active LOW
 }
 
 // ===========================
-//       PROVISIONING
+//       MQTT & COMMANDS
 // ===========================
 
+// Parse domain/IP from URL string (e.g., https://datum.bezg.in ->
+// datum.bezg.in)
+String getHostFromUrl(String url) {
+  int index = url.indexOf("://");
+  if (index != -1)
+    url = url.substring(index + 3);
+  int slash = url.indexOf("/");
+  if (slash != -1)
+    url = url.substring(0, slash);
+  int port = url.indexOf(":");
+  if (port != -1)
+    url = url.substring(0, port);
+  return url;
+}
+
+void mqttCallback(char *topic, byte *payload, unsigned int length) {
+  String message;
+  for (unsigned int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  Serial.printf("MQTT Message [%s]: %s\n", topic, message.c_str());
+
+  StaticJsonDocument<1024> doc;
+  deserializeJson(doc, message);
+
+  String type = doc["type"].as<String>();
+  JsonObject params = doc["params"];
+
+  if (type == "relay_control") {
+    int index = params["relay_index"];
+    bool state = params["state"];
+    setRelay(index, state);
+    Serial.printf("Command: Relay %d -> %s\n", index, state ? "ON" : "OFF");
+    delay(100);
+    // Send immediate update
+    sendData(false, false);
+  } else if (type == "update_firmware") {
+    String fwUrl = params["url"];
+    if (fwUrl.indexOf('?') == -1)
+      fwUrl += "?token=" + String(config.api_key);
+    else
+      fwUrl += "&token=" + String(config.api_key);
+
+    t_httpUpdate_return ret = ESPhttpUpdate.update(espClient, fwUrl);
+    switch (ret) {
+    case HTTP_UPDATE_FAILED:
+      Serial.println("OTA Failed");
+      break;
+    case HTTP_UPDATE_NO_UPDATES:
+      Serial.println("OTA: No updates");
+      break;
+    case HTTP_UPDATE_OK:
+      Serial.println("OTA: OK");
+      break;
+    }
+  }
+}
+
+boolean connectMQTT() {
+  if (mqttClient.connected())
+    return true;
+
+  mqttHost = getHostFromUrl(String(config.server_url));
+
+  espClient.setTimeout(10);                     // Increase timeout
+  mqttClient.setServer(mqttHost.c_str(), 1883); // Use global buffer
+  mqttClient.setCallback(mqttCallback);
+
+  String clientId = String(config.device_id);
+  String user = String(config.device_id);
+  String pass = String(config.api_key);
+
+  Serial.print("Connecting to MQTT... ");
+  if (mqttClient.connect(clientId.c_str(), user.c_str(), pass.c_str())) {
+    Serial.println("Connected!");
+    // Subscribe to commands
+    String cmdTopic = "commands/" + String(config.device_id);
+    mqttClient.subscribe(cmdTopic.c_str());
+    Serial.println("Subscribed to " + cmdTopic);
+    return true;
+  } else {
+    Serial.print("Failed, rc=");
+    Serial.println(mqttClient.state());
+    return false;
+  }
+}
+
+// Send Data via MQTT (Fallback to HTTP if needed, but MQTT preferred)
+void sendData(bool isBoot, bool isConnect) {
+  if (strlen(config.api_key) == 0)
+    return;
+
+  StaticJsonDocument<512> doc;
+  doc["relay_0"] = relays[0];
+  doc["relay_1"] = relays[1];
+  doc["relay_2"] = relays[2];
+  doc["relay_3"] = relays[3];
+  doc["battery_adc"] = analogRead(ADC_BATTERY);
+  doc["wifi_rssi"] = WiFi.RSSI();
+  doc["free_heap"] = ESP.getFreeHeap();
+  doc["uptime"] = millis() / 1000;
+
+  if (isConnect) {
+    doc["local_ip"] = WiFi.localIP().toString();
+    doc["ssid"] = WiFi.SSID();
+  }
+  if (isBoot)
+    doc["fw_ver"] = FIRMWARE_VER;
+
+  String payload;
+  serializeJson(doc, payload);
+
+  // Try MQTT first
+  if (mqttClient.connected()) {
+    String topic = "data/" + String(config.device_id);
+    mqttClient.publish(topic.c_str(), payload.c_str());
+    Serial.println("MQTT Publish: " + payload);
+  } else {
+    // Fallback? Or just skip? Camera fw skips. Let's stick to MQTT logic
+    // mostly.
+    Serial.println("MQTT Disconnected. Skip report.");
+  }
+}
+
+// ===========================
+//       PROVISIONING (Simplified)
+// ===========================
 void setupProvisioning() {
   provisioningMode = true;
   WiFi.mode(WIFI_AP);
   String apName = "Datum-Relay-" + String(ESP.getChipId(), HEX);
   WiFi.softAP(apName.c_str(), NULL);
 
-  // Web Server Routes
   server.on("/info", HTTP_GET, []() {
     StaticJsonDocument<200> doc;
     doc["device_uid"] = String(ESP.getChipId());
     doc["firmware_version"] = FIRMWARE_VER;
-    doc["device_type"] = DEVICE_TYPE_NAME; // "relay_board" from includes
+    doc["device_type"] = DEVICE_TYPE_NAME;
     String response;
     serializeJson(doc, response);
     server.send(200, "application/json", response);
-  });
-
-  // WoT (Web of Things) Discovery Endpoint
-  server.on("/.well-known/wot-thing-description", HTTP_GET, []() {
-    String json = "{";
-    json += "\"@context\": \"https://www.w3.org/2019/wot/td/v1\",";
-    json += "\"id\": \"urn:dev:ops:" + String(ESP.getChipId()) + "\",";
-    json += "\"title\": \"ESP8266 Relay\",";
-    json +=
-        "\"device_type\": \"relay_board\","; // Custom extension for App Factory
-    json +=
-        "\"securityDefinitions\": {\"bearer_sec\": {\"scheme\": \"bearer\"}},";
-    json += "\"security\": \"bearer_sec\",";
-    json += "\"properties\": {";
-    json +=
-        "  \"relay_0\": {\"type\": \"boolean\", \"description\": \"Relay 1\"},";
-    json +=
-        "  \"relay_1\": {\"type\": \"boolean\", \"description\": \"Relay 2\"},";
-    json +=
-        "  \"relay_2\": {\"type\": \"boolean\", \"description\": \"Relay 3\"},";
-    json +=
-        "  \"relay_3\": {\"type\": \"boolean\", \"description\": \"Relay 4\"},";
-    json += "  \"wifi_rssi\": {\"type\": \"integer\", \"description\": "
-            "\"Signal Strength\"},";
-    json += "  \"battery_adc\": {\"type\": \"integer\", \"description\": "
-            "\"Battery Level\"}";
-    json += "},";
-    json += "\"actions\": {";
-    json +=
-        "  \"relay_control\": {\"description\": \"Toggle a specific relay\"},";
-    json += "  \"update_firmware\": {\"description\": \"OTA Update\"}";
-    json += "}";
-    json += "}";
-    server.send(200, "application/td+json", json);
   });
 
   server.on("/scan", HTTP_GET, []() {
@@ -174,32 +257,26 @@ void setupProvisioning() {
   });
 
   server.on("/configure", HTTP_POST, []() {
-    if (!server.hasArg("wifi_ssid") || !server.hasArg("wifi_pass")) {
-      server.send(400, "text/plain", "Missing WiFi credentials");
+    if (!server.hasArg("wifi_ssid")) {
+      server.send(400, "text/plain", "Missing");
       return;
     }
-
-    // Save Basic Info
     strncpy(config.wifi_ssid, server.arg("wifi_ssid").c_str(),
             sizeof(config.wifi_ssid));
     strncpy(config.wifi_pass, server.arg("wifi_pass").c_str(),
             sizeof(config.wifi_pass));
-
-    // Optional Params
-    if (server.hasArg("device_name"))
-      strncpy(config.device_name, server.arg("device_name").c_str(),
-              sizeof(config.device_name));
     if (server.hasArg("server_url"))
       strncpy(config.server_url, server.arg("server_url").c_str(),
               sizeof(config.server_url));
     if (server.hasArg("user_token"))
       strncpy(config.user_token, server.arg("user_token").c_str(),
               sizeof(config.user_token));
+    if (server.hasArg("device_name"))
+      strncpy(config.device_name, server.arg("device_name").c_str(),
+              sizeof(config.device_name));
 
-    // Reset API Key if re-configuring from scratch, unless preserved?
-    // Usually safe to clear API key on re-provision to force re-registration
+    // Clear old key to force re-register
     memset(config.api_key, 0, sizeof(config.api_key));
-
     saveConfig();
     server.send(200, "text/plain", "Saved. Restarting...");
     delay(1000);
@@ -210,190 +287,56 @@ void setupProvisioning() {
   Serial.println("Provisioning Mode Started: " + apName);
 }
 
-// ===========================
-//       DATUM CLIENT
-// ===========================
-
-WiFiClientSecure client;
-
+// Helper: HTTP Registration (One-time)
 void registerDevice() {
-  if (strlen(config.user_token) == 0) {
-    Serial.println("No User Token for registration.");
+  if (strlen(config.user_token) == 0)
     return;
-  }
-
-  client.setInsecure(); // Skip cert validation for simplicity
   HTTPClient http;
   String url = String(config.server_url) + "/devices";
+  http.begin(espClient, url); // Use basic client
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Authorization", "Bearer " + String(config.user_token));
 
-  if (http.begin(client, url)) {
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("Authorization",
-                   "Bearer " + String(config.user_token)); // Use User Token
+  StaticJsonDocument<200> doc;
+  doc["name"] =
+      strlen(config.device_name) > 0 ? config.device_name : "Relay Board";
+  doc["type"] = DEVICE_TYPE_NAME;
+  doc["uid"] = String(ESP.getChipId());
 
-    StaticJsonDocument<200> doc;
-    doc["name"] =
-        strlen(config.device_name) > 0 ? config.device_name : "Relay Board";
-    doc["type"] = DEVICE_TYPE_NAME;
-    doc["uid"] = String(ESP.getChipId()); // Helper for server to identify HW
+  String payload;
+  serializeJson(doc, payload);
+  int code = http.POST(payload);
 
-    String payload;
-    serializeJson(doc, payload);
-
-    int code = http.POST(payload);
-    if (code == 200 || code == 201) {
-      String response = http.getString();
-      StaticJsonDocument<512> respDoc;
-      deserializeJson(respDoc, response);
-
-      const char *key = respDoc["api_key"];
-      const char *id = respDoc["id"];
-
-      if (key && id) {
-        strncpy(config.api_key, key, sizeof(config.api_key));
-        strncpy(config.device_id, id, sizeof(config.device_id));
-        // Clear user token after successful registration for security
-        memset(config.user_token, 0, sizeof(config.user_token));
-        saveConfig();
-        Serial.println("Registration Successful! API Key and ID saved.");
-      }
-    } else {
-      Serial.printf("Registration Failed: %d %s\n", code,
-                    http.getString().c_str());
+  if (code == 200 || code == 201) {
+    StaticJsonDocument<512> resp;
+    deserializeJson(resp, http.getString());
+    const char *key = resp["api_key"];
+    const char *id = resp["id"];
+    if (key && id) {
+      strncpy(config.api_key, key, sizeof(config.api_key));
+      strncpy(config.device_id, id, sizeof(config.device_id));
+      memset(config.user_token, 0, sizeof(config.user_token)); // Clear token
+      saveConfig();
+      Serial.println("Registration Success!");
     }
-    http.end();
   }
-}
-
-void sendData(bool isBoot, bool isConnect) {
-  if (strlen(config.api_key) == 0)
-    return;
-
-  client.setInsecure();
-  HTTPClient http;
-  String url = String(config.server_url) + "/data/" + String(config.device_id);
-
-  if (http.begin(client, url)) {
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("Authorization", "Bearer " + String(config.api_key));
-
-    StaticJsonDocument<512> doc;
-    // Base Metrics (Dynamic)
-    doc["relay_0"] = relays[0];
-    doc["relay_1"] = relays[1];
-    doc["relay_2"] = relays[2];
-    doc["relay_3"] = relays[3];
-    doc["battery_adc"] = analogRead(ADC_BATTERY);
-    doc["wifi_rssi"] = WiFi.RSSI();
-    doc["free_heap"] = ESP.getFreeHeap();
-    doc["uptime"] = millis() / 1000;
-
-    // Connect Event
-    if (isConnect) {
-      doc["local_ip"] = WiFi.localIP().toString();
-      doc["ssid"] = WiFi.SSID();
-      doc["bssid"] = WiFi.BSSIDstr();
-      doc["channel"] = WiFi.channel();
-    }
-
-    // Boot Event
-    if (isBoot) {
-      doc["fw_ver"] = FIRMWARE_VER;
-      doc["reset_reason"] = ESP.getResetReason();
-    }
-
-    String payload;
-    serializeJson(doc, payload);
-
-    int code = http.POST(payload);
-    // Serial.println("Data sent: " + String(code));
-    http.end();
-  }
-}
-
-void checkCommands() {
-  if (strlen(config.api_key) == 0 || strlen(config.device_id) == 0)
-    return;
-
-  client.setInsecure();
-  HTTPClient http;
-
-  // Endpoint: GET /devices/:id/commands
-  String url = String(config.server_url) + "/device/" +
-               String(config.device_id) + "/commands";
-
-  if (http.begin(client, url)) {
-    http.addHeader("Authorization", "Bearer " + String(config.api_key));
-
-    int code = http.GET();
-    if (code == 200) {
-      String payload = http.getString();
-      StaticJsonDocument<1024> doc;
-      deserializeJson(doc, payload); // Expecting array of commands or single
-
-      // Handle "commands" array if wrapper exists, or just array
-      JsonArray commands = doc.as<JsonArray>();
-      if (commands.isNull() && doc.containsKey("commands")) {
-        commands = doc["commands"].as<JsonArray>();
-      }
-
-      for (JsonVariant v : commands) {
-        String type = v["type"].as<String>();
-        JsonObject params = v["params"];
-
-        if (type == "relay_control") {
-          int index = params["relay_index"];
-          bool state = params["state"];
-          setRelay(index, state);
-          Serial.printf("Command: Relay %d -> %s\n", index,
-                        state ? "ON" : "OFF");
-        } else if (type == "update_firmware") {
-          String fwUrl = params["url"];
-          Serial.println("Command: OTA Update -> " + fwUrl);
-
-          // Secure OTA: Append token
-          if (fwUrl.indexOf('?') == -1) {
-            fwUrl += "?token=" + String(config.api_key);
-          } else {
-            fwUrl += "&token=" + String(config.api_key);
-          }
-
-          // Simple OTA Implementation (Blocking)
-          t_httpUpdate_return ret = ESPhttpUpdate.update(client, fwUrl);
-          switch (ret) {
-          case HTTP_UPDATE_FAILED:
-            Serial.printf("OTA Failed: %s\n",
-                          ESPhttpUpdate.getLastErrorString().c_str());
-            break;
-          case HTTP_UPDATE_NO_UPDATES:
-            Serial.println("OTA: No updates");
-            break;
-          case HTTP_UPDATE_OK:
-            Serial.println("OTA: OK");
-            break;
-          }
-        }
-      }
-    }
-    http.end();
-  }
+  http.end();
 }
 
 // ===========================
-//          SETUP
+//           SETUP
 // ===========================
-
 void setup() {
   Serial.begin(115200);
   delay(500);
   EEPROM.begin(EEPROM_SIZE);
   loadConfig();
 
-  // Init Relays
   pinMode(GPIO_RELAY_0, OUTPUT);
   pinMode(GPIO_RELAY_1, OUTPUT);
   pinMode(GPIO_RELAY_2, OUTPUT);
   pinMode(GPIO_RELAY_3, OUTPUT);
+  // Default OFF
   setRelay(0, false);
   setRelay(1, false);
   setRelay(2, false);
@@ -404,8 +347,7 @@ void setup() {
   } else {
     WiFi.mode(WIFI_STA);
     WiFi.begin(config.wifi_ssid, config.wifi_pass);
-    Serial.print("Connecting to WiFi");
-
+    Serial.print("Connecting WiFi");
     int attempt = 0;
     while (WiFi.status() != WL_CONNECTED && attempt < 20) {
       delay(500);
@@ -414,14 +356,13 @@ void setup() {
     }
 
     if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("\nConnected! IP: " + WiFi.localIP().toString());
-
-      // Auto-Register if needed
+      Serial.println("\nWiFi Connected!");
       if (strlen(config.api_key) == 0 && strlen(config.user_token) > 0) {
         registerDevice();
       }
+      connectMQTT();
+      sendData(true, true);
     } else {
-      Serial.println("\nWiFi Failed. Starting Provisioning Mode.");
       setupProvisioning();
     }
   }
@@ -430,22 +371,29 @@ void setup() {
 // ===========================
 //           LOOP
 // ===========================
-
 void loop() {
   if (provisioningMode) {
     server.handleClient();
   } else {
     if (WiFi.status() == WL_CONNECTED) {
-      unsigned long now = millis();
+      // Manage MQTT
+      if (!mqttClient.connected()) {
+        unsigned long now = millis();
+        if (now - lastReconnectAttempt > 5000) {
+          lastReconnectAttempt = now;
+          if (connectMQTT()) {
+            lastReconnectAttempt = 0;
+          }
+        }
+      } else {
+        mqttClient.loop();
+      }
 
+      // Periodic Reporting
+      unsigned long now = millis();
       if (now - lastDataReport > REPORT_INTERVAL) {
         sendData(false, false);
         lastDataReport = now;
-      }
-
-      if (now - lastCommandCheck > COMMAND_INTERVAL) {
-        checkCommands();
-        lastCommandCheck = now;
       }
     }
   }

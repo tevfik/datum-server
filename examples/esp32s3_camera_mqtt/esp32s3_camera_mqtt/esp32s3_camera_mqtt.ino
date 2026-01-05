@@ -140,6 +140,7 @@ String wifiSSID;
 String wifiPass;
 String deviceID;
 String userToken;  // Store token directly
+String mqttHost;   // Global to prevent dangling pointer in PubSubClient
 String deviceName; // Custom device name
 
 // LED State Globals
@@ -965,12 +966,19 @@ String getMQTTHost() {
   return host;
 }
 
+// Setup MQTT with Global Host string to prevent pointer reuse issues
 void setupMQTT() {
-  String host = getMQTTHost();
-  DEBUG_PRINTLN("MQTT Host: " + host);
-  mqttClient.setServer(host.c_str(), 1883);
+  mqttHost = getMQTTHost();
+  DEBUG_PRINTLN("MQTT Host: " + mqttHost);
+
+  // Set timeout to 10s for slow connections
+  espClient.setTimeout(10);
+
+  // PubSubClient stores the pointer, so we MUST use a global/static string
+  mqttClient.setServer(mqttHost.c_str(), 1883);
   mqttClient.setCallback(mqttCallback);
-  mqttClient.setBufferSize(2048);
+  mqttClient.setBufferSize(
+      4096); // Increased buffer for larger commands/telemetry
 }
 
 void startCameraServer() {
