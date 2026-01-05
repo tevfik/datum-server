@@ -143,18 +143,13 @@ func (h *AuthHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) boo
 	// Let's support API Key for now as it's simplest.
 	// TODO: Support Dynamic Tokens (dk_) by verifying JWT signature.
 
-	if strings.HasPrefix(token, "sk_") {
+	// Validate API Key (sk_ or dk_)
+	if strings.HasPrefix(token, "sk_") || strings.HasPrefix(token, "dk_") {
 		device, err := h.store.GetDeviceByAPIKey(token)
 		if err != nil || device.ID != deviceID {
 			return false
 		}
 		return true
-	} else if strings.HasPrefix(token, "dk_") {
-		// Validating dynamic tokens requires JWT secret.
-		// For simplicity in this iteration, we accept if it matches stored user key?
-		// No, let's rely on API Keys for MQTT 1.0.
-		// User can upgrade later.
-		return false
 	}
 
 	return false
