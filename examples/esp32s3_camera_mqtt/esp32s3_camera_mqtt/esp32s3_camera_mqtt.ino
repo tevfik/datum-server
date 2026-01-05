@@ -1215,8 +1215,8 @@ void reportTelemetry(bool isBoot, bool isConnect) {
 }
 
 void checkCommands() {
-  // Check every 1 second
-  if (millis() - lastCommandPoll < 1000)
+  // Check every 2 seconds (Hybrid fallback)
+  if (millis() - lastCommandPoll < 2000)
     return;
   lastCommandPoll = millis();
   if (WiFi.status() != WL_CONNECTED || apiKey.length() == 0)
@@ -1644,8 +1644,8 @@ void loop() {
       mqttClient.loop();
     }
 
-    // Explicit Command Poll (HTTP) is REMOVED in favor of MQTT
-    // kept comment used to be checking commands manually
+    // Hybrid Mode: Poll HTTP commands every 2s as fallback/compatibility
+    checkCommands();
 
     if (streaming) {
       streamLoop();
