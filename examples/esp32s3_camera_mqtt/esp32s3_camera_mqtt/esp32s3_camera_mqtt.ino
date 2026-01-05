@@ -808,6 +808,171 @@ void startSetupMode() {
   setupServer.begin();
 }
 
+// ============================================================================
+// MQTT Logic
+// ============================================================================
+
+// Forward declaration
+void ackCommand(String cmdId);
+
+bool reconnectMQTT() {
+  if (mqttClient.connected())
+    return true;
+
+  DEBUG_PRINT("Attempting MQTT connection...");
+
+  String clientId = deviceID;
+
+  if (mqttClient.connect(clientId.c_str(), deviceID.c_str(), apiKey.c_str())) {
+    DEBUG_PRINTLN("connected");
+    String cmdTopic = "commands/" + deviceID;
+    mqttClient.subscribe(cmdTopic.c_str());
+    DEBUG_PRINTLN("Subscribed to " + cmdTopic);
+    return true;
+  } else {
+    DEBUG_PRINT("failed, rc=");
+    DEBUG_PRINT(mqttClient.state());
+    DEBUG_PRINTLN(" try again in 5 seconds");
+    return false;
+  }
+}
+
+void mqttCallback(char *topic, byte *payload, unsigned int length) {
+  DEBUG_PRINT("Message arrived [");
+  DEBUG_PRINT(topic);
+  DEBUG_PRINT("] ");
+
+  String pl = "";
+  for (int i = 0; i < length; i++) {
+    pl += (char)payload[i];
+  }
+  DEBUG_PRINTLN(pl);
+
+  String pid = extractJsonVal(pl, "id");
+  if (pid.length() == 0)
+    pid = extractJsonVal(pl, "command_id");
+  String action = extractJsonVal(pl, "action");
+
+  String paramsBlock = "";
+  int pstart = pl.indexOf("\"params\":");
+  if (pstart > 0) {
+    int pvalStart = pl.indexOf('{', pstart);
+    if (pvalStart > 0) {
+      int pend = pvalStart;
+      int pcount = 1;
+      while (pcount > 0 && pend < pl.length() - 1) {
+        pend++;
+        if (pl.charAt(pend) == '{')
+          pcount++;
+        else if (pl.charAt(pend) == '}')
+          pcount--;
+      }
+      if (pcount == 0)
+        paramsBlock = pl.substring(pvalStart, pend + 1);
+    }
+  }
+
+  if (pid.length() > 0 && action.length() > 0) {
+    DEBUG_PRINTLN("Processing MQTT Command: " + pid + " Action: " + action);
+
+    ackCommand(pid);
+
+    if (action == "update_settings") {
+      String resolution = extractJsonVal(paramsBlock, "resolution");
+      String color = extractJsonVal(paramsBlock, "led_color");
+      int brightness = extractJsonInt(paramsBlock, "led_brightness");
+      bool hmirror = extractJsonBool(paramsBlock, "hmirror");
+      bool vflip = extractJsonBool(paramsBlock, "vflip");
+
+      if (color.length() > 0) {
+        long number = strtol(&color.c_str()[1], NULL, 16);
+        savedR = number >> 16;
+        savedG = number >> 8 & 0xFF;
+        savedB = number & 0xFF;
+      }
+      if (brightness != -1)
+        savedBrightness = brightness;
+
+#ifdef LED_GPIO_NUM
+      int r = (savedR * savedBrightness) / 100;
+      int g = (savedG * savedBrightness) / 100;
+      int b = (savedB * savedBrightness) / 100;
+#if LED_GPIO_NUM == 48
+      neopixelWrite(LED_GPIO_NUM, r, g, b);
+      torchState = (r + g + b > 0);
+#else
+      digitalWrite(LED_GPIO_NUM, (r + g + b > 0) ? HIGH : LOW);
+#endif
+#endif
+
+      sensor_t *s = esp_camera_sensor_get();
+      if (s) {
+        if (resolution.length() > 0) {
+          framesize_t newSize = getFrameSizeFromName(resolution);
+          if (s->status.framesize != newSize) {
+            bool wasStreaming = streaming;
+            streaming = false;
+            delay(100);
+            s->set_framesize(s, newSize);
+            streaming = wasStreaming;
+          }
+        }
+        if (paramsBlock.indexOf("hmirror") != -1)
+          s->set_hmirror(s, hmirror ? 1 : 0);
+        if (paramsBlock.indexOf("vflip") != -1)
+          s->set_vflip(s, vflip ? 1 : 0);
+      }
+
+    } else if (action == "stream") {
+      String state = extractJsonVal(paramsBlock, "state");
+      streaming = (state == "on");
+      DEBUG_PRINTLN(streaming ? "Streaming STARTED" : "Streaming STOPPED");
+
+    } else if (action == "snap") {
+      String snapRes = extractJsonVal(paramsBlock, "resolution");
+      handleSnap(snapRes);
+
+    } else if (action == "restart") {
+      ESP.restart();
+
+    } else if (action == "led") {
+#ifdef LED_GPIO_NUM
+#if LED_GPIO_NUM == 48
+      torchState = !torchState;
+      neopixelWrite(LED_GPIO_NUM, torchState ? 255 : 0, torchState ? 255 : 0,
+                    torchState ? 255 : 0);
+#endif
+#endif
+    }
+  }
+}
+
+String getMQTTHost() {
+  int start = serverURL.indexOf("://");
+  if (start == -1)
+    start = 0;
+  else
+    start += 3;
+
+  int end = serverURL.indexOf("/", start);
+  String host = (end == -1) ? serverURL.substring(start)
+                            : serverURL.substring(start, end);
+
+  int portIdx = host.indexOf(":");
+  if (portIdx != -1) {
+    host = host.substring(0, portIdx);
+  }
+  return host;
+}
+
+void setupMQTT() {
+  String host = getMQTTHost();
+  DEBUG_PRINTLN("MQTT Host: " + host);
+  mqttClient.setServer(host.c_str(), 1883);
+  mqttClient.setCallback(mqttCallback);
+  mqttClient.setBufferSize(2048);
+}
+
 void startCameraServer() {
   setupServer.on("/", HTTP_GET, handleSetupRoot);
   setupServer.on("/stream", HTTP_GET, handleStream);
@@ -1392,6 +1557,7 @@ void setup() {
     // Check activation
     if (apiKey.length() > 0) {
       currentState = STATE_ONLINE;
+      setupMQTT();
       startCameraServer();
       streaming = false;
     } else if (attemptSelfRegistration()) { // Try self registration if
