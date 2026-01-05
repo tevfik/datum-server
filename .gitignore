@@ -57,3 +57,6 @@ tmp/
 
 # Docker volumes
 docker-data/
+
+# Theia IDE
+.theia/
