@@ -44,12 +44,14 @@ services:
       # HTTP Router
       - "traefik.http.routers.datum-server.rule=Host(`${DOMAIN:-datum.localhost}`)"
       - "traefik.http.routers.datum-server.entrypoints=${TRAEFIK_ENTRYPOINT_HTTP:-web}"
+      - "traefik.http.routers.datum-server.service=datum-server"
 
       # HTTPS Router
       - "traefik.http.routers.datum-server-secure.rule=Host(`${DOMAIN:-datum.localhost}`)"
       - "traefik.http.routers.datum-server-secure.entrypoints=${TRAEFIK_ENTRYPOINT_HTTPS:-websecure}"
       - "traefik.http.routers.datum-server-secure.tls=true"
       - "traefik.http.routers.datum-server-secure.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.routers.datum-server-secure.service=datum-server"
 
       # Service
       - "traefik.http.services.datum-server.loadbalancer.server.port=8000"
@@ -66,6 +68,7 @@ services:
       # --- MQTT TCP (1883) ---
       - "traefik.tcp.routers.datum-mqtt.rule=HostSNI(`*`)"
       - "traefik.tcp.routers.datum-mqtt.entrypoints=mqtt"
+      - "traefik.tcp.routers.datum-mqtt.service=datum-mqtt"
       - "traefik.tcp.services.datum-mqtt.loadbalancer.server.port=1883"
 
       # --- MQTT MQTTS (8883) ---
@@ -73,6 +76,7 @@ services:
       - "traefik.tcp.routers.datum-mqtts.entrypoints=mqtts"
       - "traefik.tcp.routers.datum-mqtts.tls=true"
       - "traefik.tcp.routers.datum-mqtts.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.tcp.routers.datum-mqtts.service=datum-mqtts"
       - "traefik.tcp.services.datum-mqtts.loadbalancer.server.port=1883"
 
       # --- MQTT WSS (1884) ---
@@ -80,6 +84,7 @@ services:
       - "traefik.http.routers.datum-mqttws.entrypoints=mqttws"
       - "traefik.http.routers.datum-mqttws.tls=true"
       - "traefik.http.routers.datum-mqttws.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.routers.datum-mqttws.service=datum-mqttws"
       - "traefik.http.services.datum-mqttws.loadbalancer.server.port=1884"
       - "traefik.http.middlewares.mqtt-ws.headers.customrequestheaders.Connection=Upgrade"
       - "traefik.http.middlewares.mqtt-ws.headers.customrequestheaders.Upgrade=websocket"
