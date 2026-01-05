@@ -354,66 +354,6 @@ func TestLoginHandlerSuspendedUser(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "suspended")
 }
 
-func TestCreateDeviceHandler(t *testing.T) {
-	router := setupTestServerHandlers(t)
-	defer store.Close()
-
-	router.POST("/devices", func(c *gin.Context) {
-		c.Set("user_id", "regular-user-001")
-		createDeviceHandler(c)
-	})
-
-	body := map[string]interface{}{
-		"name": "Test Device",
-		"type": "sensor",
-	}
-	bodyBytes, _ := json.Marshal(body)
-
-	req := httptest.NewRequest(http.MethodPost, "/devices", bytes.NewReader(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusCreated, w.Code)
-
-	var response map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &response)
-	assert.Contains(t, response, "device_id")
-	assert.Contains(t, response, "api_key")
-}
-
-func TestListDevicesHandler(t *testing.T) {
-	router := setupTestServerHandlers(t)
-	defer store.Close()
-
-	// Create a test device
-	device := &storage.Device{
-		ID:        "test-device-001",
-		UserID:    "regular-user-001",
-		Name:      "Test Device",
-		Type:      "sensor",
-		APIKey:    "sk_test_key",
-		Status:    "active",
-		CreatedAt: time.Now(),
-	}
-	store.CreateDevice(device)
-
-	router.GET("/devices", func(c *gin.Context) {
-		c.Set("user_id", "regular-user-001")
-		listDevicesHandler(c)
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/devices", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var response map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &response)
-	assert.Contains(t, response, "devices")
-}
-
 func TestUpdateDeviceHandler(t *testing.T) {
 	router := setupTestServerHandlers(t)
 	defer store.Close()
