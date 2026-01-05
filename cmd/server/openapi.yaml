@@ -44,11 +44,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: User JWT token or Persistent API Key (ak_...)
+      description: User Authentication. Accepts standard JWT Access Token (via Login) OR Persistent User API Key (starts with `ak_`).
     ApiKeyAuth:
       type: http
       scheme: bearer
-      description: Device API key
+      description: Device Authentication. Accepts Device API Key (starts with `sk_`) OR Dynamic Device Token (starts with `dk_`).
 
   schemas:
     Error:
