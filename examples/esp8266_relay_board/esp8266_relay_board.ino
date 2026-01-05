@@ -319,7 +319,7 @@ void registerDevice() {
   String srv = String(config.server_url);
   if (srv.endsWith("/"))
     srv.remove(srv.length() - 1);
-  String url = srv + "/device";
+  String url = srv + "/devices";
   Serial.println("Registering Device at: " + url);
 
   // Client selection (HTTP vs HTTPS)

@@ -75,14 +75,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### API Endpoints
 - `POST /system/setup` - Initialize system
-- `POST /api/register` - User registration
-- `POST /api/login` - User login
-- `POST /api/devices` - Create device
-- `GET /api/devices` - List user devices
-- `POST /api/data` - Ingest device data
-- `GET /api/data/history` - Query historical data
-- `GET /api/data/latest` - Get latest data point
-- `GET /api/stream/:device_id` - SSE data streaming
+- `POST /auth/register` - User registration
+- `POST /auth/login` - User login
+- `POST /devices` - Create device
+- `GET /devices` - List user devices
+- `POST /data` - Ingest device data
+- `GET /data/history` - Query historical data
+- `GET /data/latest` - Get latest data point
+- `GET /stream/:device_id` - SSE data streaming
 - `GET /health` - Health check
 - `GET /ready` - Readiness check
 - `GET /metrics` - System metrics
@@ -92,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `POST /admin/users` - Create user
 - `PUT /admin/users/:id` - Update user
 - `DELETE /admin/users/:id` - Delete user
-- `POST /admin/users/:id/reset-password` - Reset password
+- `POST /admin/users/:username/reset-password` - Reset password
 - `GET /admin/devices` - List all devices
 - `PUT /admin/devices/:id` - Update device
 - `GET /admin/database/stats` - Database statistics

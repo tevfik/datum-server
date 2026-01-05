@@ -151,7 +151,7 @@ Response:
 Device uses API key for all subsequent requests:
 
 ```bash
-POST /device/dev_xyz789/push
+POST /devices/dev_xyz789/push
 Authorization: Bearer dk_secret123...
 Content-Type: application/json
 

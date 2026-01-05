@@ -71,7 +71,7 @@ func setupAdminRoutes(r *gin.Engine, store storage.Provider) {
 	}
 
 	// Device auth routes for token refresh
-	deviceAuth := r.Group("/device")
+	deviceAuth := r.Group("/devices")
 	deviceAuth.Use(auth.DeviceAuthMiddleware())
 	{
 		// deviceAuth.POST("/token/refresh", refreshTokenHandler)

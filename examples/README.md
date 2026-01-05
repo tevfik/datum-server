@@ -84,9 +84,9 @@ A MicroPython client for Raspberry Pi Pico W, ESP32, or any MicroPython-compatib
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/device/{id}/push` | POST | API Key | Send sensor data |
-| `/device/{id}/commands/poll` | GET | API Key | Get pending commands |
-| `/device/{id}/commands/{cmd}/ack` | POST | API Key | Acknowledge command |
+| `/devices/{id}/push` | POST | API Key | Send sensor data |
+| `/devices/{id}/commands/poll` | GET | API Key | Get pending commands |
+| `/devices/{id}/commands/{cmd}/ack` | POST | API Key | Acknowledge command |
 
 ### Authentication
 
@@ -123,9 +123,9 @@ The `/push` endpoint returns:
 ### Handling Commands
 
 1. Check `commands_pending` in push response
-2. If > 0, poll `/device/{id}/commands/poll`
+2. If > 0, poll `/devices/{id}/commands/poll`
 3. Execute each command
-4. Acknowledge with `/device/{id}/commands/{cmd}/ack`
+4. Acknowledge with `/devices/{id}/commands/{cmd}/ack`
 
 Command format:
 ```json

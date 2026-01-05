@@ -101,7 +101,7 @@ For devices that cannot make POST requests with JSON bodies, use the GET push en
 
 ### Simple HTTP GET Request
 ```http
-GET /device/{device_id}/push?key={api_key}&temp=25.5&humidity=60&battery=85
+GET /devices/{device_id}/push?key={api_key}&temp=25.5&humidity=60&battery=85
 ```
 
 ### Arduino/ESP8266 Example with WiFiClient
@@ -110,7 +110,7 @@ GET /device/{device_id}/push?key={api_key}&temp=25.5&humidity=60&battery=85
 void sendData(float temp, float humidity, int battery) {
   WiFiClient client;
   if (client.connect("your-server.com", 8007)) {
-    String url = "/device/" + String(DEVICE_ID) + "/push";
+    String url = "/devices/" + String(DEVICE_ID) + "/push";
     url += "?key=" + String(API_KEY);
     url += "&temp=" + String(temp, 1);
     url += "&humidity=" + String(humidity, 1);

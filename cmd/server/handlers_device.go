@@ -30,7 +30,7 @@ type DeviceResponse struct {
 // ============ Device Handlers ============
 
 // createDeviceHandler creates a new device for the authenticated user
-// POST /devices
+// POST /device
 func createDeviceHandler(c *gin.Context) {
 	userID, _ := auth.GetUserID(c)
 
@@ -69,7 +69,7 @@ func createDeviceHandler(c *gin.Context) {
 }
 
 // listDevicesHandler lists all devices for the authenticated user
-// GET /devices
+// GET /device
 func listDevicesHandler(c *gin.Context) {
 	userID, _ := auth.GetUserID(c)
 	role, _ := auth.GetUserRole(c)

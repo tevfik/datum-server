@@ -123,7 +123,7 @@ int sendData(float temp, float humidity, float battery) {
 
 void pollAndExecuteCommands() {
   String url =
-      String(API_URL) + "/device/" + DEVICE_ID + "/commands/pending?wait=5";
+      String(API_URL) + "/devices/" + DEVICE_ID + "/commands/pending?wait=5";
 
   http.begin(url);
   http.addHeader("Authorization", String("Bearer ") + API_KEY);
@@ -169,7 +169,7 @@ void pollAndExecuteCommands() {
 
 void acknowledgeCommand(const char *cmdId, JsonDocument &result) {
   String url =
-      String(API_URL) + "/device/" + DEVICE_ID + "/commands/" + cmdId + "/ack";
+      String(API_URL) + "/devices/" + DEVICE_ID + "/commands/" + cmdId + "/ack";
 
   StaticJsonDocument<256> doc;
   doc["status"] = "success";

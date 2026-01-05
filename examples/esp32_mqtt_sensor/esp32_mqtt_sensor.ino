@@ -312,7 +312,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
     // We could publish ack via MQTT here if server supports it, or HTTP
     // Currently server expects HTTP ack
     HTTPClient http;
-    http.begin(serverURL + "/device/" + deviceID + "/commands/" + cmdId +
+    http.begin(serverURL + "/devices/" + deviceID + "/commands/" + cmdId +
                "/ack");
     http.addHeader("Authorization", "Bearer " + apiKey);
     http.POST("{}");

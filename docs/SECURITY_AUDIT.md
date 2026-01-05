@@ -329,7 +329,7 @@ Example: dk_1735660800.a1b2c3d4e5f67890abcdef12
 | `/admin/devices/:id/rotate-key` | POST | Admin-initiated key rotation |
 | `/admin/devices/:id/revoke-key` | POST | Emergency key revocation |
 | `/admin/devices/:id/token-info` | GET | Token status information |
-| `/device/token/refresh` | POST | Device self-refresh (before expiry) |
+| `/devices/token/refresh` | POST | Device self-refresh (before expiry) |
 
 #### CLI Commands
 ```bash

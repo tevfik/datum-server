@@ -227,7 +227,7 @@ sequenceDiagram
     
     alt Token expires in < 7 days
         Device->>Device: Generate new token from MasterSecret
-        Device->>Server: POST /device/token/refresh<br/>Bearer: old_token<br/>{new_token_signature}
+        Device->>Server: POST /devices/token/refresh<br/>Bearer: old_token<br/>{new_token_signature}
         Server->>Server: Validate old token<br/>Verify new token signature
         Server->>Server: Store new token<br/>Keep old as PreviousToken
         Server-->>Device: {token_accepted, expires_at}
@@ -548,7 +548,7 @@ curl -X POST https://your-server/admin/devices/my-device-001/revoke-key \
 
 ```bash
 # Device refreshes its own token before expiry
-curl -X POST https://your-server/device/token/refresh \
+curl -X POST https://your-server/devices/token/refresh \
   -H "Authorization: Bearer $CURRENT_TOKEN" \
   -H "Content-Type: application/json"
 
@@ -589,7 +589,7 @@ void checkAndRefreshToken() {
         Serial.println("Token expiring soon, refreshing...");
         
         HTTPClient http;
-        http.begin(serverURL + "/device/token/refresh");
+        http.begin(serverURL + "/devices/token/refresh");
         http.addHeader("Authorization", "Bearer " + currentToken);
         http.addHeader("Content-Type", "application/json");
         

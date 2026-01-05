@@ -29,7 +29,7 @@ Content-Type: application/json
 
 To connect a new device, you need a **User Token** (obtained via `POST /auth/login`).
 
-### Endpoint: `POST /devices`
+### Endpoint: `POST /device`
 **Payload:**
 ```json
 {

@@ -157,7 +157,7 @@ sequenceDiagram
     participant Device
     
     Note over Device,SSE: Device maintains SSE connection
-    Device->>SSE: GET /device/{id}/commands/stream
+    Device->>SSE: GET /devices/{id}/commands/stream
     SSE-->>Device: SSE Connection Open
     
     Admin->>API: POST /devices/{id}/commands<br/>{action: "reboot"}
@@ -168,7 +168,7 @@ sequenceDiagram
     Note over SSE,Device: Command delivered in real-time
     SSE->>Device: event: command<br/>data: {id, action: "reboot"}
     
-    Device->>API: POST /device/&#123;id&#125;/commands/&#123;cmd_id&#125;/ack<br/>{status: "success"}
+    Device->>API: POST /devices/&#123;id&#125;/commands/&#123;cmd_id&#125;/ack<br/>{status: "success"}
     API->>BuntDB: Update command status
     API-->>Device: 200 OK
 ```
@@ -286,7 +286,7 @@ graph TD
     API["/api"] --> AUTH["/auth"]
     API --> DEVICES["/devices"]
     API --> DATA["/data"]
-    API --> DEVICE["/device"]
+    API --> DEVICE["/devices/{id}"]
     API --> PUBLIC["/public"]
     API --> ADMIN["/admin"]
     API --> SYSTEM["/system"]

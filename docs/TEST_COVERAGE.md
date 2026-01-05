@@ -26,7 +26,7 @@ All datumctl CLI tests passing. Coverage includes:
 
 ### ✅ cmd/server (263 tests)
 Comprehensive HTTP handler tests. Coverage:
-- Admin API (user/device management)
+- Admin API (user/devices management)
 - Device provisioning (basic)
 - Data ingestion and queries
 - System setup and configuration

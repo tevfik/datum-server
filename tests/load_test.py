@@ -112,7 +112,7 @@ class AuthenticatedDeviceUser(HttpUser):
             return
         
         self.client.get(
-            f"/device/{self.device_id}/commands",
+            f"/devices/{self.device_id}/commands",
             headers={"Authorization": f"Bearer {self.api_key}"}
         )
 

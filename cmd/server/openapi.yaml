@@ -10,7 +10,7 @@ info:
     
     ## Quick Start
     1. Register user: `POST /auth/register`
-    2. Create device: `POST /device`
+    2. Create device: `POST /devices`
     3. Send data (HTTP): `POST /data/{device_id}`
 
     ## MQTT / IoT Integration
@@ -228,6 +228,79 @@ components:
         wifi_pass:
           type: string
 
+    SetupRequest:
+      type: object
+      required: [platform_name, admin_email, admin_password]
+      properties:
+        platform_name:
+          type: string
+        admin_email:
+          type: string
+          format: email
+        admin_password:
+          type: string
+          minLength: 8
+        allow_register:
+          type: boolean
+        data_retention:
+          type: integer
+          description: Data retention in days
+          
+    UpdateRetentionRequest:
+      type: object
+      required: [days, check_interval_hours]
+      properties:
+        days:
+          type: integer
+          minimum: 1
+          maximum: 365
+        check_interval_hours:
+          type: integer
+          minimum: 1
+          maximum: 24
+          
+    UpdateRateLimitRequest:
+      type: object
+      required: [max_requests, window_seconds]
+      properties:
+        max_requests:
+          type: integer
+          minimum: 10
+        window_seconds:
+          type: integer
+          minimum: 1
+          
+    UpdateAlertConfigRequest:
+      type: object
+      properties:
+        email_enabled:
+          type: boolean
+        disk_threshold:
+          type: integer
+          minimum: 10
+          maximum: 95
+        memory_threshold:
+          type: integer
+          minimum: 10
+          maximum: 95
+          
+    UpdateRegistrationRequest:
+      type: object
+      properties:
+        allow_register:
+          type: boolean
+          
+    LogEntry:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        level:
+          type: string
+        message:
+          type: string
+
 paths:
   /:
     get:
@@ -385,7 +458,7 @@ paths:
         '200':
           description: Account deleted
 
-  /device/firmware/{filename}:
+  /devices/firmware/{filename}:
     get:
       summary: Download Firmware (Secured)
       tags: [Devices]
@@ -413,7 +486,7 @@ paths:
                 format: binary
 
 
-  /device:
+  /devices:
     post:
       summary: Create device
       tags: [Devices]
@@ -441,7 +514,7 @@ paths:
         '200':
           description: List of devices
 
-  /device/{device_id}:
+  /devices/{device_id}:
     delete:
       summary: Delete device
       tags: [Devices]
@@ -457,7 +530,7 @@ paths:
         '204':
           description: Device deleted
 
-  /device/{device_id}/commands:
+  /devices/{device_id}/commands:
     post:
       summary: Send command to device
       tags: [Commands]
@@ -479,7 +552,7 @@ paths:
         '201':
           description: Command queued
 
-  /device/{device_id}/commands/pending:
+  /devices/{device_id}/commands/pending:
     get:
       summary: Poll for commands (device)
       tags: [Commands]
@@ -495,7 +568,7 @@ paths:
         '200':
           description: Pending commands
 
-  /device/{device_id}/commands/poll:
+  /devices/{device_id}/commands/poll:
     get:
       summary: Long poll for commands
       tags: [Commands]
@@ -518,7 +591,7 @@ paths:
         '200':
           description: Commands or timeout
 
-  /device/{device_id}/commands/{command_id}/ack:
+  /devices/{device_id}/commands/{command_id}/ack:
     post:
       summary: Acknowledge command execution
       tags: [Commands]
@@ -539,7 +612,7 @@ paths:
         '200':
           description: Command acknowledged
 
-  /device/{device_id}/push:
+  /devices/{device_id}/push:
     get:
       summary: Push data via GET (for constrained devices)
       description: |
@@ -593,7 +666,7 @@ paths:
                   commands_pending:
                     type: integer
 
-  /device/{device_id}/stream/frame:
+  /devices/{device_id}/stream/frame:
     post:
       summary: Upload video frame
       tags: [Streaming]
@@ -921,7 +994,7 @@ paths:
         '200':
           description: Historical data points
 
-  /device/{device_id}/commands/stream:
+  /devices/{device_id}/commands/stream:
     get:
       summary: SSE stream for real-time commands
       description: |
@@ -1488,3 +1561,144 @@ paths:
                   expires_at:
                     type: string
                     format: date-time
+
+  /admin/users/{username}/reset-password:
+    post:
+      summary: Admin reset user password
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset
+
+  /admin/logs:
+    get:
+      summary: Get system logs
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: level
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LogEntry'
+                  total:
+                    type: integer
+    delete:
+      summary: Clear system logs
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logs cleared
+
+  /admin/config:
+    get:
+      summary: Get system configuration
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: System configuration
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /admin/config/retention:
+    put:
+      summary: Update data retention policy
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRetentionRequest'
+      responses:
+        '200':
+          description: Retention updated
+
+  /admin/config/rate-limit:
+    put:
+      summary: Update rate limit settings
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRateLimitRequest'
+      responses:
+        '200':
+          description: Rate limit updated
+
+  /admin/config/alerts:
+    put:
+      summary: Update alert settings
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAlertConfigRequest'
+      responses:
+        '200':
+          description: Alerts updated
+
+  /admin/config/registration:
+    put:
+      summary: Update registration settings
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRegistrationRequest'
+      responses:
+        '200':
+          description: Registration updated

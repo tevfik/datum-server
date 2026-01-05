@@ -482,7 +482,7 @@ bool sendSensorData() {
     }
     
     HTTPClient http;
-    String dataURL = serverURL + "/device/" + deviceID + "/push";
+    String dataURL = serverURL + "/devices/" + deviceID + "/push";
     
     http.begin(dataURL);
     http.addHeader("Authorization", "Bearer " + apiKey);

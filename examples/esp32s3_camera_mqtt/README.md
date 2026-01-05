@@ -113,7 +113,7 @@ Y6:    GPIO 36
         │                            │                             │
         │ 1. Poll commands           │                             │
         │───────────────────────────>│                             │
-        │    GET /device/:id/commands│                             │
+        │    GET /devices/:id/commands│                             │
         │                            │                             │
         │ 2. Receive "start-stream"  │    3. User connects         │
         │<───────────────────────────│<────────────────────────────│
@@ -121,7 +121,7 @@ Y6:    GPIO 36
         │                            │                             │
         │ 4. POST JPEG frames        │                             │
         │───────────────────────────>│                             │
-        │  /device/:id/stream/frame  │                             │
+        │  /devices/:id/stream/frame  │                             │
         │                            │ 5. Broadcast frames         │
         │                            │────────────────────────────>│
         │                            │    (WebSocket binary)       │
@@ -410,7 +410,7 @@ curl -i -N \
 
 #### Upload Frame
 ```http
-POST /device/:device_id/stream/frame
+POST /devices/:device_id/stream/frame
 X-API-Key: {device_api_key}
 Content-Type: image/jpeg
 
@@ -428,7 +428,7 @@ Content-Type: image/jpeg
 
 #### Poll Commands
 ```http
-GET /device/:device_id/commands
+GET /devices/:device_id/commands
 X-API-Key: {device_api_key}
 ```
 

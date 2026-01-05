@@ -91,7 +91,7 @@ void sendData() {
     serializeJson(doc, payload);
     
     HTTPClient http;
-    http.begin(String(SERVER) + "/device/living-room-sensor/push");
+    http.begin(String(SERVER) + "/devices/living-room-sensor/push");
     http.addHeader("Authorization", "Bearer " + String(API_KEY));
     http.addHeader("Content-Type", "application/json");
     
@@ -114,7 +114,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 # Get all home sensors
 curl -H "Authorization: Bearer $TOKEN" \
-  "$SERVER/devices?owner=$USER_ID"
+  "$SERVER/device?owner=$USER_ID"
 ```
 
 ### Automation Example
@@ -123,7 +123,7 @@ Use SSE to trigger automation when motion is detected:
 
 ```javascript
 const eventSource = new EventSource(
-  `${SERVER}/device/living-room-sensor/commands/stream`,
+  `${SERVER}/devices/living-room-sensor/commands/stream`,
   { headers: { 'Authorization': `Bearer ${API_KEY}` } }
 );
 
@@ -315,7 +315,7 @@ def read_and_send():
     }
     
     response = requests.post(
-        f"{SERVER}/device/cnc-machine-001/push",
+        f"{SERVER}/devices/cnc-machine-001/push",
         headers={"Authorization": f"Bearer {API_KEY}"},
         json=data
     )

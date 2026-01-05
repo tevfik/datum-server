@@ -133,7 +133,7 @@ curl -X POST http://localhost:8080/api/login \
   -d '{"email": "user@example.com", "password": "secret"}'
 
 # Create device
-curl -X POST http://localhost:8080/api/devices \
+curl -X POST http://localhost:8080/devices \
   -H "Authorization: Bearer <jwt-token>" \
   -H "Content-Type: application/json" \
   -d '{"name": "Sensor-01", "type": "temperature"}'

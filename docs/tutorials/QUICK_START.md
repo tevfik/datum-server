@@ -97,7 +97,7 @@ Response:
 export API_KEY="dk_a1b2c3d4e5f6..."
 export DEVICE_ID="dev_xyz789"
 
-curl -X POST "http://localhost:8080/device/$DEVICE_ID/push" \
+curl -X POST "http://localhost:8080/devices/$DEVICE_ID/push" \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -138,7 +138,7 @@ void setup() {
 void loop() {
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
-        String url = String(SERVER) + "/device/" + DEVICE_ID + "/push";
+        String url = String(SERVER) + "/devices/" + DEVICE_ID + "/push";
         
         http.begin(url);
         http.addHeader("Authorization", String("Bearer ") + API_KEY);
@@ -168,7 +168,7 @@ SERVER = "http://your-server:8080"
 
 def send_data(temperature, humidity):
     response = urequests.post(
-        f"{SERVER}/device/{DEVICE_ID}/push",
+        f"{SERVER}/devices/{DEVICE_ID}/push",
         headers={
             "Authorization": f"Bearer {API_KEY}",
             "Content-Type": "application/json"
@@ -250,7 +250,7 @@ curl -X POST "http://localhost:8080/devices/$DEVICE_ID/commands" \
 ```bash
 # Device polls for commands
 curl -H "Authorization: Bearer $API_KEY" \
-  "http://localhost:8080/device/$DEVICE_ID/commands/poll"
+  "http://localhost:8080/devices/$DEVICE_ID/commands/poll"
 ```
 
 ### Acknowledge Command
@@ -258,7 +258,7 @@ curl -H "Authorization: Bearer $API_KEY" \
 ```bash
 export CMD_ID="cmd_abc123"
 
-curl -X POST "http://localhost:8080/device/$DEVICE_ID/commands/$CMD_ID/ack" \
+curl -X POST "http://localhost:8080/devices/$DEVICE_ID/commands/$CMD_ID/ack" \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"status": "success"}'

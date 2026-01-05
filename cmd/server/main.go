@@ -248,7 +248,7 @@ func main() {
 	}
 
 	// Device management routes (require user auth)
-	devicesGroup := r.Group("/device")
+	devicesGroup := r.Group("/devices")
 	devicesGroup.Use(UserAuthMiddleware(store))
 	{
 		devicesGroup.POST("", createDeviceHandler)
@@ -261,7 +261,7 @@ func main() {
 	}
 
 	// Device command polling (device auth)
-	deviceCommandGroup := r.Group("/device")
+	deviceCommandGroup := r.Group("/devices")
 	deviceCommandGroup.Use(auth.DeviceAuthMiddleware())
 	{
 		// Renamed from /:device_id/commands to /:device_id/commands/pending to avoid collision with User List Commands
@@ -288,7 +288,7 @@ func main() {
 	{
 
 		// Video streaming routes (require user auth)
-		streamGroup := r.Group("/device")
+		streamGroup := r.Group("/devices")
 		streamGroup.Use(UserAuthMiddleware(store))
 		{
 			streamGroup.GET("/:device_id/stream/mjpeg", mjpegStreamHandler)       // MJPEG over HTTP (SSE-like)
@@ -311,7 +311,7 @@ func main() {
 	// Serve firmware updates (protected)
 	// Devices must provide ?token=<API_KEY> query parameter
 	// This replaces public static serving
-	r.GET("/device/firmware/:filename", auth.DeviceAuthMiddleware(), func(c *gin.Context) {
+	r.GET("/devices/firmware/:filename", auth.DeviceAuthMiddleware(), func(c *gin.Context) {
 		filename := c.Param("filename")
 		// Prevent directory traversal
 		if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
@@ -385,11 +385,11 @@ func rootHandler(c *gin.Context) {
 		"version": Version,
 		"endpoints": gin.H{
 			"auth":         []string{"POST /auth/register", "POST /auth/login"},
-			"devices":      []string{"POST /device", "GET /device", "DELETE /device/{id}"},
-			"commands":     []string{"POST /device/{id}/commands", "GET /device/{id}/commands"},
+			"devices":      []string{"POST /devices", "GET /devices", "DELETE /devices/{id}"},
+			"commands":     []string{"POST /devices/{id}/commands", "GET /devices/{id}/commands"},
 			"data":         []string{"POST /data/{id}", "GET /data/{id}", "GET /data/{id}/history"},
 			"public":       []string{"POST /public/data/{id}", "GET /public/data/{id}"},
-			"provisioning": []string{"POST /device/register", "GET /device/provisioning", "POST /provisioning/activate/{id}"},
+			"provisioning": []string{"POST /devices/register", "GET /devices/provisioning", "POST /provisioning/activate/{id}"},
 		},
 	})
 }

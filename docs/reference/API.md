@@ -30,7 +30,48 @@ GET /system/status
 ```
 Response: `{"initialized": true, "platform_name": "...", "allow_register": true}`
 
-> For admin endpoints, see [ADMIN.md](./ADMIN.md)
+### Setup System
+```http
+POST /system/setup
+Content-Type: application/json
+
+{"platform_name": "My IoT", "admin_email": "admin@example.com", "admin_password": "..."}
+```
+
+---
+
+## Admin Endpoints
+*(Require Admin Role)*
+
+### Logs
+```http
+GET /admin/logs?level=INFO&limit=50
+DELETE /admin/logs
+```
+
+### Configuration
+```http
+GET /admin/config
+PUT /admin/config/retention
+PUT /admin/config/rate-limit
+PUT /admin/config/alerts
+PUT /admin/config/registration
+```
+
+### User Management
+```http
+GET /admin/users
+POST /admin/users
+DELETE /admin/users/{user_id}
+POST /admin/users/{username}/reset-password
+```
+
+### Device Management
+```http
+GET /admin/devices
+POST /admin/devices
+DELETE /admin/devices/{device_id}
+```
 
 ---
 
@@ -75,7 +116,7 @@ Response: `{"status": "ok", "commands_pending": 0}`
 ### Send Data (Authenticated - GET for Constrained Devices)
 For devices that cannot make POST requests with JSON bodies (ESP8266, Arduino, etc.):
 ```http
-GET /device/{device_id}/push?key={api_key}&temp=25.5&humidity=60&battery=90
+GET /devices/{device_id}/push?key={api_key}&temp=25.5&humidity=60&battery=90
 ```
 Response: `{"status": "ok", "fields_stored": 3, "commands_pending": 0}`
 
@@ -170,15 +211,15 @@ Content-Type: application/json
 
 ### Poll Commands (Device)
 ```http
-GET /device/{device_id}/commands
-GET /device/{device_id}/commands/poll?wait=30
-GET /device/{device_id}/commands/stream?wait=30
+GET /devices/{device_id}/commands
+GET /devices/{device_id}/commands/poll?wait=30
+GET /devices/{device_id}/commands/stream?wait=30
 Authorization: Bearer {api_key}
 ```
 
 ### Acknowledge Command
 ```http
-POST /device/{device_id}/commands/{command_id}/ack
+POST /devices/{device_id}/commands/{command_id}/ack
 Authorization: Bearer {api_key}
 Content-Type: application/json
 

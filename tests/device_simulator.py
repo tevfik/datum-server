@@ -48,7 +48,7 @@ def send_data(device_id: str, api_key: str, data: dict) -> dict:
 
 def poll_commands(device_id: str, api_key: str, wait: int = 30) -> list:
     """Long poll for pending commands"""
-    url = f"{API_URL}/device/{device_id}/commands/poll?wait={wait}"
+    url = f"{API_URL}/devices/{device_id}/commands/poll?wait={wait}"
     headers = {"Authorization": f"Bearer {api_key}"}
     
     try:
@@ -61,7 +61,7 @@ def poll_commands(device_id: str, api_key: str, wait: int = 30) -> list:
 
 def acknowledge_command(device_id: str, api_key: str, command_id: str, result: dict) -> dict:
     """Acknowledge command execution"""
-    url = f"{API_URL}/device/{device_id}/commands/{command_id}/ack"
+    url = f"{API_URL}/devices/{device_id}/commands/{command_id}/ack"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
