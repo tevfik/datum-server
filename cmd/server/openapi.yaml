@@ -11,8 +11,22 @@ info:
     ## Quick Start
     1. Register user: `POST /auth/register`
     2. Create device: `POST /devices`
-    3. Send data: `POST /data/{device_id}`
-  version: 1.0.0
+    3. Send data (HTTP): `POST /data/{device_id}`
+
+    ## MQTT / IoT Integration
+    For real-time data and low-overhead communication, use MQTT:
+    - **Brokers**:
+      - `TCP`: Port `1883` (No TLS)
+      - `MQTTS`: Port `8883` (Secure TLS)
+      - `WS`: Port `1884` (WebSocket Secure - via Traefik)
+    - **Authentication**:
+      - Username: `{device_id}`
+      - Password: `{api_key}`
+    - **Topics**:
+      - Data (Pub): `data/{device_id}`
+      - Commands (Sub): `commands/{device_id}`
+      - Firmware (Sub): `firmware/{device_id}`
+  version: 1.1.0
   contact:
     name: API Support
   license:
@@ -927,95 +941,6 @@ paths:
                 event: ping
                 data: {"time":"2024-01-01T12:00:00Z"}
 
-  # ============ Provisioning Endpoints ============
-  /devices/register:
-    post:
-      summary: Register new device (Mobile App)
-      description: Mobile app registers a device using its UID. Returns provisioning credentials.
-      tags: [Provisioning]
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RegisterDeviceRequest'
-      responses:
-        '201':
-          description: Device registered
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RegisterDeviceResponse'
-
-  /devices/check-uid/{uid}:
-    get:
-      summary: Check for existing UID (Mobile App)
-      tags: [Provisioning]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: uid
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Check result
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  registered:
-                    type: boolean
-                  has_pending:
-                    type: boolean
-
-  /devices/provisioning:
-    get:
-      summary: List pending provisioning requests
-      tags: [Provisioning]
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: List of requests
-
-  /provisioning/activate:
-    post:
-      summary: Device Activation (Device)
-      description: Called by the device to claim its API Key after mobile registration.
-      tags: [Provisioning]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DeviceActivateRequest'
-      responses:
-        '200':
-          description: Activation successful
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeviceActivateResponse'
-
-  /provisioning/check/{uid}:
-    get:
-      summary: Check activation status (Device)
-      tags: [Provisioning]
-      parameters:
-        - name: uid
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Status check
 
   # ============ System Endpoints ============
   /system/status:
