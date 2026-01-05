@@ -25,7 +25,9 @@ type Broker struct {
 
 // NewBroker creates a new MQTT broker instance
 func NewBroker(store storage.Provider, processor *processing.TelemetryProcessor) *Broker {
-	server := mqtt.New(nil)
+	server := mqtt.New(&mqtt.Options{
+		InlineClient: true,
+	})
 	return &Broker{
 		server:    server,
 		store:     store,
