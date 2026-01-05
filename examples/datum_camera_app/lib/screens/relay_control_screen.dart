@@ -121,7 +121,15 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.device.name)),
+      appBar: AppBar(
+        title: Text(widget.device.name),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.white),
+            onPressed: _confirmDelete,
+          ),
+        ],
+      ),
       body: _isLoading 
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -138,6 +146,48 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
               ),
             ),
     );
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Device?'),
+        content: Text('Are you sure you want to delete "${widget.device.name}"? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      if (!mounted) return;
+      setState(() => _isLoading = true);
+      try {
+        await _api.deleteDevice(widget.device.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Device deleted successfully')),
+          );
+          Navigator.pop(context, true); // Return true to refresh list
+        }
+      } catch (e) {
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Delete failed: $e'), backgroundColor: Colors.red),
+          );
+          setState(() => _isLoading = false);
+        }
+      }
+    }
   }
 
   Widget _buildVoltageCard(double val) {

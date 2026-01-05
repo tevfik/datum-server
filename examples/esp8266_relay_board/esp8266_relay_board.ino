@@ -126,6 +126,9 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
   deserializeJson(doc, message);
 
   String type = doc["type"].as<String>();
+  if (type.length() == 0) {
+    type = doc["action"].as<String>();
+  }
   JsonObject params = doc["params"];
 
   if (type == "relay_control") {
