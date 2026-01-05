@@ -24,13 +24,13 @@
 
 // ======== STORAGE CONFIG ========
 #define EEPROM_SIZE 2048
-#define CONFIG_MAGIC 0xD4701102 // Increment this when modifying struct
+#define CONFIG_MAGIC 0xD4701103 // Increment this when modifying struct
 
 struct Config {
   uint32_t magic;
   char wifi_ssid[32];
   char wifi_pass[64];
-  char api_key[33];
+  char api_key[64]; // Increased from 33 to support sk_ (35) and dk_ (38) keys
   char server_url[128];
   char user_token[1024];
   char device_name[33];
