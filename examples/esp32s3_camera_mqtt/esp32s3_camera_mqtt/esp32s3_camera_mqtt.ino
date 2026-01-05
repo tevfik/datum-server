@@ -1049,7 +1049,7 @@ bool attemptSelfRegistration() {
   // 1. Register Device directly using Token
   DEBUG_PRINTLN("Attempting registration with token");
 
-  http.begin(serverURL + "/devices/register");
+  http.begin(serverURL + "/device/register");
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", "Bearer " + userToken); // Use User Token
 
@@ -1126,8 +1126,7 @@ bool activateProvisioning() {
 // Helper to ACK commands so they don't loop
 void ackCommand(String cmdId) {
   HTTPClient http;
-  http.begin(serverURL + "/devices/" + deviceID + "/commands/" + cmdId +
-             "/ack");
+  http.begin(serverURL + "/device/" + deviceID + "/commands/" + cmdId + "/ack");
   http.addHeader("Authorization", "Bearer " + apiKey);
   http.addHeader("Content-Type", "application/json");
   http.POST("{\"status\":\"executed\"}");
@@ -1232,7 +1231,7 @@ void checkCommands() {
     return;
 
   HTTPClient http;
-  http.begin(serverURL + "/devices/" + deviceID + "/commands/pending");
+  http.begin(serverURL + "/device/" + deviceID + "/commands/pending");
   http.addHeader("Authorization", "Bearer " + apiKey);
   if (http.GET() == 200) {
     String pl = http.getString();
@@ -1374,7 +1373,7 @@ void uploadFrame(camera_fb_t *fb) {
   // Use Global httpStream to allow Keep-Alive (reuse connection)
   httpStream.setReuse(true);
   httpStream.setTimeout(15000); // 15s for high-res uploads
-  httpStream.begin(serverURL + "/devices/" + deviceID + "/stream/frame");
+  httpStream.begin(serverURL + "/device/" + deviceID + "/stream/frame");
   httpStream.addHeader("Authorization", "Bearer " + apiKey);
   httpStream.addHeader("Content-Type", "image/jpeg");
 

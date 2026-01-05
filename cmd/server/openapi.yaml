@@ -10,7 +10,7 @@ info:
     
     ## Quick Start
     1. Register user: `POST /auth/register`
-    2. Create device: `POST /devices`
+    2. Create device: `POST /device`
     3. Send data (HTTP): `POST /data/{device_id}`
 
     ## MQTT / IoT Integration
@@ -385,7 +385,7 @@ paths:
         '200':
           description: Account deleted
 
-  /devices/firmware/{filename}:
+  /device/firmware/{filename}:
     get:
       summary: Download Firmware (Secured)
       tags: [Devices]
@@ -413,7 +413,7 @@ paths:
                 format: binary
 
 
-  /devices:
+  /device:
     post:
       summary: Create device
       tags: [Devices]
@@ -441,7 +441,7 @@ paths:
         '200':
           description: List of devices
 
-  /devices/{device_id}:
+  /device/{device_id}:
     delete:
       summary: Delete device
       tags: [Devices]
@@ -457,7 +457,7 @@ paths:
         '204':
           description: Device deleted
 
-  /devices/{device_id}/commands:
+  /device/{device_id}/commands:
     post:
       summary: Send command to device
       tags: [Commands]
@@ -479,7 +479,7 @@ paths:
         '201':
           description: Command queued
 
-  /devices/{device_id}/commands/pending:
+  /device/{device_id}/commands/pending:
     get:
       summary: Poll for commands (device)
       tags: [Commands]
@@ -495,7 +495,7 @@ paths:
         '200':
           description: Pending commands
 
-  /devices/{device_id}/commands/poll:
+  /device/{device_id}/commands/poll:
     get:
       summary: Long poll for commands
       tags: [Commands]
@@ -518,7 +518,7 @@ paths:
         '200':
           description: Commands or timeout
 
-  /devices/{device_id}/commands/{command_id}/ack:
+  /device/{device_id}/commands/{command_id}/ack:
     post:
       summary: Acknowledge command execution
       tags: [Commands]
@@ -539,7 +539,7 @@ paths:
         '200':
           description: Command acknowledged
 
-  /devices/{device_id}/push:
+  /device/{device_id}/push:
     get:
       summary: Push data via GET (for constrained devices)
       description: |
@@ -593,7 +593,7 @@ paths:
                   commands_pending:
                     type: integer
 
-  /devices/{device_id}/stream/frame:
+  /device/{device_id}/stream/frame:
     post:
       summary: Upload video frame
       tags: [Streaming]

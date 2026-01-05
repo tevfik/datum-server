@@ -96,12 +96,12 @@ class ApiClient {
   }
 
   Future<List<dynamic>> getDevices() async {
-    final response = await _dio.get('/devices');
+    final response = await _dio.get('/device');
     return response.data['devices'] ?? [];
   }
 
   Future<Map<String, dynamic>> getDevice(String id) async {
-    final response = await _dio.get('/devices/$id');
+    final response = await _dio.get('/device/$id');
     return response.data;
   }
 
@@ -121,7 +121,7 @@ class ApiClient {
 
   Future<Map<String, dynamic>> createProvisioningRequest(
       String uid, String name, String ssid, String pass) async {
-    final response = await _dio.post('/devices/register', data: {
+    final response = await _dio.post('/device/register', data: {
       'device_uid': uid,
       'device_name': name,
       'wifi_ssid': ssid,
@@ -131,7 +131,7 @@ class ApiClient {
   }
 
   Future<void> sendCommand(String deviceId, String action, {Map<String, dynamic>? params}) async {
-    await _dio.post('/devices/$deviceId/commands', data: {
+    await _dio.post('/device/$deviceId/commands', data: {
       'action': action,
       'params': params ?? {},
     });
@@ -139,7 +139,7 @@ class ApiClient {
 
   Future<void> deleteDevice(String deviceId) async {
     try {
-      await _dio.delete('/devices/$deviceId');
+      await _dio.delete('/device/$deviceId');
       _logger.log('Device deleted: $deviceId');
     } catch (e) {
        if (e is DioException && e.response != null) {

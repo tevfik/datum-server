@@ -76,7 +76,7 @@ def send_data(data):
 
 def poll_commands(wait=5):
     """Poll for pending commands"""
-    url = f"{CONFIG['api_url']}/devices/{CONFIG['device_id']}/commands/poll?wait={wait}"
+    url = f"{CONFIG['api_url']}/device/{CONFIG['device_id']}/commands/poll?wait={wait}"
     headers = {"Authorization": f"Bearer {CONFIG['api_key']}"}
     
     try:
@@ -90,7 +90,7 @@ def poll_commands(wait=5):
 
 def acknowledge_command(cmd_id, result):
     """Acknowledge command execution"""
-    url = f"{CONFIG['api_url']}/devices/{CONFIG['device_id']}/commands/{cmd_id}/ack"
+    url = f"{CONFIG['api_url']}/device/{CONFIG['device_id']}/commands/{cmd_id}/ack"
     headers = {
         "Authorization": f"Bearer {CONFIG['api_key']}",
         "Content-Type": "application/json"
