@@ -13,7 +13,11 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
       - "--log.level=${TRAEFIK_LOG_LEVEL:-INFO}"
+      - "--log.level=${TRAEFIK_LOG_LEVEL:-INFO}"
       - "--accesslog=true"
+      # MQTT Entrypoints
+      - "--entrypoints.mqtt.address=:1883"
+      - "--entrypoints.mqttws.address=:1884"
     ports:
       - "80:80"
       - "443:443"
@@ -85,6 +89,22 @@ services:
       - "traefik.http.middlewares.datum-redirect.redirectscheme.scheme=https"
       - "traefik.http.middlewares.datum-redirect.redirectscheme.permanent=true"
       - "traefik.http.routers.datum-server.middlewares=datum-redirect"
+
+      # MQTT TCP Router (1883)
+      - "traefik.tcp.routers.datum-mqtt.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.datum-mqtt.entrypoints=mqtt"
+      - "traefik.tcp.services.datum-mqtt.loadbalancer.server.port=1883"
+
+      # MQTT WebSocket Router (1884)
+      # Treat as HTTP for Upgrade handling? Or TCP?
+      # Mochi serves HTTP Upgrade on 1884. We can use HTTP router.
+      # User might access ws://domain:1884/mqtt
+      - "traefik.http.routers.datum-mqttws.rule=Host(`${DOMAIN:-datum.localhost}`)"
+      - "traefik.http.routers.datum-mqttws.entrypoints=mqttws"
+      - "traefik.http.services.datum-mqttws.loadbalancer.server.port=1884"
+      - "traefik.http.middlewares.mqtt-ws.headers.customrequestheaders.Connection=Upgrade"
+      - "traefik.http.middlewares.mqtt-ws.headers.customrequestheaders.Upgrade=websocket"
+      - "traefik.http.routers.datum-mqttws.middlewares=mqtt-ws"
     restart: unless-stopped
 
   # PostgreSQL Database (Optional - Enabled by setting DATABASE_URL)
