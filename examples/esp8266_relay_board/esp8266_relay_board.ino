@@ -302,10 +302,15 @@ void setupProvisioning() {
 
 // Helper: HTTP Registration (One-time)
 void registerDevice() {
-  if (strlen(config.user_token) == 0)
+  if (strlen(config.user_token) == 0) {
+    Serial.println("Skipping Registration: No User Token");
     return;
+  }
+
   HTTPClient http;
   String url = String(config.server_url) + "/devices";
+  Serial.println("Registering Device at: " + url);
+
   http.begin(espClient, url); // Use basic client
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", "Bearer " + String(config.user_token));
@@ -314,24 +319,47 @@ void registerDevice() {
   doc["name"] =
       strlen(config.device_name) > 0 ? config.device_name : "Relay Board";
   doc["type"] = DEVICE_TYPE_NAME;
-  doc["uid"] = String(ESP.getChipId());
+  doc["uid"] = String(ESP.getChipId()); // Ensure UID is sent
 
   String payload;
   serializeJson(doc, payload);
+  Serial.println("Payload: " + payload);
+
   int code = http.POST(payload);
+  Serial.printf("Registration HTTP Code: %d\n", code);
 
   if (code == 200 || code == 201) {
-    StaticJsonDocument<512> resp;
-    deserializeJson(resp, http.getString());
+    String responseBody = http.getString();
+    Serial.println("Response: " + responseBody);
+
+    StaticJsonDocument<1024> resp; // Increased buffer
+    DeserializationError error = deserializeJson(resp, responseBody);
+    if (error) {
+      Serial.print("JSON Parse Failed: ");
+      Serial.println(error.c_str());
+      http.end();
+      return;
+    }
+
     const char *key = resp["api_key"];
-    const char *id = resp["id"];
+    const char *id = resp["device_id"]; // Note: Server returns 'device_id' or
+                                        // 'id', check handlers
+    if (!id)
+      id = resp["id"]; // Fallback
+
     if (key && id) {
       strncpy(config.api_key, key, sizeof(config.api_key));
       strncpy(config.device_id, id, sizeof(config.device_id));
       memset(config.user_token, 0, sizeof(config.user_token)); // Clear token
       saveConfig();
-      Serial.println("Registration Success!");
+      Serial.println("Registration Success! Saved Credentials.");
+      Serial.printf("ID: %s\n", config.device_id);
+    } else {
+      Serial.println("Registration Failed: Missing api_key or id in response");
     }
+  } else {
+    String responseBody = http.getString();
+    Serial.println("Registration Error Response: " + responseBody);
   }
   http.end();
 }
