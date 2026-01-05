@@ -622,3 +622,81 @@ func TestStreamConcurrentClients(t *testing.T) {
 		assert.Equal(t, 0, sm.GetClientCount(deviceID))
 	})
 }
+
+func TestStreamSnapshotHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router, testStore := setupTestRouter()
+	store = testStore
+
+	// Create test user and device
+	testUser := &storage.User{
+		ID:           "test-user-snapshot",
+		Email:        "snapshot@example.com",
+		PasswordHash: "hashed",
+		Role:         "user",
+		Status:       "active",
+		CreatedAt:    time.Now(),
+	}
+	store.CreateUser(testUser)
+
+	testDevice := &storage.Device{
+		ID:     "test-device-snapshot",
+		UserID: testUser.ID,
+		Name:   "Snapshot Camera",
+		APIKey: "test-snapshot-api-key",
+	}
+	store.CreateDevice(testDevice)
+
+	adminToken, _ := auth.GenerateToken(testUser.ID, testUser.Email, "user")
+
+	router.GET("/devices/:device_id/stream/snapshot", func(c *gin.Context) {
+		token := c.GetHeader("Authorization")
+		if len(token) > 7 && token[:7] == "Bearer " {
+			c.Set("user_id", testUser.ID)
+		}
+		streamSnapshotHandler(c)
+	})
+
+	t.Run("snapshot - no stream active", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/devices/test-device-snapshot/stream/snapshot", nil)
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("snapshot - success", func(t *testing.T) {
+		// Broadcast a frame
+		validJPEG := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0xFF, 0xD9}
+		streamManager.BroadcastFrame("test-device-snapshot", validJPEG)
+
+		req := httptest.NewRequest("GET", "/devices/test-device-snapshot/stream/snapshot", nil)
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "image/jpeg", w.Header().Get("Content-Type"))
+		assert.Equal(t, validJPEG, w.Body.Bytes())
+	})
+
+	t.Run("snapshot - access denied", func(t *testing.T) {
+		otherUser := &storage.User{ID: "other", Email: "other@x.com", Role: "user"}
+		store.CreateUser(otherUser)
+		otherToken, _ := auth.GenerateToken(otherUser.ID, otherUser.Email, "user")
+
+		otherRouter, _ := setupTestRouter()
+		otherRouter.GET("/devices/:device_id/stream/snapshot", func(c *gin.Context) {
+			c.Set("user_id", otherUser.ID)
+			streamSnapshotHandler(c)
+		})
+
+		req := httptest.NewRequest("GET", "/devices/test-device-snapshot/stream/snapshot", nil)
+		req.Header.Set("Authorization", "Bearer "+otherToken)
+		w := httptest.NewRecorder()
+
+		otherRouter.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusForbidden, w.Code)
+	})
+}

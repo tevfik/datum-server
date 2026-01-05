@@ -182,3 +182,78 @@ func TestSSECommandsHandlerUnauthorized(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
+
+func TestSSECommandsHandler_Success(t *testing.T) {
+	router, cleanup := setupSSETestServer(t)
+	defer cleanup()
+
+	// Create test device
+	device := &storage.Device{
+		ID:     "sse-device-success",
+		UserID: "user-sse",
+		APIKey: "sk_sse_success",
+		Status: "active",
+	}
+	store.CreateDevice(device)
+
+	// Register route
+	router.GET("/devices/:device_id/commands/sse", func(c *gin.Context) {
+		c.Set("api_key", "sk_sse_success")
+		sseCommandsHandler(c)
+	})
+
+	// Pre-populate a command so it returns immediately (or quickly)
+	command := &storage.Command{
+		ID:       "cmd-immediate",
+		DeviceID: device.ID,
+		Action:   "ping",
+		Status:   "pending",
+	}
+	store.CreateCommand(command)
+
+	req := httptest.NewRequest(http.MethodGet, "/devices/sse-device-success/commands/sse?wait=1", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Header().Get("Content-Type"), "text/event-stream")
+	assert.Contains(t, w.Body.String(), "event:keepalive")
+	assert.Contains(t, w.Body.String(), "event:command")
+	assert.Contains(t, w.Body.String(), "cmd-immediate")
+}
+
+func TestSSECommandsHandler_Timeout(t *testing.T) {
+	router, cleanup := setupSSETestServer(t)
+	defer cleanup()
+
+	// Create test device
+	device := &storage.Device{
+		ID:     "sse-device-timeout",
+		UserID: "user-sse",
+		APIKey: "sk_sse_timeout",
+		Status: "active",
+	}
+	store.CreateDevice(device)
+
+	// Register route
+	router.GET("/devices/:device_id/commands/sse", func(c *gin.Context) {
+		c.Set("api_key", "sk_sse_timeout")
+		sseCommandsHandler(c)
+	})
+
+	// No commands, wait=1 second
+	req := httptest.NewRequest(http.MethodGet, "/devices/sse-device-timeout/commands/sse?wait=1", nil)
+	w := httptest.NewRecorder()
+
+	start := time.Now()
+	router.ServeHTTP(w, req)
+	duration := time.Since(start)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	// Should wait at least 1 second (approx)
+	assert.GreaterOrEqual(t, duration.Milliseconds(), int64(900))
+
+	assert.Contains(t, w.Body.String(), "event:keepalive")
+	assert.Contains(t, w.Body.String(), "event:timeout")
+	assert.Contains(t, w.Body.String(), "no commands")
+}
