@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/device_provider.dart';
 import 'provisioning_wizard.dart';
 import 'device_detail_screen.dart';
+import 'relay_control_screen.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -60,7 +61,8 @@ class HomeScreen extends StatelessWidget {
                 final device = deviceProvider.devices[index];
                 return ListTile(
                   leading: Icon(
-                    device.type == 'camera' ? Icons.camera_alt : Icons.sensors,
+                    device.type == 'camera' ? Icons.camera_alt : 
+                    device.type == 'relay_board' ? Icons.power : Icons.sensors,
                     color: device.status == 'online' ? Colors.green : Colors.grey,
                   ),
                   title: Text(device.name),
@@ -70,7 +72,9 @@ class HomeScreen extends StatelessWidget {
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => DeviceDetailScreen(device: device),
+                        builder: (_) => device.type == 'relay_board' 
+                            ? RelayControlScreen(device: device)
+                            : DeviceDetailScreen(device: device),
                       ),
                     );
                     
