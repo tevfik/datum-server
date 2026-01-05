@@ -373,8 +373,20 @@ void setup() {
       if (strlen(config.api_key) == 0 && strlen(config.user_token) > 0) {
         registerDevice();
       }
-      connectMQTT();
-      sendData(true, true);
+
+      // CRITICAL START: Auto-Provisioning Fallback
+      // If we still have no API Key (registration failed or no token),
+      // we MUST go to Provisioning Mode so user can fix it (since no button).
+      if (strlen(config.api_key) == 0) {
+        Serial.println(
+            "No API Key and Registration Failed -> Entering Provisioning Mode");
+        setupProvisioning();
+      } else {
+        connectMQTT();
+        sendData(true, true);
+      }
+      // CRITICAL END
+
     } else {
       setupProvisioning();
     }
