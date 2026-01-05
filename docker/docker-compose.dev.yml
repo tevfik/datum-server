@@ -24,6 +24,8 @@ services:
     environment:
       - PORT=8000
       - JWT_SECRET=dev-secret-key-not-for-production-use-only
+      - DOCS_USER=admin
+      - DOCS_PASS=admin123
       - RETENTION_MAX_DAYS=1
       - RETENTION_CHECK_HOURS=1
       - LOG_LEVEL=DEBUG
