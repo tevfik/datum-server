@@ -155,6 +155,6 @@ jobs:
             # We use 'datum-release' as the package name to group all artifacts.
             curl -v --fail -X PUT \
               --user "${{ github.actor }}:${{ secrets.PACKAGE_ARTIFACTORY_TOKEN || secrets.GITEA_TOKEN || secrets.GITHUB_TOKEN }}" \
-              "${{ github.server_url }}/api/packages/${{ github.repository_owner }}/generic/datum-release/${{ github.ref_name }}/$filename" \
+              "${{ github.server_url }}/api/packages/${{ github.repository_owner }}/generic/datum-server/${{ github.ref_name }}/$filename" \
               --upload-file "$file"
           done
