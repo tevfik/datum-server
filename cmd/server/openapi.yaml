@@ -140,8 +140,78 @@ components:
       properties:
         action:
           type: string
-        params:
           type: object
+    
+    ChangePasswordRequest:
+      type: object
+      required: [old_password, new_password]
+      properties:
+        old_password:
+          type: string
+        new_password:
+          type: string
+          minLength: 8
+
+    RegisterDeviceRequest:
+      type: object
+      required: [device_uid, device_name]
+      properties:
+        device_uid:
+          type: string
+          description: Hardware UID (MAC address or Serial)
+        device_name:
+          type: string
+        device_type:
+          type: string
+        wifi_ssid:
+          type: string
+        wifi_pass:
+          type: string
+
+    RegisterDeviceResponse:
+      type: object
+      properties:
+        request_id:
+          type: string
+        device_uid:
+          type: string
+        device_id:
+          type: string
+        status:
+          type: string
+        activate_url:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        api_key:
+          type: string
+          description: Temporary provisioning key
+
+    DeviceActivateRequest:
+      type: object
+      required: [device_uid]
+      properties:
+        device_uid:
+          type: string
+        firmware_version:
+          type: string
+        model:
+          type: string
+    
+    DeviceActivateResponse:
+      type: object
+      properties:
+        device_id:
+          type: string
+        api_key:
+          type: string
+        server_url:
+          type: string
+        wifi_ssid:
+          type: string
+        wifi_pass:
+          type: string
 
 paths:
   /:
@@ -272,6 +342,33 @@ paths:
       responses:
         '200':
           description: Password updated
+
+  /auth/password:
+    put:
+      summary: Change password
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed
+
+  /auth/user:
+    delete:
+      summary: Delete account
+      description: Permanently delete the authenticated user and all their devices/data.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Account deleted
 
   /devices/firmware/{filename}:
     get:
@@ -633,6 +730,92 @@ paths:
                           type: integer
                           description: Number of aggregated points (when using int parameter)
 
+  /devices/{device_id}/stream/mjpeg:
+    get:
+      summary: MJPEG Stream (Browser)
+      tags: [Streaming]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Multipart MJPEG stream
+          content:
+            multipart/x-mixed-replace:
+              schema:
+                type: string
+                format: binary
+
+  /devices/{device_id}/stream/snapshot:
+    get:
+      summary: Get current frame snapshot
+      tags: [Streaming]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: JPEG Image
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+
+  /devices/{device_id}/stream/ws:
+    get:
+      summary: WebSocket Stream (Binary)
+      tags: [Streaming]
+      description: Connect via WebSocket to receive raw binary JPEG frames.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '101':
+          description: WebSocket Upgrade
+
+  /devices/{device_id}/stream/info:
+    get:
+      summary: Stream Info
+      tags: [Streaming]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stream metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active:
+                    type: boolean
+                  clients:
+                    type: integer
+                  frame_size:
+                    type: integer
+
   /public/data/{device_id}:
     post:
       summary: Send public data (no auth)
@@ -742,6 +925,96 @@ paths:
                 
                 event: ping
                 data: {"time":"2024-01-01T12:00:00Z"}
+
+  # ============ Provisioning Endpoints ============
+  /devices/register:
+    post:
+      summary: Register new device (Mobile App)
+      description: Mobile app registers a device using its UID. Returns provisioning credentials.
+      tags: [Provisioning]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+      responses:
+        '201':
+          description: Device registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterDeviceResponse'
+
+  /devices/check-uid/{uid}:
+    get:
+      summary: Check for existing UID (Mobile App)
+      tags: [Provisioning]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  registered:
+                    type: boolean
+                  has_pending:
+                    type: boolean
+
+  /devices/provisioning:
+    get:
+      summary: List pending provisioning requests
+      tags: [Provisioning]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of requests
+
+  /provisioning/activate:
+    post:
+      summary: Device Activation (Device)
+      description: Called by the device to claim its API Key after mobile registration.
+      tags: [Provisioning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceActivateRequest'
+      responses:
+        '200':
+          description: Activation successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceActivateResponse'
+
+  /provisioning/check/{uid}:
+    get:
+      summary: Check activation status (Device)
+      tags: [Provisioning]
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Status check
 
   # ============ System Endpoints ============
   /system/status:
