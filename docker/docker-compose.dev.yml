@@ -41,5 +41,22 @@ services:
     command: |
       sh -c "cd /app && go run ./cmd/server"
 
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-datum}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datum_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-datum}
+    ports:
+      - "5432:5432" # Expose DB for local inspection
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-datum}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   datum-data-dev:
+  postgres_data_dev:

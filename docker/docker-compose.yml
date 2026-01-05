@@ -50,6 +50,9 @@ services:
       - SERVER_URL=https://${DOMAIN:-datum.localhost}
       - RESEND_API_KEY=${RESEND_API_KEY}
       - EMAIL_FROM=${EMAIL_FROM}
+      # Database Config - If set, uses Postgres. If empty, uses internal BuntDB.
+      # Constructs connection string from postgres service variables
+      - DATABASE_URL=postgres://${POSTGRES_USER:-datum}:${POSTGRES_PASSWORD:-datum_secret}@postgres:5432/${POSTGRES_DB:-datum}?sslmode=disable
       - DATA_DIR=./data
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:8000/health" ]
@@ -80,6 +83,29 @@ services:
       - "traefik.http.middlewares.datum-redirect.redirectscheme.permanent=true"
       - "traefik.http.routers.datum-server.middlewares=datum-redirect"
     restart: unless-stopped
+
+  # PostgreSQL Database (Optional - Enabled by setting DATABASE_URL)
+  postgres:
+    image: postgres:15-alpine
+    container_name: datum-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-datum}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datum_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-datum}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - datum-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-datum}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+
 
 networks:
   datum-network:

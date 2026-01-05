@@ -11,7 +11,7 @@ import (
 )
 
 // UserAuthMiddleware handles authentication for Users via JWT or Persistent API Key (ak_)
-func UserAuthMiddleware(store *storage.Storage) gin.HandlerFunc {
+func UserAuthMiddleware(store storage.Provider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		var token string

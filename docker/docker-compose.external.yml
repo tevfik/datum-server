@@ -19,6 +19,10 @@ services:
       - SERVER_URL=https://${DOMAIN:-datum.localhost}
       - RESEND_API_KEY=${RESEND_API_KEY}
       - EMAIL_FROM=${EMAIL_FROM}
+      # External Database Configuration
+      # Set DATABASE_URL in .env to connect to an external PostgreSQL
+      # format: postgres://user:pass@host:5432/dbname?sslmode=disable
+      - DATABASE_URL=${DATABASE_URL}
       - DATA_DIR=./data
     volumes:
       - ${DATA_DIR:-../data}:/root/data

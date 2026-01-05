@@ -17,6 +17,7 @@ import (
 	"datum-go/internal/email"
 	"datum-go/internal/logger"
 	"datum-go/internal/storage"
+	"datum-go/internal/storage/postgres"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -28,7 +29,7 @@ var (
 )
 
 var (
-	store        *storage.Storage
+	store        storage.Provider
 	emailService *email.EmailSender
 )
 
@@ -125,19 +126,29 @@ func main() {
 	// Note: CleanupEvery is handled internally by tstorage or ignored if using WithRetention
 
 	// Initialize storage (BuntDB for metadata, tstorage for time-series)
+	// Initialize storage
 	var err error
-	store, err = storage.New(dataDirPath+"/meta.db", dataDirPath+"/tsdata", retentionConfig.MaxAge)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize storage")
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL != "" {
+		// Use PostgreSQL
+		store, err = postgres.New(dbURL)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to initialize PostgreSQL storage")
+		}
+		log.Info().Str("backend", "PostgreSQL").Msg("Storage initialized")
+	} else {
+		// Use BuntDB (Default)
+		store, err = storage.New(dataDirPath+"/meta.db", dataDirPath+"/tsdata", retentionConfig.MaxAge)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to initialize BuntDB storage")
+		}
+		log.Info().
+			Str("backend", "BuntDB").
+			Str("timeseries", "tstorage").
+			Str("data_dir", dataDirPath).
+			Dur("retention", retentionConfig.MaxAge).
+			Msg("Storage initialized")
 	}
-	// Defer close is handled in graceful shutdown
-
-	log.Info().
-		Str("metadata", "BuntDB").
-		Str("timeseries", "tstorage").
-		Str("data_dir", dataDirPath).
-		Dur("retention", retentionConfig.MaxAge).
-		Msg("Storage initialized")
 
 	// Startup cleanup: expired grace periods and provisioning requests
 	if cleanedCount, err := store.CleanupExpiredGracePeriods(); err == nil && cleanedCount > 0 {

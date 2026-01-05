@@ -68,4 +68,20 @@ type Provider interface {
 	IsDeviceUIDRegistered(deviceUID string) (bool, string, error)
 	DeleteDeviceUIDIndex(deviceUID string) error
 	CleanupExpiredProvisioningRequests() (int, error)
+
+	// User API Key Operations
+	CreateUserAPIKey(key *APIKey) error
+	GetUserAPIKeys(userID string) ([]APIKey, error)
+	DeleteUserAPIKey(userID, keyID string) error
+	GetUserByUserAPIKey(apiKey string) (*User, error)
+
+	// System Operations
+	GetSystemConfig() (*SystemConfig, error)
+	SaveSystemConfig(config *SystemConfig) error
+	IsSystemInitialized() bool
+	InitializeSystem(platformName string, allowRegister bool, retention int) error
+	ResetSystem() error
+	ExportDatabase() (map[string]interface{}, error)
+	UpdateDataRetention(days int) error
+	UpdateRegistrationConfig(allow bool) error
 }

@@ -22,7 +22,7 @@ func generateIDString(byteLen int) string {
 }
 
 // SetupAdminRoutes configures all admin-related routes
-func setupAdminRoutes(r *gin.Engine, store *storage.Storage) {
+func setupAdminRoutes(r *gin.Engine, store storage.Provider) {
 	// System status (public - no auth needed)
 	r.GET("/system/status", getSystemStatusHandler)
 	r.POST("/system/setup", setupSystemHandler)

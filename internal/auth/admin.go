@@ -11,7 +11,7 @@ import (
 )
 
 // AdminMiddleware requires the user to have admin role
-func AdminMiddleware(store *storage.Storage) gin.HandlerFunc {
+func AdminMiddleware(store storage.Provider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -74,7 +74,7 @@ func AdminMiddleware(store *storage.Storage) gin.HandlerFunc {
 }
 
 // GetUserFromToken extracts user info from JWT token and checks status
-func CheckUserStatus(store *storage.Storage, userID string) error {
+func CheckUserStatus(store storage.Provider, userID string) error {
 	user, err := store.GetUserByID(userID)
 	if err != nil {
 		return err

@@ -204,6 +204,7 @@ See [Testing Guide](docs/guides/TESTING.md) for comprehensive testing documentat
 | [Retention Guide](docs/guides/RETENTION.md) | Data retention policies |
 | [Password Reset](docs/guides/PASSWORD_RESET.md) | Password recovery procedures |
 | [Registration Guide](docs/guides/REGISTRATION.md) | User registration setup |
+| [Database Setup](docs/guides/DATABASE_SETUP.md) | **PostgreSQL Setup & Migration** |
 
 ### Tutorials
 | Document | Description |
