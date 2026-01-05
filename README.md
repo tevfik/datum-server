@@ -118,7 +118,7 @@ This viewer handles JWT token acquisition and passes it to the stream endpoint s
 
 ```bash
 # Data ingestion
-curl -X POST http://localhost:8080/api/data \
+curl -X POST http://localhost:8080/data/YOUR_DEVICE_ID \
   -H "Authorization: Bearer <device-api-key>" \
   -H "Content-Type: application/json" \
   -d '{"temperature": 23.5, "humidity": 65}'
@@ -128,7 +128,7 @@ curl -X POST http://localhost:8080/api/data \
 
 ```bash
 # Login
-curl -X POST http://localhost:8080/api/login \
+curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "secret"}'
 
@@ -143,7 +143,7 @@ curl -X POST http://localhost:8080/devices \
 
 ```bash
 # Subscribe to device data stream
-curl -N http://localhost:8080/api/stream/<device-id> \
+curl -N http://localhost:8080/devices/<device-id>/stream/mjpeg \
   -H "Authorization: Bearer <jwt-token>"
 ```
 
@@ -250,7 +250,7 @@ META_PATH=./data/metadata.db
 
 # Retention
 RETENTION_MAX_DAYS=7
-RETENTION_CHECK_HOURS=1
+RETENTION_CHECK_HOURS=1 # (Deprecated)
 
 # Rate Limiting
 RATE_LIMIT_REQUESTS=1000
@@ -305,7 +305,7 @@ The server supports command-line flags that take precedence over environment var
 #include <HTTPClient.h>
 
 const char* apiKey = "your-device-api-key";
-const char* serverUrl = "http://server:8080/api/data";
+const char* serverUrl = "http://server:8080/data";
 
 void sendData(float temp, float humidity) {
   HTTPClient http;
@@ -356,7 +356,7 @@ import urequests
 import ujson
 
 API_KEY = "your-device-api-key"
-SERVER_URL = "http://server:8080/api/data"
+SERVER_URL = "http://server:8080/data/YOUR_DEVICE_ID"
 
 def send_data(temperature, humidity):
     headers = {

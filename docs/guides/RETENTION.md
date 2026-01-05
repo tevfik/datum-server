@@ -9,7 +9,7 @@ Configure via environment variables:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `RETENTION_MAX_DAYS` | 7 | Days to keep data |
-| `RETENTION_CHECK_HOURS` | 1 | Hours between cleanup runs |
+| `RETENTION_CHECK_HOURS` | 1 | (Deprecated) Hours between cleanup runs |
 
 ### docker-compose.yml
 ```yaml

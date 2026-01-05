@@ -305,9 +305,10 @@ PORT=8080
 DATA_DIR=/var/lib/datum/data
 JWT_SECRET=your-super-secret-jwt-key-min-32-chars
 RETENTION_MAX_DAYS=7
-RETENTION_CHECK_HOURS=24
 LOG_LEVEL=INFO
 GIN_MODE=release
+# Public URL for device provisioning and email links
+SERVER_URL=https://datum.example.com
 ```
 
 ### Service Management
@@ -391,7 +392,6 @@ data:
   LOG_LEVEL: "INFO"
   GIN_MODE: "release"
   RETENTION_MAX_DAYS: "7"
-  RETENTION_CHECK_HOURS: "24"
 ```
 
 **secret.yaml:**

@@ -61,7 +61,7 @@ We will respond within 48 hours and work with you to understand and resolve the 
 - Passwords hashed with bcrypt
 - Minimum password length: 8 characters
 - **Device Authentication**:
-  - Hybrid SAS Token Rotation (90-day expiry)
+  - **[Planned]** Hybrid SAS Token Rotation (90-day expiry)
   - 7-day grace period
   - Emergency revocation support
 

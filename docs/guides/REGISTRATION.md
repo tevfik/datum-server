@@ -61,7 +61,7 @@ This will prompt only for password and then setup everything.
 ### Method 3: Direct API Call (curl)
 
 ```bash
-curl -X POST http://localhost:8000/system/setup \
+curl -X POST http://localhost:8080/system/setup \
   -H "Content-Type: application/json" \
   -d '{
     "platform_name": "My IoT Platform",

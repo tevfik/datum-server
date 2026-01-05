@@ -1,4 +1,6 @@
-# API Key Security Architecture
+# API Key Security Architecture [PROPOSAL]
+
+> **Note:** This is a proposed architecture for future implementation. The endpoints described here (e.g. token refresh, rotation) are NOT yet implemented in the current version.
 
 This document describes the API key lifecycle management architecture for Datum Server, including the rationale for the chosen approach and detailed flow diagrams.
 

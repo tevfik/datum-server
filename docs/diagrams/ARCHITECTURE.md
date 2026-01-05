@@ -31,8 +31,8 @@ graph TB
         APP[Mobile App]
     end
 
-    D1 -->|POST /data| API
-    D2 -->|POST /data| API
+    D1 -->|POST /data/{id}| API
+    D2 -->|POST /data/{id}| API
     D3 -->|GET /push| API
     
     D1 -->|SSE| SSE

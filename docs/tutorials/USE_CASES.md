@@ -91,7 +91,7 @@ void sendData() {
     serializeJson(doc, payload);
     
     HTTPClient http;
-    http.begin(String(SERVER) + "/devices/living-room-sensor/push");
+    http.begin(String(SERVER) + "/data/living-room-sensor");
     http.addHeader("Authorization", "Bearer " + String(API_KEY));
     http.addHeader("Content-Type", "application/json");
     
@@ -315,7 +315,7 @@ def read_and_send():
     }
     
     response = requests.post(
-        f"{SERVER}/devices/cnc-machine-001/push",
+        f"{SERVER}/data/cnc-machine-001",
         headers={"Authorization": f"Bearer {API_KEY}"},
         json=data
     )
