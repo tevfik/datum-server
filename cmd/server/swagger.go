@@ -10,24 +10,32 @@ import (
 //go:embed openapi.yaml
 var openAPISpec string
 
-// Scalar UI HTML template
-const swaggerUIHTML = `<!doctype html>
+// Swagger UI HTML template
+const swaggerUIHTML = `<!DOCTYPE html>
 <html>
-  <head>
+<head>
     <title>Datum API Documentation</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
     <style>
-      body { margin: 0; }
+        body { margin: 0; padding: 0; }
+        .swagger-ui .topbar { display: none; }
     </style>
-  </head>
-  <body>
-    <script
-      id="api-reference"
-      data-url="/docs/openapi.yaml"
-      data-proxy-url="https://proxy.scalar.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
-  </body>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+        SwaggerUIBundle({
+            url: '/docs/openapi.yaml',
+            dom_id: '#swagger-ui',
+            presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+            layout: "BaseLayout",
+            deepLinking: true,
+            showExtensions: true,
+            showCommonExtensions: true
+        });
+    </script>
+</body>
 </html>`
 
 // setupSwagger adds API documentation endpoints
