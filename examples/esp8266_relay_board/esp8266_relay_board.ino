@@ -172,6 +172,11 @@ boolean connectMQTT() {
   String user = String(config.device_id);
   String pass = String(config.api_key);
 
+  if (pass.length() == 0) {
+    Serial.println("Skipping MQTT: No API Key");
+    return false;
+  }
+
   Serial.print("Connecting to MQTT... ");
   if (mqttClient.connect(clientId.c_str(), user.c_str(), pass.c_str())) {
     Serial.println("Connected!");

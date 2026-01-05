@@ -832,6 +832,11 @@ bool reconnectMQTT() {
     DEBUG_PRINTLN("DNS Resolution FAILED!");
   }
 
+  if (apiKey.length() == 0) {
+    DEBUG_PRINTLN("Skipping MQTT connection: No API Key");
+    return false;
+  }
+
   String clientId = deviceID;
 
   if (mqttClient.connect(clientId.c_str(), deviceID.c_str(), apiKey.c_str())) {
@@ -986,14 +991,17 @@ void setupMQTT() {
   mqttHost = getMQTTHost();
   DEBUG_PRINTLN("MQTT Host: " + mqttHost);
 
-  // Set timeout to 10s for slow connections
-  espClient.setTimeout(10);
+  // Set timeout to 10s (10000 ms) for slow connections
+  espClient.setTimeout(10000);
 
   // PubSubClient stores the pointer, so we MUST use a global/static string
   mqttClient.setServer(mqttHost.c_str(), 1883);
   mqttClient.setCallback(mqttCallback);
-  mqttClient.setBufferSize(
-      4096); // Increased buffer for larger commands/telemetry
+
+  // 4096 was causing malformed packets? Reducing to safe 1024.
+  // Telemetry is ~300 bytes.
+  mqttClient.setBufferSize(1024);
+  mqttClient.setKeepAlive(60); // 60s keepalive
 }
 
 void startCameraServer() {
