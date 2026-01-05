@@ -165,6 +165,8 @@ boolean connectMQTT() {
   espClient.setTimeout(10);                     // Increase timeout
   mqttClient.setServer(mqttHost.c_str(), 1883); // Use global buffer
   mqttClient.setCallback(mqttCallback);
+  mqttClient.setBufferSize(1024); // Increase buffer for OTA URLs/Commands
+  mqttClient.setKeepAlive(60);    // 60s Keep Alive
 
   String clientId = String(config.device_id);
   String user = String(config.device_id);
@@ -180,7 +182,13 @@ boolean connectMQTT() {
     return true;
   } else {
     Serial.print("Failed, rc=");
-    Serial.println(mqttClient.state());
+    int rc = mqttClient.state();
+    Serial.print(rc);
+    if (rc == 5) {
+      Serial.println(" (UNAUTHORIZED) - Check API Key!");
+    } else {
+      Serial.println("");
+    }
     return false;
   }
 }
