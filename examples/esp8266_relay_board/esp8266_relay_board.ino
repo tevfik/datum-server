@@ -6,6 +6,8 @@
 #include <ESP8266httpUpdate.h>
 #include <PubSubClient.h> // MQTT Support
 #include <WiFiClient.h>
+#include <WiFiClientSecure.h>
+#include <memory>
 
 // ======== HARDWARE CONFIG ========
 // Relay Pins (Active Low/High depends on board, typically Low for Relay Boards)
@@ -278,9 +280,13 @@ void setupProvisioning() {
             sizeof(config.wifi_ssid));
     strncpy(config.wifi_pass, server.arg("wifi_pass").c_str(),
             sizeof(config.wifi_pass));
-    if (server.hasArg("server_url"))
-      strncpy(config.server_url, server.arg("server_url").c_str(),
-              sizeof(config.server_url));
+    if (server.hasArg("server_url")) {
+      String url = server.arg("server_url");
+      if (url.endsWith("/")) {
+        url.remove(url.length() - 1);
+      }
+      strncpy(config.server_url, url.c_str(), sizeof(config.server_url));
+    }
     if (server.hasArg("user_token"))
       strncpy(config.user_token, server.arg("user_token").c_str(),
               sizeof(config.user_token));
@@ -308,10 +314,26 @@ void registerDevice() {
   }
 
   HTTPClient http;
-  String url = String(config.server_url) + "/devices";
+  String srv = String(config.server_url);
+  if (srv.endsWith("/"))
+    srv.remove(srv.length() - 1);
+  String url = srv + "/devices";
   Serial.println("Registering Device at: " + url);
 
-  http.begin(espClient, url); // Use basic client
+  // Client selection (HTTP vs HTTPS)
+  std::unique_ptr<WiFiClient> client;
+  if (url.startsWith("https://")) {
+    WiFiClientSecure *secureClient = new WiFiClientSecure();
+    secureClient->setInsecure(); // Skip cert validation
+    client.reset(secureClient);
+    Serial.println("Using secure client (HTTPS)");
+  } else {
+    client.reset(new WiFiClient());
+    Serial.println("Using plain client (HTTP)");
+  }
+
+  HTTPClient http;
+  http.begin(*client, url);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", "Bearer " + String(config.user_token));
 
