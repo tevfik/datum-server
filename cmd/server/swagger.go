@@ -3,6 +3,7 @@ package main
 import (
 	_ "embed"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 )
@@ -40,13 +41,25 @@ const swaggerUIHTML = `<!DOCTYPE html>
 
 // setupSwagger adds API documentation endpoints
 func setupSwagger(r *gin.Engine) {
+	var docs *gin.RouterGroup
+
+	// Check if Basic Auth credentials are configured
+	user := os.Getenv("DOCS_USER")
+	pass := os.Getenv("DOCS_PASS")
+
+	if user != "" && pass != "" {
+		docs = r.Group("/", gin.BasicAuth(gin.Accounts{user: pass}))
+	} else {
+		docs = r.Group("/")
+	}
+
 	// Swagger UI
-	r.GET("/docs", func(c *gin.Context) {
+	docs.GET("/docs", func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(swaggerUIHTML))
 	})
 
 	// OpenAPI spec
-	r.GET("/docs/openapi.yaml", func(c *gin.Context) {
+	docs.GET("/docs/openapi.yaml", func(c *gin.Context) {
 		c.Data(http.StatusOK, "application/x-yaml", []byte(openAPISpec))
 	})
 
