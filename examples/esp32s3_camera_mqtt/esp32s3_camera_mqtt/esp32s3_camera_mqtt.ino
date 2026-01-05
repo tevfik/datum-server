@@ -832,7 +832,12 @@ bool reconnectMQTT() {
     return true;
   } else {
     DEBUG_PRINT("failed, rc=");
-    DEBUG_PRINT(mqttClient.state());
+    int rc = mqttClient.state();
+    DEBUG_PRINT(rc);
+    if (rc == 5) {
+      DEBUG_PRINTLN(" (MQTT_CONNECT_UNAUTHORIZED) - Check API Key or Factory "
+                    "Reset Device!");
+    }
     DEBUG_PRINTLN(" try again in 5 seconds");
     return false;
   }
