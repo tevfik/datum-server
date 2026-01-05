@@ -43,7 +43,7 @@ services:
 
       # HTTP Router
       - "traefik.http.routers.datum-server.rule=Host(`${DOMAIN:-datum.localhost}`)"
-      - "traefik.http.routers.datum-server.entrypoints=${TRAEFIK_ENTRYPOINT_HTTP:-web}"
+      - "traefik.http.routers.datum-server.entrypoints=${TRAEFIK_ENTRYPOINT_HTTP:-web80}"
       - "traefik.http.routers.datum-server.service=datum-server"
 
       # HTTPS Router
@@ -63,6 +63,8 @@ services:
       - "traefik.http.routers.datum-server-secure.middlewares=datum-ws"
 
       # HTTP to HTTPS redirect
+      - "traefik.http.middlewares.datum-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.datum-redirect.redirectscheme.permanent=true"
       - "traefik.http.routers.datum-server.middlewares=datum-redirect"
 
       # --- MQTT TCP (1883) ---
