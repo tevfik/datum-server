@@ -174,7 +174,7 @@ boolean connectMQTT() {
   if (mqttClient.connect(clientId.c_str(), user.c_str(), pass.c_str())) {
     Serial.println("Connected!");
     // Subscribe to commands
-    String cmdTopic = "commands/" + String(config.device_id);
+    String cmdTopic = "cmd/" + String(config.device_id);
     mqttClient.subscribe(cmdTopic.c_str());
     Serial.println("Subscribed to " + cmdTopic);
     return true;

@@ -836,7 +836,7 @@ bool reconnectMQTT() {
 
   if (mqttClient.connect(clientId.c_str(), deviceID.c_str(), apiKey.c_str())) {
     DEBUG_PRINTLN("connected");
-    String cmdTopic = "commands/" + deviceID;
+    String cmdTopic = "cmd/" + deviceID;
     mqttClient.subscribe(cmdTopic.c_str());
     DEBUG_PRINTLN("Subscribed to " + cmdTopic);
     return true;
