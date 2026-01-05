@@ -146,7 +146,7 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [const BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -192,7 +192,7 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
         color: Colors.white, 
         borderRadius: BorderRadius.circular(16),
         border: isOn ? Border.all(color: Colors.blueAccent, width: 2) : null,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
