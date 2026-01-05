@@ -277,9 +277,15 @@ func main() {
 
 	// Data routes (require device auth)
 	dataGroup := r.Group("/data")
-    // ... (unchanged)
+	dataGroup.Use(auth.DeviceAuthMiddleware())
+	{
+		dataGroup.POST("/:device_id", postDataHandler)
+	}
 
-    // ...
+	// Data query routes (require user auth)
+	dataQueryGroup := r.Group("/data")
+	dataQueryGroup.Use(UserAuthMiddleware(store))
+	{
 
 		// Video streaming routes (require user auth)
 		streamGroup := r.Group("/device")
