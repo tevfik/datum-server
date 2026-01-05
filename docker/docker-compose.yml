@@ -19,8 +19,8 @@ services:
       - "443:443"
       - "8080:8080" # Traefik dashboard
       # MQTT Ports
-      - "1883:1883" # MQTT TCP
-      - "1884:1884" # MQTT Websocket
+      - "${MQTT_TCP_PORT:-1883}:1883" # MQTT TCP
+      - "${MQTT_WS_PORT:-1884}:1884" # MQTT Websocket
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "${LETSENCRYPT_DIR:-./letsencrypt}:/letsencrypt"
