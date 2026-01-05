@@ -820,7 +820,17 @@ bool reconnectMQTT() {
   if (mqttClient.connected())
     return true;
 
-  DEBUG_PRINT("Attempting MQTT connection...");
+  DEBUG_PRINT("Attempting MQTT connection to: ");
+  DEBUG_PRINTLN(mqttHost);
+
+  // Debug DNS Resolution
+  IPAddress ip;
+  if (WiFi.hostByName(mqttHost.c_str(), ip)) {
+    DEBUG_PRINT("Resolved IP: ");
+    DEBUG_PRINTLN(ip);
+  } else {
+    DEBUG_PRINTLN("DNS Resolution FAILED!");
+  }
 
   String clientId = deviceID;
 
