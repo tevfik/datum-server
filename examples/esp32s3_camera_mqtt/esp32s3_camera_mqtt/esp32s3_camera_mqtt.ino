@@ -1586,11 +1586,13 @@ void setup() {
     } else if (attemptSelfRegistration()) { // Try self registration if
                                             // we have user creds
       currentState = STATE_ONLINE;
+      setupMQTT();
       startCameraServer();
       streaming = false;
     } else if (activateProvisioning()) { // Fallback to old provisioning
                                          // if pending request exists
       currentState = STATE_ONLINE;
+      setupMQTT();
       startCameraServer();
       streaming = false;
     } else {
