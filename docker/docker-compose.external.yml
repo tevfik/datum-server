@@ -7,9 +7,10 @@ services:
     container_name: datum-server
     restart: unless-stopped
     ports:
+      # Ports are handled by External Traefik
       - "${PORT:-8000}:${PORT:-8000}"
-      - "${MQTT_TCP_PORT:-1883}:1883"
-      - "${MQTT_WS_PORT:-1884}:1884"
+      # - "${MQTT_TCP_PORT:-1883}:1883"
+      # - "${MQTT_WS_PORT:-1884}:1884"
     environment:
       - PORT=${PORT:-8000}
       - JWT_SECRET=${JWT_SECRET}
@@ -60,9 +61,29 @@ services:
       - "traefik.http.routers.datum-server-secure.middlewares=datum-ws"
 
       # HTTP to HTTPS redirect
-      - "traefik.http.middlewares.datum-redirect.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.datum-redirect.redirectscheme.permanent=true"
       - "traefik.http.routers.datum-server.middlewares=datum-redirect"
+
+      # --- MQTT TCP (1883) ---
+      - "traefik.tcp.routers.datum-mqtt.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.datum-mqtt.entrypoints=mqtt"
+      - "traefik.tcp.services.datum-mqtt.loadbalancer.server.port=1883"
+
+      # --- MQTT MQTTS (8883) ---
+      - "traefik.tcp.routers.datum-mqtts.rule=HostSNI(`${DOMAIN:-datum.localhost}`)"
+      - "traefik.tcp.routers.datum-mqtts.entrypoints=mqtts"
+      - "traefik.tcp.routers.datum-mqtts.tls=true"
+      - "traefik.tcp.routers.datum-mqtts.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.tcp.services.datum-mqtts.loadbalancer.server.port=1883"
+
+      # --- MQTT WSS (1884) ---
+      - "traefik.http.routers.datum-mqttws.rule=Host(`${DOMAIN:-datum.localhost}`)"
+      - "traefik.http.routers.datum-mqttws.entrypoints=mqttws"
+      - "traefik.http.routers.datum-mqttws.tls=true"
+      - "traefik.http.routers.datum-mqttws.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.services.datum-mqttws.loadbalancer.server.port=1884"
+      - "traefik.http.middlewares.mqtt-ws.headers.customrequestheaders.Connection=Upgrade"
+      - "traefik.http.middlewares.mqtt-ws.headers.customrequestheaders.Upgrade=websocket"
+      - "traefik.http.routers.datum-mqttws.middlewares=mqtt-ws"
 
 networks:
   int_docker:
