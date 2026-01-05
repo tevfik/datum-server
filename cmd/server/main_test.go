@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"datum-go/internal/processing"
 	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,9 @@ func setupTestRouter() (*gin.Engine, *storage.Storage) {
 
 	// Create in-memory storage for testing
 	testStore, _ := storage.New(":memory:", "", 0)
+
+	// Initialize Telemetry Processor for testing
+	telemetryProcessor = processing.NewTelemetryProcessor(testStore)
 
 	r := gin.New()
 	return r, testStore

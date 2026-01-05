@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -64,10 +65,34 @@ func sendCommandHandler(c *gin.Context) {
 		return
 	}
 
+	// SMART ROUTING: Check if device is connected via MQTT
+	// default status
+	status := "pending"
+	message := "Command queued for device (offline)"
+
+	if mqttBroker != nil && mqttBroker.IsDeviceConnected(deviceID) {
+		// Construct payload
+		payload := map[string]interface{}{
+			"command_id": cmdID,
+			"action":     cmd.Action,
+			"params":     cmd.Params,
+		}
+
+		// Marshal JSON
+		if jsonBytes, err := json.Marshal(payload); err == nil {
+			if err := mqttBroker.PublishCommand(deviceID, jsonBytes); err == nil {
+				status = "sent"
+				message = "Command sent to device via MQTT"
+				// Optionally mark as "sent" or "delivered" in DB if you track that state
+				// store.UpdateCommandStatus(cmdID, "sent")
+			}
+		}
+	}
+
 	c.JSON(http.StatusAccepted, gin.H{
 		"command_id": cmdID,
-		"status":     "pending",
-		"message":    "Command queued for device",
+		"status":     status,
+		"message":    message,
 		"expires_at": expiresAt,
 	})
 }

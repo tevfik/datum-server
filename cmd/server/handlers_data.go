@@ -24,6 +24,8 @@ type DataResponse struct {
 
 // postDataHandler handles data ingestion from devices
 // POST /data/:device_id
+// postDataHandler handles data ingestion from devices
+// POST /data/:device_id
 func postDataHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 	apiKey, _ := c.Get("api_key")
@@ -40,33 +42,16 @@ func postDataHandler(c *gin.Context) {
 		return
 	}
 
-	// ---------------------------------------------------------
-	// Enrichment: Server-Side Tagging
-	// ---------------------------------------------------------
-	// User requested Public IP (Gateway IP).
-	// We inject it here so the device doesn't need to look it up.
-	data["public_ip"] = c.ClientIP()
-	data["server_time"] = time.Now().Unix() // Also useful debugging
-	// ---------------------------------------------------------
-
-	point := &storage.DataPoint{
-		DeviceID:  deviceID,
-		Timestamp: time.Now(),
-		Data:      data,
-	}
-
-	if err := store.StoreData(point); err != nil {
+	result, err := telemetryProcessor.Process(deviceID, data, c.ClientIP())
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Check for pending commands
-	commandsPending := store.GetPendingCommandCount(deviceID)
-
 	c.JSON(http.StatusOK, gin.H{
 		"status":           "ok",
-		"timestamp":        point.Timestamp.Format(time.RFC3339),
-		"commands_pending": commandsPending,
+		"timestamp":        result.Timestamp.Format(time.RFC3339),
+		"commands_pending": result.CommandsPending,
 	})
 }
 
@@ -275,6 +260,9 @@ func getDataHistoryHandler(c *gin.Context) {
 // pushDataViaGetHandler allows constrained devices to push data via GET request
 // using query parameters instead of JSON body
 // Example: GET /device/:device_id/push?temp=25.5&humidity=60&battery=85
+// pushDataViaGetHandler allows constrained devices to push data via GET request
+// using query parameters instead of JSON body
+// Example: GET /device/:device_id/push?temp=25.5&humidity=60&battery=85
 func pushDataViaGetHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 	apiKey, exists := c.Get("api_key")
@@ -317,24 +305,16 @@ func pushDataViaGetHandler(c *gin.Context) {
 		return
 	}
 
-	point := &storage.DataPoint{
-		DeviceID:  deviceID,
-		Timestamp: time.Now(),
-		Data:      data,
-	}
-
-	if err := store.StoreData(point); err != nil {
+	result, err := telemetryProcessor.Process(deviceID, data, c.ClientIP())
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Check for pending commands
-	commandsPending := store.GetPendingCommandCount(deviceID)
-
 	c.JSON(http.StatusOK, gin.H{
 		"status":           "ok",
-		"timestamp":        point.Timestamp.Format(time.RFC3339),
+		"timestamp":        result.Timestamp.Format(time.RFC3339),
 		"fields_stored":    len(data),
-		"commands_pending": commandsPending,
+		"commands_pending": result.CommandsPending,
 	})
 }

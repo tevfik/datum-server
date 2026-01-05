@@ -16,6 +16,8 @@ import (
 	"datum-go/internal/auth"
 	"datum-go/internal/email"
 	"datum-go/internal/logger"
+	mqtt_internal "datum-go/internal/mqtt"
+	"datum-go/internal/processing"
 	"datum-go/internal/storage"
 	"datum-go/internal/storage/postgres"
 
@@ -29,8 +31,10 @@ var (
 )
 
 var (
-	store        storage.Provider
-	emailService *email.EmailSender
+	store              storage.Provider
+	emailService       *email.EmailSender
+	telemetryProcessor *processing.TelemetryProcessor
+	mqttBroker         *mqtt_internal.Broker
 )
 
 // Security headers middleware
@@ -164,6 +168,18 @@ func main() {
 
 	// Initialize Email Service
 	emailService = email.NewEmailSender(publicURL)
+
+	// Initialize Telemetry Processor
+	telemetryProcessor = processing.NewTelemetryProcessor(store)
+
+	// Initialize and Start MQTT Broker
+	mqttBroker = mqtt_internal.NewBroker(store, telemetryProcessor)
+	if err := mqttBroker.Start(); err != nil {
+		log.Error().Err(err).Msg("Failed to start MQTT Broker")
+	} else {
+		// Ensure Broker closes on shutdown
+		defer mqttBroker.Stop()
+	}
 
 	// Set global PublicURL for handlers that need it (e.g. web fallback)
 	GlobalPublicURL = publicURL

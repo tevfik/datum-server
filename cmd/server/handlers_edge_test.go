@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"datum-go/internal/auth"
+	"datum-go/internal/processing"
 	"datum-go/internal/storage"
 	"encoding/json"
 	"net/http"
@@ -22,6 +23,7 @@ func setupEdgeCaseTestServer(t *testing.T) (*gin.Engine, func()) {
 	var err error
 	store, err = storage.New(tmpDir+"/meta.db", tmpDir+"/tsdata", 7*24*time.Hour)
 	require.NoError(t, err)
+	telemetryProcessor = processing.NewTelemetryProcessor(store)
 
 	router := gin.New()
 	cleanup := func() {

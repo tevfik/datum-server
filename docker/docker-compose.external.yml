@@ -6,6 +6,10 @@ services:
       dockerfile: docker/Dockerfile
     container_name: datum-server
     restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+      - "1883:1883"
+      - "1884:1884"
     environment:
       - PORT=${PORT:-8000}
       - JWT_SECRET=${JWT_SECRET}

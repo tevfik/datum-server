@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"datum-go/internal/auth"
+	"datum-go/internal/processing"
 	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,7 @@ func TestPostDataWithDeviceAuth(t *testing.T) {
 	testStore, err := storage.New(":memory:", "", 7*24*time.Hour)
 	assert.NoError(t, err)
 	store = testStore
+	telemetryProcessor = processing.NewTelemetryProcessor(testStore)
 
 	// Initialize system
 	testStore.InitializeSystem("Test", false, 7)
@@ -76,6 +78,7 @@ func TestPostDataUnauthorized(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
 	store = testStore
+	telemetryProcessor = processing.NewTelemetryProcessor(testStore)
 
 	r := gin.New()
 	dataGroup := r.Group("/data")

@@ -15,6 +15,19 @@ func main() {
 	sourceDir := flag.String("src", "./data", "Source data directory (containing meta.db)")
 	targetURL := flag.String("dest", "", "Target PostgreSQL URL (required)")
 	retentionDays := flag.Int("days", 90, "Number of days of history to migrate")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "\nDatum DB Migration Tool\n")
+		fmt.Fprintf(os.Stderr, "-----------------------\n")
+		fmt.Fprintf(os.Stderr, "Migrates data from Legacy BuntDB/tstorage to PostgreSQL.\n\n")
+		fmt.Fprintf(os.Stderr, "Usage: %s [options]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  %s -dest \"postgres://user:pass@localhost:5432/datum\"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -src ./data -dest \"postgres://...\" -days 180\n\n", os.Args[0])
+	}
+
 	flag.Parse()
 
 	if *targetURL == "" {
