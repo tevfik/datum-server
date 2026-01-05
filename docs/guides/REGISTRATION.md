@@ -138,6 +138,60 @@ curl -X PUT http://localhost:8080/admin/config \
   }'
 ```
 
+## Device Registration Flows
+
+There are three ways to register a device.
+
+### Flow 1: Manual Registration (Pre-Shared Key)
+Best for prototyping or simple deployments.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI
+    participant Server
+    participant Device
+
+    User->>CLI: datumctl device create --name "Sensor 1"
+    CLI->>Server: POST /devices
+    Server-->>CLI: { "device_id": "...", "api_key": "dk_..." }
+    CLI-->>User: Shows API Key
+    User->>Device: Flash Firmware (Hardcode API Key)
+    Device->>Server: POST /data (Auth: API Key)
+```
+
+### Flow 2: Self-Registration (HTTP)
+Device uses a User Token to register itself on first boot.
+
+```mermaid
+sequenceDiagram
+    participant Device
+    participant Server
+
+    Note over Device: Has User Token
+    Device->>Server: POST /devices/register (Auth: User Token)
+    Server-->>Device: { "device_id": "...", "api_key": "..." }
+    Note over Device: Saves Creds to NVS
+    Device->>Server: POST /data (Auth: API Key)
+```
+
+### Flow 3: WiFi Provisioning (Mobile App)
+User claims device via Mobile App, app pushes credentials.
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Device
+    participant Server
+
+    Device->>Device: Start SoftAP
+    App->>Device: Connect to SoftAP & Push User Token
+    Device->>Server: POST /devices/register (Auth: User Token)
+    Server-->>Device: { "device_id": "...", "api_key": "..." }
+    Device->>Server: Activate / Confirm
+    Device-->>App: Success
+```
+
 ## Device Registration (API Keys)
 
 Devices don't use email/password. They use API keys:
@@ -195,7 +249,8 @@ curl -X PUT http://localhost:8080/admin/config \
 ```
 
 ### Q: Can devices register themselves?
-**A:** Devices need to be created by users/admins first via `datumctl device create`. This generates an API key. Devices can't self-register for security reasons.
+### Q: Can devices register themselves?
+**A:** Yes! Devices can use **Self-Registration** if they possess a valid **User Token**. They call `POST /devices/register` to exchange the User Token for a permanent Device API Key. See [Flow 2](#flow-2-self-registration-http) above.
 
 ### Q: What's the difference between datumctl setup and login?
 **A:** 
