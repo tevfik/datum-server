@@ -687,6 +687,7 @@ paths:
       responses:
         '200':
           description: Frame processed
+  /data/{device_id}:
     post:
       summary: Send data (device)
       tags: [Data]
