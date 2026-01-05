@@ -17,6 +17,7 @@ services:
       - "--accesslog=true"
       # MQTT Entrypoints
       - "--entrypoints.mqtt.address=:1883"
+      - "--entrypoints.mqtts.address=:8883"
       - "--entrypoints.mqttws.address=:1884"
     ports:
       - "80:80"
@@ -24,6 +25,7 @@ services:
       - "8080:8080" # Traefik dashboard
       # MQTT Ports
       - "${MQTT_TCP_PORT:-1883}:1883" # MQTT TCP
+      - "${MQTT_TLS_PORT:-8883}:8883" # MQTT MQTTS
       - "${MQTT_WS_PORT:-1884}:1884" # MQTT Websocket
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
@@ -95,12 +97,19 @@ services:
       - "traefik.tcp.routers.datum-mqtt.entrypoints=mqtt"
       - "traefik.tcp.services.datum-mqtt.loadbalancer.server.port=1883"
 
+      # MQTT Secure TCP Router (8883)
+      - "traefik.tcp.routers.datum-mqtts.rule=HostSNI(`${DOMAIN:-datum.localhost}`)"
+      - "traefik.tcp.routers.datum-mqtts.entrypoints=mqtts"
+      - "traefik.tcp.routers.datum-mqtts.tls=true"
+      - "traefik.tcp.routers.datum-mqtts.tls.certresolver=letsencrypt"
+      - "traefik.tcp.services.datum-mqtts.loadbalancer.server.port=1883"
+
       # MQTT WebSocket Router (1884)
-      # Treat as HTTP for Upgrade handling? Or TCP?
-      # Mochi serves HTTP Upgrade on 1884. We can use HTTP router.
-      # User might access ws://domain:1884/mqtt
+      # Secure WebSocket (WSS) via TLS
       - "traefik.http.routers.datum-mqttws.rule=Host(`${DOMAIN:-datum.localhost}`)"
       - "traefik.http.routers.datum-mqttws.entrypoints=mqttws"
+      - "traefik.http.routers.datum-mqttws.tls=true"
+      - "traefik.http.routers.datum-mqttws.tls.certresolver=letsencrypt"
       - "traefik.http.services.datum-mqttws.loadbalancer.server.port=1884"
       - "traefik.http.middlewares.mqtt-ws.headers.customrequestheaders.Connection=Upgrade"
       - "traefik.http.middlewares.mqtt-ws.headers.customrequestheaders.Upgrade=websocket"
