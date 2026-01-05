@@ -58,6 +58,9 @@ func setupAdminRoutes(r *gin.Engine, store storage.Provider) {
 		admin.POST("/database/cleanup", forceCleanupHandler)
 		admin.DELETE("/database/reset", resetDatabaseHandler)
 
+		// System Configuration
+		admin.PUT("/config", updateRegistrationConfigHandler)
+
 		// System configuration
 		admin.GET("/config", getSystemConfigHandler)
 		admin.PUT("/config/retention", updateRetentionPolicyHandler)

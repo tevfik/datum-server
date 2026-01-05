@@ -480,3 +480,61 @@ func TestGetDatabaseStats(t *testing.T) {
 
 	testStore.Close()
 }
+
+// TestUpdateRegistrationConfigHandler_Success tests updating registration config
+func TestUpdateRegistrationConfigHandler_Success(t *testing.T) {
+	r, testStore, token := setupTestEnvironment(t)
+
+	// Enable registration
+	configData := map[string]bool{
+		"allow_register": true,
+	}
+
+	body, _ := json.Marshal(configData)
+	req, _ := http.NewRequest("PUT", "/admin/config", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Verify change in store
+	config, err := testStore.GetSystemConfig()
+	assert.NoError(t, err)
+	assert.True(t, config.AllowRegister)
+
+	// Disable registration
+	configData["allow_register"] = false
+	body, _ = json.Marshal(configData)
+	req, _ = http.NewRequest("PUT", "/admin/config", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	config, err = testStore.GetSystemConfig()
+	assert.NoError(t, err)
+	assert.False(t, config.AllowRegister)
+
+	testStore.Close()
+}
+
+// TestUpdateRegistrationConfigHandler_InvalidJSON tests invalid payload
+func TestUpdateRegistrationConfigHandler_InvalidJSON(t *testing.T) {
+	r, testStore, token := setupTestEnvironment(t)
+
+	invalidJSON := []byte(`{"allow_register": "not-a-boolean"}`)
+
+	req, _ := http.NewRequest("PUT", "/admin/config", bytes.NewBuffer(invalidJSON))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	testStore.Close()
+}
