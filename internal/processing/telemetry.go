@@ -24,7 +24,7 @@ func NewTelemetryProcessor(store storage.Provider) *TelemetryProcessor {
 		Store:         store,
 		dataChan:      make(chan *storage.DataPoint, 50000), // Increased buffer for high throughput (bursts)
 		flushInterval: 500 * time.Millisecond,
-		batchSize:     1000,
+		batchSize:     5000,
 		done:          make(chan struct{}),
 	}
 
