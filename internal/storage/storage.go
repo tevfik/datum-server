@@ -312,7 +312,6 @@ func (s *Storage) StoreData(point *DataPoint) error {
 	}
 
 	// 2. Update Device Shadow (Latest State) in BuntDB
-	// This merges new data with existing state to ensure "split telemetry" works correctly.
 	return s.db.Update(func(tx *buntdb.Tx) error {
 		shadowKey := fmt.Sprintf("device:%s:shadow", point.DeviceID)
 
@@ -335,7 +334,9 @@ func (s *Storage) StoreData(point *DataPoint) error {
 
 		// Save back
 		newJSON, _ := json.Marshal(shadowData)
-		_, _, err = tx.Set(shadowKey, string(newJSON), nil)
+		if _, _, err = tx.Set(shadowKey, string(newJSON), nil); err != nil {
+			return err
+		}
 
 		// Also update device LastSeen
 		deviceKey := fmt.Sprintf("device:%s", point.DeviceID)
@@ -345,10 +346,6 @@ func (s *Storage) StoreData(point *DataPoint) error {
 				device.LastSeen = time.Now()
 				// Store public IP if present in data
 				if ip, ok := point.Data["public_ip"].(string); ok {
-					if device.Type == "camera" || device.Type == "relay" {
-						// Optionally store it in device struct if needed,
-						// but shadow is sufficient for display.
-					}
 					_ = ip
 				}
 
@@ -356,8 +353,102 @@ func (s *Storage) StoreData(point *DataPoint) error {
 				tx.Set(deviceKey, string(devJSON), nil)
 			}
 		}
+		return nil
+	})
+}
 
-		return err
+// StoreDataBatch stores multiple data points in a single batch operation
+func (s *Storage) StoreDataBatch(points []*DataPoint) error {
+	if len(points) == 0 {
+		return nil
+	}
+
+	// 1. Prepare Time-Series Data (tstorage)
+	var rows []tstorage.Row
+	for _, point := range points {
+		ts := point.Timestamp.UnixNano()
+		for key, val := range point.Data {
+			var floatVal float64
+			switch v := val.(type) {
+			case float64:
+				floatVal = v
+			case float32:
+				floatVal = float64(v)
+			case int:
+				floatVal = float64(v)
+			case int64:
+				floatVal = float64(v)
+			default:
+				continue
+			}
+
+			metricName := fmt.Sprintf("%s.%s", point.DeviceID, key)
+			rows = append(rows, tstorage.Row{
+				Metric:    metricName,
+				DataPoint: tstorage.DataPoint{Timestamp: ts, Value: floatVal},
+			})
+		}
+	}
+
+	if len(rows) > 0 {
+		if err := s.ts.InsertRows(rows); err != nil {
+			return err
+		}
+	}
+
+	// 2. Update Device Shadows in BuntDB (Atomic Batch)
+	// For efficiency, we group by device to only update each device once per batch
+	latestState := make(map[string]*DataPoint)
+	for _, p := range points {
+		// Since we process in order, the last one for a device is the latest
+		latestState[p.DeviceID] = p
+	}
+
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		for deviceID, point := range latestState {
+			shadowKey := fmt.Sprintf("device:%s:shadow", deviceID)
+
+			// Get existing shadow
+			var shadowData map[string]interface{}
+			existingJSON, err := tx.Get(shadowKey)
+			if err == nil {
+				json.Unmarshal([]byte(existingJSON), &shadowData)
+			} else {
+				shadowData = make(map[string]interface{})
+			}
+
+			// Merge new data
+			for k, v := range point.Data {
+				shadowData[k] = v
+			}
+			shadowData["timestamp"] = point.Timestamp.Unix()
+			shadowData["_last_updated"] = time.Now().Format(time.RFC3339)
+
+			// Save back
+			newJSON, _ := json.Marshal(shadowData)
+			if _, _, err = tx.Set(shadowKey, string(newJSON), nil); err != nil {
+				return err
+			}
+
+			// Also update device LastSeen
+			deviceKey := fmt.Sprintf("device:%s", deviceID)
+			if deviceVal, err := tx.Get(deviceKey); err == nil {
+				var device Device
+				if err := json.Unmarshal([]byte(deviceVal), &device); err == nil {
+					device.LastSeen = time.Now()
+					// Store public IP if present (prioritize latest)
+					if ip, ok := point.Data["public_ip"].(string); ok {
+						// Logic could guide here, but shadow is fine
+						_ = ip
+					}
+
+					// Save device back
+					dJSON, _ := json.Marshal(device)
+					tx.Set(deviceKey, string(dJSON), nil)
+				}
+			}
+		}
+		return nil
 	})
 }
 

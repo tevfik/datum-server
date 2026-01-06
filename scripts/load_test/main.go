@@ -42,6 +42,9 @@ func main() {
 	numUsers := flag.Int("users", 5, "Number of users to simulate")
 	devicesPer := flag.Int("devices", 2, "Number of devices per user")
 	duration := flag.Duration("duration", 30*time.Second, "Test duration")
+	cleanup := flag.Bool("cleanup", false, "Clean up users from previous runs (load_test_users.json)")
+	cleanupAfter := flag.Bool("cleanup-after", false, "Clean up users after test completes")
+	adminToken := flag.String("admin-token", "", "Admin token for cleaning up ALL load test users (ignores load_test_users.json)")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "\nDatum Load Test Runner\n")
@@ -52,16 +55,11 @@ func main() {
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  %s -proto mqtt -users 10\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -url http://localhost:8080 -proto mixed\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -cleanup\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -cleanup -admin-token <TOKEN>\n", os.Args[0])
 	}
 
 	flag.Parse()
-
-	log.Printf("Starting Load Test against %s (Proto: %s)", *baseURL, *protocol)
-	if *protocol != "http" {
-		log.Printf("MQTT Broker: %s", *mqttBroker)
-	}
-	log.Printf("Setup: %d Users, %d Devices/User (Total %d devices)", *numUsers, *devicesPer, *numUsers**devicesPer)
 
 	client := &http.Client{
 		Timeout: 5 * time.Second,
@@ -71,6 +69,22 @@ func main() {
 			IdleConnTimeout:     90 * time.Second,
 		},
 	}
+
+	if *cleanup {
+		log.Println("--- Cleanup Mode ---")
+		if *adminToken != "" {
+			performAdminCleanup(client, *baseURL, *adminToken)
+		} else {
+			performCleanup(client, *baseURL)
+		}
+		return
+	}
+
+	log.Printf("Starting Load Test against %s (Proto: %s)", *baseURL, *protocol)
+	if *protocol != "http" {
+		log.Printf("MQTT Broker: %s", *mqttBroker)
+	}
+	log.Printf("Setup: %d Users, %d Devices/User (Total %d devices)", *numUsers, *devicesPer, *numUsers**devicesPer)
 
 	// 1. Setup Phase
 	log.Println("--- Setup Phase: Registering Users & Devices (HTTP) ---")
@@ -141,6 +155,16 @@ func main() {
 
 	// 3. Report Phase
 	printReport(elapsed)
+
+	// 4. Cleanup Phase (Optional)
+	if *cleanupAfter {
+		log.Println("\n--- Auto-Cleanup Phase ---")
+		if *adminToken != "" {
+			performAdminCleanup(client, *baseURL, *adminToken)
+		} else {
+			performCleanup(client, *baseURL)
+		}
+	}
 }
 
 func connectMQTTClients(devices []DeviceCreds, broker string) {
@@ -178,8 +202,14 @@ func connectMQTTClients(devices []DeviceCreds, broker string) {
 	log.Printf("Connected %d/%d MQTT clients", connected, len(devices))
 }
 
+type UserCreds struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 func setupTestEntities(client *http.Client, baseURL string, numUsers, devicesPer int) []DeviceCreds {
 	var devices []DeviceCreds
+	var users []UserCreds
 
 	// Pre-seed random for unique emails
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -195,6 +225,8 @@ func setupTestEntities(client *http.Client, baseURL string, numUsers, devicesPer
 			log.Printf("Failed to register user %s: status %d", email, status)
 			continue
 		}
+
+		users = append(users, UserCreds{Email: email, Password: password})
 
 		// Login
 		var loginResp map[string]interface{}
@@ -240,7 +272,185 @@ func setupTestEntities(client *http.Client, baseURL string, numUsers, devicesPer
 		// Small delay to avoid overwhelming DB during setup
 		time.Sleep(10 * time.Millisecond)
 	}
+
+	// Save users to file for cleanup
+	saveUsers(users)
 	return devices
+}
+
+func saveUsers(users []UserCreds) {
+	// Read existing users to append
+	existing := loadSavedUsers()
+	existing = append(existing, users...)
+
+	data, err := json.MarshalIndent(existing, "", "  ")
+	if err != nil {
+		log.Printf("Failed to marshal users: %v", err)
+		return
+	}
+	_ = os.WriteFile("load_test_users.json", data, 0644)
+}
+
+func loadSavedUsers() []UserCreds {
+	data, err := os.ReadFile("load_test_users.json")
+	if err != nil {
+		return []UserCreds{}
+	}
+	var users []UserCreds
+	json.Unmarshal(data, &users)
+	return users
+}
+
+func performCleanup(client *http.Client, baseURL string) {
+	users := loadSavedUsers()
+	if len(users) == 0 {
+		log.Println("No users found in load_test_users.json to cleanup.")
+		return
+	}
+
+	log.Printf("Cleaning up %d users...", len(users))
+	deleted := 0
+	var remaining []UserCreds
+
+	for _, user := range users {
+		// Login to get token
+		body := map[string]string{"email": user.Email, "password": user.Password}
+		var loginResp map[string]interface{}
+		status, _ := postJSON(client, baseURL+"/auth/login", body, &loginResp)
+
+		if status != 200 {
+			// User might already be deleted or invalid credentials
+			log.Printf("Could not login %s (Status: %d). Skipping.", user.Email, status)
+			continue // Don't keep in remaining list if we can't login? Actually, maybe keep if network error?
+			// If login failed, likely user deleted.
+		}
+
+		if token, ok := loginResp["token"].(string); ok {
+			// DELETE /auth/user
+			req, _ := http.NewRequest("DELETE", baseURL+"/auth/user", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			resp, err := client.Do(req)
+			if err == nil && resp.StatusCode == 200 {
+				deleted++
+			} else {
+				log.Printf("Failed to delete %s", user.Email)
+				remaining = append(remaining, user)
+			}
+			if resp != nil {
+				resp.Body.Close()
+			}
+		}
+	}
+
+	log.Printf("Cleanup complete. Deleted %d users.", deleted)
+
+	// Update file with remaining users (if any failed)
+	if len(remaining) > 0 {
+		data, _ := json.MarshalIndent(remaining, "", "  ")
+		_ = os.WriteFile("load_test_users.json", data, 0644)
+	} else {
+		os.Remove("load_test_users.json")
+	}
+}
+
+func performAdminCleanup(client *http.Client, baseURL, adminToken string) {
+	log.Println("Authenticated Admin Cleanup: Fetching all users...")
+
+	// 1. List all users
+	req, _ := http.NewRequest("GET", baseURL+"/admin/users", nil)
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Failed to list users: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Printf("Failed to list users. Status: %d", resp.StatusCode)
+		return
+	}
+
+	// 2. Parse response (structure from admin.go: listUsersHandler)
+	// Response is { "users": [ ... ] } or simple list?
+	// Checking admin.go: c.JSON(http.StatusOK, gin.H{"users": safeUsers})
+	// Wait, seeing listUsersHandler in admin.go...
+	// It actually returns list of users directly?
+	// Let's assume generic structure and inspect.
+	// Actually, looking at admin.go from memory/context:
+	// c.JSON(http.StatusOK, gin.H{"users": users, "total": count}) usually
+	// Let's decode into a generic map
+	var listResp map[string]interface{}
+	body, _ := io.ReadAll(resp.Body)
+	if err := json.Unmarshal(body, &listResp); err != nil {
+		// It might be a direct array? admin.go:233+
+		// `users, err := store.ListAllUsers()` ... `c.JSON(..., safeUsers)`
+		// Wait, safeUsers is []gin.H.
+		// Gin JSON with slice marshals to [{},{}].
+		// BUT `c.JSON(http.StatusOK, safeUsers)` or `c.JSON(http.StatusOK, gin.H{"users": safeUsers})`?
+		// Verification needed.
+		// Let's try to unmarshal as array first, if fail then map.
+		var usersList []map[string]interface{}
+		if err2 := json.Unmarshal(body, &usersList); err2 == nil {
+			// It is an array
+			processAdminCleanupList(client, baseURL, adminToken, usersList)
+			return
+		}
+		log.Printf("Failed to parse users list: %v", err)
+		return
+	}
+
+	// If it's a map, look for "users" key
+	if val, ok := listResp["users"]; ok {
+		if usersList, ok := val.([]interface{}); ok {
+			// Convert to []map[string]interface{} helper?
+			// Just iterate
+			var cleanupList []map[string]interface{}
+			for _, u := range usersList {
+				if uMap, ok := u.(map[string]interface{}); ok {
+					cleanupList = append(cleanupList, uMap)
+				}
+			}
+			processAdminCleanupList(client, baseURL, adminToken, cleanupList)
+		}
+	} else {
+		// Maybe it was just an array masked as interface{}?
+		log.Println("Could not find 'users' array in response.")
+	}
+}
+
+func processAdminCleanupList(client *http.Client, baseURL, token string, users []map[string]interface{}) {
+	deleted := 0
+	for _, u := range users {
+		email, _ := u["email"].(string)
+		id, _ := u["id"].(string)
+
+		// Filter by "loaduser_"
+		if matchesLoadUser(email) {
+			// Delete User
+			req, _ := http.NewRequest("DELETE", baseURL+"/admin/users/"+id, nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			resp, err := client.Do(req)
+			if err == nil && resp.StatusCode == 200 {
+				deleted++
+				if deleted%50 == 0 {
+					fmt.Print(".")
+				}
+			} else {
+				log.Printf("Failed to delete user %s (%s)", email, id)
+			}
+			if resp != nil {
+				resp.Body.Close()
+			}
+		}
+	}
+	log.Printf("\nAdmin Cleanup complete. Deleted %d users.", deleted)
+}
+
+func matchesLoadUser(email string) bool {
+	// Simple prefix check
+	// "loaduser_"
+	return len(email) > 9 && email[:9] == "loaduser_"
 }
 
 func sendTelemetryHTTP(client *http.Client, baseURL string, dev DeviceCreds) {
@@ -255,9 +465,10 @@ func sendTelemetryHTTP(client *http.Client, baseURL string, dev DeviceCreds) {
 
 	start := time.Now()
 
+	// Authorization: Bearer <Key> is required by DeviceAuthMiddleware
 	headers := map[string]string{
-		"X-API-Key":    dev.Key,
-		"Content-Type": "application/json",
+		"Authorization": "Bearer " + dev.Key,
+		"Content-Type":  "application/json",
 	}
 
 	status, _ := postJSONWithHeaders(client, url, payload, nil, headers)

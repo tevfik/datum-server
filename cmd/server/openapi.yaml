@@ -289,10 +289,39 @@ components:
       properties:
         allow_register:
           type: boolean
+
+    CreateUserRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        role:
+          type: string
+          enum: [admin, user]
+
+    ProvisionDeviceRequest:
+      type: object
+      required: [name]
+      properties:
+        device_id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [temperature, humidity, weather, actuator, sensor]
           
     LogEntry:
       type: object
       properties:
+        raw:
+          type: string
+          description: Raw log line content
         timestamp:
           type: string
           format: date-time
@@ -1126,6 +1155,31 @@ paths:
 
   # ============ Admin Endpoints ============
   /admin/users:
+    post:
+      summary: Create new user (admin)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username: 
+                    type: string
+                  role:
+                    type: string
+        '409':
+          description: User already exists
     get:
       summary: List all users (admin only)
       tags: [Admin]
@@ -1194,6 +1248,24 @@ paths:
           description: User deleted
 
   /admin/devices:
+    post:
+      summary: Provision device manually (admin)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProvisionDeviceRequest'
+      responses:
+        '201':
+          description: Device provisioned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
     get:
       summary: List all devices (across all users)
       tags: [Admin]

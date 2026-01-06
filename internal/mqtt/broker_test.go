@@ -109,6 +109,9 @@ func TestIngestionHook_OnPublish(t *testing.T) {
 	_, err := hook.OnPublish(cl, pk)
 	assert.NoError(t, err)
 
+	// Flush async processor
+	tp.Close()
+
 	// Verify Data Stored
 	latest, err := store.GetLatestData("dev-1")
 	assert.NoError(t, err)

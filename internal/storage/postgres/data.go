@@ -50,6 +50,72 @@ func (s *PostgresStore) StoreData(point *storage.DataPoint) error {
 	return tx.Commit()
 }
 
+// StoreDataBatch stores multiple data points in a single batch operation
+func (s *PostgresStore) StoreDataBatch(points []*storage.DataPoint) error {
+	if len(points) == 0 {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Prepare statements for efficiency
+	stmtInsert, err := tx.Prepare(`
+		INSERT INTO data_points (time, device_id, data)
+		VALUES ($1, $2, $3)
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmtInsert.Close()
+
+	stmtUpdateShadow, err := tx.Prepare(`
+		UPDATE devices 
+		SET 
+			shadow_state = COALESCE(shadow_state, '{}'::jsonb) || $1,
+			last_seen = $2,
+			updated_at = $2
+		WHERE id = $3
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmtUpdateShadow.Close()
+
+	// Group by device for shadow update to minimize locking/updates
+	latestState := make(map[string]*storage.DataPoint)
+
+	for _, point := range points {
+		jsonData, err := json.Marshal(point.Data)
+		if err != nil {
+			continue
+		}
+
+		// 1. Insert into Time-Series
+		if _, err := stmtInsert.Exec(point.Timestamp, point.DeviceID, jsonData); err != nil {
+			return fmt.Errorf("failed to insert batch point: %w", err)
+		}
+
+		latestState[point.DeviceID] = point
+	}
+
+	// 2. Update Device Shadows (Latest State)
+	for deviceID, point := range latestState {
+		jsonData, err := json.Marshal(point.Data)
+		if err != nil {
+			continue
+		}
+		if _, err := stmtUpdateShadow.Exec(jsonData, time.Now(), deviceID); err != nil {
+			return fmt.Errorf("failed to update shadow batch: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
 // GetLatestData retrieves the merged shadow state
 func (s *PostgresStore) GetLatestData(deviceID string) (*storage.DataPoint, error) {
 	var shadowJSON []byte

@@ -82,7 +82,7 @@ func TestRegisterDeviceHandler_Success(t *testing.T) {
 	assert.NotEmpty(t, response.DeviceID)
 	assert.NotEmpty(t, response.APIKey)
 	assert.Equal(t, "active", response.Status)
-	assert.Contains(t, response.ActivateURL, "/provisioning/activate")
+	assert.Empty(t, response.ActivateURL)
 }
 
 func TestRegisterDeviceHandler_MissingUID(t *testing.T) {

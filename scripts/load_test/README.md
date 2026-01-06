@@ -35,6 +35,8 @@ go run scripts/load_test/main.go [flags]
 | `-users` | `5` | Number of unique users to simulate |
 | `-devices` | `2` | Number of devices to create per user |
 | `-duration` | `30s` | Duration of the load test |
+| `-cleanup` | `false` | Run in cleanup mode (delete users from previous runs) |
+| `-cleanup-after` | `false` | Automatically delete users after test completes |
 
 ## Examples
 
@@ -77,3 +79,21 @@ go run scripts/load_test/main.go -proto mixed -users 100
 2. **Connect Phase**: If MQTT is enabled, it establishes persistent MQTT connections for all devices using their credentials.
 3. **Load Phase**: All devices run concurrently, sending telemetry at varying intervals (approx every 100ms) for the specified duration.
 4. **Report Phase**: Outputs aggregate statistics including total requests, success/error counts, and average latency.
+
+## Data Cleanup
+
+The load test creates many users (`loaduser_...`) and devices. To clean them up:
+
+### Auto-Cleanup (Recommended)
+Add `-cleanup-after` to your command. This will delete all created users immediately after the test finishes.
+
+```bash
+go run scripts/load_test/main.go -users 100 -devices 5 -cleanup-after
+```
+
+### Manual Cleanup
+If a test was interrupted (e.g., Ctrl+C), you can run a cleanup-only pass. This reads the `load_test_users.json` file created during the test.
+
+```bash
+go run scripts/load_test/main.go -cleanup
+```

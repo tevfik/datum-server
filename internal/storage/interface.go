@@ -42,6 +42,7 @@ type Provider interface {
 
 	// Data Operations
 	StoreData(point *DataPoint) error
+	StoreDataBatch(points []*DataPoint) error
 	GetLatestData(deviceID string) (*DataPoint, error)
 	GetDataHistoryWithRange(deviceID string, start, end time.Time, limit int) ([]DataPoint, error)
 	GetDataHistory(deviceID string, limit int) ([]DataPoint, error)

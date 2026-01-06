@@ -17,9 +17,6 @@ func TestTelemetryProcessor_Process(t *testing.T) {
 
 	// Create test device
 	deviceID := "test-device-1"
-	// We might need to create the device in store if Process checks it?
-	// Process() blindly stores data using store.StoreData which validates device existence usually?
-	// Let's create it to be safe.
 	store.InitializeSystem("Test", false, 7)
 	device := &storage.Device{
 		ID:        deviceID,
@@ -36,9 +33,10 @@ func TestTelemetryProcessor_Process(t *testing.T) {
 
 	// EXECUTE
 	_, err = tp.Process(deviceID, payload, "127.0.0.1")
-
-	// VERIFY
 	assert.NoError(t, err)
+
+	// Force flush by closing
+	tp.Close()
 
 	// Check data stored
 	latest, err := store.GetLatestData(deviceID)
@@ -48,9 +46,49 @@ func TestTelemetryProcessor_Process(t *testing.T) {
 	assert.Contains(t, latest.Data, "server_time")         // enriched
 }
 
+func TestTelemetryProcessor_Batching(t *testing.T) {
+	// Setup memory store for BuntDB, temp dir for TStorage
+	tmp := t.TempDir()
+	store, err := storage.New(":memory:", tmp, 0)
+	assert.NoError(t, err)
+
+	tp := NewTelemetryProcessor(store)
+	// Override flush interval for faster test if needed, but Close() handles it
+
+	deviceID := "batch-device-1"
+	store.InitializeSystem("Test", false, 7)
+	device := &storage.Device{ID: deviceID, Status: "active", UserID: "u1"}
+	store.CreateDevice(device)
+
+	// Send 10 points
+	for i := 0; i < 10; i++ {
+		payload := map[string]interface{}{"value": float64(i)}
+		_, err := tp.Process(deviceID, payload, "")
+		assert.NoError(t, err)
+	}
+
+	// Force flush
+	tp.Close()
+
+	// 1. Check updated shadow (BuntDB)
+	latest, err := store.GetLatestData(deviceID)
+	assert.NoError(t, err)
+	assert.Equal(t, float64(9), latest.Data["value"]) // Should be lighter
+
+	// 2. Check history (TStorage)
+	history, err := store.GetDataHistory(deviceID, 100)
+	assert.NoError(t, err)
+	assert.Len(t, history, 10)
+
+	// Verify order or content (optional)
+	// History is sorted descending by default
+	assert.Equal(t, float64(9), history[0].Data["value"])
+}
+
 func TestTelemetryProcessor_CommandCheck(t *testing.T) {
 	store, _ := storage.New(":memory:", "", 0)
 	tp := NewTelemetryProcessor(store)
+	defer tp.Close() // Good practice
 	store.InitializeSystem("Test", false, 7)
 
 	deviceID := "cmd-device-1"

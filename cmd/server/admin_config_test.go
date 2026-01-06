@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"datum-go/internal/logger"
 	"datum-go/internal/storage"
 	"encoding/json"
 	"net/http"
@@ -24,6 +25,9 @@ func setupAdminConfigTestServer(t *testing.T) (*gin.Engine, func()) {
 
 	// Initialize system
 	store.InitializeSystem("Test Platform", true, 7)
+
+	// Initialize logger
+	logger.InitLogger(tmpDir + "/test.log")
 
 	router := gin.New()
 	cleanup := func() {

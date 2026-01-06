@@ -109,10 +109,6 @@ func main() {
 	}
 	SetProvisioningServerURL(publicURL)
 
-	// Initialize structured logging
-	logger.InitLogger()
-	log := logger.GetLogger()
-
 	// Get data directory (priority: flag > env > default)
 	dataDirPath := *dataDir
 	if dataDirPath == "" {
@@ -121,6 +117,19 @@ func main() {
 			dataDirPath = "./data"
 		}
 	}
+
+	// Initialize structured logging
+	// Log file path: data/server.log
+	logFile := "server.log"
+	// Basic path join if filepath not imported, valid for linux
+	if strings.HasSuffix(dataDirPath, "/") {
+		logFile = dataDirPath + "server.log"
+	} else {
+		logFile = dataDirPath + "/server.log"
+	}
+
+	logger.InitLogger(logFile)
+	log := logger.GetLogger()
 
 	// Configure retention (priority: flag > env > default)
 	retentionConfig := storage.GetRetentionConfigFromEnv()

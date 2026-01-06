@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -12,8 +13,12 @@ import (
 
 var Logger zerolog.Logger
 
+var LogFilePath string
+
 // InitLogger initializes the global structured logger
-func InitLogger() {
+func InitLogger(logPath string) {
+	LogFilePath = logPath
+
 	// Configure based on environment
 	logLevel := strings.ToUpper(os.Getenv("LOG_LEVEL"))
 	if logLevel == "" {
@@ -37,42 +42,55 @@ func InitLogger() {
 		level = zerolog.InfoLevel
 	}
 
-	// Configure pretty logging for development
-	logFormat := os.Getenv("LOG_FORMAT")
-	if logFormat == "pretty" || logFormat == "" {
-		// Human-readable console output with colors
-		output := zerolog.ConsoleWriter{
-			Out:        os.Stdout,
-			TimeFormat: time.RFC3339,
-		}
-		Logger = zerolog.New(output).
-			Level(level).
-			With().
-			Timestamp().
-			Caller().
-			Logger()
-	} else {
-		// JSON format for production
-		Logger = zerolog.New(os.Stdout).
-			Level(level).
-			With().
-			Timestamp().
-			Caller().
-			Logger()
+	var logWriter zerolog.LevelWriter
+
+	// Configure pretty logging for development (console)
+	consoleWriter := zerolog.ConsoleWriter{
+		Out:        os.Stdout,
+		TimeFormat: time.RFC3339,
 	}
+
+	if logPath != "" {
+		// Create/Open log file
+		file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			// Fallback to console only if file fails
+			log.Error().Err(err).Msg("Failed to open log file")
+			logWriter = multiLevelWriter{consoleWriter}
+		} else {
+			// Write to both console and file
+			// Note: File will get JSON logs, Console gets pretty logs if configured
+			// For simplicity, let's write JSON to file and Pretty to console
+			logWriter = zerolog.MultiLevelWriter(consoleWriter, file)
+		}
+	} else {
+		logWriter = multiLevelWriter{consoleWriter}
+	}
+
+	// Configure global logger
+	Logger = zerolog.New(logWriter).
+		Level(level).
+		With().
+		Timestamp().
+		Caller().
+		Logger()
 
 	// Set as global logger
 	log.Logger = Logger
 
-	displayFormat := logFormat
-	if displayFormat == "" {
-		displayFormat = "pretty (default)"
-	}
-
 	Logger.Info().
 		Str("configured_level", logLevel).
-		Str("format", displayFormat).
+		Str("log_file", logPath).
 		Msg("Logger initialized")
+}
+
+// multiLevelWriter adapts a writer to LevelWriter interface (needed for zerolog 1.20+)
+type multiLevelWriter struct {
+	io.Writer
+}
+
+func (w multiLevelWriter) WriteLevel(l zerolog.Level, p []byte) (n int, err error) {
+	return w.Write(p)
 }
 
 // GetLogger returns the configured logger instance
