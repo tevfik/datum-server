@@ -1,3 +1,26 @@
+/*
+#include <EEPROM.h>
+
+void setup() {
+  Serial.begin(115200);
+  EEPROM.begin(2048); // Firmware'de kullandığınız boyut
+
+  Serial.println("\nSiliniyor...");
+
+  // Bütün hafızayı 0 (veya 255) ile doldurarak temizle
+  for (int i = 0; i < 2048; i++) {
+    EEPROM.write(i, 0);
+  }
+  EEPROM.commit();
+
+  Serial.println("EEPROM Silindi! Simdi asil kodu tekrar yukleyebilirsiniz.");
+}
+
+void loop() {
+  // Boş döngü
+}
+*/
+
 #include <ArduinoJson.h>
 #include <EEPROM.h>
 #include <ESP8266HTTPClient.h>
@@ -116,31 +139,58 @@ String getHostFromUrl(String url) {
 }
 
 void mqttCallback(char *topic, byte *payload, unsigned int length) {
-  String message;
-  for (unsigned int i = 0; i < length; i++) {
-    message += (char)payload[i];
-  }
-  Serial.printf("MQTT Message [%s]: %s\n", topic, message.c_str());
+  // Print payload for debugging (be careful with large payloads)
+  Serial.printf("MQTT Message [%s] (%d bytes)\n", topic, length);
 
-  StaticJsonDocument<1024> doc;
-  deserializeJson(doc, message);
+  // Use DynamicJsonDocument for flexibility, though Static is faster.
+  // 1024 is plenty for commands.
+  DynamicJsonDocument doc(1024);
 
-  String type = doc["type"].as<String>();
-  if (type.length() == 0) {
-    type = doc["action"].as<String>();
+  // Deserialize directly from payload to save memory
+  DeserializationError error = deserializeJson(doc, payload, length);
+
+  if (error) {
+    Serial.print("JSON Parse Failed: ");
+    Serial.println(error.c_str());
+    return;
   }
-  JsonObject params = doc["params"];
+
+  // Handle both 'type' (legacy) and 'action' (standard)
+  const char *typeStr = doc["type"];
+  const char *actionStr = doc["action"];
+
+  String type = "";
+  if (typeStr)
+    type = String(typeStr);
+  else if (actionStr)
+    type = String(actionStr);
+
+  Serial.printf("Parsed Type/Action: '%s'\n", type.c_str());
 
   if (type == "relay_control") {
+    JsonObject params = doc["params"]; // Params might be nested
+    if (params.isNull()) {
+      Serial.println("Error: No params found for relay_control");
+      return;
+    }
+
     int index = params["relay_index"];
     bool state = params["state"];
+
     setRelay(index, state);
-    Serial.printf("Command: Relay %d -> %s\n", index, state ? "ON" : "OFF");
-    delay(100);
+    Serial.printf("Command Executed: Relay %d -> %s\n", index,
+                  state ? "ON" : "OFF");
+
+    delay(50); // Small debounce
     // Send immediate update
     sendData(false, false);
   } else if (type == "update_firmware") {
+    // ... handling code remains similar but simplified ...
+    JsonObject params = doc["params"];
     String fwUrl = params["url"];
+    if (fwUrl.length() == 0 && doc.containsKey("url"))
+      fwUrl = doc["url"].as<String>(); // Fallback if not in params
+
     if (fwUrl.indexOf('?') == -1)
       fwUrl += "?token=" + String(config.api_key);
     else
@@ -149,7 +199,8 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
     t_httpUpdate_return ret = ESPhttpUpdate.update(espClient, fwUrl);
     switch (ret) {
     case HTTP_UPDATE_FAILED:
-      Serial.println("OTA Failed");
+      Serial.printf("OTA Failed: %s\n",
+                    ESPhttpUpdate.getLastErrorString().c_str());
       break;
     case HTTP_UPDATE_NO_UPDATES:
       Serial.println("OTA: No updates");
@@ -158,6 +209,8 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       Serial.println("OTA: OK");
       break;
     }
+  } else {
+    Serial.println("Unknown command type: " + type);
   }
 }
 
