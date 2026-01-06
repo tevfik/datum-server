@@ -1,3 +1,10 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:datum_camera_app/main.dart';
+import 'package:datum_camera_app/providers/auth_provider.dart';
+import 'package:datum_camera_app/providers/device_provider.dart';
+import 'package:datum_camera_app/screens/login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
