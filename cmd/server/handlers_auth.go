@@ -100,21 +100,25 @@ func loginHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	// Normalize email
 	req.Email = strings.ToLower(req.Email)
 
 	user, err := store.GetUserByEmail(req.Email)
 	if err != nil {
+		logger.GetLogger().Warn().Str("email", req.Email).Err(err).Msg("Login failed: User not found")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
 	// Check if user is suspended
 	if user.Status == "suspended" {
+		logger.GetLogger().Warn().Str("email", req.Email).Msg("Login failed: User suspended")
 		c.JSON(http.StatusForbidden, gin.H{"error": "Account suspended. Contact administrator."})
 		return
 	}
 
 	if !auth.CheckPassword(user.PasswordHash, req.Password) {
+		logger.GetLogger().Warn().Str("email", req.Email).Msg("Login failed: Password mismatch")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
