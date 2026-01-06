@@ -80,6 +80,7 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
       // Load list
       // Note: On iOS this might be empty, so we might need a specific prefix connection if we knew it.
       // But for generic "Datum-XXXX", we scan.
+      // ignore: deprecated_member_use
       List<WifiNetwork> networks = await WiFiForIoTPlugin.loadWifiList();
       
       var deviceNetworks = networks
