@@ -58,8 +58,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
       
-      - name: Generate Mocks
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+
 
       - name: Analyze
         run: flutter analyze

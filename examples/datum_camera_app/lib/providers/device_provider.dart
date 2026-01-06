@@ -42,4 +42,6 @@ class DeviceProvider with ChangeNotifier {
     await _api.createProvisioningRequest(uid, name, ssid, pass);
     await fetchDevices(); // Refresh list (though it will be pending)
   }
+
+
 }

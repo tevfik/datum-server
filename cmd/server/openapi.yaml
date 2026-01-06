@@ -310,6 +310,36 @@ paths:
         '200':
           description: API information
 
+  /system/time:
+    get:
+      summary: Get system time
+      description: Returns current server time in Unix and ISO8601 formats. Useful for Christian's Algorithm time sync.
+      tags: [System]
+      responses:
+        '200':
+          description: Current time
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unix:
+                    type: integer
+                    format: int64
+                    description: Unix timestamp in seconds
+                  unix_ms:
+                    type: integer
+                    format: int64
+                    description: Unix timestamp in milliseconds
+                  timestamp:
+                    type: integer
+                    format: int64
+                    description: Unix timestamp in nanoseconds
+                  iso8601:
+                    type: string
+                    format: date-time
+
+
   /auth/register:
     post:
       summary: Register new user

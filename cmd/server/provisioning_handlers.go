@@ -164,21 +164,26 @@ func registerDeviceHandler(c *gin.Context) {
 		return
 	}
 
-	// 2. Complete Provisioning Request (Creates Device)
-	// This simulates the full flow: request -> complete -> device active
-	if _, err := store.CompleteProvisioningRequest(requestID); err != nil {
-		logger.GetLogger().Error().Err(err).Msg("Failed to complete provisioning request")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to complete provisioning"})
-		return
+	// AUTO-COMPLETE: Immediately activate the device (Seamless Onboarding)
+	// The user expects the device to be active immediately after registration.
+	device, err := store.CompleteProvisioningRequest(requestID)
+	if err != nil {
+		logger.GetLogger().Error().Err(err).Msg("Failed to auto-complete provisioning")
+		// Fallback to pending if completion fails (unlikely)
+	} else {
+		// Update Status and API Key using the permanent device key
+		provReq.Status = "active"
+		apiKey = device.APIKey // Use the confirmed key
 	}
 
-	// Log successful provisioning registration
+	// 2. Log successful provisioning registration
 	logger.GetLogger().Info().
 		Str("event", "provisioning_registration").
 		Str("user_id", userID).
 		Str("device_uid", deviceUID).
 		Str("request_id", requestID).
 		Str("device_id", deviceID).
+		Str("status", provReq.Status).
 		Str("ip", c.ClientIP()).
 		Time("expires_at", provReq.ExpiresAt).
 		Msg("Device registered and activated")
@@ -192,8 +197,8 @@ func registerDeviceHandler(c *gin.Context) {
 		WiFiSSID:    req.WiFiSSID,
 		WiFiPass:    req.WiFiPass,
 		ExpiresAt:   provReq.ExpiresAt,
-		Status:      "active",
-		ActivateURL: fmt.Sprintf("%s/provisioning/activate", provisioningConfig.ServerURL),
+		Status:      provReq.Status, // Will be "active"
+		ActivateURL: "",             // No activation needed
 	})
 }
 

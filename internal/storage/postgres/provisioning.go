@@ -169,7 +169,20 @@ func (s *PostgresStore) CancelProvisioningRequest(reqID string) error {
 }
 
 func (s *PostgresStore) CleanupExpiredProvisioningRequests() (int, error) {
-	res, err := s.db.Exec("DELETE FROM provisioning_requests WHERE status = 'pending' AND expires_at < $1", time.Now())
+	// SOFT DELETE: Update status to 'expired'
+	res, err := s.db.Exec("UPDATE provisioning_requests SET status = 'expired' WHERE status = 'pending' AND expires_at < $1", time.Now())
+	if err != nil {
+		return 0, err
+	}
+	rows, _ := res.RowsAffected()
+	return int(rows), nil
+}
+
+func (s *PostgresStore) PurgeProvisioningRequests(maxAge time.Duration) (int, error) {
+	// HARD DELETE: Remove old requests to prevent table bloat
+	// Delete requests that are 'expired' or 'cancelled' and older than maxAge
+	cutoff := time.Now().Add(-maxAge)
+	res, err := s.db.Exec("DELETE FROM provisioning_requests WHERE (status = 'expired' OR status = 'cancelled' OR status = 'completed') AND created_at < $1", cutoff)
 	if err != nil {
 		return 0, err
 	}

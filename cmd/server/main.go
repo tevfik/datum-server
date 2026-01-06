@@ -219,7 +219,8 @@ func main() {
 	r.GET("/healthz", healthHandler)
 	r.GET("/live", livenessHandler)
 	r.GET("/ready", readinessHandler)
-	r.GET("/metrics", metricsHandler) // Prometheus metrics
+	// System routes
+	r.GET("/system/time", getSystemTimeHandler)
 
 	// Auth routes
 	authGroup := r.Group("/auth")
@@ -465,9 +466,14 @@ func startPeriodicCleanup() {
 				log.Info().Int("count", count).Msg("Periodic cleanup: expired grace periods")
 			}
 
-			// Cleanup expired provisioning requests
+			// Cleanup expired provisioning requests (Soft Delete)
 			if count, err := store.CleanupExpiredProvisioningRequests(); err == nil && count > 0 {
 				log.Info().Int("count", count).Msg("Periodic cleanup: expired provisioning requests")
+			}
+
+			// Purge old provisioning requests (Hard Delete > 7 days old)
+			if count, err := store.PurgeProvisioningRequests(7 * 24 * time.Hour); err == nil && count > 0 {
+				log.Info().Int("count", count).Msg("Periodic cleanup: purged old provisioning requests")
 			}
 		}
 	}()

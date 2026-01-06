@@ -130,6 +130,9 @@ class ApiClient {
     return response.data;
   }
 
+
+
+
   Future<void> sendCommand(String deviceId, String action, {Map<String, dynamic>? params}) async {
     await _dio.post('/devices/$deviceId/commands', data: {
       'action': action,

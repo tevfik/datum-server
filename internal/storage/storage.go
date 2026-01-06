@@ -1553,6 +1553,43 @@ func (s *Storage) CleanupExpiredProvisioningRequests() (int, error) {
 	return cleaned, err
 }
 
+// PurgeProvisioningRequests permanently deletes old requests
+func (s *Storage) PurgeProvisioningRequests(maxAge time.Duration) (int, error) {
+	var cleaned int
+	cutoff := time.Now().Add(-maxAge)
+
+	err := s.db.Update(func(tx *buntdb.Tx) error {
+		var keysToDelete []string
+
+		// Scan all provisioning requests
+		tx.Ascend("", func(key, value string) bool {
+			if len(key) > 10 && key[:10] == "provision:" && key[10:14] != "uid:" {
+				var req ProvisioningRequest
+				if json.Unmarshal([]byte(value), &req) == nil {
+					// Check if eligible for purge:
+					// 1. Status is final (expired, cancelled, completed)
+					// 2. CreatedAt is older than cutoff
+					isFinal := req.Status == "expired" || req.Status == "cancelled" || req.Status == "completed"
+					if isFinal && req.CreatedAt.Before(cutoff) {
+						keysToDelete = append(keysToDelete, key)
+					}
+				}
+			}
+			return true
+		})
+
+		// Delete identified keys
+		for _, key := range keysToDelete {
+			if _, err := tx.Delete(key); err == nil {
+				cleaned++
+			}
+		}
+		return nil
+	})
+
+	return cleaned, err
+}
+
 // ============ User API Key operations (BuntDB) ============
 
 type APIKey struct {

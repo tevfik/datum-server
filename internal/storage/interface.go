@@ -68,6 +68,7 @@ type Provider interface {
 	IsDeviceUIDRegistered(deviceUID string) (bool, string, error)
 	DeleteDeviceUIDIndex(deviceUID string) error
 	CleanupExpiredProvisioningRequests() (int, error)
+	PurgeProvisioningRequests(maxAge time.Duration) (int, error)
 
 	// User API Key Operations
 	CreateUserAPIKey(key *APIKey) error
