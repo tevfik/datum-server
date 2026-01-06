@@ -55,8 +55,10 @@ func registerHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Email = strings.ToLower(req.Email)
 
 	hashedPassword, err := auth.HashPassword(req.Password)
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
 		return
@@ -98,6 +100,7 @@ func loginHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Email = strings.ToLower(req.Email)
 
 	user, err := store.GetUserByEmail(req.Email)
 	if err != nil {
@@ -266,6 +269,7 @@ func forgotPasswordHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Email = strings.ToLower(req.Email)
 
 	// Always return 200 to prevent user enumeration
 	// We only log errors internally
