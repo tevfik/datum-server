@@ -127,6 +127,7 @@ func setupSystemHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.AdminEmail = strings.ToLower(req.AdminEmail)
 
 	// Set defaults
 	if req.DataRetention == 0 {
@@ -188,6 +189,7 @@ func createUserHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Email = strings.ToLower(req.Email)
 
 	// Set defaults
 	if req.Role == "" {
