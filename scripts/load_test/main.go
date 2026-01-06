@@ -13,12 +13,15 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
 // DeviceCreds holds the credentials for a test device
 type DeviceCreds struct {
-	ID  string
-	Key string
+	ID         string
+	Key        string
+	MQTTClient mqtt.Client
 }
 
 // Stats tracks the load test results
@@ -33,7 +36,9 @@ type Stats struct {
 var stats Stats
 
 func main() {
-	baseURL := flag.String("url", "http://localhost:8080", "Target Server URL")
+	baseURL := flag.String("url", "http://localhost:8080", "Target Server URL (HTTP)")
+	mqttBroker := flag.String("mqtt-broker", "tcp://localhost:1883", "MQTT Broker URL")
+	protocol := flag.String("proto", "http", "Protocol: http, mqtt, mixed")
 	numUsers := flag.Int("users", 5, "Number of users to simulate")
 	devicesPer := flag.Int("devices", 2, "Number of devices per user")
 	duration := flag.Duration("duration", 30*time.Second, "Test duration")
@@ -46,16 +51,17 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  %s -url http://localhost:8080 -users 10 -devices 5\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -url https://api.myserver.com -duration 5m\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -users 50 -devices 2\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -proto mqtt -users 10\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -url http://localhost:8080 -proto mixed\n\n", os.Args[0])
 	}
 
 	flag.Parse()
 
-	log.Printf("Starting Load Test against %s", *baseURL)
+	log.Printf("Starting Load Test against %s (Proto: %s)", *baseURL, *protocol)
+	if *protocol != "http" {
+		log.Printf("MQTT Broker: %s", *mqttBroker)
+	}
 	log.Printf("Setup: %d Users, %d Devices/User (Total %d devices)", *numUsers, *devicesPer, *numUsers**devicesPer)
-	log.Printf("Target Duration: %v", *duration)
 
 	client := &http.Client{
 		Timeout: 5 * time.Second,
@@ -67,11 +73,18 @@ func main() {
 	}
 
 	// 1. Setup Phase
-	log.Println("--- Setup Phase: Registering Users & Devices ---")
+	log.Println("--- Setup Phase: Registering Users & Devices (HTTP) ---")
 	devices := setupTestEntities(client, *baseURL, *numUsers, *devicesPer)
 	if len(devices) == 0 {
 		log.Fatal("No devices created. Exiting.")
 	}
+
+	// Connect MQTT clients if needed
+	if *protocol == "mqtt" || *protocol == "mixed" {
+		log.Println("--- Connecting MQTT Clients ---")
+		connectMQTTClients(devices, *mqttBroker)
+	}
+
 	log.Printf("Successfully registered %d devices.", len(devices))
 
 	// 2. Load Phase
@@ -90,6 +103,13 @@ func main() {
 		wg.Add(1)
 		go func(d DeviceCreds) {
 			defer wg.Done()
+			// Close MQTT on exit
+			defer func() {
+				if d.MQTTClient != nil && d.MQTTClient.IsConnected() {
+					d.MQTTClient.Disconnect(250)
+				}
+			}()
+
 			ticker := time.NewTicker(time.Duration(100+rand.Intn(50)) * time.Millisecond) // Jitter
 			defer ticker.Stop()
 
@@ -98,7 +118,19 @@ func main() {
 				case <-stopCh:
 					return
 				case <-ticker.C:
-					sendTelemetry(client, *baseURL, d)
+					// Determine protocol for this message
+					useMQTT := false
+					if *protocol == "mqtt" {
+						useMQTT = true
+					} else if *protocol == "mixed" {
+						useMQTT = (rand.Float32() < 0.5)
+					}
+
+					if useMQTT {
+						sendTelemetryMQTT(d)
+					} else {
+						sendTelemetryHTTP(client, *baseURL, d)
+					}
 				}
 			}
 		}(dev)
@@ -109,6 +141,41 @@ func main() {
 
 	// 3. Report Phase
 	printReport(elapsed)
+}
+
+func connectMQTTClients(devices []DeviceCreds, broker string) {
+	// To avoid flooding the broker with connects, limit concurrency
+	sem := make(chan bool, 50) // Max 50 concurrent connects
+	var connected int32
+
+	var wg sync.WaitGroup
+	for i := range devices {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			sem <- true
+			defer func() { <-sem }()
+
+			dev := &devices[idx]
+			opts := mqtt.NewClientOptions()
+			opts.AddBroker(broker)
+			opts.SetClientID(dev.ID)
+			opts.SetUsername(dev.ID)
+			opts.SetPassword(dev.Key)
+			opts.SetCleanSession(true)
+			opts.SetConnectTimeout(5 * time.Second)
+
+			c := mqtt.NewClient(opts)
+			if token := c.Connect(); token.Wait() && token.Error() != nil {
+				log.Printf("MQTT Connect Error (%s): %v", dev.ID, token.Error())
+			} else {
+				dev.MQTTClient = c
+				atomic.AddInt32(&connected, 1)
+			}
+		}(i)
+	}
+	wg.Wait()
+	log.Printf("Connected %d/%d MQTT clients", connected, len(devices))
 }
 
 func setupTestEntities(client *http.Client, baseURL string, numUsers, devicesPer int) []DeviceCreds {
@@ -176,21 +243,21 @@ func setupTestEntities(client *http.Client, baseURL string, numUsers, devicesPer
 	return devices
 }
 
-func sendTelemetry(client *http.Client, baseURL string, dev DeviceCreds) {
+func sendTelemetryHTTP(client *http.Client, baseURL string, dev DeviceCreds) {
 	url := fmt.Sprintf("%s/data/%s", baseURL, dev.ID)
 
 	payload := map[string]interface{}{
 		"temperature": 20.0 + rand.Float64()*10.0,
 		"humidity":    40.0 + rand.Float64()*20.0,
 		"battery":     rand.Intn(100),
-		"status":      "testing",
+		"status":      "testing_http",
 	}
 
 	start := time.Now()
 
-	// X-API-Key header is supported by DeviceAuthMiddleware
 	headers := map[string]string{
-		"X-API-Key": dev.Key,
+		"X-API-Key":    dev.Key,
+		"Content-Type": "application/json",
 	}
 
 	status, _ := postJSONWithHeaders(client, url, payload, nil, headers)
@@ -204,9 +271,31 @@ func sendTelemetry(client *http.Client, baseURL string, dev DeviceCreds) {
 		atomic.AddInt64(&stats.Success, 1)
 	} else {
 		atomic.AddInt64(&stats.Errors, 1)
-		if stats.Errors < 10 { // Log first few errors
-			log.Printf("Req Failed: Status %d", status)
-		}
+	}
+}
+
+func sendTelemetryMQTT(dev DeviceCreds) {
+	if dev.MQTTClient == nil || !dev.MQTTClient.IsConnected() {
+		atomic.AddInt64(&stats.Errors, 1)
+		return
+	}
+
+	topic := fmt.Sprintf("data/%s", dev.ID)
+	payload := fmt.Sprintf(`{"temperature":%.2f,"humidity":%.2f,"status":"testing_mqtt"}`,
+		20.0+rand.Float64()*10.0, 40.0+rand.Float64()*20.0)
+
+	start := time.Now()
+	token := dev.MQTTClient.Publish(topic, 0, false, payload)
+	token.Wait()
+
+	latency := time.Since(start).Microseconds()
+	atomic.AddInt64(&stats.TotalRequests, 1)
+	atomic.AddInt64(&stats.TotalLatency, latency)
+
+	if token.Error() != nil {
+		atomic.AddInt64(&stats.Errors, 1)
+	} else {
+		atomic.AddInt64(&stats.Success, 1)
 	}
 }
 
@@ -241,14 +330,13 @@ func postJSON(client *http.Client, url string, data interface{}, result interfac
 func postJSONWithHeaders(client *http.Client, url string, data interface{}, result interface{}, headers map[string]string) (int, []byte) {
 	jsonBytes, _ := json.Marshal(data)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonBytes))
-	req.Header.Set("Content-Type", "application/json")
+
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		// Network error
 		return 0, nil
 	}
 	defer resp.Body.Close()
