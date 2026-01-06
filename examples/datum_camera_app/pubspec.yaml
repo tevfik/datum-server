@@ -18,6 +18,8 @@ dependencies:
   package_info_plus: ^8.0.0
   flutter_quick_video_encoder: ^1.7.2
   app_links: 6.3.0
+  wifi_iot: ^0.3.19
+  permission_handler: ^11.0.1
 
 dev_dependencies:
   flutter_test:

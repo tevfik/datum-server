@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
+import 'package:wifi_iot/wifi_iot.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../providers/auth_provider.dart';
 
 import '../utils/thing_description_registry.dart'; // Import Registry
@@ -47,11 +49,184 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
     return dio; 
   }
 
-  // Step 1: Discover Device
-  Future<void> _discoverDevice() async {
+  // Step 1: Discover Device (Auto-Connect)
+  Future<void> _autoConnectAndDiscover() async {
     setState(() {
       _isLoading = true;
-      _statusMessage = "Connecting to device...";
+      _statusMessage = "Requesting permissions...";
+    });
+
+    // 1. Request Permissions
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.location,
+      Permission.nearbyWifiDevices, // Android 13+
+    ].request();
+
+    if (statuses[Permission.location]!.isDenied || 
+        (statuses[Permission.nearbyWifiDevices] != null && statuses[Permission.nearbyWifiDevices]!.isDenied)) {
+       setState(() {
+         _isLoading = false;
+         _statusMessage = "Permissions denied. Cannot scan for devices.";
+       });
+       return;
+    }
+
+    // 2. Scan for Datum Networks
+    setState(() => _statusMessage = "Scanning for 'Datum-' devices...");
+    
+    try {
+      // Load list
+      // Note: On iOS this might be empty, so we might need a specific prefix connection if we knew it.
+      // But for generic "Datum-XXXX", we scan.
+      List<WifiNetwork> networks = await WiFiForIoTPlugin.loadWifiList();
+      
+      var deviceNetworks = networks
+          .where((n) => n.ssid != null && n.ssid!.startsWith("Datum-"))
+          .toList();
+
+      // Sort by signal strength (descending)
+      deviceNetworks.sort((a, b) => (b.level ?? -100).compareTo(a.level ?? -100));
+
+      if (deviceNetworks.isEmpty) {
+         setState(() {
+           _isLoading = false;
+           _statusMessage = "No 'Datum-' devices found. Make sure device is in setup mode.";
+         });
+         return;
+      }
+
+      // 3. Connect to the strongest one
+      var target = deviceNetworks.first;
+      setState(() => _statusMessage = "Connecting to ${target.ssid}...");
+
+      bool connected = await WiFiForIoTPlugin.connect(
+        target.ssid!,
+        password: null, // Open network as per firmware
+        security: NetworkSecurity.NONE,
+        joinOnce: true, // Important for iOS
+        withInternet: false, // Don't expect internet
+      );
+
+      if (!connected) {
+         setState(() {
+           _isLoading = false;
+           _statusMessage = "Failed to connect to ${target.ssid}.";
+         });
+         return;
+      }
+      
+      // Force WiFi usage on Android (since no internet)
+      await WiFiForIoTPlugin.forceWifiUsage(true);
+
+      // 4. Verify Connection & Get Info
+      setState(() => _statusMessage = "Connected! Reading device info...");
+      // Small delay to let network stack settle
+      await Future.delayed(const Duration(seconds: 2));
+      
+      await _discoverDevice(); // Call original discovery logic
+
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _statusMessage = "Auto-connect error: $e. Try manual connection.";
+        });
+      }
+    }
+  }
+
+  // Step 1: Discover Device (Auto-Connect)
+  Future<void> _autoConnectAndDiscover() async {
+    setState(() {
+      _isLoading = true;
+      _statusMessage = "Requesting permissions...";
+    });
+
+    // 1. Request Permissions
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.location,
+      Permission.nearbyWifiDevices, // Android 13+
+    ].request();
+
+    if (statuses[Permission.location]!.isDenied || 
+        (statuses[Permission.nearbyWifiDevices] != null && statuses[Permission.nearbyWifiDevices]!.isDenied)) {
+       setState(() {
+         _isLoading = false;
+         _statusMessage = "Permissions denied. Cannot scan for devices.";
+       });
+       return;
+    }
+
+    // 2. Scan for Datum Networks
+    setState(() => _statusMessage = "Scanning for 'Datum-' devices...");
+    
+    try {
+      // Load list
+      // Note: On iOS this might be empty, so we might need a specific prefix connection if we knew it.
+      // But for generic "Datum-XXXX", we scan.
+      List<WifiNetwork> networks = await WiFiForIoTPlugin.loadWifiList();
+      
+      var deviceNetworks = networks
+          .where((n) => n.ssid != null && n.ssid!.startsWith("Datum-"))
+          .toList();
+
+      // Sort by signal strength (descending)
+      deviceNetworks.sort((a, b) => (b.level ?? -100).compareTo(a.level ?? -100));
+
+      if (deviceNetworks.isEmpty) {
+         setState(() {
+           _isLoading = false;
+           _statusMessage = "No 'Datum-' devices found. Make sure device is in setup mode.";
+         });
+         return;
+      }
+
+      // 3. Connect to the strongest one
+      var target = deviceNetworks.first;
+      setState(() => _statusMessage = "Connecting to ${target.ssid}...");
+
+      bool connected = await WiFiForIoTPlugin.connect(
+        target.ssid!,
+        password: null, // Open network as per firmware
+        security: NetworkSecurity.NONE,
+        joinOnce: true, // Important for iOS
+        withInternet: false, // Don't expect internet
+      );
+
+      if (!connected) {
+         setState(() {
+           _isLoading = false;
+           _statusMessage = "Failed to connect to ${target.ssid}.";
+         });
+         return;
+      }
+      
+      // Force WiFi usage on Android (since no internet)
+      await WiFiForIoTPlugin.forceWifiUsage(true);
+
+      // 4. Verify Connection & Get Info
+      setState(() => _statusMessage = "Connected! Reading device info...");
+      // Small delay to let network stack settle
+      await Future.delayed(const Duration(seconds: 2));
+      
+      await _discoverDevice(); // Call original discovery logic
+
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _statusMessage = "Auto-connect error: $e. Try manual connection.";
+        });
+      }
+    }
+  }
+
+  // Original Discovery Logic (now internal or manual fallback)
+  Future<void> _discoverDevice() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _statusMessage = "Reading device info from 192.168.4.1...";
     });
 
     try {
@@ -61,20 +236,19 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
         setState(() {
           _deviceUID = data['device_uid'];
           _firmwareVersion = data['firmware_version'];
-          _deviceType = data['device_type']; // Get type from firmware
+          _deviceType = data['device_type']; 
           _isLoading = false;
-           _statusMessage = null;
-          _step++; // Move to next step
+          _statusMessage = null;
+          _step++; 
         });
         
-        // Auto-scan for networks
         _scanNetworks();
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _statusMessage = "Could not find device. Ensure you are connected to 'Datum-Camera-...' WiFi.";
+          _statusMessage = "Could not reach device. Ensure you are connected to 'Datum-...' WiFi.";
         });
       }
     }
@@ -181,9 +355,21 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
             child: Row(
               children: [
                 if (_step == 0)
-                  ElevatedButton(
-                    onPressed: _discoverDevice,
-                    child: const Text('I am Connected'),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.wifi_find),
+                        label: const Text('Auto Connect & Setup'),
+                        onPressed: _autoConnectAndDiscover,
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: _discoverDevice, 
+                        child: const Text('I connected manually', style: TextStyle(color: Colors.grey)),
+                      ),
+                    ],
                   ),
                   
                 if (_step == 1)
