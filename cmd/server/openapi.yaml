@@ -1325,8 +1325,48 @@ paths:
           schema:
             type: string
       responses:
-        '200':
           description: Device deleted
+
+  /admin/devices/{device_id}/rotate-key:
+    post:
+      summary: Rotate device API key
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Key rotated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  api_key:
+                    type: string
+
+  /admin/devices/{device_id}/revoke-key:
+    post:
+      summary: Revoke device API key
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Key revoked
 
   /admin/database/stats:
     get:

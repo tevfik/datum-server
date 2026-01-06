@@ -49,9 +49,10 @@ func setupAdminRoutes(r *gin.Engine, store storage.Provider) {
 		admin.DELETE("/devices/:device_id", forceDeleteDeviceHandler)
 
 		// Key management (token rotation and revocation)
-		// Key management (token rotation and revocation) - TODO: Implement handlers
-		// admin.POST("/devices/:device_id/rotate-key", rotateDeviceKeyHandler)
-		// admin.POST("/devices/:device_id/revoke-key", revokeDeviceKeyHandler)
+		// Key management (token rotation and revocation)
+		admin.POST("/devices/:device_id/rotate-key", rotateDeviceKeyHandler)
+		admin.POST("/devices/:device_id/revoke-key", revokeDeviceKeyHandler)
+		// admin.GET("/devices/:device_id/token-info", getDeviceTokenInfoHandler)
 		// admin.GET("/devices/:device_id/token-info", getDeviceTokenInfoHandler)
 
 		// Database operations
@@ -372,8 +373,9 @@ func deleteUserHandler(c *gin.Context) {
 
 // ============ Device Management Handlers ============
 
+// listAllDevicesHandler lists all devices in the system
 func listAllDevicesHandler(c *gin.Context) {
-	devices, err := store.ListAllDevices()
+	devices, err := store.GetAllDevices()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -880,5 +882,44 @@ func updateRegistrationConfigHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message":        "Registration configuration updated",
 		"allow_register": req.AllowRegister,
+	})
+}
+
+// rotateDeviceKeyHandler rotates the API key for a device
+// POST /admin/devices/:device_id/rotate-key
+func rotateDeviceKeyHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
+
+	// Generate new key
+	newKey := generateIDString(16) // 32 chars hex
+
+	if err := store.UpdateDeviceAPIKey(deviceID, newKey); err != nil {
+		logger.Logger.Error().Msgf("Failed to rotate key for device %s: %v", deviceID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to rotate key"})
+		return
+	}
+
+	logger.Logger.Info().Msgf("Rotated API key for device %s by admin", deviceID)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Key rotated successfully",
+		"api_key": newKey,
+	})
+}
+
+// revokeDeviceKeyHandler revokes the API key for a device
+// POST /admin/devices/:device_id/revoke-key
+func revokeDeviceKeyHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
+
+	// Set key to empty string to revoke access
+	if err := store.UpdateDeviceAPIKey(deviceID, ""); err != nil {
+		logger.Logger.Error().Msgf("Failed to revoke key for device %s: %v", deviceID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to revoke key"})
+		return
+	}
+
+	logger.Logger.Info().Msgf("Revoked API key for device %s by admin", deviceID)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Key revoked successfully",
 	})
 }

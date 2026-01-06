@@ -1010,6 +1010,61 @@ func (s *Storage) GetAllDevices() ([]Device, error) {
 	return devices, err
 }
 
+// UpdateDeviceAPIKey updates a device's API key
+func (s *Storage) UpdateDeviceAPIKey(id string, newKey string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		// Get existing device
+		val, err := tx.Get("device:" + id)
+		if err != nil {
+			return err
+		}
+
+		var device Device
+		if err := json.Unmarshal([]byte(val), &device); err != nil {
+			return err
+		}
+
+		// Update fields
+		device.APIKey = newKey
+		device.UpdatedAt = time.Now()
+
+		// Save back
+		updatedVal, err := json.Marshal(device)
+		if err != nil {
+			return err
+		}
+
+		_, _, err = tx.Set("device:"+id, string(updatedVal), nil)
+		return err
+	})
+}
+
+// GetDeviceByUID retrieves a device by its UID (e.g. MAC address)
+func (s *Storage) GetDeviceByUID(uid string) (*Device, error) {
+	var device *Device
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		var found bool
+		tx.Ascend("", func(key, value string) bool {
+			if strings.HasPrefix(key, "device:dev_") && !strings.Contains(key[7:], ":") {
+				var d Device
+				if err := json.Unmarshal([]byte(value), &d); err == nil {
+					if d.DeviceUID == uid {
+						device = &d
+						found = true
+						return false // Stop iteration
+					}
+				}
+			}
+			return true
+		})
+		if !found {
+			return fmt.Errorf("device not found")
+		}
+		return nil
+	})
+	return device, err
+}
+
 // ForceDeleteDevice deletes a device by admin (bypasses user ownership check)
 func (s *Storage) ForceDeleteDevice(deviceID string) error {
 	return s.db.Update(func(tx *buntdb.Tx) error {

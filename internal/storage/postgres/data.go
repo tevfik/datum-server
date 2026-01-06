@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -248,4 +249,63 @@ func (s *PostgresStore) GetDatabaseStats() (map[string]interface{}, error) {
 	stats["banned_devices"] = bannedDevices
 
 	return stats, nil
+}
+
+// UpdateDeviceAPIKey updates a device's API key
+func (s *PostgresStore) UpdateDeviceAPIKey(id string, newKey string) error {
+	result, err := s.db.Exec(
+		"UPDATE devices SET api_key = $1, updated_at = $2 WHERE id = $3",
+		newKey, time.Now(), id,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return errors.New("device not found")
+	}
+
+	return nil
+}
+
+// GetDeviceByUID retrieves a device by its generic UID (e.g. MAC address)
+func (s *PostgresStore) GetDeviceByUID(uid string) (*storage.Device, error) {
+	var device storage.Device
+	var created, updated, ls sql.NullTime
+
+	// Adjust column selection based on actual schema. Assuming standard columns.
+	// If schema differs, this query needs adjustment.
+	// Using generic selection or specific columns.
+	err := s.db.QueryRow(`
+		SELECT id, user_id, name, type, device_uid, api_key, status, last_seen, created_at, updated_at 
+		FROM devices 
+		WHERE device_uid = $1
+	`, uid).Scan(
+		&device.ID, &device.UserID, &device.Name, &device.Type, &device.DeviceUID, &device.APIKey, &device.Status,
+		&ls, &created, &updated,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("device not found")
+		}
+		return nil, err
+	}
+
+	if ls.Valid {
+		device.LastSeen = ls.Time
+	}
+	if created.Valid {
+		device.CreatedAt = created.Time
+	}
+	if updated.Valid {
+		device.UpdatedAt = updated.Time
+	}
+
+	return &device, nil
 }

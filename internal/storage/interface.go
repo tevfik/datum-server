@@ -20,17 +20,18 @@ type Provider interface {
 	UpdateUserPassword(userID string, passwordHash string) error
 	DeleteUser(userID string) error
 
-	// Device Operations
+	// Device management
 	CreateDevice(device *Device) error
-	GetDevice(deviceID string) (*Device, error)
+	GetDevice(id string) (*Device, error)
+	GetDeviceByUID(uid string) (*Device, error)
 	GetDeviceByAPIKey(apiKey string) (*Device, error)
 	GetUserDevices(userID string) ([]Device, error)
+	GetAllDevices() ([]Device, error)
+	UpdateDevice(id string, status string) error
+	UpdateDeviceAPIKey(id string, newKey string) error // New method
+	UpdateDeviceLastSeen(id string) error
 	DeleteDevice(deviceID, userID string) error
-	ListAllDevices() ([]Device, error)
-	GetAllDevices() ([]Device, error) // Admin
-	UpdateDevice(deviceID string, status string) error
-	UpdateDeviceLastSeen(deviceID string) error
-	ForceDeleteDevice(deviceID string) error
+	ForceDeleteDevice(id string) error
 
 	// Token Operations
 	RotateDeviceKey(deviceID string, newToken string, tokenExpiresAt time.Time, gracePeriodDays int) (*Device, error)
