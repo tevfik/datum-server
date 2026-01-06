@@ -89,6 +89,12 @@ class _DatumAppState extends State<DatumApp> {
       ),
       home: Consumer<AuthProvider>(
         builder: (context, auth, _) {
+          if (!auth.isInitialized) {
+            return const Scaffold(
+              backgroundColor: Color(0xFF1B1B1B),
+              body: Center(child: CircularProgressIndicator(color: Colors.cyan)),
+            );
+          }
           return auth.isAuthenticated ? const HomeScreen() : const LoginScreen();
         },
       ),

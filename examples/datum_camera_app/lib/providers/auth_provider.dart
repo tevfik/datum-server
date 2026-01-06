@@ -9,6 +9,9 @@ class AuthProvider with ChangeNotifier {
 
   late final ApiClient _api;
 
+  bool _isInitialized = false;
+  bool get isInitialized => _isInitialized;
+
   AuthProvider({ApiClient? apiClient}) {
     _api = apiClient ?? ApiClient();
     _loadToken();
@@ -20,6 +23,7 @@ class AuthProvider with ChangeNotifier {
     if (_token != null) {
       _api.setToken(_token!);
     }
+    _isInitialized = true;
     notifyListeners();
   }
 
