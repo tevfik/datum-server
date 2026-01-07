@@ -10,7 +10,8 @@ class DebugLogger {
   final ValueNotifier<int> logCount = ValueNotifier(0);
 
   void log(String message) {
-    final timestamp = DateTime.now().toIso8601String().split('T').last.substring(0, 8);
+    final timestamp =
+        DateTime.now().toIso8601String().split('T').last.substring(0, 8);
     logs.add('[$timestamp] $message');
     if (logs.length > 100) logs.removeAt(0); // Keep last 100 logs
     logCount.value++;
@@ -26,6 +27,8 @@ class DebugLogger {
 class ApiClient {
   final Dio _dio = Dio();
   final DebugLogger _logger = DebugLogger();
+
+  VoidCallback? onUnauthorized;
 
   ApiClient() {
     _dio.options.baseUrl = 'https://datum.bezg.in'; // Default to production
@@ -45,6 +48,11 @@ class ApiClient {
       onError: (DioException e, handler) {
         _logger.log('ERR: ${e.response?.statusCode} ${e.message}');
         if (e.response != null) _logger.log('RES DATA: ${e.response?.data}');
+
+        if (e.response?.statusCode == 401 && onUnauthorized != null) {
+          onUnauthorized!();
+        }
+
         return handler.next(e);
       },
     ));
@@ -74,25 +82,25 @@ class ApiClient {
       return response.data['token'];
     } catch (e) {
       if (e is DioException && e.response != null) {
-          throw Exception('Login failed: ${e.response?.data}');
+        throw Exception('Login failed: ${e.response?.data}');
       }
       throw Exception('Login failed: $e');
     }
   }
 
   Future<Map<String, dynamic>> register(String email, String password) async {
-      try {
-        final response = await _dio.post('/auth/register', data: {
-          'email': email,
-          'password': password,
-        });
-        return response.data;
-      } catch (e) {
-        if (e is DioException && e.response != null) {
-            throw Exception('Registration failed: ${e.response?.data}');
-        }
-        throw Exception('Registration failed: $e');
+    try {
+      final response = await _dio.post('/auth/register', data: {
+        'email': email,
+        'password': password,
+      });
+      return response.data;
+    } catch (e) {
+      if (e is DioException && e.response != null) {
+        throw Exception('Registration failed: ${e.response?.data}');
       }
+      throw Exception('Registration failed: $e');
+    }
   }
 
   Future<List<dynamic>> getDevices() async {
@@ -108,11 +116,12 @@ class ApiClient {
   Future<Map<String, dynamic>> getDeviceData(String id) async {
     final response = await _dio.get('/data/$id');
     final Map<String, dynamic> raw = response.data;
-    
+
     // Server returns { "data": {...}, "timestamp": "...", "device_id": "..." }
     // We want to flatten it for the UI: { ...data, "timestamp": "..." }
-    
-    final Map<String, dynamic> flattened = Map<String, dynamic>.from(raw['data'] ?? {});
+
+    final Map<String, dynamic> flattened =
+        Map<String, dynamic>.from(raw['data'] ?? {});
     if (raw.containsKey('timestamp')) {
       flattened['timestamp'] = raw['timestamp'];
     }
@@ -130,10 +139,8 @@ class ApiClient {
     return response.data;
   }
 
-
-
-
-  Future<void> sendCommand(String deviceId, String action, {Map<String, dynamic>? params}) async {
+  Future<void> sendCommand(String deviceId, String action,
+      {Map<String, dynamic>? params}) async {
     await _dio.post('/devices/$deviceId/commands', data: {
       'action': action,
       'params': params ?? {},
@@ -145,12 +152,13 @@ class ApiClient {
       await _dio.delete('/devices/$deviceId');
       _logger.log('Device deleted: $deviceId');
     } catch (e) {
-       if (e is DioException && e.response != null) {
-          throw Exception('Delete failed: ${e.response?.data}');
+      if (e is DioException && e.response != null) {
+        throw Exception('Delete failed: ${e.response?.data}');
       }
       throw Exception('Delete failed: $e');
     }
   }
+
   Future<void> changePassword(String oldPassword, String newPassword) async {
     try {
       await _dio.put('/auth/password', data: {
@@ -185,7 +193,7 @@ class ApiClient {
     } catch (e) {
       // 200 OK is returned even if email not found (security), so this catches actual errors
       if (e is DioException && e.response != null) {
-         throw Exception('Request failed: ${e.response?.data}');
+        throw Exception('Request failed: ${e.response?.data}');
       }
       throw Exception('Request failed: $e');
     }

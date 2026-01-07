@@ -14,6 +14,10 @@ ApiClient apiClient(Ref ref) {
 Future<ApiClient> authenticatedApiClient(Ref ref) async {
   final token = await ref.watch(authProvider.future);
   final client = ApiClient();
+  client.onUnauthorized = () {
+    ref.read(authProvider.notifier).logout();
+  };
+
   if (token != null) {
     client.setToken(token);
   }
