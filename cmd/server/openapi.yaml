@@ -330,6 +330,18 @@ components:
         message:
           type: string
 
+    CheckUIDResponse:
+      type: object
+      properties:
+        registered:
+          type: boolean
+        device_id:
+          type: string
+        has_pending:
+          type: boolean
+        request_id:
+          type: string
+
 paths:
   /:
     get:
@@ -368,6 +380,73 @@ paths:
                     type: string
                     format: date-time
 
+
+  /system/status:
+    get:
+      summary: Get system status
+      tags: [System]
+      responses:
+        '200':
+          description: System status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  initialized:
+                    type: boolean
+
+  /system/setup:
+    post:
+      summary: Initialize system
+      tags: [System]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetupRequest'
+      responses:
+        '201':
+          description: System initialized
+        '409':
+          description: Already initialized
+
+  /health:
+    get:
+      summary: Health check
+      tags: [System]
+      responses:
+        '200':
+          description: Healthy
+        '503':
+          description: Unhealthy
+
+  /healthz:
+    get:
+      summary: Health check (alias)
+      tags: [System]
+      responses:
+        '200':
+          description: Healthy
+
+  /live:
+    get:
+      summary: Liveness check
+      tags: [System]
+      responses:
+        '200':
+          description: Alive
+
+  /ready:
+    get:
+      summary: Readiness check
+      tags: [System]
+      responses:
+        '200':
+          description: Ready
+        '503':
+          description: Not ready
 
   /auth/register:
     post:
@@ -573,6 +652,118 @@ paths:
         '200':
           description: List of devices
 
+  /devices/register:
+    post:
+      summary: Register device (Mobile App)
+      tags: [Provisioning]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+      responses:
+        '201':
+          description: Device registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterDeviceResponse'
+
+  /devices/check-uid/{uid}:
+    get:
+      summary: Check if device UID is registered
+      tags: [Provisioning]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckUIDResponse'
+
+  /devices/provisioning:
+    get:
+      summary: List user provisioning requests
+      tags: [Provisioning]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of requests
+
+  /devices/provisioning/{request_id}:
+    get:
+      summary: Get provisioning request status
+      tags: [Provisioning]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Request status
+    delete:
+      summary: Cancel provisioning request
+      tags: [Provisioning]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cancelled
+
+  /provisioning/activate:
+    post:
+      summary: Activate device (Device side)
+      tags: [Provisioning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceActivateRequest'
+      responses:
+        '200':
+          description: Activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceActivateResponse'
+
+  /provisioning/check/{uid}:
+    get:
+      summary: Check provisioning status (Device side)
+      tags: [Provisioning]
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Status check
+
   /devices/{device_id}:
     delete:
       summary: Delete device
@@ -746,6 +937,88 @@ paths:
       responses:
         '200':
           description: Frame processed
+
+  /devices/{device_id}/stream/mjpeg:
+    get:
+      summary: MJPEG Stream
+      tags: [Streaming]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: MJPEG Stream
+
+  /devices/{device_id}/stream/snapshot:
+    get:
+      summary: Get current frame snapshot
+      tags: [Streaming]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: JPEG Image
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+
+  /devices/{device_id}/stream/ws:
+    get:
+      summary: WebSocket Stream
+      tags: [Streaming]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '101':
+          description: WebSocket upgrade
+
+  /devices/{device_id}/stream/info:
+    get:
+      summary: Stream Metadata
+      tags: [Streaming]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stream info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active:
+                    type: boolean
+                  fps:
+                    type: number
+                  width:
+                    type: integer
+                  height:
+                    type: integer
   /data/{device_id}:
     post:
       summary: Send data (device)
@@ -1797,6 +2070,183 @@ paths:
       responses:
         '200':
           description: Retention updated
+
+  /admin/devices:
+    post:
+      summary: Provision device (Admin)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProvisionDeviceRequest'
+      responses:
+        '201':
+          description: Device created
+    get:
+      summary: List all devices (Admin)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of devices
+
+  /admin/devices/{device_id}:
+    get:
+      summary: Get device details (Admin)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Device details
+    put:
+      summary: Update device status
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [active, banned, suspended]
+      responses:
+        '200':
+          description: Updated
+    delete:
+      summary: Force delete device
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+
+  /admin/devices/{device_id}/rotate-key:
+    post:
+      summary: Rotate device key
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Key rotated
+
+  /admin/devices/{device_id}/revoke-key:
+    post:
+      summary: Revoke device key
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Key revoked
+
+  /admin/database/stats:
+    get:
+      summary: Get DB stats
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Stats
+
+  /admin/database/export:
+    post:
+      summary: Export database
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Export JSON
+
+  /admin/database/clean:
+    post:
+      summary: Cleanup database
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Cleaned
+
+  /admin/database/reset:
+    delete:
+      summary: Factory reset
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirm]
+              properties:
+                confirm:
+                  type: string
+                  enum: [RESET]
+      responses:
+        '200':
+          description: Reset complete
+
+  /admin/logs:
+    get:
+      summary: View server logs
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logs
+    delete:
+      summary: Clear logs
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logs cleared
 
   /admin/config/rate-limit:
     put:

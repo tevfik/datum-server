@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:wifi_iot/wifi_iot.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -7,22 +7,22 @@ import '../providers/auth_provider.dart';
 
 import '../utils/thing_description_registry.dart'; // Import Registry
 
-class ProvisioningWizard extends StatefulWidget {
+class ProvisioningWizard extends ConsumerStatefulWidget {
   const ProvisioningWizard({super.key});
 
   @override
-  State<ProvisioningWizard> createState() => _ProvisioningWizardState();
+  ConsumerState<ProvisioningWizard> createState() => _ProvisioningWizardState();
 }
 
-class _ProvisioningWizardState extends State<ProvisioningWizard> {
+class _ProvisioningWizardState extends ConsumerState<ProvisioningWizard> {
   final _ssidController = TextEditingController();
   final _passController = TextEditingController();
   final _nameController = TextEditingController();
-  
+
   String? _selectedSSID;
   List<dynamic> _networks = [];
   bool _scanning = false;
-  
+
   // Device Info
   String? _deviceUID;
   String? _firmwareVersion;
@@ -31,7 +31,7 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
   int _step = 0;
   bool _isLoading = false;
   String? _statusMessage;
-  
+
   @override
   void dispose() {
     _ssidController.dispose();
@@ -39,17 +39,15 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
     _nameController.dispose();
     super.dispose();
   }
-  
+
   // Helper to connect to SoftAP endpoints with short timeout
   Dio _getDeviceDio() {
     final dio = Dio();
     dio.options.baseUrl = 'http://192.168.4.1';
     dio.options.connectTimeout = const Duration(seconds: 3);
     dio.options.sendTimeout = const Duration(seconds: 3);
-    return dio; 
+    return dio;
   }
-
-
 
   // Step 1: Discover Device (Auto-Connect)
   Future<void> _autoConnectAndDiscover() async {
@@ -64,38 +62,41 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
       Permission.nearbyWifiDevices, // Android 13+
     ].request();
 
-    if (statuses[Permission.location]!.isDenied || 
-        (statuses[Permission.nearbyWifiDevices] != null && statuses[Permission.nearbyWifiDevices]!.isDenied)) {
-       setState(() {
-         _isLoading = false;
-         _statusMessage = "Permissions denied. Cannot scan for devices.";
-       });
-       return;
+    if (statuses[Permission.location]!.isDenied ||
+        (statuses[Permission.nearbyWifiDevices] != null &&
+            statuses[Permission.nearbyWifiDevices]!.isDenied)) {
+      setState(() {
+        _isLoading = false;
+        _statusMessage = "Permissions denied. Cannot scan for devices.";
+      });
+      return;
     }
 
     // 2. Scan for Datum Networks
     setState(() => _statusMessage = "Scanning for 'Datum-' devices...");
-    
+
     try {
       // Load list
       // Note: On iOS this might be empty, so we might need a specific prefix connection if we knew it.
       // But for generic "Datum-XXXX", we scan.
       // ignore: deprecated_member_use
       List<WifiNetwork> networks = await WiFiForIoTPlugin.loadWifiList();
-      
+
       var deviceNetworks = networks
           .where((n) => n.ssid != null && n.ssid!.startsWith("Datum-"))
           .toList();
 
       // Sort by signal strength (descending)
-      deviceNetworks.sort((a, b) => (b.level ?? -100).compareTo(a.level ?? -100));
+      deviceNetworks
+          .sort((a, b) => (b.level ?? -100).compareTo(a.level ?? -100));
 
       if (deviceNetworks.isEmpty) {
-         setState(() {
-           _isLoading = false;
-           _statusMessage = "No 'Datum-' devices found. Make sure device is in setup mode.";
-         });
-         return;
+        setState(() {
+          _isLoading = false;
+          _statusMessage =
+              "No 'Datum-' devices found. Make sure device is in setup mode.";
+        });
+        return;
       }
 
       // 3. Connect to the strongest one
@@ -111,13 +112,13 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
       );
 
       if (!connected) {
-         setState(() {
-           _isLoading = false;
-           _statusMessage = "Failed to connect to ${target.ssid}.";
-         });
-         return;
+        setState(() {
+          _isLoading = false;
+          _statusMessage = "Failed to connect to ${target.ssid}.";
+        });
+        return;
       }
-      
+
       // Force WiFi usage on Android (since no internet)
       await WiFiForIoTPlugin.forceWifiUsage(true);
 
@@ -125,9 +126,8 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
       setState(() => _statusMessage = "Connected! Reading device info...");
       // Small delay to let network stack settle
       await Future.delayed(const Duration(seconds: 2));
-      
-      await _discoverDevice(); // Call original discovery logic
 
+      await _discoverDevice(); // Call original discovery logic
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -153,19 +153,20 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
         setState(() {
           _deviceUID = data['device_uid'];
           _firmwareVersion = data['firmware_version'];
-          _deviceType = data['device_type']; 
+          _deviceType = data['device_type'];
           _isLoading = false;
           _statusMessage = null;
-          _step++; 
+          _step++;
         });
-        
+
         _scanNetworks();
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _statusMessage = "Could not reach device. Ensure you are connected to 'Datum-...' WiFi.";
+          _statusMessage =
+              "Could not reach device. Ensure you are connected to 'Datum-...' WiFi.";
         });
       }
     }
@@ -175,7 +176,7 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
   Future<void> _scanNetworks() async {
     setState(() {
       _scanning = true;
-      _networks = []; 
+      _networks = [];
     });
 
     try {
@@ -189,9 +190,9 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
     } catch (e) {
       if (mounted) {
         setState(() {
-           _scanning = false;
-           // If scan fails, allow manual entry
-           _networks = [];
+          _scanning = false;
+          // If scan fails, allow manual entry
+          _networks = [];
         });
       }
     }
@@ -199,28 +200,28 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
 
   // Step 3 Implementation
   Future<void> _completeProvisioning() async {
-     setState(() {
+    setState(() {
       _isLoading = true;
       _statusMessage = "Configuring device...";
     });
-    
+
     // Get token from AuthProvider
     // Note: In real app, make sure getter exists or use public field if comfortable.
     // Based on previous file read, _token is private but there is `get isAuthenticated`.
-    // I need to update AuthProvider to expose token or hack it via reflection? 
+    // I need to update AuthProvider to expose token or hack it via reflection?
     // Wait, the file read of `auth_provider.dart` showed `String? _token;` and NO public getter for token string, only `isAuthenticated`.
-    // I MUST ADD A GETTER TO AuthProvider FIRST. 
+    // I MUST ADD A GETTER TO AuthProvider FIRST.
     // Assuming I will do that in next step or assuming I can modify it now.
     // I will use `Provider.of<AuthProvider>(context, listen: false).token` and fix AuthProvider immediately after this tool call.
-    
-    final token = Provider.of<AuthProvider>(context, listen: false).token; 
-    
+
+    final token = ref.read(authProvider).value;
+
     if (token == null) {
-       setState(() {
-         _isLoading = false;
-         _statusMessage = "Error: User not authenticated.";
-       });
-       return;
+      setState(() {
+        _isLoading = false;
+        _statusMessage = "Error: User not authenticated.";
+      });
+      return;
     }
 
     try {
@@ -230,30 +231,33 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
         data: FormData.fromMap({
           "wifi_ssid": _ssidController.text,
           "wifi_pass": _passController.text,
-          "device_name": _nameController.text.isNotEmpty ? _nameController.text : defaultName,
+          "device_name": _nameController.text.isNotEmpty
+              ? _nameController.text
+              : defaultName,
           "server_url": "https://datum.bezg.in",
           "user_token": token,
         }),
       );
 
       if (response.statusCode == 200) {
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-              _statusMessage = "Success! Device is restarting and will register itself.";
-            });
-          }
-          
-          await Future.delayed(const Duration(seconds: 3));
-          if (mounted) Navigator.pop(context, true);
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _statusMessage =
+                "Success! Device is restarting and will register itself.";
+          });
+        }
+
+        await Future.delayed(const Duration(seconds: 3));
+        if (mounted) Navigator.pop(context, true);
       }
     } catch (e) {
-       if (mounted) {
-         setState(() {
+      if (mounted) {
+        setState(() {
           _isLoading = false;
           _statusMessage = "Failed to configure device: $e";
         });
-       }
+      }
     }
   }
 
@@ -265,9 +269,9 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
         type: StepperType.vertical,
         currentStep: _step,
         controlsBuilder: (context, details) {
-           if (_isLoading) return const SizedBox.shrink();
+          if (_isLoading) return const SizedBox.shrink();
 
-           return Padding(
+          return Padding(
             padding: const EdgeInsets.only(top: 20.0),
             child: Row(
               children: [
@@ -279,38 +283,42 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
                         icon: const Icon(Icons.wifi_find),
                         label: const Text('Auto Connect & Setup'),
                         onPressed: _autoConnectAndDiscover,
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                            foregroundColor: Colors.white),
                       ),
                       const SizedBox(height: 8),
                       TextButton(
-                        onPressed: _discoverDevice, 
-                        child: const Text('I connected manually', style: TextStyle(color: Colors.grey)),
+                        onPressed: _discoverDevice,
+                        child: const Text('I connected manually',
+                            style: TextStyle(color: Colors.grey)),
                       ),
                     ],
                   ),
-                  
                 if (_step == 1)
                   ElevatedButton(
-                     onPressed: () {
-                       if (_ssidController.text.isEmpty) {
-                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Select or enter WiFi SSID")));
-                         return;
-                       }
-                       setState(() => _step++);
-                     },
-                     child: const Text('Next'),
+                    onPressed: () {
+                      if (_ssidController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text("Select or enter WiFi SSID")));
+                        return;
+                      }
+                      setState(() => _step++);
+                    },
+                    child: const Text('Next'),
                   ),
-                  
                 if (_step == 2) ...[
-                   ElevatedButton(
-                     onPressed: () {
-                        _completeProvisioning();
-                     },
-                     style: ElevatedButton.styleFrom(backgroundColor: Colors.cyan, foregroundColor: Colors.white),
-                     child: const Text('Provision Device'),
-                   ),
+                  ElevatedButton(
+                    onPressed: () {
+                      _completeProvisioning();
+                    },
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.cyan,
+                        foregroundColor: Colors.white),
+                    child: const Text('Provision Device'),
+                  ),
                 ],
-                
                 const SizedBox(width: 10),
                 if (_step > 0)
                   TextButton(
@@ -332,8 +340,9 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
                 const Text('2. Connect to "Datum-Camera-XXXX"'),
                 const Text('3. Return here and press "I am Connected"'),
                 const SizedBox(height: 10),
-                if (_statusMessage != null) 
-                   Text(_statusMessage!, style: const TextStyle(color: Colors.red)),
+                if (_statusMessage != null)
+                  Text(_statusMessage!,
+                      style: const TextStyle(color: Colors.red)),
               ],
             ),
             isActive: _step >= 0,
@@ -342,50 +351,52 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
 
           // Step 1: Network Selection
           Step(
-             title: const Text('Select WiFi Network'),
-             content: Column(
-               children: [
-                 if (_scanning) const LinearProgressIndicator()
-                 else if (_networks.isEmpty) 
-                    TextButton.icon(icon: const Icon(Icons.refresh), label: const Text("Rescan"), onPressed: _scanNetworks),
-                    
-                 if (_networks.isNotEmpty)
-                   Container(
-                     height: 150,
-                     decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
-                     child: ListView.builder(
-                       itemCount: _networks.length,
-                       itemBuilder: (ctx, i) {
-                         final net = _networks[i];
-                         return ListTile(
-                           title: Text(net['ssid']),
-                           trailing: const Icon(Icons.wifi, size: 20),
-                           dense: true,
-                           onTap: () {
+            title: const Text('Select WiFi Network'),
+            content: Column(
+              children: [
+                if (_scanning)
+                  const LinearProgressIndicator()
+                else if (_networks.isEmpty)
+                  TextButton.icon(
+                      icon: const Icon(Icons.refresh),
+                      label: const Text("Rescan"),
+                      onPressed: _scanNetworks),
+                if (_networks.isNotEmpty)
+                  Container(
+                    height: 150,
+                    decoration:
+                        BoxDecoration(border: Border.all(color: Colors.grey)),
+                    child: ListView.builder(
+                        itemCount: _networks.length,
+                        itemBuilder: (ctx, i) {
+                          final net = _networks[i];
+                          return ListTile(
+                            title: Text(net['ssid']),
+                            trailing: const Icon(Icons.wifi, size: 20),
+                            dense: true,
+                            onTap: () {
                               setState(() {
                                 _ssidController.text = net['ssid'];
                                 _selectedSSID = net['ssid'];
                               });
-                           },
-                           selected: _selectedSSID == net['ssid'],
-                         );
-                       }
-                     ),
-                   ),
-                   
-                 const SizedBox(height: 10),
-                 TextField(
-                   controller: _ssidController,
-                   decoration: const InputDecoration(labelText: 'SSID'),
-                 ),
-                 TextField(
-                   controller: _passController,
-                   decoration: const InputDecoration(labelText: 'WiFi Password'),
-                   obscureText: true,
-                 ),
-               ],
-             ),
-             isActive: _step >= 1,
+                            },
+                            selected: _selectedSSID == net['ssid'],
+                          );
+                        }),
+                  ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _ssidController,
+                  decoration: const InputDecoration(labelText: 'SSID'),
+                ),
+                TextField(
+                  controller: _passController,
+                  decoration: const InputDecoration(labelText: 'WiFi Password'),
+                  obscureText: true,
+                ),
+              ],
+            ),
+            isActive: _step >= 1,
             state: _step > 1 ? StepState.complete : StepState.indexed,
           ),
 
@@ -395,27 +406,33 @@ class _ProvisioningWizardState extends State<ProvisioningWizard> {
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                  if (_deviceUID != null) ...[
-                     Text("Found: ${ThingDescriptionRegistry.get(_deviceType ?? '').title}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                     Text("ID: $_deviceUID\nFW: ${_firmwareVersion ?? 'Unknown'}", style: const TextStyle(color: Colors.grey)),
-                     const SizedBox(height: 10),
-                  ],
-                  TextField(
-                    controller: _nameController,
-                    decoration: InputDecoration(
-                      labelText: 'Device Name', 
-                      hintText: ThingDescriptionRegistry.get(_deviceType ?? '').title, // Dynamic Hint
-                      border: const OutlineInputBorder()
-                    ),
-                  ),
+                if (_deviceUID != null) ...[
+                  Text(
+                      "Found: ${ThingDescriptionRegistry.get(_deviceType ?? '').title}",
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text("ID: $_deviceUID\nFW: ${_firmwareVersion ?? 'Unknown'}",
+                      style: const TextStyle(color: Colors.grey)),
                   const SizedBox(height: 10),
-                  const Text('Device will be linked to your account automatically.'),
-                  
-                   if (_statusMessage != null) ...[
-                      const SizedBox(height: 10),
-                      Text(_statusMessage!, style: TextStyle(color: _isLoading ? Colors.blue : Colors.green)),
-                   ],
-                   if (_isLoading) const LinearProgressIndicator(),
+                ],
+                TextField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                      labelText: 'Device Name',
+                      hintText: ThingDescriptionRegistry.get(_deviceType ?? '')
+                          .title, // Dynamic Hint
+                      border: const OutlineInputBorder()),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                    'Device will be linked to your account automatically.'),
+                if (_statusMessage != null) ...[
+                  const SizedBox(height: 10),
+                  Text(_statusMessage!,
+                      style: TextStyle(
+                          color: _isLoading ? Colors.blue : Colors.green)),
+                ],
+                if (_isLoading) const LinearProgressIndicator(),
               ],
             ),
             isActive: _step >= 2,

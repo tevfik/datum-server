@@ -1,85 +1,82 @@
-import 'package:flutter/material.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../api_client.dart';
+import 'api_provider.dart';
 
-class AuthProvider with ChangeNotifier {
-  String? _token;
-  bool get isAuthenticated => _token != null;
-  String? get token => _token;
+part 'auth_provider.g.dart';
 
-  late final ApiClient _api;
-
-  bool _isInitialized = false;
-  bool get isInitialized => _isInitialized;
-
-  AuthProvider({ApiClient? apiClient}) {
-    _api = apiClient ?? ApiClient();
-    _loadToken();
-  }
-
-  Future<void> _loadToken() async {
+@Riverpod(keepAlive: true)
+class Auth extends _$Auth {
+  @override
+  Future<String?> build() async {
     final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('auth_token');
-    if (_token != null) {
-      _api.setToken(_token!);
+    final token = prefs.getString('auth_token');
+
+    if (token != null) {
+      ref.read(apiClientProvider).setToken(token);
+    } else {
+      ref.read(apiClientProvider).clearToken();
     }
-    _isInitialized = true;
-    notifyListeners();
+
+    return token;
   }
 
-  Future<bool> login(String email, String password, {bool rememberMe = false}) async {
+  bool get isAuthenticated => state.value != null;
+
+  Future<bool> login(String email, String password,
+      {bool rememberMe = false}) async {
+    final api = ref.read(apiClientProvider);
+    state = const AsyncValue.loading();
     try {
-      final token = await _api.login(email, password);
-      _token = token;
-      _api.setToken(token);
-      
+      final token = await api.login(email, password);
+      api.setToken(token);
+
+      final prefs = await SharedPreferences.getInstance();
       if (rememberMe) {
-        final prefs = await SharedPreferences.getInstance();
         await prefs.setString('auth_token', token);
       } else {
-        // Safety: Ensure it's not saved if they didn't ask for it
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('auth_token');
+        await prefs.remove('auth_token'); // Don't persist if not asked
       }
-      
-      notifyListeners();
+
+      state = AsyncValue.data(token);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  Future<bool> register(String email, String password) async {
+    final api = ref.read(apiClientProvider);
+    try {
+      await api.register(email, password);
       return true;
     } catch (e) {
       return false;
     }
   }
 
-  Future<bool> register(String email, String password) async {
-    try {
-      await _api.register(email, password);
-      return true; // Registration successful
-    } catch (e) {
-      return false; // Registration failed
-    }
-  }
-
   Future<void> logout() async {
-    _token = null;
-    _api.clearToken();
+    final api = ref.read(apiClientProvider);
+    api.clearToken();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
-    notifyListeners();
+    state = const AsyncValue.data(null);
   }
 
   Future<void> changePassword(String oldPassword, String newPassword) async {
-    await _api.changePassword(oldPassword, newPassword);
+    await ref.read(apiClientProvider).changePassword(oldPassword, newPassword);
   }
 
   Future<void> deleteAccount() async {
-    await _api.deleteAccount();
+    await ref.read(apiClientProvider).deleteAccount();
     await logout();
   }
 
   Future<void> forgotPassword(String email) async {
-    await _api.forgotPassword(email);
+    await ref.read(apiClientProvider).forgotPassword(email);
   }
 
   Future<void> resetPassword(String token, String newPassword) async {
-    await _api.resetPassword(token, newPassword);
+    await ref.read(apiClientProvider).resetPassword(token, newPassword);
   }
 }

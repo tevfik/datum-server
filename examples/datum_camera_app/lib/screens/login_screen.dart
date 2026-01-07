@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
@@ -7,15 +7,14 @@ import 'debug_screen.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
@@ -42,19 +41,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     setState(() => _isLoading = true);
-    final success = await Provider.of<AuthProvider>(context, listen: false)
-        .login(_emailController.text, _passwordController.text, rememberMe: _rememberMe);
+    final success = await ref.read(authProvider.notifier).login(
+        _emailController.text, _passwordController.text,
+        rememberMe: _rememberMe);
     setState(() => _isLoading = false);
 
     if (success) {
       // Save email for next time if Remember Me is checked
       final prefs = await SharedPreferences.getInstance();
       if (_rememberMe) {
-         await prefs.setBool('remember_me', true);
-         await prefs.setString('saved_email', _emailController.text);
+        await prefs.setBool('remember_me', true);
+        await prefs.setString('saved_email', _emailController.text);
       } else {
-         await prefs.remove('remember_me');
-         await prefs.remove('saved_email');
+        await prefs.remove('remember_me');
+        await prefs.remove('saved_email');
       }
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -88,22 +88,24 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 20),
             TextField(
               controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                  labelText: 'Email', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 10),
             TextField(
               controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                  labelText: 'Password', border: OutlineInputBorder()),
               obscureText: true,
             ),
             Row(
-               children: [
-                 Checkbox(
-                   value: _rememberMe,
-                   onChanged: (v) => setState(() => _rememberMe = v ?? false),
-                 ),
-                 const Text("Remember Me"),
-               ],
+              children: [
+                Checkbox(
+                  value: _rememberMe,
+                  onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                ),
+                const Text("Remember Me"),
+              ],
             ),
             const SizedBox(height: 10),
             _isLoading
@@ -124,19 +126,23 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                            MaterialPageRoute(
+                                builder: (_) => const ForgotPasswordScreen()),
                           );
                         },
-                        child: const Text('Forgot Password?', style: TextStyle(color: Colors.grey)),
+                        child: const Text('Forgot Password?',
+                            style: TextStyle(color: Colors.grey)),
                       ),
                       TextButton(
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                            MaterialPageRoute(
+                                builder: (_) => const RegisterScreen()),
                           );
                         },
-                        child: const Text('Create Account', style: TextStyle(color: Colors.cyan)),
+                        child: const Text('Create Account',
+                            style: TextStyle(color: Colors.cyan)),
                       ),
                     ],
                   ),

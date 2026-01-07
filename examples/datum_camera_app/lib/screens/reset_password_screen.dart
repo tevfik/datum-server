@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 
-class ResetPasswordScreen extends StatefulWidget {
+class ResetPasswordScreen extends ConsumerStatefulWidget {
   final String? initialToken;
 
   const ResetPasswordScreen({super.key, this.initialToken});
 
   @override
-  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+  ConsumerState<ResetPasswordScreen> createState() =>
+      _ResetPasswordScreenState();
 }
 
-class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   final _tokenController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -34,7 +35,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     }
 
     if (_tokenController.text.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Token is missing')),
       );
       return;
@@ -42,12 +43,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await Provider.of<AuthProvider>(context, listen: false)
+      await ref
+          .read(authProvider.notifier)
           .resetPassword(_tokenController.text, _passwordController.text);
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Password reset successfully. Please login.')),
+          const SnackBar(
+              content: Text('Password reset successfully. Please login.')),
         );
         Navigator.popUntil(context, (route) => route.isFirst); // Go to login
       }
@@ -70,8 +73,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-             // Usually token is hidden if passed via deep link, but visible for manual entry
-             TextField(
+            // Usually token is hidden if passed via deep link, but visible for manual entry
+            TextField(
               controller: _tokenController,
               decoration: const InputDecoration(
                 labelText: 'Reset Token',
