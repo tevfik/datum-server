@@ -13,8 +13,13 @@ func GetRetentionConfigFromEnv() RetentionConfig {
 	config := DefaultRetention
 
 	if maxDays := os.Getenv("RETENTION_MAX_DAYS"); maxDays != "" {
-		if days, err := strconv.Atoi(maxDays); err == nil && days > 0 {
-			config.MaxAge = time.Duration(days) * 24 * time.Hour
+		if days, err := strconv.Atoi(maxDays); err == nil {
+			if days <= 0 {
+				// 0 or negative means infinite retention
+				config.MaxAge = 0
+			} else {
+				config.MaxAge = time.Duration(days) * 24 * time.Hour
+			}
 		}
 	}
 
