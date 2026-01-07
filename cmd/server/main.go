@@ -193,6 +193,17 @@ func main() {
 	// Set global PublicURL for handlers that need it (e.g. web fallback)
 	GlobalPublicURL = publicURL
 
+	// User Auth Provider
+	var authProvider auth.AuthProvider
+	authType := os.Getenv("AUTH_PROVIDER")
+	if authType == "supabase" {
+		authProvider = auth.NewSupabaseProvider(store, "")
+		log.Info().Msg("Using Supabase Auth Provider")
+	} else {
+		authProvider = auth.NewLocalProvider(store)
+		log.Info().Msg("Using Local Auth Provider")
+	}
+
 	// Setup router
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
@@ -234,11 +245,11 @@ func main() {
 	// Auth routes
 	authGroup := r.Group("/auth")
 	{
-		authGroup.POST("/register", registerHandler)
-		authGroup.POST("/login", loginHandler)
+		authGroup.POST("/register", authProvider.RegisterHandler)
+		authGroup.POST("/login", authProvider.LoginHandler)
 		// Password Reset
-		authGroup.POST("/forgot-password", forgotPasswordHandler)
-		authGroup.POST("/reset-password", completeResetPasswordHandler)
+		authGroup.POST("/forgot-password", authProvider.ForgotPasswordHandler)
+		authGroup.POST("/reset-password", authProvider.ResetPasswordHandler)
 	}
 
 	// Password Reset Web Page (for deep linking fallback)
@@ -246,8 +257,12 @@ func main() {
 
 	// Authenticated user routes (password change, self-deletion)
 	authProtectedGroup := r.Group("/auth")
-	authProtectedGroup.Use(UserAuthMiddleware(store))
+	authProtectedGroup.Use(authProvider.AuthMiddleware())
 	{
+		// These handlers (changePassword, deleteSelf) are still in handlers_auth.go
+		// effectively as "User Controller" methods. Ideally they should be moved too
+		// or adapted, but for now they likely depend on "user_id" in context which
+		// both middlewares provide.
 		authProtectedGroup.PUT("/password", changePasswordHandler)
 		authProtectedGroup.DELETE("/user", deleteSelfHandler)
 

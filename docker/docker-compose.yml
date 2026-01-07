@@ -59,6 +59,9 @@ services:
       - SERVER_URL=https://${DOMAIN:-datum.localhost}
       - RESEND_API_KEY=${RESEND_API_KEY}
       - EMAIL_FROM=${EMAIL_FROM}
+      # Auth Configuration
+      - AUTH_PROVIDER=${AUTH_PROVIDER:-local}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
       # Database Config - If set, uses Postgres. If empty, uses internal BuntDB.
       # Constructs connection string from postgres service variables
       - DATABASE_URL=postgres://${POSTGRES_USER:-datum}:${POSTGRES_PASSWORD:-datum_secret}@postgres:5432/${POSTGRES_DB:-datum}?sslmode=disable
@@ -121,7 +124,7 @@ services:
       - "traefik.http.routers.datum-mqttws.middlewares=mqtt-ws"
     restart: unless-stopped
 
-  # PostgreSQL Database (Optional - Enabled by setting DATABASE_URL)
+  # PostgreSQL Database (Required for Supabase Auth, Optional for Datum Storage)
   postgres:
     image: postgres:15-alpine
     container_name: datum-postgres
@@ -139,6 +142,30 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Supabase Auth (GoTrue)
+  supabase-auth:
+    image: supabase/gotrue:v2.132.3
+    container_name: datum-supabase-auth
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://${POSTGRES_USER:-datum}:${POSTGRES_PASSWORD:-datum_secret}@postgres:5432/${POSTGRES_DB:-datum}?sslmode=disable&search_path=auth
+      GOTRUE_SITE_URL: https://${DOMAIN:-datum.localhost}
+      GOTRUE_URI_ALLOW_LIST: "*"
+      GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-change_me_to_a_secure_random_string_min_32_chars}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_DB_MIGRATIONS_PATH: /usr/local/etc/gotrue/migrations
+    ports:
+      - "9999:9999"
+    networks:
+      - datum-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
