@@ -345,7 +345,8 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                       title: const Text("LED Power"),
                       subtitle: const Text("Toggle Light On/Off"),
                       value: _ledOn,
-                      activeThumbColor: Colors.amber,
+                      // ignore: deprecated_member_use
+                      activeColor: Colors.amber,
                       onChanged: (val) {
                         setModalState(() => _ledOn = val);
                         setState(() => _ledOn = val);

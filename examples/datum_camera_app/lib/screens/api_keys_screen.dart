@@ -117,9 +117,10 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
         );
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
       setState(() => _isLoading = false);
     }
   }

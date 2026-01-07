@@ -93,8 +93,9 @@ class _RelayControlScreenState extends ConsumerState<RelayControlScreen> {
   Widget build(BuildContext context) {
     // Voltage from telemetry or dummy
     double voltage = 0.0;
-    if (_deviceData.containsKey('voltage'))
+    if (_deviceData.containsKey('voltage')) {
       voltage = (_deviceData['voltage'] as num).toDouble();
+    }
     if (_deviceData.containsKey('battery_adc')) {
       // Firmware sends raw ADC or calculated? Firmware sends analogRead.
       // Assuming simplistic conversion for display if raw.
@@ -262,7 +263,8 @@ class _RelayControlScreenState extends ConsumerState<RelayControlScreen> {
               Switch(
                 value: isOn,
                 onChanged: (v) => _toggleRelay(index, v),
-                activeThumbColor: Colors.blueAccent,
+                // ignore: deprecated_member_use
+                activeColor: Colors.blueAccent,
               ),
             ],
           ),
