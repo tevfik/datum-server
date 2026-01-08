@@ -1,31 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'providers/auth_provider.dart';
-import 'providers/device_provider.dart';
 import 'package:app_links/app_links.dart';
 import 'screens/reset_password_screen.dart';
 
 void main() {
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProxyProvider<AuthProvider, DeviceProvider>(
-          create: (_) => DeviceProvider(),
-          update: (_, auth, deviceProvider) {
-            deviceProvider!.updateToken(auth.token);
-            return deviceProvider;
-          },
-        ),
-      ],
-      child: const DatumApp(),
+    const ProviderScope(
+      child: DatumApp(),
     ),
   );
 }
-
-
 
 class DatumApp extends StatefulWidget {
   const DatumApp({super.key});
@@ -48,7 +35,8 @@ class _DatumAppState extends State<DatumApp> {
     _appLinks = AppLinks();
 
     // Check initial link
-    final uri = await _appLinks.getInitialLink(); // In v6+, this returns Uri? (or String? based on confusing docs, but we test Uri)
+    final uri = await _appLinks
+        .getInitialLink(); // In v6+, this returns Uri? (or String? based on confusing docs, but we test Uri)
     if (uri != null) {
       _handleDeepLink(uri);
     }
@@ -87,15 +75,31 @@ class _DatumAppState extends State<DatumApp> {
         ),
         cardColor: const Color(0xFF2D2D2D),
       ),
-      home: Consumer<AuthProvider>(
-        builder: (context, auth, _) {
-          if (!auth.isInitialized) {
-            return const Scaffold(
+      home: Consumer(
+        builder: (context, ref, _) {
+          final authState = ref.watch(authProvider);
+
+          // Listen for auth changes to reset navigation stack on logout
+          ref.listen<AsyncValue<String?>>(authProvider, (previous, next) {
+            next.whenData((token) {
+              if (token == null) {
+                // User logged out - clear entire stack and go to login
+                _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+                // Ensure we are at root which will be LoginScreen due to home param
+              }
+            });
+          });
+
+          return authState.when(
+            data: (token) =>
+                token != null ? const HomeScreen() : const LoginScreen(),
+            loading: () => const Scaffold(
               backgroundColor: Color(0xFF1B1B1B),
-              body: Center(child: CircularProgressIndicator(color: Colors.cyan)),
-            );
-          }
-          return auth.isAuthenticated ? const HomeScreen() : const LoginScreen();
+              body:
+                  Center(child: CircularProgressIndicator(color: Colors.cyan)),
+            ),
+            error: (err, stack) => const LoginScreen(),
+          );
         },
       ),
     );

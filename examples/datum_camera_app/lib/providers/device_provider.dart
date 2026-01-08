@@ -1,47 +1,32 @@
-import 'package:flutter/material.dart';
-import '../api_client.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:dio/dio.dart';
 import '../models/device.dart';
+import 'api_provider.dart';
+import 'auth_provider.dart';
 
-class DeviceProvider with ChangeNotifier {
-  List<Device> _devices = [];
-  List<Device> get devices => _devices;
-  bool _isLoading = false;
-  bool get isLoading => _isLoading;
+part 'device_provider.g.dart';
 
-  final ApiClient _api = ApiClient();
+@riverpod
+class Devices extends _$Devices {
+  @override
+  Future<List<Device>> build() async {
+    final token = await ref.watch(authProvider.future);
+    if (token == null) return [];
 
-  void updateToken(String? token) {
-    if (token != null) {
-      _api.setToken(token);
-      // If we have a token, we can try fetching devices immediately if list is empty
-      if (_devices.isEmpty && !_isLoading) {
-         fetchDevices();
-      }
-    } else {
-      _api.clearToken();
-      _devices = [];
-      notifyListeners();
-    }
-  }
-
-  Future<void> fetchDevices() async {
-    _isLoading = true;
-    notifyListeners();
+    final api = await ref.watch(authenticatedApiClientProvider.future);
     try {
-      final data = await _api.getDevices();
-      _devices = data.map((json) => Device.fromJson(json)).toList();
-    } catch (e) {
-      debugPrint('Error fetching devices: $e');
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+      final data = await api.getDevices();
+      return data.map((json) => Device.fromJson(json)).toList();
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) return [];
+      rethrow;
     }
   }
 
-  Future<void> createProvisioningRequest(String uid, String name, String ssid, String pass) async {
-    await _api.createProvisioningRequest(uid, name, ssid, pass);
-    await fetchDevices(); // Refresh list (though it will be pending)
+  Future<void> createProvisioningRequest(
+      String uid, String name, String ssid, String pass) async {
+    final api = await ref.read(authenticatedApiClientProvider.future);
+    await api.createProvisioningRequest(uid, name, ssid, pass);
+    ref.invalidateSelf(); // Refresh list
   }
-
-
 }

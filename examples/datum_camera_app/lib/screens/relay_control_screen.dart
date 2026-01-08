@@ -1,21 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/device.dart';
-import '../providers/auth_provider.dart';
-import '../api_client.dart';
+import '../providers/api_provider.dart';
 
-class RelayControlScreen extends StatefulWidget {
+class RelayControlScreen extends ConsumerStatefulWidget {
   final Device device;
 
   const RelayControlScreen({super.key, required this.device});
 
   @override
-  State<RelayControlScreen> createState() => _RelayControlScreenState();
+  ConsumerState<RelayControlScreen> createState() => _RelayControlScreenState();
 }
 
-class _RelayControlScreenState extends State<RelayControlScreen> {
-  late ApiClient _api;
+class _RelayControlScreenState extends ConsumerState<RelayControlScreen> {
+  // late ApiClient _api; // Removed
   Timer? _timer;
   Map<String, dynamic> _deviceData = {};
   bool _isLoading = true;
@@ -26,23 +25,6 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
   @override
   void initState() {
     super.initState();
-    // Get API client from provider (or create new if not in provider, but Home uses Provider)
-    // Actually Home uses DeviceProvider which uses ApiClient internally usually.
-    // DeviceDetailScreen creates ApiClient locally or uses context?
-    // Checking DeviceDetailScreen imports: it imports '../api_client.dart' and instantiates it?
-    // DeviceDetailScreen uses: `final _api = ApiClient();` (if I recall correctly or similar)
-    // Actually the Outline showed it uses `_api` but didn't show instantiation.
-    // AuthProvider usually holds the token.
-    
-    _api = ApiClient();
-    _initAuth();
-  }
-
-  Future<void> _initAuth() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.token != null) {
-      _api.setToken(authProvider.token!);
-    }
     _pollData(); // Initial fetch
     _startPolling();
   }
@@ -61,7 +43,8 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
 
   Future<void> _pollData() async {
     try {
-      final data = await _api.getDeviceData(widget.device.id);
+      final api = await ref.read(authenticatedApiClientProvider.future);
+      final data = await api.getDeviceData(widget.device.id);
       if (mounted) {
         setState(() {
           _deviceData = data;
@@ -69,7 +52,8 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
           // Sync relays
           for (int i = 0; i < 4; i++) {
             if (_deviceData.containsKey('relay_$i')) {
-               _relayStates[i] = _deviceData['relay_$i'] == 1 || _deviceData['relay_$i'] == true;
+              _relayStates[i] = _deviceData['relay_$i'] == 1 ||
+                  _deviceData['relay_$i'] == true;
             }
           }
         });
@@ -86,7 +70,8 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
     });
 
     try {
-      await _api.sendCommand(widget.device.id, 'relay_control', params: {
+      final api = await ref.read(authenticatedApiClientProvider.future);
+      await api.sendCommand(widget.device.id, 'relay_control', params: {
         'relay_index': index,
         'state': value,
       });
@@ -108,16 +93,18 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
   Widget build(BuildContext context) {
     // Voltage from telemetry or dummy
     double voltage = 0.0;
-    if (_deviceData.containsKey('voltage')) voltage = (_deviceData['voltage'] as num).toDouble();
+    if (_deviceData.containsKey('voltage')) {
+      voltage = (_deviceData['voltage'] as num).toDouble();
+    }
     if (_deviceData.containsKey('battery_adc')) {
-       // Firmware sends raw ADC or calculated? Firmware sends analogRead.
-       // Assuming simplistic conversion for display if raw.
-       // Or assuming firmware sends 'voltage' if calculated.
-       // Let's display raw or 0 if missing.
-       // Actually Firmware sendData sends 'battery_adc'.
-       // Map ADC to Voltage (approx 0-1024 -> 0-15V?)
-       // Just showing ADC if 'voltage' missing.
-       voltage = (_deviceData['battery_adc'] as num).toDouble(); 
+      // Firmware sends raw ADC or calculated? Firmware sends analogRead.
+      // Assuming simplistic conversion for display if raw.
+      // Or assuming firmware sends 'voltage' if calculated.
+      // Let's display raw or 0 if missing.
+      // Actually Firmware sendData sends 'battery_adc'.
+      // Map ADC to Voltage (approx 0-1024 -> 0-15V?)
+      // Just showing ADC if 'voltage' missing.
+      voltage = (_deviceData['battery_adc'] as num).toDouble();
     }
 
     return Scaffold(
@@ -130,7 +117,7 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
           ),
         ],
       ),
-      body: _isLoading 
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -139,7 +126,11 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
                 children: [
                   _buildVoltageCard(voltage),
                   const SizedBox(height: 24),
-                  const Text("RELAY CONTROL", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  const Text("RELAY CONTROL",
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey)),
                   const SizedBox(height: 12),
                   _buildRelayGrid(),
                 ],
@@ -153,7 +144,8 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Device?'),
-        content: Text('Are you sure you want to delete "${widget.device.name}"? This cannot be undone.'),
+        content: Text(
+            'Are you sure you want to delete "${widget.device.name}"? This cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -171,8 +163,10 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
     if (confirmed == true) {
       if (!mounted) return;
       setState(() => _isLoading = true);
+      setState(() => _isLoading = true);
       try {
-        await _api.deleteDevice(widget.device.id);
+        final api = await ref.read(authenticatedApiClientProvider.future);
+        await api.deleteDevice(widget.device.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Device deleted successfully')),
@@ -181,8 +175,10 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
         }
       } catch (e) {
         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Delete failed: $e'), backgroundColor: Colors.red),
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Delete failed: $e'),
+                backgroundColor: Colors.red),
           );
           setState(() => _isLoading = false);
         }
@@ -196,7 +192,9 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))],
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -204,11 +202,18 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("INPUT VOLTAGE", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const Text("INPUT VOLTAGE",
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey)),
               const SizedBox(height: 4),
               // If val is > 20 likely ADC, otherwise Voltage. quick hack
-              Text(val > 50 ? "$val (ADC)" : "${val.toStringAsFixed(1)} V", 
-                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+              Text(val > 50 ? "$val (ADC)" : "${val.toStringAsFixed(1)} V",
+                  style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blueAccent)),
             ],
           ),
           const Icon(Icons.electric_bolt, size: 40, color: Colors.amber),
@@ -239,10 +244,12 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white, 
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: isOn ? Border.all(color: Colors.blueAccent, width: 2) : null,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -251,18 +258,20 @@ class _RelayControlScreenState extends State<RelayControlScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.power_settings_new, color: isOn ? Colors.blueAccent : Colors.grey),
+              Icon(Icons.power_settings_new,
+                  color: isOn ? Colors.blueAccent : Colors.grey),
               Switch(
-                value: isOn, 
+                value: isOn,
                 onChanged: (v) => _toggleRelay(index, v),
+                // ignore: deprecated_member_use
                 activeColor: Colors.blueAccent,
               ),
             ],
           ),
-          Text("Relay ${index + 1}", style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text("Relay ${index + 1}",
+              style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
-
 }
