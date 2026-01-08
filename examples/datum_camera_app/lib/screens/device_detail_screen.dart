@@ -48,7 +48,6 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
   int _motionPeriod = 1; // Seconds
 
   // Throttling
-  DateTime? _lastThrottleTime;
   // Timer? _throttleTimer; Using simple debouncer logic inside update
 
   @override
@@ -62,7 +61,12 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     _startStream();
   }
 
-  // ... (Stream methods unchanged) ...
+  @override
+  void dispose() {
+    _stopStream();
+    _streamController.dispose();
+    super.dispose();
+  }
 
   // Throttling Helper
   final Map<String, dynamic> _pendingUpdates = {};
@@ -97,6 +101,26 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     }
   }
 
+  Future<void> _startStream() async {
+    try {
+      final api = await ref.read(authenticatedApiClientProvider.future);
+      await api
+          .sendCommand(widget.device.id, "stream", params: {"state": "on"});
+    } catch (e) {
+      debugPrint("Start Stream Error: $e");
+    }
+  }
+
+  Future<void> _stopStream() async {
+    try {
+      // Fire and forget, no await to avoid blocking dispose
+      final api = await ref.read(authenticatedApiClientProvider.future);
+      api.sendCommand(widget.device.id, "stream", params: {"state": "off"});
+    } catch (e) {
+      debugPrint("Stop Stream Error: $e");
+    }
+  }
+
   Future<void> _pollData() async {
     try {
       final api = await ref.read(authenticatedApiClientProvider.future);
@@ -106,41 +130,58 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
         _deviceData = data;
 
         // Sync state from telemetry
-        if (data.containsKey('vres'))
+        if (data.containsKey('vres')) {
           _vres = data['vres'];
-        else if (data.containsKey('resolution'))
+        } else if (data.containsKey('resolution')) {
           _vres = data['resolution']; // Fallback
+        }
 
-        if (data.containsKey('ires')) _ires = data['ires'];
+        if (data.containsKey('ires')) {
+          _ires = data['ires'];
+        }
 
-        if (data.containsKey('lbri'))
+        if (data.containsKey('lbri')) {
           _ledBrightness = (data['lbri'] as num).toDouble();
-        else if (data.containsKey('led_brightness'))
+        } else if (data.containsKey('led_brightness')) {
           _ledBrightness = (data['led_brightness'] as num).toDouble();
+        }
 
-        if (data.containsKey('led'))
+        if (data.containsKey('led')) {
           _ledOn = data['led'];
-        else if (data.containsKey('led_on')) _ledOn = data['led_on'];
+        } else if (data.containsKey('led_on')) {
+          _ledOn = data['led_on'];
+        }
 
-        if (data.containsKey('imir'))
+        if (data.containsKey('imir')) {
           _hmirror = data['imir'];
-        else if (data.containsKey('hmirror')) _hmirror = data['hmirror'];
+        } else if (data.containsKey('hmirror')) {
+          _hmirror = data['hmirror'];
+        }
 
-        if (data.containsKey('iflip'))
+        if (data.containsKey('iflip')) {
           _vflip = data['iflip'];
-        else if (data.containsKey('vflip')) _vflip = data['vflip'];
+        } else if (data.containsKey('vflip')) {
+          _vflip = data['vflip'];
+        }
 
         // Motion
-        if (data.containsKey('mot')) _motionEnabled = data['mot'];
-        if (data.containsKey('msens'))
+        if (data.containsKey('mot')) {
+          _motionEnabled = data['mot'];
+        }
+        if (data.containsKey('msens')) {
           _motionSensitivity = (data['msens'] as num).toDouble();
-        if (data.containsKey('mper')) _motionPeriod = data['mper'];
+        }
+        if (data.containsKey('mper')) {
+          _motionPeriod = data['mper'];
+        }
 
         // Parse Color
         String? hex;
-        if (data.containsKey('lcol'))
+        if (data.containsKey('lcol')) {
           hex = data['lcol'];
-        else if (data.containsKey('led_color')) hex = data['led_color'];
+        } else if (data.containsKey('led_color')) {
+          hex = data['led_color'];
+        }
 
         if (hex != null && hex.startsWith('#') && hex.length == 7) {
           _ledColor = Color(int.parse("0xFF${hex.substring(1)}"));
@@ -149,6 +190,12 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     } catch (e) {
       // debugPrint("Poll error: $e");
     }
+  }
+
+  String _getStreamUrl() {
+    // We need token synchronously for URL string.
+    final token = ref.read(authProvider).value;
+    return 'https://datum.bezg.in/devices/${widget.device.id}/stream/mjpeg?token=$token';
   }
 
   void _showSettingsDialog() {
@@ -300,9 +347,9 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                           setModalState(() => _ledColor = color);
                           setState(() => _ledColor = color);
 
-                          int r = (color.red);
-                          int g = (color.green);
-                          int b = (color.blue);
+                          int r = (color.r * 255).toInt();
+                          int g = (color.g * 255).toInt();
+                          int b = (color.b * 255).toInt();
                           String hex =
                               '#${r.toRadixString(16).padLeft(2, '0')}${g.toRadixString(16).padLeft(2, '0')}${b.toRadixString(16).padLeft(2, '0')}'
                                   .toUpperCase();
@@ -351,9 +398,9 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                         onColorChanged: (color) {
                           setModalState(() => _ledColor = color);
 
-                          int r = (color.red);
-                          int g = (color.green);
-                          int b = (color.blue);
+                          int r = (color.r * 255).toInt();
+                          int g = (color.g * 255).toInt();
+                          int b = (color.b * 255).toInt();
                           String hex =
                               '#${r.toRadixString(16).padLeft(2, '0')}${g.toRadixString(16).padLeft(2, '0')}${b.toRadixString(16).padLeft(2, '0')}'
                                   .toUpperCase();
