@@ -47,10 +47,22 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 		}
 
 		switch action {
+		// Resource Management
 		case "Device Management":
 			if err := deviceMenu(); err != nil {
 				fmt.Printf("\n❌ Error: %v\n", err)
 			}
+		case "User Management":
+			// Renamed from Admin Management (subset) or new wrapper?
+			// Let's use adminMenu but maybe rename it later.
+			// Or better, let's look at `User Management` vs `Admin Management`.
+			// The original `adminMenu` had user list, create, etc.
+			// I'll reuse `adminMenu` for now but ideally split it.
+			if err := adminMenu(); err != nil {
+				fmt.Printf("\n❌ Error: %v\n", err)
+			}
+
+		// Data & Control
 		case "Data Queries":
 			if err := dataMenu(); err != nil {
 				fmt.Printf("\n❌ Error: %v\n", err)
@@ -64,15 +76,33 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 				fmt.Printf("\n❌ Error: %v\n", err)
 			}
 
-		case "Admin Management":
+		// System & Admin
+		case "System Status":
+			fmt.Println("\n> datumctl status")
+			if err := runStatus(nil, nil); err != nil {
+				fmt.Printf("\n❌ Error: %v\n", err)
+			}
+
+		case "MQTT Management":
+			if err := mqttMenu(); err != nil {
+				fmt.Printf("\n❌ Error: %v\n", err)
+			}
+
+		case "Admin Utils":
+			// System specific parts of old admin menu?
+			// Since we routed "User Management" to adminMenu, let's route this to adminMenu too?
+			// Actually, `adminMenu` contains everything.
+			// I should probably refactor `adminMenu` to be `userMenu` and `systemMenu`.
+			// For now, let's just loop back to `adminMenu` for simplicity to avoid breaking `interactive.go` logic completely in one step.
 			if err := adminMenu(); err != nil {
 				fmt.Printf("\n❌ Error: %v\n", err)
 			}
-		case "Setup System":
-			fmt.Println("\n> datumctl setup")
-			if err := runSetup(nil, nil); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
+
+		case "Configuration":
+			fmt.Println("\n> datumctl config show")
+			runConfigShow(nil, nil)
+
+		// Account
 		case "Login / Switch User":
 			if err := promptLogin(); err != nil {
 				fmt.Printf("\n❌ Error: %v\n", err)
@@ -90,18 +120,11 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 			// Reset global variables
 			token = ""
 			apiKey = ""
-		case "System Status":
-			fmt.Println("\n> datumctl status")
-			if err := runStatus(nil, nil); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
-		case "Configuration":
-			fmt.Println("\n> datumctl config show")
-			runConfigShow(nil, nil)
+
+		// Other
 		case "Show Version":
 			fmt.Println("\nDatum IoT Platform CLI")
 			fmt.Printf("Version: %s\n", Version)
-			// fmt.Printf("Build: %s\n", BuildDate)
 		case fmt.Sprintf("Toggle Curl Output (Current: %v)", showCurl), "Toggle Curl Output (Current: true)", "Toggle Curl Output (Current: false)":
 			showCurl = !showCurl
 			fmt.Printf("\n🔄 Curl output toggled: %v\n", showCurl)
@@ -119,26 +142,38 @@ func showMainMenu() (string, error) {
 	prompt := &survey.Select{
 		Message: "\nWhat would you like to do?",
 		Options: []string{
+			"── Resource Management ──",
 			"Device Management",
+			"User Management",
+			"── Data & Control ──",
 			"Data Queries",
 			"Command & Control",
 			"Provisioning",
-			"Admin Management",
-			"Setup System",
+			"── System & Admin ──",
+			"System Status",
+			"MQTT Management",
+			"Admin Utils",
+			"Configuration",
+			"── Account ──",
 			"Login / Switch User",
 			"Register User",
 			"Logout",
-			"System Status",
-			"Configuration",
+			"── Other ──",
 			"Show Version",
 			fmt.Sprintf("Toggle Curl Output (Current: %v)", showCurl),
 			"Exit",
 		},
-		PageSize: 10,
+		PageSize: 15,
 	}
 
-	if err := survey.AskOne(prompt, &action); err != nil {
-		return "", err
+	// Filter out separator lines if selected
+	for {
+		if err := survey.AskOne(prompt, &action); err != nil {
+			return "", err
+		}
+		if !strings.HasPrefix(action, "──") {
+			break
+		}
 	}
 
 	return action, nil

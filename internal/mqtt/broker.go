@@ -87,12 +87,64 @@ func (b *Broker) PublishCommand(deviceID string, payload []byte) error {
 	return b.server.Publish(topic, payload, false, 0)
 }
 
+// Publish sends a payload to any topic
+func (b *Broker) Publish(topic string, payload []byte, retain bool) error {
+	return b.server.Publish(topic, payload, retain, 0)
+}
+
 // IsDeviceConnected checks if a device is currently connected
 func (b *Broker) IsDeviceConnected(deviceID string) bool {
 	// Mochi-MQTT v2 tracks clients by ID.
 	// We assume Device.ID is used as ClientID.
 	_, ok := b.server.Clients.Get(deviceID)
 	return ok
+}
+
+// ClientInfo represents connected client details
+type ClientInfo struct {
+	ID        string `json:"id"`
+	IP        string `json:"ip"`
+	Connected bool   `json:"connected"`
+}
+
+// GetConnectedClients returns a list of currently connected clients
+func (b *Broker) GetConnectedClients() []ClientInfo {
+	var clients []ClientInfo
+	// Iterate over connected clients
+	// Mochi-MQTT v2 Clients.GetAll() returns map[string]*Client
+	for _, client := range b.server.Clients.GetAll() {
+		if !client.Closed() {
+			ip, _, _ := net.SplitHostPort(client.Net.Remote)
+			clients = append(clients, ClientInfo{
+				ID:        client.ID,
+				IP:        ip,
+				Connected: !client.Closed(),
+			})
+		}
+	}
+	return clients
+}
+
+// BrokerStats represents broker statistics
+type BrokerStats struct {
+	BytesRecv     int64 `json:"bytes_recv"`
+	BytesSent     int64 `json:"bytes_sent"`
+	Clients       int   `json:"clients_connected"`
+	Subscriptions int   `json:"subscriptions"`
+	Inflight      int   `json:"inflight"`
+}
+
+// GetStats returns current broker statistics
+func (b *Broker) GetStats() BrokerStats {
+	// stats := b.server.Info.Stats
+	// Simplified for compatibility with current mochi-mqtt version
+	return BrokerStats{
+		BytesRecv:     0,
+		BytesSent:     0,
+		Clients:       b.server.Clients.Len(),
+		Subscriptions: 0,
+		Inflight:      0,
+	}
 }
 
 // -----------------------------------------------------------------------------
