@@ -1165,91 +1165,11 @@ paths:
                           type: integer
                           description: Number of aggregated points (when using int parameter)
 
-  /devices/{device_id}/stream/mjpeg:
-    get:
-      summary: MJPEG Stream (Browser)
-      tags: [Streaming]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: device_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Multipart MJPEG stream
-          content:
-            multipart/x-mixed-replace:
-              schema:
-                type: string
-                format: binary
 
-  /devices/{device_id}/stream/snapshot:
-    get:
-      summary: Get current frame snapshot
-      tags: [Streaming]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: device_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: JPEG Image
-          content:
-            image/jpeg:
-              schema:
-                type: string
-                format: binary
 
-  /devices/{device_id}/stream/ws:
-    get:
-      summary: WebSocket Stream (Binary)
-      tags: [Streaming]
-      description: Connect via WebSocket to receive raw binary JPEG frames.
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: device_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '101':
-          description: WebSocket Upgrade
 
-  /devices/{device_id}/stream/info:
-    get:
-      summary: Stream Info
-      tags: [Streaming]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: device_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Stream metadata
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  active:
-                    type: boolean
-                  clients:
-                    type: integer
-                  frame_size:
-                    type: integer
+
+
 
   /public/data/{device_id}:
     post:
@@ -1819,77 +1739,7 @@ paths:
                   request_id:
                     type: string
 
-  /devices/provisioning:
-    get:
-      summary: List provisioning requests
-      description: List all provisioning requests for the current user.
-      tags: [Provisioning]
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: List of provisioning requests
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  requests:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        request_id:
-                          type: string
-                        device_uid:
-                          type: string
-                        device_name:
-                          type: string
-                        status:
-                          type: string
-                          enum: [pending, completed, expired, cancelled]
-                        expires_at:
-                          type: string
-                          format: date-time
-                        created_at:
-                          type: string
-                          format: date-time
 
-  /devices/provisioning/{request_id}:
-    get:
-      summary: Get provisioning request status
-      tags: [Provisioning]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: request_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Provisioning request details
-        '404':
-          description: Request not found
-    delete:
-      summary: Cancel provisioning request
-      tags: [Provisioning]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: request_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Request cancelled
-        '400':
-          description: Cannot cancel (not pending)
-        '404':
-          description: Request not found
 
   /provisioning/activate:
     post:
