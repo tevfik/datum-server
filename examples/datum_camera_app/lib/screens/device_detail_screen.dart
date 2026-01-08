@@ -333,7 +333,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                     SwitchListTile(
                       title: const Text("LED Power"),
                       value: _ledOn,
-                      activeThumbColor: Colors.amber,
+                      activeColor: Colors.amber,
                       onChanged: (val) {
                         setModalState(() => _ledOn = val);
                         setState(() => _ledOn = val);
