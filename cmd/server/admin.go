@@ -74,6 +74,11 @@ func setupAdminRoutes(r *gin.Engine, store storage.Provider) {
 		// Logs management
 		admin.GET("/logs", getLogsHandler)
 		admin.DELETE("/logs", clearLogsHandler)
+
+		// MQTT Management
+		admin.GET("/mqtt/stats", getMQTTStatsHandler)
+		admin.GET("/mqtt/clients", getMQTTClientsHandler)
+		admin.POST("/mqtt/publish", postMQTTPublishHandler)
 	}
 
 	// Device auth routes for token refresh

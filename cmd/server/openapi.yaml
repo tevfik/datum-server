@@ -2295,3 +2295,79 @@ paths:
       responses:
         '200':
           description: Registration updated
+
+  /admin/mqtt/stats:
+    get:
+      summary: Get MQTT broker statistics
+      tags: [Admin]
+      responses:
+        '200':
+          description: Broker statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bytes_recv:
+                    type: integer
+                  bytes_sent:
+                    type: integer
+                  clients_connected:
+                    type: integer
+                  subscriptions:
+                    type: integer
+                  inflight:
+                    type: integer
+
+  /admin/mqtt/clients:
+    get:
+      summary: List connected MQTT clients
+      tags: [Admin]
+      responses:
+        '200':
+          description: List of connected clients
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  clients:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        ip:
+                          type: string
+                        connected:
+                          type: boolean
+
+  /admin/mqtt/publish:
+    post:
+      summary: Publish MQTT message
+      tags: [Admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [topic, message]
+              properties:
+                topic:
+                  type: string
+                message:
+                  type: string
+                retain:
+                  type: boolean
+      responses:
+        '200':
+          description: Message published
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
