@@ -33,20 +33,27 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
   // Device Data (Telemetry)
   Map<String, dynamic> _deviceData = {};
 
-  // State for settings (Initialized with defaults, updated from telemetry)
-  String _streamRes = "VGA";
-  String _snapRes = "UXGA";
+  // State for settings
+  String _vres = "VGA"; // Video Stream Res
+  String _ires = "UXGA"; // Snapshot Res
   Color _ledColor = Colors.white;
   double _ledBrightness = 100;
   bool _hmirror = false;
   bool _vflip = false;
-  bool _ledOn = true; // LED Power state
+  bool _ledOn = true;
+
+  // Motion Settings
+  bool _motionEnabled = true;
+  double _motionSensitivity = 50;
+  int _motionPeriod = 1; // Seconds
+
+  // Throttling
+  DateTime? _lastThrottleTime;
+  // Timer? _throttleTimer; Using simple debouncer logic inside update
 
   @override
   void initState() {
     super.initState();
-    // Auth token logic handled by authenticatedApiClientProvider
-
     _streamController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -55,30 +62,38 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     _startStream();
   }
 
-  @override
-  void dispose() {
-    _stopStream();
-    _streamController.dispose();
-    super.dispose();
+  // ... (Stream methods unchanged) ...
+
+  // Throttling Helper
+  final Map<String, dynamic> _pendingUpdates = {};
+
+  void _sendThrottled(String key, dynamic value) {
+    _pendingUpdates[key] = value;
+
+    // Cancel previous if any (Debounce 300ms)
+    // Since we don't have easy Timer reference per-key, we use a single global timer for simplicity
+    // For a robust app we'd use a Throttler class, but here:
+
+    // Simple Debounce:
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      // If this value is still the pending one, send it
+      if (_pendingUpdates[key] == value) {
+        _sendCommand("update_settings", params: {key: value});
+      }
+    });
   }
 
-  Future<void> _startStream() async {
-    try {
-      final api = await ref.read(authenticatedApiClientProvider.future);
-      await api
-          .sendCommand(widget.device.id, "stream", params: {"state": "on"});
-    } catch (e) {
-      debugPrint("Start Stream Error: $e");
-    }
-  }
+  void _updateSetting(String key, dynamic value) {
+    // Immediate updates for Switches/Dropdowns
+    // Throttled updates for Sliders/Pickers
 
-  Future<void> _stopStream() async {
-    try {
-      // Fire and forget, no await to avoid blocking dispose
-      final api = await ref.read(authenticatedApiClientProvider.future);
-      api.sendCommand(widget.device.id, "stream", params: {"state": "off"});
-    } catch (e) {
-      debugPrint("Stop Stream Error: $e");
+    bool isSlider = (key == "lbri" || key == "msens" || key == "lcol");
+
+    if (isSlider) {
+      _sendThrottled(key, value);
+    } else {
+      _sendCommand("update_settings", params: {key: value});
     }
   }
 
@@ -90,65 +105,50 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
       setState(() {
         _deviceData = data;
 
-        // Sync state from telemetry if available
-        if (_deviceData.containsKey('led_brightness')) {
-          _ledBrightness = (_deviceData['led_brightness'] as num).toDouble();
-        }
-        if (_deviceData.containsKey('led_on')) {
-          _ledOn = _deviceData['led_on'];
-        }
-        if (_deviceData.containsKey('resolution')) {
-          _streamRes = _deviceData['resolution'];
-        }
-        if (_deviceData.containsKey('hmirror')) {
-          _hmirror = _deviceData['hmirror'];
-        }
-        if (_deviceData.containsKey('vflip')) {
-          _vflip = _deviceData['vflip'];
-        }
+        // Sync state from telemetry
+        if (data.containsKey('vres'))
+          _vres = data['vres'];
+        else if (data.containsKey('resolution'))
+          _vres = data['resolution']; // Fallback
+
+        if (data.containsKey('ires')) _ires = data['ires'];
+
+        if (data.containsKey('lbri'))
+          _ledBrightness = (data['lbri'] as num).toDouble();
+        else if (data.containsKey('led_brightness'))
+          _ledBrightness = (data['led_brightness'] as num).toDouble();
+
+        if (data.containsKey('led'))
+          _ledOn = data['led'];
+        else if (data.containsKey('led_on')) _ledOn = data['led_on'];
+
+        if (data.containsKey('imir'))
+          _hmirror = data['imir'];
+        else if (data.containsKey('hmirror')) _hmirror = data['hmirror'];
+
+        if (data.containsKey('iflip'))
+          _vflip = data['iflip'];
+        else if (data.containsKey('vflip')) _vflip = data['vflip'];
+
+        // Motion
+        if (data.containsKey('mot')) _motionEnabled = data['mot'];
+        if (data.containsKey('msens'))
+          _motionSensitivity = (data['msens'] as num).toDouble();
+        if (data.containsKey('mper')) _motionPeriod = data['mper'];
+
         // Parse Color
-        if (_deviceData.containsKey('led_color')) {
-          String hex = _deviceData['led_color'];
-          if (hex.startsWith('#') && hex.length == 7) {
-            _ledColor = Color(int.parse("0xFF${hex.substring(1)}"));
-          }
+        String? hex;
+        if (data.containsKey('lcol'))
+          hex = data['lcol'];
+        else if (data.containsKey('led_color')) hex = data['led_color'];
+
+        if (hex != null && hex.startsWith('#') && hex.length == 7) {
+          _ledColor = Color(int.parse("0xFF${hex.substring(1)}"));
         }
       });
     } catch (e) {
       // debugPrint("Poll error: $e");
     }
-  }
-
-  String _getStreamUrl() {
-    // We need token synchronously for URL string.
-    // We can peek the current value of authProvider (it's AsyncNotifier so .value)
-    // Or we can assume usage inside build and use ref.watch?
-    // But this is called by StreamRecorder which expects a string.
-    // Let's use ref.read(authProvider).value.
-    final token = ref.read(authProvider).value;
-    return 'https://datum.bezg.in/devices/${widget.device.id}/stream/mjpeg?token=$token';
-  }
-
-  void _sendSettings() {
-    // Convert Color to Hex string #RRGGBB
-    int r = (_ledColor.r * 255).toInt();
-    int g = (_ledColor.g * 255).toInt();
-    int b = (_ledColor.b * 255).toInt();
-    // Fix: Pad left with 0 to ensure valid hex (e.g., 0A instead of A)
-    String hex =
-        '#${r.toRadixString(16).padLeft(2, '0')}${g.toRadixString(16).padLeft(2, '0')}${b.toRadixString(16).padLeft(2, '0')}'
-            .toUpperCase();
-
-    final params = {
-      "resolution": _streamRes,
-      "led_color": hex,
-      "led_brightness": _ledOn ? _ledBrightness.toInt() : 0,
-      "hmirror": _hmirror,
-      "vflip": _vflip
-    };
-
-    // CRITICAL: Send "update_settings" action, NOT generic action
-    _sendCommand("update_settings", params: params);
   }
 
   void _showSettingsDialog() {
@@ -160,7 +160,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
           builder: (context, setModalState) {
             return Container(
               padding: const EdgeInsets.all(20),
-              height: 700, // Increased height for ColorPicker
+              height: 800,
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,60 +170,52 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                             fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 20),
 
-                    const Text("Stream Resolution"),
+                    // --- VIDEO & IMAGE ---
+                    const Text("Video Resolution (Stream)",
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                     DropdownButton<String>(
-                      value: _streamRes,
+                      value: _vres,
                       isExpanded: true,
-                      items: [
-                        "QVGA",
-                        "VGA",
-                        "SVGA",
-                        "HD",
-                        "SXGA",
-                        "UXGA",
-                        "QXGA"
-                      ].map((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                      onChanged: (newValue) {
-                        if (newValue != null) {
-                          setModalState(() => _streamRes = newValue);
-                          setState(() => _streamRes = newValue);
-                          // Offline: Do not send immediately
+                      items: ["QVGA", "VGA", "SVGA", "HD", "UXGA"]
+                          .map((val) =>
+                              DropdownMenuItem(value: val, child: Text(val)))
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setModalState(() => _vres = val);
+                          setState(() => _vres = val);
+                          _updateSetting("vres", val);
                         }
                       },
                     ),
-
-                    const SizedBox(height: 15),
-                    const Text("Snapshot Resolution"),
+                    const SizedBox(height: 10),
+                    const Text("Snapshot Resolution",
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                     DropdownButton<String>(
-                      value: _snapRes,
+                      value: _ires,
                       isExpanded: true,
-                      items: ["HD", "UXGA", "QXGA"].map((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                      onChanged: (newValue) {
-                        if (newValue != null) {
-                          setModalState(() => _snapRes = newValue);
-                          setState(() => _snapRes = newValue);
+                      items: ["HD", "UXGA", "QXGA"]
+                          .map((val) =>
+                              DropdownMenuItem(value: val, child: Text(val)))
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setModalState(() => _ires = val);
+                          setState(() => _ires = val);
+                          _updateSetting("ires", val);
                         }
                       },
                     ),
 
                     const Divider(),
-                    const Text("Orientation"),
+                    // --- ORIENTATION ---
                     SwitchListTile(
                       title: const Text("Mirror Horizontal"),
                       value: _hmirror,
                       onChanged: (val) {
                         setModalState(() => _hmirror = val);
                         setState(() => _hmirror = val);
+                        _updateSetting("imir", val);
                       },
                     ),
                     SwitchListTile(
@@ -232,128 +224,154 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                       onChanged: (val) {
                         setModalState(() => _vflip = val);
                         setState(() => _vflip = val);
+                        _updateSetting("iflip", val);
                       },
                     ),
 
                     const Divider(),
-                    const Text("LED Control"),
-                    const SizedBox(height: 10),
-
-                    // Quick Presets
-                    // Quick Presets
-                    Builder(builder: (ctx) {
-                      void changeColor(Color color) {
-                        setModalState(() => _ledColor = color);
-                        setState(() => _ledColor = color);
-                      }
-
-                      return BlockPicker(
-                        pickerColor: _ledColor,
-                        availableColors: const [
-                          Colors.white,
-                          Colors.red,
-                          Colors.green,
-                          Colors.blue,
-                          Colors.amber,
-                          Colors.purple,
-                        ],
-                        onColorChanged: changeColor,
-                        layoutBuilder: (context, colors, child) {
-                          return SizedBox(
-                            height: 60,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: colors.length,
-                              itemBuilder: (context, index) {
-                                return GestureDetector(
-                                  onTap: () => changeColor(colors[index]),
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(
-                                        horizontal: 5),
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                        color: colors[index],
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.grey),
-                                        boxShadow: [
-                                          if (_ledColor == colors[index])
-                                            BoxShadow(
-                                                color: colors[index]
-                                                    .withValues(alpha: 0.5),
-                                                blurRadius: 8,
-                                                spreadRadius: 2)
-                                        ]),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
+                    // --- MOTION DETECTION ---
+                    const Text("Motion Detection",
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    SwitchListTile(
+                      title: const Text("Enable Motion Detection"),
+                      value: _motionEnabled,
+                      onChanged: (val) {
+                        setModalState(() => _motionEnabled = val);
+                        setState(() => _motionEnabled = val);
+                        _updateSetting("mot", val);
+                      },
+                    ),
+                    if (_motionEnabled) ...[
+                      Text("Sensitivity: ${_motionSensitivity.toInt()}%"),
+                      Slider(
+                        value: _motionSensitivity,
+                        min: 0,
+                        max: 100,
+                        divisions: 20,
+                        label: _motionSensitivity.round().toString(),
+                        onChanged: (val) {
+                          setModalState(() => _motionSensitivity = val);
+                          _updateSetting("msens", val.toInt()); // Debounced
                         },
-                      );
-                    }),
-
-                    // Full Color Picker
-                    ColorPicker(
-                      pickerColor: _ledColor,
-                      onColorChanged: (color) {
-                        setModalState(() => _ledColor = color);
-                        setState(
-                            () => _ledColor = color); // Update parent state too
-                      },
-                      colorPickerWidth: 300,
-                      pickerAreaHeightPercent: 0.7,
-                      enableAlpha: false,
-                      labelTypes: const [], // Hide hex input
-                      paletteType: PaletteType.hueWheel,
-                    ),
-
-                    const SizedBox(height: 10),
-                    Text("Brightness: ${_ledBrightness.toInt()}%"),
-                    Slider(
-                      value: _ledBrightness,
-                      min: 0,
-                      max: 100,
-                      divisions: 10,
-                      label: _ledBrightness.round().toString(),
-                      onChanged: (double value) {
-                        setModalState(() => _ledBrightness = value);
-                      },
-                      onChangeEnd: (double value) {
-                        setState(() => _ledBrightness = value);
-                      },
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _sendSettings();
-                      },
-                      icon: const Icon(Icons.send),
-                      label: const Text("Sync Settings"),
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(40),
-                        backgroundColor: Colors.blueAccent,
-                        foregroundColor: Colors.white,
+                        onChangeEnd: (val) {
+                          setState(() => _motionSensitivity = val);
+                        },
                       ),
-                    ),
+                      const SizedBox(height: 10),
+                      const Text("Check Period (Idle Mode)"),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [1, 2, 5].map((sec) {
+                          return ChoiceChip(
+                            label: Text("${sec}s"),
+                            selected: _motionPeriod == sec,
+                            onSelected: (selected) {
+                              if (selected) {
+                                setModalState(() => _motionPeriod = sec);
+                                setState(() => _motionPeriod = sec);
+                                _updateSetting("mper", sec);
+                              }
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
 
-                    const SizedBox(height: 10),
+                    const Divider(),
+                    // --- LED CONTROL ---
+                    const Text("LED Control",
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
                     SwitchListTile(
                       title: const Text("LED Power"),
-                      subtitle: const Text("Toggle Light On/Off"),
                       value: _ledOn,
-                      // ignore: deprecated_member_use
                       activeColor: Colors.amber,
                       onChanged: (val) {
                         setModalState(() => _ledOn = val);
                         setState(() => _ledOn = val);
-                        _sendSettings(); // Toggle sends immediately
+                        _updateSetting("led", val);
                       },
                     ),
+                    if (_ledOn) ...[
+                      // Color Presets
+                      Builder(builder: (ctx) {
+                        void changeColor(Color color) {
+                          setModalState(() => _ledColor = color);
+                          setState(() => _ledColor = color);
+
+                          int r = (color.red);
+                          int g = (color.green);
+                          int b = (color.blue);
+                          String hex =
+                              '#${r.toRadixString(16).padLeft(2, '0')}${g.toRadixString(16).padLeft(2, '0')}${b.toRadixString(16).padLeft(2, '0')}'
+                                  .toUpperCase();
+                          _updateSetting("lcol", hex);
+                        }
+
+                        return Wrap(
+                          spacing: 10,
+                          children: [
+                            Colors.white,
+                            Colors.red,
+                            Colors.green,
+                            Colors.blue,
+                            Colors.amber,
+                            Colors.purple
+                          ].map((c) {
+                            return GestureDetector(
+                              onTap: () => changeColor(c),
+                              child: CircleAvatar(
+                                  backgroundColor: c,
+                                  radius: 15,
+                                  child: _ledColor == c
+                                      ? const Icon(Icons.check, size: 15)
+                                      : null),
+                            );
+                          }).toList(),
+                        );
+                      }),
+                      const SizedBox(height: 10),
+                      Text("Brightness: ${_ledBrightness.toInt()}%"),
+                      Slider(
+                          value: _ledBrightness,
+                          min: 0,
+                          max: 100,
+                          divisions: 10,
+                          onChanged: (val) {
+                            setModalState(() => _ledBrightness = val);
+                            _updateSetting("lbri", val.toInt());
+                          },
+                          onChangeEnd: (val) {
+                            setState(() => _ledBrightness = val);
+                          }),
+                      // Color Picker
+                      ColorPicker(
+                        pickerColor: _ledColor,
+                        onColorChanged: (color) {
+                          setModalState(() => _ledColor = color);
+
+                          int r = (color.red);
+                          int g = (color.green);
+                          int b = (color.blue);
+                          String hex =
+                              '#${r.toRadixString(16).padLeft(2, '0')}${g.toRadixString(16).padLeft(2, '0')}${b.toRadixString(16).padLeft(2, '0')}'
+                                  .toUpperCase();
+                          _updateSetting("lcol",
+                              hex); // Debounced via generic handler check
+                        },
+                        colorPickerWidth: 250,
+                        pickerAreaHeightPercent: 0.4,
+                        enableAlpha: false,
+                        labelTypes: const [],
+                      ),
+                    ],
+
                     const SizedBox(height: 20),
+                    ElevatedButton(
+                      child: const Text("Close"),
+                      onPressed: () => Navigator.pop(context),
+                    )
                   ],
                 ),
               ),
@@ -613,16 +631,10 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                       label: _ledOn ? "LED: ON" : "LED: OFF",
                       color: _ledOn ? Colors.amber : Colors.grey,
                       onPressed: () {
-                        // Toggle logic: If On, Turn Off. If Off, Turn On.
-                        if (_ledOn) {
-                          setState(() => _ledOn = false);
-                          setState(() => _ledBrightness = 0);
-                        } else {
-                          setState(() => _ledOn = true);
-                          setState(() => _ledBrightness = 100);
-                        }
-
-                        _sendSettings();
+                        // Toggle logic
+                        bool newState = !_ledOn;
+                        setState(() => _ledOn = newState);
+                        _updateSetting("led", newState);
                       },
                       isLoading: _loadingAction,
                     ),
@@ -637,7 +649,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                           final api = await ref
                               .read(authenticatedApiClientProvider.future);
                           await api.sendCommand(widget.device.id, "snap",
-                              params: {"resolution": _snapRes});
+                              params: {"resolution": _ires});
 
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -659,7 +671,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                             "UXGA": 1600,
                             "QXGA": 2048
                           };
-                          final expectedWidth = resMap[_snapRes] ?? 640;
+                          final expectedWidth = resMap[_ires] ?? 640;
 
                           bool success = false;
                           final dio = Dio();

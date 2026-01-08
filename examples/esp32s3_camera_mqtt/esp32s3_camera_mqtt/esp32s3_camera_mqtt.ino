@@ -1513,9 +1513,13 @@ void streamLoop() {
   esp_camera_fb_return(fb);
 }
 
-void handleSnap(String resolution = "UXGA") {
-  if (resolution.length() == 0)
-    resolution = "UXGA";
+void handleSnap(String resolution = "") {
+  if (resolution.length() == 0) {
+    // Load Default Snapshot Res
+    prefs.begin("datum", true);
+    resolution = prefs.getString("pref_ires", "UXGA");
+    prefs.end();
+  }
   Serial.println("[SNAP] Starting high-res capture (full reinit)...");
   Serial.println("[SNAP] Target Resolution: " + resolution);
 
@@ -1679,6 +1683,7 @@ void setup() {
   // preview)
   if (wifiSSID.length() == 0) {
     initCamera();
+    loadStartupSettings();
     startSetupMode();
     return;
   }
@@ -1687,6 +1692,7 @@ void setup() {
   if (connectToWiFi()) {
     // Connection successful, NOW init camera
     initCamera();
+    loadStartupSettings();
 
     // Check activation
     if (apiKey.length() > 0) {
@@ -1714,6 +1720,7 @@ void setup() {
   } else {
     // Connection failed
     initCamera();
+    loadStartupSettings();
     startSetupMode();
   }
 }
