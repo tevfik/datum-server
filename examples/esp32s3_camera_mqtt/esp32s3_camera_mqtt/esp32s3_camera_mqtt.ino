@@ -978,8 +978,18 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
 
       int msens = extractJsonInt(paramsBlock, "msens");
       if (msens != -1) {
-        // Map 0-100 to Threshold 60-5 (Inverse)
-        motionThreshold = map(msens, 0, 100, 60, 5);
+        // High Sens (100) -> Low Thresholds
+        // Low Sens (0)   -> High Thresholds
+        motionThreshold =
+            map(msens, 0, 100, 60,
+                5); // Pixel Intensity: 60 (Low Sens) to 5 (High Sens)
+        // map() for floats isn't standard, do it manually or cast:
+        // Area: 0 -> 20%, 100 -> 1%
+        float areaMin = 1.0;
+        float areaMax = 20.0;
+        motionMinAreaPct =
+            areaMax - ((float)msens / 100.0 * (areaMax - areaMin));
+
         prefs.begin("datum", false);
         prefs.putInt("pref_msens", msens);
         prefs.end();
@@ -1688,6 +1698,10 @@ void loadStartupSettings() {
   motionEnabled = prefs.getBool("pref_mot", true);
   int sens = prefs.getInt("pref_msens", 50);
   motionThreshold = map(sens, 0, 100, 60, 5);
+  // Area: 0 -> 20%, 100 -> 1%
+  float areaMin = 1.0;
+  float areaMax = 20.0;
+  motionMinAreaPct = areaMax - ((float)sens / 100.0 * (areaMax - areaMin));
   int per = prefs.getInt("pref_mper", 1);
   motionPeriodMs = per * 1000;
   if (motionPeriodMs < 500)
@@ -1715,11 +1729,18 @@ void loadStartupSettings() {
 
   prefs.end();
   Serial.println("--- Startup Settings Loaded ---");
-  Serial.printf("Motion: %s, Sens: %d, Period: %d ms\n",
-                motionEnabled ? "ON" : "OFF", sens, motionPeriodMs);
+  Serial.printf("Motion: %s, Sens: %d, Area: >%.1f%%, Period: %d ms\n",
+                motionEnabled ? "ON" : "OFF", sens, motionMinAreaPct,
+                motionPeriodMs);
   Serial.printf("LED: %s, Bri: %d\n", color.c_str(), savedBrightness);
   Serial.printf("Orientation: Mirror %s, Flip %s\n", mir ? "ON" : "OFF",
                 flip ? "ON" : "OFF");
+
+  if (s) {
+    int ires = prefs.getInt("pref_ires", 10); // Default 10 (UXGA/HD) if not set
+    Serial.printf("Resolution: Stream %u (VGA=8), Snapshot %u\n",
+                  s->status.framesize, ires);
+  }
 }
 
 // Setup logic with late camera init
