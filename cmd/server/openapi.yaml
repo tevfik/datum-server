@@ -1282,7 +1282,69 @@ paths:
                 data: {"time":"2024-01-01T12:00:00Z"}
 
 
-  # ============ System Endpoints ============
+  # ============ Admin Endpoints ============
+  /admin/users:
+    post:
+      summary: Create new user (admin)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username: 
+                    type: string
+                  role:
+                    type: string
+        '409':
+          description: User already exists
+    get:
+      summary: List all users (admin only)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of users with device counts
+        '403':
+          description: Admin access required
+
+  /admin/users/{user_id}:
+    get:
+      summary: Get user details
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User details with devices
+    put:
+      summary: Update user (role/status)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
             type: string
       requestBody:
         content:
