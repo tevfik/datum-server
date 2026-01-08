@@ -7,6 +7,7 @@
 bool motionEnabled = true;
 int motionThreshold = 30;
 int motionPeriodMs = 1000;
+float motionMinAreaPct = 5.0;
 unsigned long lastMotionTime = 0;
 
 static uint8_t *prevFrameBuffer = NULL;
@@ -32,6 +33,10 @@ void eif_motion_init() {
 
 bool eif_motion_check(camera_fb_t *fb) {
   if (!motionEnabled)
+    return false;
+
+  // Cooldown Check: Don't process if within period
+  if (millis() - lastMotionTime < motionPeriodMs)
     return false;
 
   // 1. Calculate Target Dimensions (1/4 Scale for speed/memory)
@@ -104,11 +109,11 @@ bool eif_motion_check(camera_fb_t *fb) {
 
   // Debug: Log only significant motion (> 1.0%) to avoid spam
   if (changePct > 1.0) {
-    DEBUG_PRINTF("Motion Activity: %.2f%% (Alarm Threshold: >5.00%%)\n",
-                 changePct);
+    DEBUG_PRINTF("Motion Activity: %.2f%% (Alarm Threshold: >%.2f%%)\n",
+                 changePct, motionMinAreaPct);
   }
 
-  if (changePct > 5.0) {
+  if (changePct > motionMinAreaPct) {
     DEBUG_PRINTLN("!!! MOTION ALARM TRIGGERED !!!");
     lastMotionTime = millis();
     triggered = true;

@@ -41,7 +41,7 @@ class StreamRecorderController extends ChangeNotifier {
   VoidCallback? startRecording;
   Future<void> Function()? stopRecording;
   Future<void> Function()? takeSnapshot;
-  
+
   void notify() => notifyListeners();
 }
 
@@ -69,7 +69,7 @@ class _StreamRecorderState extends State<StreamRecorder> {
   HttpClient? _httpClient;
   StreamSubscription<List<int>>? _streamSubscription;
   Uint8List? _imageBytes;
-  
+
   // FPS Logic
   int _frameCount = 0;
   Timer? _fpsTimer;
@@ -85,17 +85,17 @@ class _StreamRecorderState extends State<StreamRecorder> {
     _connectController();
     _startStream();
     _fpsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-       if (widget.controller != null) {
-          widget.controller!.fps = _frameCount;
-          if (widget.controller!.isRecording && _recordingStart != null) {
-              final duration = DateTime.now().difference(_recordingStart!);
-              final m = duration.inMinutes.toString().padLeft(2, '0');
-              final s = (duration.inSeconds % 60).toString().padLeft(2, '0');
-              widget.controller!.durationString = "$m:$s";
-              // widget.controller!.notifyListeners(); // Setters now handle notification
-          }
-       }
-       _frameCount = 0;
+      if (widget.controller != null) {
+        widget.controller!.fps = _frameCount;
+        if (widget.controller!.isRecording && _recordingStart != null) {
+          final duration = DateTime.now().difference(_recordingStart!);
+          final m = duration.inMinutes.toString().padLeft(2, '0');
+          final s = (duration.inSeconds % 60).toString().padLeft(2, '0');
+          widget.controller!.durationString = "$m:$s";
+          // widget.controller!.notifyListeners(); // Setters now handle notification
+        }
+      }
+      _frameCount = 0;
     });
   }
 
@@ -110,85 +110,85 @@ class _StreamRecorderState extends State<StreamRecorder> {
   Future<void> _startStream() async {
     _httpClient = HttpClient();
     _httpClient!.connectionTimeout = const Duration(seconds: 10);
-    
+
     // Retry loop
     while (mounted) {
       try {
         final request = await _httpClient!.getUrl(Uri.parse(widget.streamUrl));
         final response = await request.close();
-        
+
         if (response.statusCode != 200) {
-           throw HttpException("Status ${response.statusCode}");
+          throw HttpException("Status ${response.statusCode}");
         }
 
         List<int> buffer = [];
         final completer = Completer<void>();
-        
+
         _streamSubscription = response.listen((data) {
           buffer.addAll(data);
-          
+
           while (true) {
             int start = -1;
             int end = -1;
-            
+
             // Find Start (FF D8)
             for (int i = 0; i < buffer.length - 1; i++) {
-              if (buffer[i] == 0xFF && buffer[i+1] == 0xD8) {
+              if (buffer[i] == 0xFF && buffer[i + 1] == 0xD8) {
                 start = i;
                 break;
               }
             }
-            
+
             if (start == -1) {
-               if (buffer.length > 5000000) buffer.clear(); // Safety cap
-               break;
+              if (buffer.length > 5000000) buffer.clear(); // Safety cap
+              break;
             }
-            
+
             // Find End (FF D9)
             for (int i = start; i < buffer.length - 1; i++) {
-               if (buffer[i] == 0xFF && buffer[i+1] == 0xD9) {
-                 end = i + 2;
-                 break;
-               }
+              if (buffer[i] == 0xFF && buffer[i + 1] == 0xD9) {
+                end = i + 2;
+                break;
+              }
             }
-            
+
             if (end != -1) {
               final frameBytes = Uint8List.fromList(buffer.sublist(start, end));
               buffer.removeRange(0, end);
-              
+
               if (mounted) {
                 setState(() {
                   _imageBytes = frameBytes;
                   _frameCount++;
                 });
               }
-              
-              if (widget.controller?.isRecording == true && _tempFramesPath != null) {
-                 final fileName = "frame_${_recFrameCount.toString().padLeft(4, '0')}.jpg";
-                 File("$_tempFramesPath/$fileName").writeAsBytes(frameBytes); 
-                 _recFrameCount++;
+
+              if (widget.controller?.isRecording == true &&
+                  _tempFramesPath != null) {
+                final fileName =
+                    "frame_${_recFrameCount.toString().padLeft(4, '0')}.jpg";
+                File("$_tempFramesPath/$fileName").writeAsBytes(frameBytes);
+                _recFrameCount++;
               }
-              
             } else {
               if (start > 0) buffer.removeRange(0, start);
               break;
             }
           }
         }, onError: (e) {
-           // debugPrint("Stream error: $e");
-           if (!completer.isCompleted) completer.complete();
+          // debugPrint("Stream error: $e");
+          if (!completer.isCompleted) completer.complete();
         }, onDone: () {
-           // debugPrint("Stream closed");
-           if (!completer.isCompleted) completer.complete();
+          // debugPrint("Stream closed");
+          if (!completer.isCompleted) completer.complete();
         });
 
         await completer.future; // Wait for stream to end/error
-        
       } catch (e) {
         // debugPrint("Connection failed: $e");
         if (widget.onError != null) widget.onError!(e.toString());
       }
-      
+
       // Wait before reconnecting
       if (mounted) await Future.delayed(const Duration(seconds: 2));
     }
@@ -217,7 +217,7 @@ class _StreamRecorderState extends State<StreamRecorder> {
 
   Future<void> _stopRecording() async {
     if (!widget.controller!.isRecording) return;
-    
+
     // Stop recording state first
     widget.controller!.isRecording = false;
     widget.controller!.isProcessing = true;
@@ -225,8 +225,9 @@ class _StreamRecorderState extends State<StreamRecorder> {
 
     // Calculate details
     final endTime = DateTime.now();
-    final durationVal = endTime.difference(_recordingStart!).inMilliseconds / 1000.0;
-    
+    final durationVal =
+        endTime.difference(_recordingStart!).inMilliseconds / 1000.0;
+
     // FPS Calc
     int targetFps = 10;
     if (durationVal > 0 && _recFrameCount > 0) {
@@ -235,73 +236,77 @@ class _StreamRecorderState extends State<StreamRecorder> {
     if (targetFps < 1) targetFps = 1;
 
     try {
-       // Only process if we have frames
-       if (_recFrameCount < 5) {
-          throw Exception("Video too short (< 5 frames)");
-       }
+      // Only process if we have frames
+      if (_recFrameCount < 5) {
+        throw Exception("Video too short (< 5 frames)");
+      }
 
-       final docDir = await getApplicationDocumentsDirectory();
-       final outputPath = "${docDir.path}/rec_${DateTime.now().millisecondsSinceEpoch}.mp4";
+      final docDir = await getApplicationDocumentsDirectory();
+      final outputPath =
+          "${docDir.path}/rec_${DateTime.now().millisecondsSinceEpoch}.mp4";
 
-       // 1. Setup
-       final firstFrameFile = File("$_tempFramesPath/frame_0000.jpg");
-       if (!await firstFrameFile.exists()) throw Exception("No frames captured");
-       
-       final firstImage = await decodeImageFromList(await firstFrameFile.readAsBytes());
-       
-       await FlutterQuickVideoEncoder.setup(
-          width: firstImage.width,
-          height: firstImage.height,
-          fps: targetFps,
-          videoBitrate: 2000000,
-          profileLevel: ProfileLevel.any,
-          audioBitrate: 0,
-          audioChannels: 0,
-          sampleRate: 44100,
-          filepath: outputPath,
-       );
+      // 1. Setup
+      final firstFrameFile = File("$_tempFramesPath/frame_0000.jpg");
+      if (!await firstFrameFile.exists()) throw Exception("No frames captured");
 
-       // 2. Encode
-       for (int i = 0; i < _recFrameCount; i++) {
-           final f = File("$_tempFramesPath/frame_${i.toString().padLeft(4, '0')}.jpg");
-           if (await f.exists()) {
-             final bytes = await f.readAsBytes();
-             final codec = await ui.instantiateImageCodec(bytes);
-             final frameInfo = await codec.getNextFrame();
-             final rawBytes = await frameInfo.image.toByteData(format: ui.ImageByteFormat.rawRgba);
-             
-             if (rawBytes != null) {
-                await FlutterQuickVideoEncoder.appendVideoFrame(rawBytes.buffer.asUint8List());
-             }
-             frameInfo.image.dispose();
-           }
-       }
+      final firstImage =
+          await decodeImageFromList(await firstFrameFile.readAsBytes());
 
-       // 3. Finish
-       await FlutterQuickVideoEncoder.finish();
-       
-       // 4. Thumbnail
-       final thumbPath = outputPath.replaceAll(".mp4", ".jpg");
-       await firstFrameFile.copy(thumbPath);
+      await FlutterQuickVideoEncoder.setup(
+        width: firstImage.width,
+        height: firstImage.height,
+        fps: targetFps,
+        videoBitrate: 2000000,
+        profileLevel: ProfileLevel.any,
+        audioBitrate: 0,
+        audioChannels: 0,
+        sampleRate: 44100,
+        filepath: outputPath,
+      );
 
-       // 5. Gallery
-       await Gal.putVideo(outputPath);
-       
-       // Cleanup output
-       if (await File(outputPath).exists()) await File(outputPath).delete();
+      // 2. Encode
+      for (int i = 0; i < _recFrameCount; i++) {
+        final f =
+            File("$_tempFramesPath/frame_${i.toString().padLeft(4, '0')}.jpg");
+        if (await f.exists()) {
+          final bytes = await f.readAsBytes();
+          final codec = await ui.instantiateImageCodec(bytes);
+          final frameInfo = await codec.getNextFrame();
+          final rawBytes = await frameInfo.image
+              .toByteData(format: ui.ImageByteFormat.rawRgba);
 
+          if (rawBytes != null) {
+            await FlutterQuickVideoEncoder.appendVideoFrame(
+                rawBytes.buffer.asUint8List());
+          }
+          frameInfo.image.dispose();
+        }
+      }
+
+      // 3. Finish
+      await FlutterQuickVideoEncoder.finish();
+
+      // 4. Thumbnail
+      final thumbPath = outputPath.replaceAll(".mp4", ".jpg");
+      await firstFrameFile.copy(thumbPath);
+
+      // 5. Gallery
+      await Gal.putVideo(outputPath);
+
+      // Cleanup output
+      if (await File(outputPath).exists()) await File(outputPath).delete();
     } catch (e) {
       debugPrint("Encoding Error: $e");
       rethrow;
     } finally {
-       // Cleanup Temp
-       if (_tempFramesPath != null) {
-          final d = Directory(_tempFramesPath!);
-          if (await d.exists()) await d.delete(recursive: true);
-       }
-       
-       widget.controller!.isProcessing = false;
-       widget.controller!.notify();
+      // Cleanup Temp
+      if (_tempFramesPath != null) {
+        final d = Directory(_tempFramesPath!);
+        if (await d.exists()) await d.delete(recursive: true);
+      }
+
+      widget.controller!.isProcessing = false;
+      widget.controller!.notify();
     }
   }
 
@@ -309,7 +314,8 @@ class _StreamRecorderState extends State<StreamRecorder> {
     if (_imageBytes == null) return;
     try {
       final docDir = await getApplicationDocumentsDirectory();
-      final path = "${docDir.path}/snap_${DateTime.now().millisecondsSinceEpoch}.jpg";
+      final path =
+          "${docDir.path}/snap_${DateTime.now().millisecondsSinceEpoch}.jpg";
       await File(path).writeAsBytes(_imageBytes!);
       await Gal.putImage(path);
       // Cleanup
@@ -330,12 +336,15 @@ class _StreamRecorderState extends State<StreamRecorder> {
   @override
   Widget build(BuildContext context) {
     if (_imageBytes == null) {
-      return widget.placeholder ?? const Center(child: CircularProgressIndicator());
+      return widget.placeholder ??
+          const Center(child: CircularProgressIndicator());
     }
-    return Image.memory(
-      _imageBytes!,
-      gaplessPlayback: true,
-      fit: widget.fit,
+    return SizedBox.expand(
+      child: Image.memory(
+        _imageBytes!,
+        gaplessPlayback: true,
+        fit: widget.fit,
+      ),
     );
   }
 }
