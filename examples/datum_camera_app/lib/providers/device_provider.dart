@@ -1,4 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:dio/dio.dart';
 import '../models/device.dart';
 import 'api_provider.dart';
 import 'auth_provider.dart';
@@ -13,8 +14,13 @@ class Devices extends _$Devices {
     if (token == null) return [];
 
     final api = ref.read(apiClientProvider);
-    final data = await api.getDevices();
-    return data.map((json) => Device.fromJson(json)).toList();
+    try {
+      final data = await api.getDevices();
+      return data.map((json) => Device.fromJson(json)).toList();
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) return [];
+      rethrow;
+    }
   }
 
   Future<void> createProvisioningRequest(
