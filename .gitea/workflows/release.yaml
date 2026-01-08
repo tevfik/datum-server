@@ -62,66 +62,10 @@ jobs:
           name: mobile-apk
           path: build/release/datum_camera_app.apk
 
-  build-firmware:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v3
 
-      - name: Install Arduino CLI
-        run: |
-          mkdir -p bin
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=./bin sh
-          echo "$(pwd)/bin" >> $GITHUB_PATH
-
-      - name: Install ESP32 Core
-        run: |
-          arduino-cli config init
-          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-          
-          # Retry loop for flaky downloads
-          n=0
-          until [ "$n" -ge 5 ]
-          do
-             echo "Attempting to install ESP32 core ($((n+1))/5)..."
-             arduino-cli core install esp32:esp32@3.0.7 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json && break
-             n=$((n+1)) 
-             echo "Install failed. Retrying in 10s..."
-             sleep 10
-          done
-          
-          # Fail if still not installed
-          if [ "$n" -ge 5 ]; then
-            echo "Failed to install ESP32 core after 5 attempts."
-            exit 1
-          fi
-
-      - name: Install Python Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip
-          pip3 install pyserial --break-system-packages
-
-      - name: Compile Firmware
-        run: |
-          mkdir -p build/release
-          # Freenove S3 uses OPI PSRAM and 8MB Flash usually. Target: esp32s3
-          arduino-cli compile \
-            --fqbn esp32:esp32:esp32s3:PSRAM=opi,FlashMode=qio,FlashSize=8M \
-            --output-dir build/release \
-            --build-property "build.extra_flags=-DARDUINO_USB_CDC_ON_BOOT=1" \
-            examples/esp32-s3-camera/esp32_camera_streamer/esp32_camera_streamer.ino
-          
-          mv build/release/esp32_camera_streamer.ino.bin build/release/firmware-esp32s3.bin
-          
-      - name: Upload Firmware Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: firmware
-          path: build/release/firmware-esp32s3.bin
 
   create-release:
-    needs: [build-backend, build-mobile, build-firmware]
+    needs: [build-backend, build-mobile]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -134,7 +78,7 @@ jobs:
           mkdir -p assets
           cp backend-binaries/* assets/
           cp mobile-apk/* assets/
-          cp firmware/* assets/
+
           ls -R assets/
 
       - name: Create Release
