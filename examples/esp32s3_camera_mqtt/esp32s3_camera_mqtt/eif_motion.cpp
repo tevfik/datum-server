@@ -102,12 +102,14 @@ bool eif_motion_check(camera_fb_t *fb) {
   int totalChecked = grayLen / skip;
   float changePct = (float)changes * 100.0 / totalChecked;
 
-  if (changes > 0) {
-    // DEBUG_PRINTF("Motion: %d changes (%.2f%%)\n", changes, changePct);
+  // Debug: Log only significant motion (> 1.0%) to avoid spam
+  if (changePct > 1.0) {
+    DEBUG_PRINTF("Motion Activity: %.2f%% (Alarm Threshold: >5.00%%)\n",
+                 changePct);
   }
 
   if (changePct > 5.0) {
-    DEBUG_PRINTF("Motion TRIGGERED: %.2f%%\n", changePct);
+    DEBUG_PRINTLN("!!! MOTION ALARM TRIGGERED !!!");
     lastMotionTime = millis();
     triggered = true;
   }
