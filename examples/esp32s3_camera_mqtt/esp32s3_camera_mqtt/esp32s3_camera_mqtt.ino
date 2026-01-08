@@ -1520,12 +1520,20 @@ void checkMotion(camera_fb_t *fb) {
   }
 }
 
-void streamLoop() {
-  if (!streaming)
+// Unified Camera Loop: Handles Streaming AND Motion Detection
+void processCameraLoop() {
+  unsigned long now = millis();
+
+  // If both off, do nothing
+  if (!streaming && !motionEnabled)
     return;
 
-  // Uncapped framerate check
-  if (millis() - lastFrameTime < 1)
+  // Rate Limiting
+  // 1. Streaming: Fast as possible (0ms delay) or capped if needed
+  // 2. Motion Only: Slower (e.g. 5 FPS = 200ms) to save CPU/Heat
+  int minInterval = streaming ? 1 : 200;
+
+  if (now - lastFrameTime < minInterval)
     return;
 
   camera_fb_t *fb = esp_camera_fb_get();
@@ -1536,13 +1544,21 @@ void streamLoop() {
 
   lastFrameTime = millis();
 
-  // 1. Upload Stream
-  uploadFrame(fb);
+  // 1. Upload Stream (If Active)
+  if (streaming) {
+    uploadFrame(fb);
+  }
 
-  // 2. Sampling: Check every 10th frame
-  if (++frameCounter >= 10) {
-    frameCounter = 0;
-    checkMotion(fb);
+  // 2. Motion Check (If Enabled)
+  if (motionEnabled) {
+    // If streaming is active, we check every 10th frame (to not block stream)
+    // If motion ONLY, we check every frame (since FPS is already low)
+    int checkInterval = streaming ? 10 : 1;
+
+    if (++frameCounter >= checkInterval) {
+      frameCounter = 0;
+      checkMotion(fb);
+    }
   }
 
   esp_camera_fb_return(fb);
@@ -1853,9 +1869,7 @@ void loop() {
     // Explicit Command Poll (HTTP) is REMOVED in favor of MQTT
     // kept comment used to be checking commands manually
 
-    if (streaming) {
-      streamLoop();
-    }
+    processCameraLoop();
 
     updateLED();
     handleFactoryResetButton();
