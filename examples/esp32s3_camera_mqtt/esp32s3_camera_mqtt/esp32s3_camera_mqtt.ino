@@ -909,25 +909,55 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
     ackCommand(pid);
 
     if (action == "update_settings") {
-      String resolution = extractJsonVal(paramsBlock, "resolution");
-      String color = extractJsonVal(paramsBlock, "led_color");
-      int brightness = extractJsonInt(paramsBlock, "led_brightness");
-      bool hmirror = extractJsonBool(paramsBlock, "hmirror");
-      bool vflip = extractJsonBool(paramsBlock, "vflip");
+      // 1. Resolution (Stream) - "vres" or "resolution"
+      String vres = extractJsonVal(paramsBlock, "vres");
+      if (vres.length() == 0)
+        vres = extractJsonVal(paramsBlock, "resolution");
 
-      if (color.length() > 0) {
-        long number = strtol(&color.c_str()[1], NULL, 16);
-        savedR = number >> 16;
-        savedG = number >> 8 & 0xFF;
-        savedB = number & 0xFF;
+      // 2. Resolution (Snapshot) - "ires"
+      String ires = extractJsonVal(paramsBlock, "ires");
+      if (ires.length() > 0) {
+        prefs.begin("datum", false);
+        prefs.putString("pref_ires", ires);
+        prefs.end();
       }
-      if (brightness != -1)
-        savedBrightness = brightness;
 
+      // 3. LED Color - "lcol" or "led_color"
+      String lcol = extractJsonVal(paramsBlock, "lcol");
+      if (lcol.length() == 0)
+        lcol = extractJsonVal(paramsBlock, "led_color");
+      if (lcol.length() > 0) {
+        // Verify hex format #RRGGBB
+        if (lcol.startsWith("#")) {
+          long number = strtol(&lcol.c_str()[1], NULL, 16);
+          savedR = number >> 16;
+          savedG = number >> 8 & 0xFF;
+          savedB = number & 0xFF;
+
+          // Save to prefs
+          prefs.begin("datum", false);
+          prefs.putString("pref_lcol", lcol);
+          prefs.end();
+        }
+      }
+
+      // 4. LED Brightness - "lbri" or "led_brightness"
+      int lbri = extractJsonInt(paramsBlock, "lbri");
+      if (lbri == -1)
+        lbri = extractJsonInt(paramsBlock, "led_brightness");
+      if (lbri != -1) {
+        savedBrightness = lbri;
+        prefs.begin("datum", false);
+        prefs.putInt("pref_lbri", savedBrightness);
+        prefs.end();
+      }
+
+      // 5. LED Power - "led"
       if (paramsBlock.indexOf("\"led\":") != -1) {
         torchState = extractJsonBool(paramsBlock, "led");
       }
 
+// Apply LED
 #ifdef LED_GPIO_NUM
       int r = 0, g = 0, b = 0;
       if (torchState) {
@@ -935,7 +965,6 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
         g = (savedG * savedBrightness) / 100;
         b = (savedB * savedBrightness) / 100;
       }
-
 #if LED_GPIO_NUM == 48
       neopixelWrite(LED_GPIO_NUM, r, g, b);
 #else
@@ -943,24 +972,84 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
 #endif
 #endif
 
+      // 6. Motion Settings
+      if (paramsBlock.indexOf("\"mot\":") != -1) {
+        motionEnabled = extractJsonBool(paramsBlock, "mot");
+        prefs.begin("datum", false);
+        prefs.putBool("pref_mot", motionEnabled);
+        prefs.end();
+      }
+
+      int msens = extractJsonInt(paramsBlock, "msens");
+      if (msens != -1) {
+        // Map 0-100 to Threshold 60-5 (Inverse)
+        motionThreshold = map(msens, 0, 100, 60, 5);
+        prefs.begin("datum", false);
+        prefs.putInt("pref_msens", msens);
+        prefs.end();
+      }
+
+      int mper = extractJsonInt(paramsBlock, "mper");
+      if (mper != -1) {
+        motionPeriodMs = mper * 1000;
+        if (motionPeriodMs < 500)
+          motionPeriodMs = 500;
+        prefs.begin("datum", false);
+        prefs.putInt("pref_mper", mper);
+        prefs.end();
+      }
+
+      // 7. Orientation - "imir"/"hmirror", "iflip"/"vflip"
+      bool hasMirror = false, mirrorVal = false;
+      if (paramsBlock.indexOf("\"imir\":") != -1) {
+        hasMirror = true;
+        mirrorVal = extractJsonBool(paramsBlock, "imir");
+      } else if (paramsBlock.indexOf("\"hmirror\":") != -1) {
+        hasMirror = true;
+        mirrorVal = extractJsonBool(paramsBlock, "hmirror");
+      }
+
+      bool hasFlip = false, flipVal = false;
+      if (paramsBlock.indexOf("\"iflip\":") != -1) {
+        hasFlip = true;
+        flipVal = extractJsonBool(paramsBlock, "iflip");
+      } else if (paramsBlock.indexOf("\"vflip\":") != -1) {
+        hasFlip = true;
+        flipVal = extractJsonBool(paramsBlock, "vflip");
+      }
+
       sensor_t *s = esp_camera_sensor_get();
       if (s) {
-        if (resolution.length() > 0) {
-          framesize_t newSize = getFrameSizeFromName(resolution);
+        if (vres.length() > 0) {
+          framesize_t newSize = getFrameSizeFromName(vres);
           if (s->status.framesize != newSize) {
             bool wasStreaming = streaming;
             streaming = false;
             delay(100);
             s->set_framesize(s, newSize);
             streaming = wasStreaming;
+
+            // Save Res
+            prefs.begin("datum", false);
+            prefs.putString("pref_vres", vres); // Changed from pref_res
+            prefs.end();
           }
         }
-        if (paramsBlock.indexOf("hmirror") != -1)
-          s->set_hmirror(s, hmirror ? 1 : 0);
-        if (paramsBlock.indexOf("vflip") != -1)
-          s->set_vflip(s, vflip ? 1 : 0);
-      }
 
+        if (hasMirror) {
+          s->set_hmirror(s, mirrorVal ? 1 : 0);
+          prefs.begin("datum", false);
+          prefs.putBool("pref_imir", mirrorVal);
+          prefs.end();
+        }
+
+        if (hasFlip) {
+          s->set_vflip(s, flipVal ? 1 : 0);
+          prefs.begin("datum", false);
+          prefs.putBool("pref_iflip", flipVal);
+          prefs.end();
+        }
+      }
     } else if (action == "stream") {
       String state = extractJsonVal(paramsBlock, "state");
       streaming = (state == "on");
