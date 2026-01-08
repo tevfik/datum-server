@@ -24,6 +24,8 @@
 #include <Preferences.h>
 #include <PubSubClient.h> // MQTT Support
 
+int frameCounter = 0;
+
 // Motion Globals
 #include "eif_motion.h"
 

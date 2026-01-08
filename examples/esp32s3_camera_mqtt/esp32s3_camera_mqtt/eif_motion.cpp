@@ -1,6 +1,7 @@
 #include "eif_motion.h"
 #include "img_converters.h" // For jpg2rgb565
-#include <stdlib.h>         // for free, abs
+#include <Arduino.h>
+#include <stdlib.h> // for free, abs
 
 // Globals
 bool motionEnabled = true;
