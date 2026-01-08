@@ -31,6 +31,7 @@ size_t prevFrameLen = 0;
 int motionThreshold = 30;
 unsigned long lastMotionTime = 0;
 int frameCounter = 0;
+int motionPeriodMs = 1000;
 
 // Forward define neopixelWrite if not available (safe for S3)
 extern void neopixelWrite(uint8_t pin, uint8_t red, uint8_t green,
@@ -1662,6 +1663,43 @@ void handleSnap(String resolution = "") {
   }
 
   Serial.printf("[SNAP] Complete. Total time: %dms\n", millis() - startTime);
+}
+
+// Load Settings from NVS
+void loadStartupSettings() {
+  prefs.begin("datum", true);
+
+  // 1. Motion Settings
+  motionEnabled = prefs.getBool("pref_mot", true);
+  int sens = prefs.getInt("pref_msens", 50);
+  motionThreshold = map(sens, 0, 100, 60, 5);
+  int per = prefs.getInt("pref_mper", 1);
+  motionPeriodMs = per * 1000;
+  if (motionPeriodMs < 500)
+    motionPeriodMs = 500;
+
+  // 2. LED Settings
+  String color = prefs.getString("pref_lcol", "#FFFFFF");
+  if (color.startsWith("#")) {
+    long number = strtol(&color.c_str()[1], NULL, 16);
+    savedR = number >> 16;
+    savedG = number >> 8 & 0xFF;
+    savedB = number & 0xFF;
+  }
+  savedBrightness = prefs.getInt("pref_lbri", 100);
+
+  // 3. Orientation
+  bool mir = prefs.getBool("pref_imir", true);   // Default Mirror on
+  bool flip = prefs.getBool("pref_iflip", true); // Default Flip on
+
+  sensor_t *s = esp_camera_sensor_get();
+  if (s) {
+    s->set_hmirror(s, mir ? 1 : 0);
+    s->set_vflip(s, flip ? 1 : 0);
+  }
+
+  prefs.end();
+  Serial.println("Startup Settings Loaded");
 }
 
 // Setup logic with late camera init
