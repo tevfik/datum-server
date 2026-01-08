@@ -24,14 +24,8 @@
 #include <Preferences.h>
 #include <PubSubClient.h> // MQTT Support
 
-// Motion Globls
-bool motionEnabled = true;
-uint8_t *prevFrameBuffer = NULL;
-size_t prevFrameLen = 0;
-int motionThreshold = 30;
-unsigned long lastMotionTime = 0;
-int frameCounter = 0;
-int motionPeriodMs = 1000;
+// Motion Globals
+#include "eif_motion.h"
 
 // Forward define neopixelWrite if not available (safe for S3)
 extern void neopixelWrite(uint8_t pin, uint8_t red, uint8_t green,
@@ -1493,104 +1487,15 @@ void uploadFrame(camera_fb_t *fb) {
     Serial.printf("[UPLOAD] FAILED! HTTP %d, size: %d bytes\n", httpCode,
                   fb->len);
   }
-
   // With setReuse(true), enc() should not close the TCP connection
   httpStream.end();
 }
 
-// Motion: Decode RJPEG -> RGB565 (Scaled 1/4) -> Grayscale Diff
+// Motion: Check using EIF module (Grayscale Diff)
 void checkMotion(camera_fb_t *fb) {
-  if (!motionEnabled)
-    return;
-
-  // 1. Calculate Target Dimensions (1/4 Scale for speed/memory)
-  int outW = fb->width / 4;
-  int outH = fb->height / 4;
-
-  // Safety check
-  if (outW < 1 || outH < 1)
-    return;
-
-  size_t rgbLen = outW * outH * 2; // RGB565 is 2 bytes/pixel
-  size_t grayLen = outW * outH;    // 1 byte/pixel for Grayscale
-
-  // 2. Allocate Temp RGB565 Buffer
-  uint8_t *rgbBuf = (uint8_t *)ps_malloc(rgbLen);
-  if (!rgbBuf)
-    return; // OOM
-
-  // 3. Decode JPEG to RGB565 (Scale 1/4)
-  // Use jpg2rgb565 as jpg2rgb is not available
-  if (!jpg2rgb565(fb->buf, fb->len, rgbBuf, JPG_SCALE_4X)) {
-    free(rgbBuf);
-    return;
-  }
-
-  // 4. Allocate/Reallocate Previous Frame Buffer (Grayscale)
-  if (prevFrameBuffer == NULL || prevFrameLen != grayLen) {
-    if (prevFrameBuffer)
-      free(prevFrameBuffer);
-    prevFrameBuffer = (uint8_t *)ps_malloc(grayLen);
-    prevFrameLen = grayLen;
-
-    if (!prevFrameBuffer) { // OOM
-      free(rgbBuf);
-      return;
-    }
-
-    // Fill first frame with converted gray
-    // RGB565 is LSB first? XTensa is Little Endian using 16-bit pointer.
-    uint16_t *pixPtr = (uint16_t *)rgbBuf;
-    for (int i = 0; i < grayLen; i++) {
-      uint16_t pixel = pixPtr[i];
-      // Extract Green (6 bits) as Luminance proxy: (pixel >> 5) & 0x3F
-      // Shift to 8-bit range: << 2
-      prevFrameBuffer[i] = ((pixel >> 5) & 0x3F) << 2;
-    }
-    free(rgbBuf);
-    return;
-  }
-
-  // 5. Compare & Update
-  int changes = 0;
-  int skip = 2; // Pixel skip
-  uint16_t *pixPtr = (uint16_t *)rgbBuf;
-
-  for (int i = 0; i < grayLen; i += skip) {
-    uint16_t pixel = pixPtr[i];
-
-    // Compute "Grayscale" from RGB565 (Green Channel Proxy)
-    uint8_t currentGray = ((pixel >> 5) & 0x3F) << 2;
-    uint8_t prevGray = prevFrameBuffer[i];
-
-    if (abs(currentGray - prevGray) > motionThreshold) {
-      changes++;
-    }
-    // Update history
-    prevFrameBuffer[i] = currentGray;
-  }
-
-  free(rgbBuf);
-
-  // 6. Threshold Check
-  int totalChecked = grayLen / skip;
-  float changePct = (float)changes * 100.0 / totalChecked;
-
-  // Dynamic Area Threshold based on Sensitivity?
-  // Currently fixed at 5% (totalChecked / 20).
-  // Let's make it slightly more sensitive at high levels, but stick to ~1-5%
-  // range? For now, let's just log the percentage to help debug.
-
-  // Debug every few seconds if changes > 0 to avoid spam
-  if (changes > 0) {
-    DEBUG_PRINTF("Motion: %d changes (%.2f%%) - Threshold: >5%%\n", changes,
-                 changePct);
-  }
-
-  if (changePct > 5.0) { // Keep 5% Logic for now, but explicit float check
-    DEBUG_PRINTLN("Motion TRIGERRED!");
-    lastMotionTime = millis();
-    // MQTT Publish could go here
+  if (eif_motion_check(fb)) {
+    // Trigger Logic is handled inside, here we can do MQTT things if needed
+    // The module updates lastMotionTime automatically
   }
 }
 
