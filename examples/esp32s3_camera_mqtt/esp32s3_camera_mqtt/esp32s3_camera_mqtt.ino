@@ -26,6 +26,10 @@
 
 int frameCounter = 0;
 
+// Methods for SD Card & Web Routes
+#include "sd_storage.h"
+#include "web_routes.h"
+
 // Motion Globals
 #include "eif_motion.h"
 
@@ -1513,11 +1517,13 @@ void uploadFrame(camera_fb_t *fb) {
 }
 
 // Motion: Check using EIF module (Grayscale Diff)
-void checkMotion(camera_fb_t *fb) {
+bool checkMotion(camera_fb_t *fb) {
   if (eif_motion_check(fb)) {
     // Trigger Logic is handled inside, here we can do MQTT things if needed
     // The module updates lastMotionTime automatically
+    return true;
   }
+  return false;
 }
 
 // Unified Camera Loop: Handles Streaming AND Motion Detection
@@ -1557,14 +1563,22 @@ void processCameraLoop() {
 
     if (++frameCounter >= checkInterval) {
       frameCounter = 0;
-      checkMotion(fb);
+      if (checkMotion(fb)) {
+        // MOTION DETECTED!
+        // Option A: Save current frame (Fast, but low res if streaming)
+        // Option B: Take high-res snapshot (Slow, pauses stream)
+        // For now, let's save the current frame to limit latency
+        if (isSDAvailable()) {
+          saveFrameToSD(fb);
+        }
+      }
     }
   }
 
   esp_camera_fb_return(fb);
 }
 
-void handleSnap(String resolution = "") {
+void handleSnap(String resolution = "", bool saveToCard = false) {
   if (resolution.length() == 0) {
     // Load Default Snapshot Res
     prefs.begin("datum", true);
@@ -1672,16 +1686,23 @@ void handleSnap(String resolution = "") {
   Serial.printf("[SNAP] Captured: %d bytes (%dx%d) in %dms\n", fb->len,
                 fb->width, fb->height, millis() - startTime);
 
-  // Upload directly from camera buffer (streaming is paused)
-  Serial.printf("[SNAP] Uploading %d bytes...\n", fb->len);
-  unsigned long uploadStart = millis();
-
-  // Use same uploadFrame function that works for stream
-  uploadFrame(fb);
-
-  unsigned long uploadTime = millis() - uploadStart;
-  Serial.printf("[SNAP] Upload completed in %dms (%.1f KB/s)\n", uploadTime,
-                (fb->len / 1024.0) / (uploadTime / 1000.0));
+  // Action: Save to Card OR Upload
+  if (saveToCard) {
+    if (isSDAvailable()) {
+      saveFrameToSD(fb);
+      Serial.println("[SNAP] Saved to SD Card.");
+    } else {
+      Serial.println("[SNAP] SD Card not available for local save.");
+    }
+  } else {
+    // Upload directly from camera buffer (streaming is paused)
+    Serial.printf("[SNAP] Uploading %d bytes...\n", fb->len);
+    unsigned long uploadStart = millis();
+    uploadFrame(fb);
+    unsigned long uploadTime = millis() - uploadStart;
+    Serial.printf("[SNAP] Upload completed in %dms (%.1f KB/s)\n", uploadTime,
+                  (fb->len / 1024.0) / (uploadTime / 1000.0));
+  }
 
   esp_camera_fb_return(fb);
 
@@ -1802,6 +1823,13 @@ void setup() {
     if (apiKey.length() > 0) {
       currentState = STATE_ONLINE;
       setupMQTT();
+
+      // Init SD Card & Web Routes
+      if (initSD()) {
+        DEBUG_PRINTLN("SD Card Initialized");
+      }
+      setupWebRoutes(setupServer, apiKey);
+
       startCameraServer();
       streaming = false;
     } else if (attemptSelfRegistration()) { // Try self registration if
@@ -1865,6 +1893,9 @@ void loop() {
     } else {
       mqttClient.loop();
     }
+
+    // Serve Web Routes (Portal/SD) even when Online
+    setupServer.handleClient();
 
     // Explicit Command Poll (HTTP) is REMOVED in favor of MQTT
     // kept comment used to be checking commands manually
