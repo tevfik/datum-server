@@ -18,10 +18,19 @@
  */
 
 #include "esp_camera.h"
+#include "img_converters.h" // Required for decoding
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 #include <Preferences.h>
 #include <PubSubClient.h> // MQTT Support
+
+// Motion Globls
+bool motionEnabled = true;
+uint8_t *prevFrameBuffer = NULL;
+size_t prevFrameLen = 0;
+int motionThreshold = 30;
+unsigned long lastMotionTime = 0;
+int frameCounter = 0;
 
 // Forward define neopixelWrite if not available (safe for S3)
 extern void neopixelWrite(uint8_t pin, uint8_t red, uint8_t green,
@@ -1126,7 +1135,8 @@ bool activateProvisioning() {
 // Helper to ACK commands so they don't loop
 void ackCommand(String cmdId) {
   HTTPClient http;
-  http.begin(serverURL + "/devices/" + deviceID + "/commands/" + cmdId + "/ack");
+  http.begin(serverURL + "/devices/" + deviceID + "/commands/" + cmdId +
+             "/ack");
   http.addHeader("Authorization", "Bearer " + apiKey);
   http.addHeader("Content-Type", "application/json");
   http.POST("{\"status\":\"executed\"}");
@@ -1391,22 +1401,115 @@ void uploadFrame(camera_fb_t *fb) {
   httpStream.end();
 }
 
+// Motion: Decode RJPEG -> RGB565 (Scaled 1/4) -> Grayscale Diff
+void checkMotion(camera_fb_t *fb) {
+  if (!motionEnabled)
+    return;
+
+  // 1. Calculate Target Dimensions (1/4 Scale for speed/memory)
+  int outW = fb->width / 4;
+  int outH = fb->height / 4;
+
+  // Safety check
+  if (outW < 1 || outH < 1)
+    return;
+
+  size_t rgbLen = outW * outH * 2; // RGB565 is 2 bytes/pixel
+  size_t grayLen = outW * outH;    // 1 byte/pixel for Grayscale
+
+  // 2. Allocate Temp RGB565 Buffer
+  uint8_t *rgbBuf = (uint8_t *)ps_malloc(rgbLen);
+  if (!rgbBuf)
+    return; // OOM
+
+  // 3. Decode JPEG to RGB565 (Scale 1/4)
+  // Use jpg2rgb565 as jpg2rgb is not available
+  if (!jpg2rgb565(fb->buf, fb->len, rgbBuf, JPG_SCALE_4X)) {
+    free(rgbBuf);
+    return;
+  }
+
+  // 4. Allocate/Reallocate Previous Frame Buffer (Grayscale)
+  if (prevFrameBuffer == NULL || prevFrameLen != grayLen) {
+    if (prevFrameBuffer)
+      free(prevFrameBuffer);
+    prevFrameBuffer = (uint8_t *)ps_malloc(grayLen);
+    prevFrameLen = grayLen;
+
+    if (!prevFrameBuffer) { // OOM
+      free(rgbBuf);
+      return;
+    }
+
+    // Fill first frame with converted gray
+    // RGB565 is LSB first? XTensa is Little Endian using 16-bit pointer.
+    uint16_t *pixPtr = (uint16_t *)rgbBuf;
+    for (int i = 0; i < grayLen; i++) {
+      uint16_t pixel = pixPtr[i];
+      // Extract Green (6 bits) as Luminance proxy: (pixel >> 5) & 0x3F
+      // Shift to 8-bit range: << 2
+      prevFrameBuffer[i] = ((pixel >> 5) & 0x3F) << 2;
+    }
+    free(rgbBuf);
+    return;
+  }
+
+  // 5. Compare & Update
+  int changes = 0;
+  int skip = 2; // Pixel skip
+  uint16_t *pixPtr = (uint16_t *)rgbBuf;
+
+  for (int i = 0; i < grayLen; i += skip) {
+    uint16_t pixel = pixPtr[i];
+
+    // Compute "Grayscale" from RGB565 (Green Channel Proxy)
+    uint8_t currentGray = ((pixel >> 5) & 0x3F) << 2;
+    uint8_t prevGray = prevFrameBuffer[i];
+
+    if (abs(currentGray - prevGray) > motionThreshold) {
+      changes++;
+    }
+    // Update history
+    prevFrameBuffer[i] = currentGray;
+  }
+
+  free(rgbBuf);
+
+  // 6. Threshold Check
+  // If > 5% of pixels changed
+  int totalChecked = grayLen / skip;
+  if (changes > totalChecked / 20) {
+    DEBUG_PRINTF("Motion: %d changes\n", changes);
+    lastMotionTime = millis();
+    // MQTT Publish could go here
+  }
+}
+
 void streamLoop() {
   if (!streaming)
     return;
 
-  // Uncapped framerate
+  // Uncapped framerate check
   if (millis() - lastFrameTime < 1)
     return;
 
   camera_fb_t *fb = esp_camera_fb_get();
   if (!fb) {
-    delay(10); // Brief wait if no frame ready
+    delay(10);
     return;
   }
 
   lastFrameTime = millis();
+
+  // 1. Upload Stream
   uploadFrame(fb);
+
+  // 2. Sampling: Check every 10th frame
+  if (++frameCounter >= 10) {
+    frameCounter = 0;
+    checkMotion(fb);
+  }
+
   esp_camera_fb_return(fb);
 }
 

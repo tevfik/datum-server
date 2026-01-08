@@ -1,0 +1,90 @@
+#######################################
+# Syntax Coloring Map for EIF
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+eif_ema_t	KEYWORD1
+eif_median_t	KEYWORD1
+eif_ma_t	KEYWORD1
+eif_debounce_t	KEYWORD1
+eif_rate_limiter_t	KEYWORD1
+eif_hysteresis_t	KEYWORD1
+eif_fir_t	KEYWORD1
+eif_fir_q15_t	KEYWORD1
+eif_biquad_t	KEYWORD1
+eif_biquad_q15_t	KEYWORD1
+eif_z_threshold_t	KEYWORD1
+eif_running_stats_t	KEYWORD1
+eif_drift_detector_t	KEYWORD1
+eif_complementary_t	KEYWORD1
+eif_weighted_fusion_t	KEYWORD1
+eif_kalman_1d_t	KEYWORD1
+eif_activity_window_t	KEYWORD1
+eif_activity_features_t	KEYWORD1
+eif_health_indicator_t	KEYWORD1
+eif_rul_estimator_t	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+eif_ema_init	KEYWORD2
+eif_ema_update	KEYWORD2
+eif_median_init	KEYWORD2
+eif_median_update	KEYWORD2
+eif_ma_init	KEYWORD2
+eif_ma_update	KEYWORD2
+eif_debounce_init	KEYWORD2
+eif_debounce_update	KEYWORD2
+eif_rate_limiter_init	KEYWORD2
+eif_rate_limiter_update	KEYWORD2
+eif_hysteresis_init	KEYWORD2
+eif_hysteresis_update	KEYWORD2
+eif_fir_init	KEYWORD2
+eif_fir_process	KEYWORD2
+eif_fir_design_lowpass	KEYWORD2
+eif_fir_q15_init	KEYWORD2
+eif_fir_q15_process	KEYWORD2
+eif_biquad_init	KEYWORD2
+eif_biquad_process	KEYWORD2
+eif_biquad_lowpass	KEYWORD2
+eif_biquad_highpass	KEYWORD2
+eif_biquad_bandpass	KEYWORD2
+eif_biquad_q15_init	KEYWORD2
+eif_biquad_q15_process	KEYWORD2
+eif_z_threshold_init	KEYWORD2
+eif_z_threshold_check	KEYWORD2
+eif_z_threshold_get_bounds	KEYWORD2
+eif_running_stats_init	KEYWORD2
+eif_running_stats_update	KEYWORD2
+eif_drift_init	KEYWORD2
+eif_drift_update	KEYWORD2
+eif_complementary_init	KEYWORD2
+eif_complementary_update	KEYWORD2
+eif_kalman_1d_init	KEYWORD2
+eif_kalman_1d_update	KEYWORD2
+eif_activity_window_init	KEYWORD2
+eif_activity_window_add	KEYWORD2
+eif_activity_extract_features	KEYWORD2
+eif_activity_classify_rules	KEYWORD2
+eif_health_init	KEYWORD2
+eif_health_update	KEYWORD2
+eif_health_get_normalized	KEYWORD2
+eif_rul_init	KEYWORD2
+eif_rul_update	KEYWORD2
+eif_rul_estimate	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+EIF_ACTIVITY_UNKNOWN	LITERAL1
+EIF_ACTIVITY_STATIONARY	LITERAL1
+EIF_ACTIVITY_WALKING	LITERAL1
+EIF_ACTIVITY_RUNNING	LITERAL1
+EIF_HEALTH_GOOD	LITERAL1
+EIF_HEALTH_WARNING	LITERAL1
+EIF_HEALTH_CRITICAL	LITERAL1

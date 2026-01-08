@@ -1,0 +1,15 @@
+#ifndef EIF_STATUS_H
+#define EIF_STATUS_H
+
+typedef enum {
+    EIF_STATUS_OK = 0,
+    EIF_STATUS_ERROR = -1,
+    EIF_STATUS_INVALID_ARGUMENT = -2,
+    EIF_STATUS_OUT_OF_MEMORY = -3,
+    EIF_STATUS_NOT_IMPLEMENTED = -4,
+    EIF_STATUS_NOT_SUPPORTED = -5,
+    EIF_STATUS_TIMEOUT = -6,
+    EIF_STATUS_INTERNAL_ERROR = -7
+} eif_status_t;
+
+#endif // EIF_STATUS_H

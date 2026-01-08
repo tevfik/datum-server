@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edge Intelligence Framework - Documentation</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --sidebar-bg: #161b22;
+            --text-color: #c9d1d9;
+            --link-color: #58a6ff;
+            --border-color: #30363d;
+            --accent-color: #238636;
+            --code-bg: #161b22;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 280px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            box-sizing: border-box;
+            flex-shrink: 0;
+            overflow-y: auto;
+            position: fixed;
+            height: 100vh;
+        }
+
+        .content {
+            flex-grow: 1;
+            padding: 40px;
+            margin-left: 280px;
+            max-width: 900px;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: #f0f6fc;
+        }
+
+        a {
+            color: var(--link-color);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .sidebar-brand {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 20px;
+            display: block;
+            color: #f0f6fc;
+        }
+
+        .nav-category {
+            font-weight: bold;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #8b949e;
+            text-transform: uppercase;
+            font-size: 0.8em;
+        }
+
+        .nav-link {
+            display: block;
+            padding: 5px 0;
+            color: var(--text-color);
+        }
+
+        .nav-link.active {
+            color: var(--link-color);
+            font-weight: bold;
+        }
+
+        pre {
+            background-color: var(--code-bg);
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+        }
+
+        code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.9em;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+        }
+
+        th,
+        td {
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: var(--sidebar-bg);
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="sidebar">
+        <a href="index.html" class="sidebar-brand">Edge Intelligence FW</a>
+
+        {% for category, items in nav.items() %}
+        <div class="nav-category">{{ category }}</div>
+        {% for item in items %}
+        <a href="{{ item.url }}" class="nav-link">{{ item.title }}</a>
+        {% endfor %}
+        {% endfor %}
+    </nav>
+
+    <main class="content">
+        {{ content | safe }}
+    </main>
+</body>
+
+</html>
