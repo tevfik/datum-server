@@ -13,7 +13,7 @@ class Devices extends _$Devices {
     final token = await ref.watch(authProvider.future);
     if (token == null) return [];
 
-    final api = ref.read(apiClientProvider);
+    final api = await ref.watch(authenticatedApiClientProvider.future);
     try {
       final data = await api.getDevices();
       return data.map((json) => Device.fromJson(json)).toList();
@@ -25,7 +25,7 @@ class Devices extends _$Devices {
 
   Future<void> createProvisioningRequest(
       String uid, String name, String ssid, String pass) async {
-    final api = ref.read(apiClientProvider);
+    final api = await ref.read(authenticatedApiClientProvider.future);
     await api.createProvisioningRequest(uid, name, ssid, pass);
     ref.invalidateSelf(); // Refresh list
   }
