@@ -17,6 +17,7 @@ extern "C" {
 extern bool motionEnabled;
 extern int motionThreshold;
 extern int motionPeriodMs;
+extern float motionMinAreaPct;
 extern unsigned long lastMotionTime;
 
 /**
