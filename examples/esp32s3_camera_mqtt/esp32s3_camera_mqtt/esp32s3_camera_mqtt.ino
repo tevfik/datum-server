@@ -1573,10 +1573,22 @@ void checkMotion(camera_fb_t *fb) {
   free(rgbBuf);
 
   // 6. Threshold Check
-  // If > 5% of pixels changed
   int totalChecked = grayLen / skip;
-  if (changes > totalChecked / 20) {
-    DEBUG_PRINTF("Motion: %d changes\n", changes);
+  float changePct = (float)changes * 100.0 / totalChecked;
+
+  // Dynamic Area Threshold based on Sensitivity?
+  // Currently fixed at 5% (totalChecked / 20).
+  // Let's make it slightly more sensitive at high levels, but stick to ~1-5%
+  // range? For now, let's just log the percentage to help debug.
+
+  // Debug every few seconds if changes > 0 to avoid spam
+  if (changes > 0) {
+    DEBUG_PRINTF("Motion: %d changes (%.2f%%) - Threshold: >5%%\n", changes,
+                 changePct);
+  }
+
+  if (changePct > 5.0) { // Keep 5% Logic for now, but explicit float check
+    DEBUG_PRINTLN("Motion TRIGERRED!");
     lastMotionTime = millis();
     // MQTT Publish could go here
   }
