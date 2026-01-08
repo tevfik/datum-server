@@ -98,8 +98,8 @@ Y6:    GPIO 36
 
 | Sensor | Resolution | Max FPS | Notes |
 |--------|------------|---------|-------|
-| **OV2640** | 1600x1200 (2MP) | 15fps @ UXGA | Default, widely available |
-| **OV3660** | 2048x1536 (3MP) | 15fps @ QXGA | Higher quality, may need vflip |
+| **OV2640** | 1600x1200 (2MP) | 15fps @ HD | Max Stream Res: HD (1280x720) |
+| **OV3660** | 2048x1536 (3MP) | 15fps @ HD | Max Stream Res: HD (1280x720) |
 
 ---
 
@@ -426,7 +426,7 @@ Content-Type: image/jpeg
 }
 ```
 
-#### Poll Commands
+#### Poll Commands (Legacy - MQTT Preferred)
 ```http
 GET /devices/:device_id/commands
 X-API-Key: {device_api_key}
@@ -439,17 +439,19 @@ X-API-Key: {device_api_key}
     {
       "id": "cmd_1",
       "action": "update_settings",
-      "params": { "resolution": "VGA", "led": true, "mirror": false, "vflip": true }
+      "params": { 
+          "vres": "VGA", 
+          "mot": true,       // Motion Enable
+          "msens": 80,       // Sensitivity (0-100)
+          "mper": 2,         // Motion Period (seconds)
+          "lcol": "#FF0000", // LED Color
+          "lbri": 100        // LED Brightness
+      }
     },
     {
       "id": "cmd_2",
       "action": "snap",
-      "params": { "resolution": "UXGA" }
-    },
-    {
-      "id": "cmd_3",
-      "action": "update_firmware",
-      "params": { "url": "http://server/firmware.bin" }
+      "params": { "resolution": "HD" } // Max HD recommended
     }
   ]
 }

@@ -1428,6 +1428,15 @@ void checkCommands() {
           if (s) {
             if (resolution.length() > 0) {
               framesize_t newSize = getFrameSizeFromName(resolution);
+
+              // Cap Streaming Resolution to HD (1280x720) to prevent memory
+              // crashes Snapshots can still be higher (handled via "snap"
+              // action)
+              if (newSize > FRAMESIZE_HD) {
+                newSize = FRAMESIZE_HD;
+                Serial.println("Stream Resolution capped to HD");
+              }
+
               if (s->status.framesize != newSize) {
                 bool wasStreaming = streaming;
                 streaming = false;

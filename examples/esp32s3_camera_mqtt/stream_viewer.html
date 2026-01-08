@@ -287,6 +287,27 @@
                         </label>
                     </div>
 
+                    <!-- Motion Detection -->
+                    <div class="control-group" style="margin-bottom: 5px;">
+                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer;">
+                            <input type="checkbox" id="motionToggle"> Enable Motion Detection
+                        </label>
+                    </div>
+                    <div class="control-group">
+                        <label>Sensitivity: <span id="sensVal">50</span>%</label>
+                        <input type="range" id="sensSlider" min="0" max="100" value="50" style="width: 100%;"
+                            oninput="document.getElementById('sensVal').innerText = this.value">
+                    </div>
+                    <div class="control-group">
+                        <label>Period (Cooldown):</label>
+                        <select id="motionPeriod"
+                            style="width: 100%; padding: 8px; margin-bottom: 10px; background: #374151; color: white; border: 1px solid #4b5563; border-radius: 4px;">
+                            <option value="1">1 second</option>
+                            <option value="2">2 seconds</option>
+                            <option value="5">5 seconds</option>
+                        </select>
+                    </div>
+
                     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #444;">
 
                     <!-- LED Color & Brightness -->
@@ -673,17 +694,25 @@
             const hmirror = document.getElementById('hmirror').checked;
             const vflip = document.getElementById('vflip').checked;
 
+            const mot = document.getElementById('motionToggle').checked;
+            const msens = parseInt(document.getElementById('sensSlider').value);
+            const mper = parseInt(document.getElementById('motionPeriod').value);
+
             // Ensure LED Switch is ON when Syncing
             document.getElementById('ledToggle').checked = true;
 
-            log(`Syncing Settings: ${streamRes}, LED: ${color} (${brightness}%), Mirror: ${hmirror}, Flip: ${vflip}`);
+            log(`Syncing Settings: ${streamRes}, Mot:${mot}, Sens:${msens}, LED: ${color} (${brightness}%), Mirror: ${hmirror}, Flip: ${vflip}`);
 
             sendCommand('update_settings', {
-                resolution: streamRes,
-                led_color: color,
-                led_brightness: brightness,
-                hmirror: hmirror,
-                vflip: vflip
+                vres: streamRes,      // Short name
+                lcol: color,          // Short name
+                lbri: brightness,     // Short name
+                imir: hmirror,        // Short name (Image Mirror)
+                iflip: vflip,         // Short name (Image Flip)
+                mot: mot,
+                msens: msens,
+                mper: mper,
+                led: true             // Force LED on sync? Or maybe don't force it? Kept existing logic.
             });
         }
 
