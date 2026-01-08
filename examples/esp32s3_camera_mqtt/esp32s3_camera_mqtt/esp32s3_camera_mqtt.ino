@@ -1714,7 +1714,12 @@ void loadStartupSettings() {
   }
 
   prefs.end();
-  Serial.println("Startup Settings Loaded");
+  Serial.println("--- Startup Settings Loaded ---");
+  Serial.printf("Motion: %s, Sens: %d, Period: %d ms\n",
+                motionEnabled ? "ON" : "OFF", sens, motionPeriodMs);
+  Serial.printf("LED: %s, Bri: %d\n", color.c_str(), savedBrightness);
+  Serial.printf("Orientation: Mirror %s, Flip %s\n", mir ? "ON" : "OFF",
+                flip ? "ON" : "OFF");
 }
 
 // Setup logic with late camera init
