@@ -1,4 +1,0 @@
-# EIF Convert - Model Converter Tool
-
-numpy>=1.19.0
-tensorflow>=2.4.0,<=2.15.0

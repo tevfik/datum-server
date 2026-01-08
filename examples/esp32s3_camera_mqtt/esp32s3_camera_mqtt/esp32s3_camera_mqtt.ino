@@ -1505,22 +1505,8 @@ void streamLoop() {
   if (!streaming)
     return;
 
-  // Dynamic Framerate Limiter based on Resolution
-  // High Res (>VGA) triggers overflow if we push too fast because HTTP upload
-  // is blocking and slower than the camera 15FPS ISR.
-  sensor_t *s = esp_camera_sensor_get();
-  int minInterval = 1;
-  if (s) {
-    if (s->status.framesize > FRAMESIZE_VGA) {
-      minInterval = 200; // Cap at 5 FPS for HD/UXGA
-    } else if (s->status.framesize > FRAMESIZE_QVGA) {
-      minInterval = 100; // Cap at 10 FPS for VGA
-    } else {
-      minInterval = 66; // Cap at 15 FPS for QVGA (Standard)
-    }
-  }
-
-  if (millis() - lastFrameTime < minInterval)
+  // Uncapped framerate check
+  if (millis() - lastFrameTime < 1)
     return;
 
   camera_fb_t *fb = esp_camera_fb_get();

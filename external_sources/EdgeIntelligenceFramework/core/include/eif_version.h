@@ -1,9 +1,0 @@
-#ifndef EIF_VERSION_H
-#define EIF_VERSION_H
-
-#define EIF_VERSION_MAJOR 1
-#define EIF_VERSION_MINOR 0
-#define EIF_VERSION_PATCH 0
-#define EIF_VERSION_STRING "1.0.0"
-
-#endif // EIF_VERSION_H
