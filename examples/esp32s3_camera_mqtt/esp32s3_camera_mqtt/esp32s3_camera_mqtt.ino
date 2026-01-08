@@ -924,13 +924,20 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       if (brightness != -1)
         savedBrightness = brightness;
 
+      if (paramsBlock.indexOf("\"led\":") != -1) {
+        torchState = extractJsonBool(paramsBlock, "led");
+      }
+
 #ifdef LED_GPIO_NUM
-      int r = (savedR * savedBrightness) / 100;
-      int g = (savedG * savedBrightness) / 100;
-      int b = (savedB * savedBrightness) / 100;
+      int r = 0, g = 0, b = 0;
+      if (torchState) {
+        r = (savedR * savedBrightness) / 100;
+        g = (savedG * savedBrightness) / 100;
+        b = (savedB * savedBrightness) / 100;
+      }
+
 #if LED_GPIO_NUM == 48
       neopixelWrite(LED_GPIO_NUM, r, g, b);
-      torchState = (r + g + b > 0);
 #else
       digitalWrite(LED_GPIO_NUM, (r + g + b > 0) ? HIGH : LOW);
 #endif
