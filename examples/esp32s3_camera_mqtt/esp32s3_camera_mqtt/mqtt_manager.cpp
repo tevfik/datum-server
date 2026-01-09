@@ -341,6 +341,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
           prefs.end();
         }
       }
+      reportTelemetry(false, false); // Sync state immediately
 
     } else if (action == "stream") {
       String state = extractJsonVal(paramsBlock, "state");

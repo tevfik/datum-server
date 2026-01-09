@@ -18,6 +18,7 @@ bool connectToWiFiBlocking(int timeoutSeconds) {
   Serial.printf("Connecting to %s\n", wifiSSID.c_str());
 
   WiFi.mode(WIFI_STA);
+  WiFi.setSleep(true);         // Enable Modem Sleep for Power Saving
   WiFi.setAutoReconnect(true); // Ensure auto-reconnect is on
 
   // Explicit begin
