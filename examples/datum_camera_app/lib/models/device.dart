@@ -4,7 +4,6 @@ class Device {
   final String name;
   final String type;
   final String status;
-  final String? publicIP;
   final DateTime? lastSeen;
 
   Device({
@@ -13,7 +12,6 @@ class Device {
     required this.name,
     required this.type,
     required this.status,
-    this.publicIP,
     this.lastSeen,
   });
 
@@ -24,9 +22,7 @@ class Device {
       name: json['name'] ?? 'Unknown',
       type: json['type'] ?? 'unknown',
       status: json['status'] ?? 'offline',
-      publicIP: json['public_ip'],
-      lastSeen:
-          json['last_seen'] != null ? DateTime.parse(json['last_seen']) : null,
+      lastSeen: json['last_seen'] != null ? DateTime.parse(json['last_seen']) : null,
     );
   }
 }

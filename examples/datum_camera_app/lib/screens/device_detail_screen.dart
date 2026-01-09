@@ -140,14 +140,6 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
         }
       }
 
-      // Fallback: If Public IP missing from telemetry, check Device Metadata
-      if (!data.containsKey('public_ip') && widget.device.publicIP != null) {
-        final metaIP = widget.device.publicIP!;
-        if (!metaIP.startsWith("172.")) {
-          data['public_ip'] = metaIP;
-        }
-      }
-
       setState(() {
         _deviceData = data;
 
