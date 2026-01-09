@@ -461,11 +461,31 @@ void checkSDSpace() {
   uint64_t total = SD_MMC.totalBytes();
   uint64_t used = SD_MMC.usedBytes();
   uint64_t free = total - used;
-  uint64_t threshold = 50ULL * 1024 * 1024; // 50MB (Requested "Close to full")
+  // Dynamic Threshold: Keep 20% free, but cap at 50MB max required.
+  uint64_t threshold = total / 5; // 20%
+  if (threshold > 50ULL * 1024 * 1024) {
+    threshold = 50ULL * 1024 * 1024; // Cap at 50MB for large cards
+  }
+
+  // Warn user if partition seems corrupted (e.g. 16GB card showing as 31MB)
+  if (total < 100ULL * 1024 * 1024) {
+    static bool warned = false;
+    if (!warned) {
+      Serial.println("[SD] WARNING: Card Size is very small (<100MB). "
+                     "Partition might be corrupted!");
+      Serial.println("[SD] Suggestion: Format SD Card on PC (FAT32) to reclaim "
+                     "full space.");
+      warned = true;
+    }
+  }
 
   if (free < threshold) {
-    Serial.printf("[SD] Low Space: %llu MB free. Cleaning up oldest file...\n",
+    Serial.printf("[SD] Low Space Triggered! (Free < %llu MB)\n",
+                  threshold / (1024 * 1024));
+    Serial.printf("[SD] Stats: Total=%llu MB, Used=%llu MB, Free=%llu MB\n",
+                  total / (1024 * 1024), used / (1024 * 1024),
                   free / (1024 * 1024));
+    Serial.printf("[SD] Cleaning up oldest file...\n");
 
     // Scan once, find the single oldest file
     File root = SD_MMC.open("/capture");
