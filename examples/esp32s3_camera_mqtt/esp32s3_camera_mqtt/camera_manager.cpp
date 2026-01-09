@@ -718,11 +718,7 @@ void handleSnap(String resolution, bool saveToCard) {
 void cameraTask(void *pvParameters) {
   unsigned long lastHeartbeat = 0;
   while (true) {
-    if (millis() - lastHeartbeat > 5000) {
-      Serial.printf("[CORE 1] Camera Task Alive. Heap: %d, Streaming: %d\n",
-                    ESP.getFreeHeap(), streaming);
-      lastHeartbeat = millis();
-    }
+    // Heartbeat removed as per user request
     processCameraLoop();
     // Yield to avoid Watchdog if processCameraLoop returns instantly
     vTaskDelay(5 / portTICK_PERIOD_MS);

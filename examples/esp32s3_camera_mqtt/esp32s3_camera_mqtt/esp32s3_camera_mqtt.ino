@@ -900,11 +900,7 @@ void loop() { vTaskDelay(1000 / portTICK_PERIOD_MS); }
 void networkTask(void *pvParameters) {
   unsigned long lastHeartbeat = 0;
   for (;;) {
-    if (millis() - lastHeartbeat > 5000) {
-      Serial.printf("[CORE 0] Network Task Alive. WiFi: %d, Heap: %d\n",
-                    WiFi.status(), ESP.getFreeHeap());
-      lastHeartbeat = millis();
-    }
+    // Heartbeat removed as per user request
 
     // 1. Connection State Machine
     if (WiFi.status() == WL_CONNECTED) {
