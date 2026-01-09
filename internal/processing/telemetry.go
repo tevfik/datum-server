@@ -2,6 +2,7 @@ package processing
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -111,7 +112,7 @@ func (tp *TelemetryProcessor) Process(deviceID string, data map[string]interface
 	// ---------------------------------------------------------
 	// Enrichment: Server-Side Tagging
 	// ---------------------------------------------------------
-	if clientIP != "" {
+	if clientIP != "" && !strings.HasPrefix(clientIP, "172.") {
 		if val, ok := data["public_ip"]; !ok || val == "" {
 			data["public_ip"] = clientIP
 		}

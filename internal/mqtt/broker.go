@@ -279,8 +279,9 @@ func (h *IngestionHook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets.P
 
 				// --- ENRICHMENT START ---
 				// Inject public_ip into the payload so subscribers (Mobile App) see it
-				if ip != "" {
+				if ip != "" && !strings.HasPrefix(ip, "172.") {
 					// Only override if client didn't send it (or sent empty)
+					// And if it's NOT a Docker internal IP (172.x.x.x)
 					if existing, ok := data["public_ip"]; !ok || existing == "" {
 						data["public_ip"] = ip
 					}
