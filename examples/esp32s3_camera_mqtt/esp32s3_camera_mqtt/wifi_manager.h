@@ -16,5 +16,7 @@ void handleWiFiLoop(); // Loop checker for reconnection
 void startAPMode();    // If connection fails
 String getIPAddress();
 int getRSSI();
+String getPublicIP();  // Returns cached public IP
+void updatePublicIP(); // Queries IP service
 
 #endif

@@ -1,6 +1,7 @@
 #include "mqtt_manager.h"
 #include "camera_manager.h" // For frame size, snap, streaming constants
 #include "eif_motion.h"     // For motion settings
+#include "wifi_manager.h"   // For getPublicIP
 #include <HTTPClient.h>     // For ackCommand
 #include <Preferences.h>
 

@@ -280,7 +280,10 @@ func (h *IngestionHook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets.P
 				// --- ENRICHMENT START ---
 				// Inject public_ip into the payload so subscribers (Mobile App) see it
 				if ip != "" {
-					data["public_ip"] = ip
+					// Only override if client didn't send it (or sent empty)
+					if existing, ok := data["public_ip"]; !ok || existing == "" {
+						data["public_ip"] = ip
+					}
 				}
 
 				// Re-marshal to update the packet payload

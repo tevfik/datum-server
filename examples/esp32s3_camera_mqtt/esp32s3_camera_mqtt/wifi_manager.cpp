@@ -1,4 +1,6 @@
 #include "wifi_manager.h"
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 
 // Extern helpers
 extern void updateLED();
@@ -37,6 +39,7 @@ bool connectToWiFiBlocking(int timeoutSeconds) {
     Serial.print("Connected! IP: ");
     Serial.println(WiFi.localIP());
     wasConnected = true;
+    updatePublicIP();
     return true;
   }
 
@@ -63,6 +66,7 @@ void handleWiFiLoop() {
       Serial.print("IP: ");
       Serial.println(WiFi.localIP());
       wasConnected = true;
+      updatePublicIP();
     }
   } else {
     // Disconnected
@@ -92,3 +96,36 @@ void handleWiFiLoop() {
 String getIPAddress() { return WiFi.localIP().toString(); }
 
 int getRSSI() { return WiFi.RSSI(); }
+
+String publicIP = "";
+
+void updatePublicIP() {
+  if (WiFi.status() == WL_CONNECTED) {
+    if (publicIP.length() > 0)
+      return; // Keep existing if valid
+
+    Serial.println("[WiFi] Querying Public IP...");
+    WiFiClientSecure client;
+    client.setInsecure();
+    HTTPClient http;
+    http.setTimeout(8000);
+
+    if (http.begin(client, "https://api.ipify.org")) {
+      int httpCode = http.GET();
+      if (httpCode > 0) {
+        String payload = http.getString();
+        payload.trim();
+        if (payload.length() > 0) {
+          publicIP = payload; // Store in global
+          Serial.println("[WiFi] Public IP: " + publicIP);
+        }
+      } else {
+        Serial.printf("[WiFi] Public IP check failed: %s\n",
+                      http.errorToString(httpCode).c_str());
+      }
+      http.end();
+    }
+  }
+}
+
+String getPublicIP() { return publicIP; }
