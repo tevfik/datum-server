@@ -161,7 +161,7 @@ bool saveFrameToSD(camera_fb_t *fb, String filename) {
       time_t now;
       time(&now);
       struct tm *ti = localtime(&now);
-      char buf[32];
+      char buf[64]; // Increased to 64 (Fixes Stack Smashing)
       sprintf(buf, "/capture/IMG_%04d%02d%02d_%02d%02d%02d.jpg",
               ti->tm_year + 1900, ti->tm_mon + 1, ti->tm_mday, ti->tm_hour,
               ti->tm_min, ti->tm_sec);

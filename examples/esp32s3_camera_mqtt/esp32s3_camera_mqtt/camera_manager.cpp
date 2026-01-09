@@ -522,52 +522,23 @@ void processCameraLoop() {
         if (checkMotion(fb)) {
           if (isSDAvailable()) {
             // SAVE METADATA & RETURN FB BEFORE HIGH RES SNAPSHOT
-            int w = fb->width;
-            int h = fb->height;
-
-            // Must return FB to release driver lock! -> NO! We need FB for
-            // saveFrameToSD! esp_camera_fb_return(fb); // REMOVED (Caused
-            // Crash) fb = NULL;                // REMOVED (Caused Crash)
-
-            // Generate Base Filename (e.g. VID_2023...)
-            String baseName = generateFileName(""); // Get timestamp part only?
-            // Actually generateFileName("avi") returns FULL path with
-            // extension. I need to generate RAW base name or reuse the logic.
-            // Let's modify generateFileName usage.
-            // Or call generateFileName("jpg") and generateFileName("avi")
-            // separately? They call time(), so if I call them sequentially they
-            // might differ by 1 sec at boundary. Better: Get timestamped base,
-            // then append. FOR NOW: I will call it twice. 1 sec diff is
-            // acceptable or unlikely within ms. Wait, the user said "same
-            // filename". I exposed generateFileName in sd_storage.h. I should
-            // verify if it helps. Actually, I can't guarantee same name if I
-            // call logic twice. I should modify generateFileName to take "base
-            // only" flag? Or simpler:
-
-            String rawName = generateFileName("avi");
-            String aviName = rawName;
-            String jpgName = rawName;
-            jpgName.replace(".avi", ".jpg"); // Simple string replacement
-
             Serial.println("[MOTION] Triggered. Snapshot...");
 
             // CRITICAL FIX: Do NOT switch resolution (takeHighResSnapshot)
-            // during stream/motion. It causes Camera Deinit -> Init, which
-            // leads to Brownout/Crash/Watchdog. Just save the current frame
-            // (VGA) which is fast and stable. takeHighResSnapshot(jpgName);
+            // Save current frame (VGA) - Safe Mode
+            saveFrameToSD(fb);
 
-            saveFrameToSD(fb, jpgName);
-
-            startRecording(aviName, w, h, 10);
-            Serial.println("[MOTION] Video Recording Started!");
+            // Cooldown
+            ignoreMotionFor(2);
           }
         }
       }
     }
   }
+}
 
-  if (fb)
-    esp_camera_fb_return(fb);
+if (fb)
+  esp_camera_fb_return(fb);
 }
 
 void cameraTaskLoop(void *parameter) {
