@@ -112,7 +112,9 @@ func (tp *TelemetryProcessor) Process(deviceID string, data map[string]interface
 	// Enrichment: Server-Side Tagging
 	// ---------------------------------------------------------
 	if clientIP != "" {
-		data["public_ip"] = clientIP
+		if val, ok := data["public_ip"]; !ok || val == "" {
+			data["public_ip"] = clientIP
+		}
 	}
 	data["server_time"] = time.Now().Unix()
 

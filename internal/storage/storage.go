@@ -117,6 +117,7 @@ type Device struct {
 	Type            string    `json:"type"`
 	DeviceUID       string    `json:"device_uid,omitempty"` // Hardware UID
 	APIKey          string    `json:"api_key"`              // Legacy API key (for backward compatibility)
+	PublicIP        string    `json:"public_ip,omitempty"`  // WAN/External IP address
 	Status          string    `json:"status"`               // "active", "banned", "suspended", "revoked"
 	LastSeen        time.Time `json:"last_seen"`
 	CreatedAt       time.Time `json:"created_at"`
@@ -345,8 +346,8 @@ func (s *Storage) StoreData(point *DataPoint) error {
 			if err := json.Unmarshal([]byte(deviceVal), &device); err == nil {
 				device.LastSeen = time.Now()
 				// Store public IP if present in data
-				if ip, ok := point.Data["public_ip"].(string); ok {
-					_ = ip
+				if ip, ok := point.Data["public_ip"].(string); ok && ip != "" {
+					device.PublicIP = ip
 				}
 
 				devJSON, _ := json.Marshal(device)
@@ -437,9 +438,9 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 				if err := json.Unmarshal([]byte(deviceVal), &device); err == nil {
 					device.LastSeen = time.Now()
 					// Store public IP if present (prioritize latest)
-					if ip, ok := point.Data["public_ip"].(string); ok {
-						// Logic could guide here, but shadow is fine
-						_ = ip
+					// Store public IP if present (prioritize latest)
+					if ip, ok := point.Data["public_ip"].(string); ok && ip != "" {
+						device.PublicIP = ip
 					}
 
 					// Save device back
