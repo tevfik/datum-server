@@ -365,10 +365,18 @@ void handleSDGallery(WebServer &server) {
           ".grid{display:grid;grid-template-columns:repeat(auto-fill,minmax("
           "150px,1fr));gap:10px} a{color:#4da3ff}</style>";
   html += "<script>";
+  html += "let allFiles = []; let visibleCount = 0; const CHUNK = 12; ";
   html += "function loadFiles() { "
           "fetch('/sd/list').then(r=>r.json()).then(files => {";
+  html += "  // Sort descend (newest first)\n";
+  html += "  allFiles = files.sort((a,b) => b.name.localeCompare(a.name));";
+  html += "  renderChunk();";
+  html += "}); }";
+  html += "function renderChunk() {";
+  html += "  if(visibleCount >= allFiles.length) return;";
+  html += "  const slice = allFiles.slice(visibleCount, visibleCount + CHUNK);";
   html += "  const grid = document.getElementById('grid');";
-  html += "  grid.innerHTML = files.map(f => `<div "
+  html += "  const html = slice.map(f => `<div "
           "style='text-align:center;position:relative'><a "
           "href='/sd/download?file=${f.name}' "
           "target='_blank'><img src='/sd/download?file=${f.name}' "
@@ -377,15 +385,28 @@ void handleSDGallery(WebServer &server) {
           "style='background:#f44336;color:white;border:none;padding:5px;"
           "cursor:pointer;margin-top:5px;border-radius:4px'>DELETE</button></"
           "div>`).join('');";
-  html += "}); }";
+  html += "  // Append HTML\n";
+  html += "  const temp = document.createElement('div'); temp.innerHTML = "
+          "html; while(temp.firstChild) grid.appendChild(temp.firstChild);";
+  html += "  visibleCount += slice.length;";
+  html += "  updateBtn();";
+  html += "}";
+  html += "function updateBtn() {";
+  html += "  const btn = document.getElementById('btnLoad');";
+  html += "  if(btn) btn.style.display = (visibleCount >= allFiles.length) ? "
+          "'none' : 'inline-block';";
+  html += "}";
   html += "function deleteFile(f) { if(confirm('Delete ' + f + '?')) { "
           "fetch('/sd/delete?file=' + f, {method:'POST'}).then(r => { "
-          "if(r.ok) loadFiles(); else alert('Failed'); }); } }";
+          "if(r.ok) { location.reload(); } else alert('Failed'); }); } }";
   html += "window.onload=loadFiles;";
   html += "</script></head><body>";
   html +=
       "<h2>SD Card Gallery</h2><p><a href='/'>&larr; Back to Stream</a></p>";
-  html += "<div id='grid' class='grid'>Loading...</div>";
+  html += "<div id='grid' class='grid'></div>";
+  html += "<div style='text-align:center;margin:20px'><button id='btnLoad' "
+          "class='btn btn-gry' style='width:auto;padding:10px 20px' "
+          "onclick='renderChunk()'>Load More</button></div>";
   html += "</body></html>";
   server.send(200, "text/html", html);
 }
