@@ -461,50 +461,42 @@ void checkSDSpace() {
   uint64_t total = SD_MMC.totalBytes();
   uint64_t used = SD_MMC.usedBytes();
   uint64_t free = total - used;
-  uint64_t threshold = 100ULL * 1024 * 1024; // 100MB
+  uint64_t threshold = 50ULL * 1024 * 1024; // 50MB (Requested "Close to full")
 
   if (free < threshold) {
-    Serial.printf("[SD] Low Space: %llu MB free. Cleaning up old files...\n",
+    Serial.printf("[SD] Low Space: %llu MB free. Cleaning up oldest file...\n",
                   free / (1024 * 1024));
 
-    // Delete 5 oldest files
-    for (int i = 0; i < 5; i++) {
-      File root = SD_MMC.open("/capture");
-      if (!root || !root.isDirectory())
-        return;
+    // Scan once, find the single oldest file
+    File root = SD_MMC.open("/capture");
+    if (!root || !root.isDirectory())
+      return;
 
-      String oldestName = "";
+    String oldestName = "";
 
-      File file = root.openNextFile();
-      while (file) {
-        if (!file.isDirectory()) {
-          String currentName = String(file.name());
-          // Filter system files if any?
-          // Initialize oldestName
-          if (oldestName == "") {
+    File file = root.openNextFile();
+    while (file) {
+      if (!file.isDirectory()) {
+        String currentName = String(file.name());
+        if (oldestName == "") {
+          oldestName = currentName;
+        } else {
+          // Lexicographical comparison:
+          // If currentName < oldestName, it is "older" (IMG < VID, 2025 < 2026)
+          if (currentName.compareTo(oldestName) < 0) {
             oldestName = currentName;
-          } else {
-            // Lexicographical comparison:
-            // If currentName < oldestName, it is "older" (IMG < VID, 2025 <
-            // 2026) Note: /capture/ prefix is inherent? file.name() might be
-            // just "VID_...". Ensure we compare base names.
-            if (currentName.compareTo(oldestName) < 0) {
-              oldestName = currentName;
-            }
           }
         }
-        file.close(); // Close to keep memory low
-        file = root.openNextFile();
       }
-      root.close();
+      file.close(); // Close to keep memory low
+      file = root.openNextFile();
+    }
+    root.close();
 
-      if (oldestName != "") {
-        String fullPath = "/capture/" + oldestName;
-        Serial.println("[SD] Auto-Cleaning (Oldest): " + fullPath);
-        SD_MMC.remove(fullPath);
-      } else {
-        break; // No files found
-      }
+    if (oldestName != "") {
+      String fullPath = "/capture/" + oldestName;
+      Serial.println("[SD] Auto-Cleaning (Oldest): " + fullPath);
+      SD_MMC.remove(fullPath);
     }
   }
 }
