@@ -21,6 +21,8 @@ extern Preferences prefs; // For loading defaults if needed inside handleSnap
 
 TaskHandle_t camTaskHandle = NULL;
 SemaphoreHandle_t cameraMutex = NULL;
+volatile bool camPauseRequest = false;
+volatile bool camPaused = false;
 int frameCounter = 0;
 
 // Shared Buffer Globals
@@ -556,11 +558,18 @@ void cameraTaskLoop(void *parameter) {
 // Was duplicate startCameraTask - Removed
 
 void handleSnap(String resolution, bool saveToCard) {
-  if (camTaskHandle != NULL) {
-    vTaskSuspend(camTaskHandle);
-    delay(100); // Give it time to halt
-  } else {
-    // Fallback to mutex if task handle bad (shouldn't happen)
+  // Request Pause and Wait
+  camPauseRequest = true;
+  unsigned long pauseStart = millis();
+  while (!camPaused && millis() - pauseStart < 1000) {
+    delay(10);
+  }
+  // Safety: If timeout, we proceed anyway but log error (or should we abort?)
+  // For now, proceed but maybe with mutex backup if pause failed.
+  // Actually, if pause failed, we are at risk of crash.
+
+  if (camTaskHandle == NULL) {
+    // Fallback if task not running
     if (cameraMutex != NULL)
       xSemaphoreTake(cameraMutex, portMAX_DELAY);
   }
@@ -699,8 +708,13 @@ void handleSnap(String resolution, bool saveToCard) {
   esp_camera_deinit(); // Cleanup high res
   initCamera();        // Restore default/VGA
 
-  if (cameraMutex)
+  // Resume Camera Task
+  camPauseRequest = false;
+
+  // Fallback Mutex Give (only if we took it because task handle was null)
+  if (camTaskHandle == NULL && cameraMutex) {
     xSemaphoreGive(cameraMutex);
+  }
 }
 
 // Wrapper Task for FreeRTOS
@@ -708,6 +722,13 @@ void cameraTask(void *pvParameters) {
   unsigned long lastHeartbeat = 0;
   while (true) {
     // Heartbeat removed as per user request
+    if (camPauseRequest) {
+      camPaused = true;
+      while (camPauseRequest) {
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+      }
+      camPaused = false;
+    }
     processCameraLoop();
     // Yield to avoid Watchdog if processCameraLoop returns instantly
     vTaskDelay(5 / portTICK_PERIOD_MS);
