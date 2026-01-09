@@ -126,6 +126,20 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
       final api = await ref.read(authenticatedApiClientProvider.future);
       final data = await api.getDeviceData(widget.device.id);
       if (!mounted) return;
+
+      // Client-Side IP Sanitization (Fix for Docker environment)
+      if (data.containsKey('public_ip')) {
+        final ip = data['public_ip'].toString();
+        if (ip.startsWith("172.")) {
+          // It's a Docker internal IP. Prefer Local IP if available
+          if (data.containsKey('local_ip') && data['local_ip'] != null) {
+            data['public_ip'] = data['local_ip'];
+          } else {
+            data.remove('public_ip'); // Remove if no alternative
+          }
+        }
+      }
+
       setState(() {
         _deviceData = data;
 
