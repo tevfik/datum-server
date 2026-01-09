@@ -22,6 +22,7 @@ type DeviceResponse struct {
 	Name      string    `json:"name"`
 	Type      string    `json:"type"`
 	DeviceUID string    `json:"device_uid"` // Add DeviceUID
+	PublicIP  string    `json:"public_ip"`  // Add PublicIP
 	LastSeen  time.Time `json:"last_seen"`
 	CreatedAt time.Time `json:"created_at"`
 	Status    string    `json:"status"`
@@ -100,6 +101,7 @@ func listDevicesHandler(c *gin.Context) {
 			Name:      d.Name,
 			Type:      d.Type,
 			DeviceUID: d.DeviceUID,
+			PublicIP:  d.PublicIP,
 			LastSeen:  d.LastSeen,
 			CreatedAt: d.CreatedAt,
 			Status:    status,
