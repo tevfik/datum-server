@@ -84,6 +84,7 @@ func sendCommandHandler(c *gin.Context) {
 			"command_id": cmdID,
 			"action":     cmd.Action,
 			"params":     cmd.Params,
+			"timestamp":  cmd.CreatedAt.Unix(),
 		}
 
 		// Marshal JSON

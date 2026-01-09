@@ -158,6 +158,26 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
   }
 
   if (pid.length() > 0 && action.length() > 0) {
+    // Timeout Check (Stale Command Prevention)
+    long msgTs = extractJsonInt(pl, "timestamp");
+    if (msgTs > 1000000000) { // Check if timestamp looks valid (year > 2001)
+      time_t now;
+      time(&now);
+      if (now > 1000000000) { // Check if system time is synced
+        long age = (long)now - msgTs;
+        if (age > 60 ||
+            age <
+                -60) { // Tolerance for clock skew (future stamps ignored too?)
+          // If age is huge negative, maybe clock skew or wrong server time.
+          // But strict timeout: > 60 seconds old.
+          if (age > 60) {
+            Serial.printf("[MQTT] Ignored STALE command (Age: %ld s)\n", age);
+            return;
+          }
+        }
+      }
+    }
+
     ackCommand(pid);
 
     if (action == "update_settings") {
