@@ -825,6 +825,7 @@ void loadStartupSettings() {
 
 // Setup logic with late camera init
 void setup() {
+  setCpuFrequencyMhz(160); // Reduce CPU freq to 160MHz for power saving
   Serial.begin(115200);
   delay(1000); // Wait for Serial
   Serial.println("\n\n--- BOOTING DATUM CAMERA ---");
