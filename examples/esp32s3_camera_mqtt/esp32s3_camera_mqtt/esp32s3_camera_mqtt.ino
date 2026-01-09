@@ -874,7 +874,7 @@ void setup() {
       // Create Network Task (Core 0) - Handles WiFi, MQTT, Web Server
       xTaskCreatePinnedToCore(networkTask,        /* Task function */
                               "NetworkTask",      /* Name */
-                              8192,               /* Stack size */
+                              16384,              /* Stack size */
                               NULL,               /* Parameters */
                               1,                  /* Priority */
                               &networkTaskHandle, /* Handle */
