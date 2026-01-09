@@ -43,6 +43,10 @@ bool deleteSDFile(String path); // New delete function
 // Check if SD is available
 bool isSDAvailable();
 
+// Auto-cleanup space
+void checkSDSpace();
+void formatSD();
+
 // Generate Timestamped Filename
 String generateFileName(String ext);
 

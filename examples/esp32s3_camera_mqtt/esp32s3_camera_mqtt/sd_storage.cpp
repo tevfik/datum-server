@@ -453,6 +453,7 @@ bool deleteSDFile(String path) {
   return false;
 }
 
+// Smarter checkSDSpace: Scans for the oldest file by name comparison
 void checkSDSpace() {
   if (!sdInitialized)
     return;
@@ -460,46 +461,50 @@ void checkSDSpace() {
   uint64_t total = SD_MMC.totalBytes();
   uint64_t used = SD_MMC.usedBytes();
   uint64_t free = total - used;
-  // Threshold: 100MB (100 * 1024 * 1024)
-  uint64_t threshold = 100ULL * 1024 * 1024;
+  uint64_t threshold = 100ULL * 1024 * 1024; // 100MB
 
   if (free < threshold) {
     Serial.printf("[SD] Low Space: %llu MB free. Cleaning up old files...\n",
                   free / (1024 * 1024));
 
-    File root = SD_MMC.open("/capture");
-    if (!root || !root.isDirectory())
-      return;
+    // Delete 5 oldest files
+    for (int i = 0; i < 5; i++) {
+      File root = SD_MMC.open("/capture");
+      if (!root || !root.isDirectory())
+        return;
 
-    String oldestFile = "";
+      String oldestName = "";
 
-    // Simple strategy: Find first file (lexicographically oldest with YYYYMMDD
-    // naming) Since root.openNextFile() doesn't guarantee order on FAT, we
-    // might need to scan. But for a simple ring buffer, just deleting *some*
-    // files is better than crashing. Let's iterate and delete the first 5 files
-    // we find. Better: Scan once, find oldest (lexical)
+      File file = root.openNextFile();
+      while (file) {
+        if (!file.isDirectory()) {
+          String currentName = String(file.name());
+          // Filter system files if any?
+          // Initialize oldestName
+          if (oldestName == "") {
+            oldestName = currentName;
+          } else {
+            // Lexicographical comparison:
+            // If currentName < oldestName, it is "older" (IMG < VID, 2025 <
+            // 2026) Note: /capture/ prefix is inherent? file.name() might be
+            // just "VID_...". Ensure we compare base names.
+            if (currentName.compareTo(oldestName) < 0) {
+              oldestName = currentName;
+            }
+          }
+        }
+        file.close(); // Close to keep memory low
+        file = root.openNextFile();
+      }
+      root.close();
 
-    // For now, simpler robust approach: Delete 10 files to free space quickly.
-    int deletedCount = 0;
-    while (deletedCount < 5) {
-      File f = root.openNextFile();
-      if (!f)
-        break;
-      if (!f.isDirectory()) {
-        String path = String(f.path()); // full path /capture/filename
-        // f.path() usually works on ESP32-S3 SD_MMC
-        // If not, construct: "/capture/" + String(f.name())
-        // Let's use name construction to be safe
-        String fullPath = "/capture/" + String(f.name());
-
-        f.close(); // Close before delete
+      if (oldestName != "") {
+        String fullPath = "/capture/" + oldestName;
+        Serial.println("[SD] Auto-Cleaning (Oldest): " + fullPath);
         SD_MMC.remove(fullPath);
-        Serial.println("[SD] Auto-Cleaning: " + fullPath);
-        deletedCount++;
       } else {
-        f.close();
+        break; // No files found
       }
     }
-    root.close();
   }
 }
