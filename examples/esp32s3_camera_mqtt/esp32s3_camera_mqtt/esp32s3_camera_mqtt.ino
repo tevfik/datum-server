@@ -143,7 +143,7 @@ const int daylightOffset_sec = 0;
 
 // Task handles
 TaskHandle_t streamTask;
-const int COMMAND_POLL_INTERVAL_MS = 5000;
+const int COMMAND_POLL_INTERVAL_MS = 10000;
 unsigned long lastCommandPoll = 0;
 
 void updateFirmware(String url) {
@@ -523,7 +523,7 @@ bool activateProvisioning() {
 
 void checkCommands() {
   // Check every 1 second
-  if (millis() - lastCommandPoll < 1000)
+  if (millis() - lastCommandPoll < COMMAND_POLL_INTERVAL_MS)
     return;
   lastCommandPoll = millis();
   if (WiFi.status() != WL_CONNECTED || apiKey.length() == 0)
