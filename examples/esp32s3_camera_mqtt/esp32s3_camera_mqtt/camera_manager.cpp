@@ -535,10 +535,9 @@ void processCameraLoop() {
       }
     }
   }
-}
 
-if (fb)
-  esp_camera_fb_return(fb);
+  if (fb)
+    esp_camera_fb_return(fb);
 }
 
 void cameraTaskLoop(void *parameter) {
@@ -615,6 +614,8 @@ void handleSnap(String resolution, bool saveToCard) {
     Serial.printf("[SNAP] Init Failed: 0x%x\n", err);
     initCamera(); // Fallback to default
     streaming = wasStreaming;
+    if (cameraMutex)
+      xSemaphoreGive(cameraMutex);
     return;
   }
 
@@ -641,6 +642,8 @@ void handleSnap(String resolution, bool saveToCard) {
     esp_camera_deinit();
     initCamera();
     streaming = wasStreaming;
+    if (cameraMutex)
+      xSemaphoreGive(cameraMutex);
     return;
   }
 
@@ -683,6 +686,9 @@ void handleSnap(String resolution, bool saveToCard) {
   // as that seems safer and likely intended but missing.
   esp_camera_deinit(); // Cleanup high res
   initCamera();        // Restore default/VGA
+
+  if (cameraMutex)
+    xSemaphoreGive(cameraMutex);
 }
 
 // Wrapper Task for FreeRTOS
