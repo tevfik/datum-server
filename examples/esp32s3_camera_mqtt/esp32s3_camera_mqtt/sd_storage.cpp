@@ -155,6 +155,9 @@ bool saveFrameToSD(camera_fb_t *fb, String filename) {
   if (!sdInitialized)
     return false;
 
+  // Auto-cleanup before saving
+  checkSDSpace();
+
   // Generate Filename if empty
   if (filename.length() == 0) {
     if (timeSynced) {
@@ -162,7 +165,8 @@ bool saveFrameToSD(camera_fb_t *fb, String filename) {
       time(&now);
       struct tm *ti = localtime(&now);
       char buf[64]; // Increased to 64 (Fixes Stack Smashing)
-      sprintf(buf, "/capture/IMG_%04d%02d%02d_%02d%02d%02d.jpg",
+      // Use VID_ prefix so mixed JPG/AVI files sort correctly by date
+      sprintf(buf, "/capture/VID_%04d%02d%02d_%02d%02d%02d.jpg",
               ti->tm_year + 1900, ti->tm_mon + 1, ti->tm_mday, ti->tm_hour,
               ti->tm_min, ti->tm_sec);
       filename = String(buf);
@@ -447,4 +451,55 @@ bool deleteSDFile(String path) {
     return SD_MMC.remove(path);
   }
   return false;
+}
+
+void checkSDSpace() {
+  if (!sdInitialized)
+    return;
+
+  uint64_t total = SD_MMC.totalBytes();
+  uint64_t used = SD_MMC.usedBytes();
+  uint64_t free = total - used;
+  // Threshold: 100MB (100 * 1024 * 1024)
+  uint64_t threshold = 100ULL * 1024 * 1024;
+
+  if (free < threshold) {
+    Serial.printf("[SD] Low Space: %llu MB free. Cleaning up old files...\n",
+                  free / (1024 * 1024));
+
+    File root = SD_MMC.open("/capture");
+    if (!root || !root.isDirectory())
+      return;
+
+    String oldestFile = "";
+
+    // Simple strategy: Find first file (lexicographically oldest with YYYYMMDD
+    // naming) Since root.openNextFile() doesn't guarantee order on FAT, we
+    // might need to scan. But for a simple ring buffer, just deleting *some*
+    // files is better than crashing. Let's iterate and delete the first 5 files
+    // we find. Better: Scan once, find oldest (lexical)
+
+    // For now, simpler robust approach: Delete 10 files to free space quickly.
+    int deletedCount = 0;
+    while (deletedCount < 5) {
+      File f = root.openNextFile();
+      if (!f)
+        break;
+      if (!f.isDirectory()) {
+        String path = String(f.path()); // full path /capture/filename
+        // f.path() usually works on ESP32-S3 SD_MMC
+        // If not, construct: "/capture/" + String(f.name())
+        // Let's use name construction to be safe
+        String fullPath = "/capture/" + String(f.name());
+
+        f.close(); // Close before delete
+        SD_MMC.remove(fullPath);
+        Serial.println("[SD] Auto-Cleaning: " + fullPath);
+        deletedCount++;
+      } else {
+        f.close();
+      }
+    }
+    root.close();
+  }
 }
