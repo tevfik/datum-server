@@ -524,9 +524,16 @@ void processCameraLoop() {
             // SAVE METADATA & RETURN FB BEFORE HIGH RES SNAPSHOT
             Serial.println("[MOTION] Triggered. Snapshot...");
 
-            // CRITICAL FIX: Do NOT switch resolution (takeHighResSnapshot)
-            // Save current frame (VGA) - Safe Mode
-            saveFrameToSD(fb);
+            // Use handleSnap to take High-Res Snapshot (same as mobile app)
+            // Arg1: "" -> Load resolution from preferences (High Res)
+            // Arg2: true -> Save to SD card
+
+            // Release Frame Buffer FIRST so we can deinit camera
+            esp_camera_fb_return(fb);
+            fb =
+                NULL; // Mark as null so we don't return it again at end of loop
+
+            handleSnap("", true);
 
             // Cooldown
             ignoreMotionFor(2);
