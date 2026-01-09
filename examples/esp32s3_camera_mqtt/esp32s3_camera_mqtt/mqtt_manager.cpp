@@ -525,9 +525,11 @@ void reportTelemetry(bool isBoot, bool isConnect) {
   }
 
   String pubIP = getPublicIP();
-  if (pubIP.length() > 0) {
-    json += ",\"public_ip\":\"" + pubIP + "\"";
+  if (pubIP.length() == 0) {
+    pubIP =
+        WiFi.localIP().toString(); // Fallback to local IP if public check fails
   }
+  json += ",\"public_ip\":\"" + pubIP + "\"";
   json += "}";
 
   String topic = "data/" + deviceID;
