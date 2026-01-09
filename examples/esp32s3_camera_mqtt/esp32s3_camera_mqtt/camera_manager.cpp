@@ -449,8 +449,7 @@ void processCameraLoop() {
                         ? 1
                         : 50; // 50ms = ~20 FPS drain for motion-only mode
 
-  if (now - lastFrameTime < minInterval)
-    return;
+  // Early check removed - must drain buffer first!
 
   camera_fb_t *fb = NULL;
 
