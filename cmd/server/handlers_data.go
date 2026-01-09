@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"datum-go/internal/auth"
@@ -78,6 +79,21 @@ func getLatestDataHandler(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "No data found"})
 		return
+	}
+
+	// Sanitize Public IP (fix for Docker/Internal IP leak)
+	if data, ok := point.Data.(map[string]interface{}); ok {
+		if ip, ok := data["public_ip"].(string); ok && strings.HasPrefix(ip, "172.") {
+			data["public_ip"] = ""
+		}
+	} else {
+		// Handle case where point.Data might not be map[string]interface{}
+		// But store.GetLatestData defines it as such in struct usually.
+		// Actually point.Data is map[string]interface{} in struct definition:
+		// type DataPoint struct { Data map[string]interface{} ... }
+		if ip, ok := point.Data["public_ip"].(string); ok && strings.HasPrefix(ip, "172.") {
+			point.Data["public_ip"] = ""
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -235,10 +251,14 @@ func getDataHistoryHandler(c *gin.Context) {
 		}
 	} else {
 		for _, p := range points {
+			data := p.Data
+			if ip, ok := data["public_ip"].(string); ok && strings.HasPrefix(ip, "172.") {
+				data["public_ip"] = ""
+			}
 			response = append(response, DataResponse{
 				Timestamp:   p.Timestamp.Format(time.RFC3339),
 				TimestampMs: p.Timestamp.UnixMilli(),
-				Data:        p.Data,
+				Data:        data,
 			})
 		}
 	}
