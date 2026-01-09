@@ -525,9 +525,9 @@ void processCameraLoop() {
             int w = fb->width;
             int h = fb->height;
 
-            // Must return FB to release driver lock!
-            esp_camera_fb_return(fb);
-            fb = NULL;
+            // Must return FB to release driver lock! -> NO! We need FB for
+            // saveFrameToSD! esp_camera_fb_return(fb); // REMOVED (Caused
+            // Crash) fb = NULL;                // REMOVED (Caused Crash)
 
             // Generate Base Filename (e.g. VID_2023...)
             String baseName = generateFileName(""); // Get timestamp part only?

@@ -504,6 +504,10 @@ void reportTelemetry(bool isBoot, bool isConnect) {
     json += "\"resolution\":\"VGA\",\"hmirror\":false,\"vflip\":false";
   }
 
+  String pubIP = getPublicIP();
+  if (pubIP.length() > 0) {
+    json += ",\"public_ip\":\"" + pubIP + "\"";
+  }
   json += "}";
 
   String topic = "data/" + deviceID;
