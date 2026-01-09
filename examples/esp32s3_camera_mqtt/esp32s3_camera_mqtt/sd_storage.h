@@ -17,15 +17,36 @@ bool initSD();
 
 // Save camera framebuffer to SD Card
 // Returns true on success
+// Filename is optional, if empty it generates one based on timestamp
 bool saveFrameToSD(camera_fb_t *fb, String filename = "");
+
+void setUserToken(String token);
+void setServerURL(String url);
+
+// Sync Time from Server
+void syncTime();
+
+// Video Recording (AVI)
+bool startRecording(String filename = "", uint16_t width = 640,
+                    uint16_t height = 480, uint8_t rate = 10);
+bool processRecording(camera_fb_t *fb);
+void stopRecording();
+bool isRecordingActive();
 
 // Create standard folders
 void createSDFolders();
 
 // List files in a directory (returns JSON string)
 String listSDFiles(String path = "/capture");
+bool deleteSDFile(String path); // New delete function
 
 // Check if SD is available
 bool isSDAvailable();
+
+// Generate Timestamped Filename
+String generateFileName(String ext);
+
+// Get Status Message
+String getSDStatus();
 
 #endif

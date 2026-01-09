@@ -71,6 +71,13 @@ Y7:    GPIO 12     HREF:  GPIO 47
 Y6:    GPIO 14     PCLK:  GPIO 13
 ```
 
+### 4. Features & Improvements
+- **Video Recording**: Automatically records 15-second AVI clips (MJPEG) to SD card when motion is detected (`/capture/VID_...avi`).
+- **Time Synchronization**: Syncs with server time to ensure files have correct timestamps.
+- **Dual Core Performance**: Camera and Motion Detection run on **Core 0** (dedicated FreeRTOS task), ensuring the Web UI and MQTT (on **Core 1**) remain responsive even during heavy video writes.
+- **Stabilized Resolution**: Video streaming and recording is capped at HD (1280x720) to ensure stability, while Snapshots can still be captured at full resolution (e.g. QXGA).
+- **SD Card Status**: Detailed reporting of SD card type, size, and health on the dashboard.
+
 ### 2. Freenove ESP32-S3 WROOM CAM
 ```
 XCLK:  GPIO 15     Y5:    GPIO 10

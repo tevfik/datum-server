@@ -17,14 +17,18 @@
  * License: MIT
  */
 
+#include "camera_manager.h" // Camera Manager Module
+#include "camera_pins.h"    // Camera Pins
 #include "esp_camera.h"
-#include "img_converters.h" // Required for decoding
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 #include <Preferences.h>
-#include <PubSubClient.h> // MQTT Support
+// PubSubClient included via mqtt_manager.h
+#include "mqtt_manager.h"
+#include "wifi_manager.h"
 
-int frameCounter = 0;
+// frameCounter moved to camera_manager.cpp, declaring extern here
+extern int frameCounter;
 
 // Methods for SD Card & Web Routes
 #include "sd_storage.h"
@@ -60,7 +64,8 @@ extern void neopixelWrite(uint8_t pin, uint8_t red, uint8_t green,
 // ============================================================================
 // #define CAMERA_MODEL_AI_THINKER
 // #define CAMERA_MODEL_ESP32S3_CAM
-#define CAMERA_MODEL_FREENOVE_S3
+// Camera Model selected in camera_manager.cpp
+// #define CAMERA_MODEL_FREENOVE_S3
 
 // ============================================================================
 // Configuration
@@ -77,81 +82,33 @@ extern void neopixelWrite(uint8_t pin, uint8_t red, uint8_t green,
 // ============================================================================
 // Pin Definitions
 // ============================================================================
-#if defined(CAMERA_MODEL_ESP32S3_CAM)
-#define PWDN_GPIO_NUM -1
-#define RESET_GPIO_NUM -1
-#define XCLK_GPIO_NUM 10
-#define SIOD_GPIO_NUM 40
-#define SIOC_GPIO_NUM 39
-#define Y9_GPIO_NUM 48
-#define Y8_GPIO_NUM 11
-#define Y7_GPIO_NUM 12
-#define Y6_GPIO_NUM 14
-#define Y5_GPIO_NUM 16
-#define Y4_GPIO_NUM 18
-#define Y3_GPIO_NUM 17
-#define Y2_GPIO_NUM 15
-#define VSYNC_GPIO_NUM 38
-#define HREF_GPIO_NUM 47
-#define PCLK_GPIO_NUM 13
-#define LED_GPIO_NUM 21
-#elif defined(CAMERA_MODEL_FREENOVE_S3)
-#define PWDN_GPIO_NUM -1
-#define RESET_GPIO_NUM -1
-#define XCLK_GPIO_NUM 15
-#define SIOD_GPIO_NUM 4
-#define SIOC_GPIO_NUM 5
-#define Y9_GPIO_NUM 16
-#define Y8_GPIO_NUM 17
-#define Y7_GPIO_NUM 18
-#define Y6_GPIO_NUM 12
-#define Y5_GPIO_NUM 10
-#define Y4_GPIO_NUM 8
-#define Y3_GPIO_NUM 9
-#define Y2_GPIO_NUM 11
-#define VSYNC_GPIO_NUM 6
-#define HREF_GPIO_NUM 7
-#define PCLK_GPIO_NUM 13
-#define LED_GPIO_NUM 48
-#elif defined(CAMERA_MODEL_AI_THINKER)
-#define PWDN_GPIO_NUM 32
-#define RESET_GPIO_NUM -1
-#define XCLK_GPIO_NUM 0
-#define SIOD_GPIO_NUM 26
-#define SIOC_GPIO_NUM 27
-#define Y9_GPIO_NUM 35
-#define Y8_GPIO_NUM 34
-#define Y7_GPIO_NUM 39
-#define Y6_GPIO_NUM 36
-#define Y5_GPIO_NUM 21
-#define Y4_GPIO_NUM 19
-#define Y3_GPIO_NUM 18
-#define Y2_GPIO_NUM 18
-#define Y2_GPIO_NUM 5
-#define VSYNC_GPIO_NUM 25
-#define HREF_GPIO_NUM 23
-#define PCLK_GPIO_NUM 22
-#define LED_GPIO_NUM 4
-#else
-#error "Camera model not selected!"
-#endif
+// Pin Definitions moved to camera_manager.cpp
 
 // ============================================================================
 // Globals
 // ============================================================================
 Preferences prefs;
+// MQTT Objects moved to mqtt_manager.cpp
+// WiFiClient espClient;
+// PubSubClient mqttClient(espClient);
 WebServer setupServer(SETUP_HTTP_PORT);
+HTTPClient httpStream;
 
+// Dual Core Globals
+// Dual Core Globals
+// camTaskHandle, cameraMutex moved to camera_manager.cpp
+
+// State Variables
 String deviceUID;
-String deviceMAC;
+String deviceName;
 String apiKey;
 String serverURL;
 String wifiSSID;
 String wifiPass;
 String deviceID;
-String userToken;  // Store token directly
-String mqttHost;   // Global to prevent dangling pointer in PubSubClient
-String deviceName; // Custom device name
+String deviceMAC;
+String userToken; // Store token directly
+// mqttHost moved to mqtt_manager.cpp
 
 // LED State Globals
 byte savedR = 255;
@@ -159,6 +116,10 @@ byte savedG = 255;
 byte savedB = 255;
 int savedBrightness = 100;
 bool torchState = false;
+
+// Task Handles
+TaskHandle_t networkTaskHandle = NULL;
+void networkTask(void *pvParameters);
 
 enum DeviceState {
   STATE_BOOT,
@@ -170,15 +131,15 @@ enum DeviceState {
 };
 DeviceState currentState = STATE_BOOT;
 
-bool streaming = false; // Cloud streaming state
+volatile bool streaming = false; // Cloud streaming state
 unsigned long lastFrameTime = 0;
 const char *ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 0;
 const int daylightOffset_sec = 0;
 
 // Forward Declarations
-void handleSnap(String resolution);
-framesize_t getFrameSizeFromName(String name);
+// Forward Declarations: handleSnap, getFrameSizeFromName moved to
+// camera_manager.h
 
 // Task handles
 TaskHandle_t streamTask;
@@ -244,167 +205,31 @@ bool ledState = false;
 unsigned long lastTelemetryTime = 0; // Telemetry timer
 
 HTTPClient httpCommand;
-HTTPClient httpStream;
-WiFiClient espClient;
-PubSubClient mqttClient(espClient);
+// Removed redundant httpStream, espClient, mqttClient
 
 bool requestRestart = false;
 bool isActivated() { return apiKey.length() > 0; }
 bool justConnected = false;
 bool initialBoot = true;
 
+void onWifiConnected() {
+  setServerURL(serverURL);
+  syncTime();
+}
+
 // ============================================================================
 // Web Interface (ESP-DASH Style)
 // ============================================================================
-const char DASHBOARD_HTML[] PROGMEM =
-    R"rawliteral(<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Datum Camera</title><style>body{background:#1b1b1b;color:white;font-family:sans-serif;margin:0;padding:20px}.card{background:#2d2d2d;padding:20px;margin-bottom:20px;border-radius:8px}.btn{background:#00bcd4;color:white;border:none;padding:10px;width:100%;border-radius:4px;font-size:16px;cursor:pointer;margin-top:5px}.btn-dan{background:#f44336}input{width:100%;padding:10px;margin:5px 0 15px;box-sizing:border-box;background:#444;border:none;color:white;border-radius:4px}img{width:100%;max-width:640px;display:block;margin:0 auto;background:black;border-radius:4px}.info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.info div{background:#333;padding:10px;border-radius:4px;text-align:center}label{display:block;margin-bottom:5px;color:#aaa;font-size:14px}</style></head><body><h1>📷 Datum Camera</h1><div class="card"><img id="stream" src="/capture"><div class="info"><div>Signal<br><b id="rssi">-</b></div><div>Uptime<br><b id="uptime">0s</b></div></div></div><div class="card"><h2>📡 Configuration</h2><form action="/configure" method="POST"><label>Server URL</label><input type="url" name="server_url" placeholder="https://..." required><label>WiFi SSID</label><input type="text" name="wifi_ssid" required><label>WiFi Password</label><input type="password" name="wifi_pass"><hr style="border-color:#444;margin:20px 0"><label>User Email</label><input type="email" name="user_email" required><label>User Password</label><input type="password" name="user_password" required><button type="submit" class="btn">Save & Restart</button></form></div><div class="card"><h2>⚡ Controls</h2><div style="display:flex;gap:10px"><button class="btn" onclick="fetch('/action?type=led')">Toggle LED</button><button class="btn btn-dan" onclick="if(confirm('Reboot?')) fetch('/action?type=restart')">Restart</button></div></div><script>const i=document.getElementById('stream');const l=()=>{setTimeout(()=>{i.src='/capture?t='+Date.now()},200)};i.onload=l;i.onerror=l;document.querySelector('form').onsubmit=(e)=>{e.preventDefault();const b=document.querySelector('button[type=submit]');b.disabled=true;b.innerText='Saving...';fetch('/configure',{method:'POST',body:new FormData(e.target)}).then(()=>{document.body.innerHTML='<div style="text-align:center;margin-top:50px"><h1>🔄 Restarting...</h1><p>Please connect to your WiFi network.</p></div>'}).catch(e=>alert('Error: '+e))};function update(){fetch('/info').then(r=>r.json()).then(d=>{document.getElementById('rssi').innerText='Active'}).catch(e=>console.log(e))}let s=0;setInterval(()=>{document.getElementById('uptime').innerText=Math.floor(++s/60)+'m '+(s%60)+'s'},1000);setInterval(update,5000);update()</script></body></html>)rawliteral";
+// DASHBOARD_HTML moved to web_routes.cpp
 
 // ============================================================================
 // Core Functions
 // ============================================================================
 
-String extractJsonVal(String json, String key) {
-  int keyIdx = json.indexOf("\"" + key + "\"");
-  if (keyIdx < 0)
-    return "";
-
-  // Find the colon after key
-  int colonIdx = json.indexOf(":", keyIdx);
-  if (colonIdx < 0)
-    return "";
-
-  // Find start of value (first quote after colon)
-  int valStart = json.indexOf("\"", colonIdx);
-  if (valStart < 0)
-    return "";
-
-  // Find end of value
-  int valEnd = json.indexOf("\"", valStart + 1);
-  if (valEnd < 0)
-    return "";
-
-  return json.substring(valStart + 1, valEnd);
-}
-
 // Helper to extract nested JSON object
-String extractNestedJsonVal(String json, String parentKey, String childKey) {
-  int parentIdx = json.indexOf("\"" + parentKey + "\":");
-  if (parentIdx < 0)
-    return "";
+// Helper functions (extractJson etc) moved to mqtt_manager.cpp/h
 
-  // Find start of object (look for { after parent key)
-  int objStart = json.indexOf("{", parentIdx);
-  if (objStart < 0)
-    return "";
-
-  // Find end of object (simple heuristic: first })
-  int objEnd = json.indexOf("}", objStart);
-  if (objEnd < 0)
-    return "";
-
-  String nested = json.substring(objStart, objEnd + 1);
-  return extractJsonVal(nested, childKey);
-}
-
-// Helper to extract numeric JSON value (robust)
-int extractJsonInt(String json, String key) {
-  int keyIdx = json.indexOf("\"" + key + "\"");
-  if (keyIdx < 0)
-    return -1;
-
-  int colonIdx = json.indexOf(":", keyIdx);
-  if (colonIdx < 0)
-    return -1;
-
-  // Skip whitespace/quotes/brackets to find start of number
-  int s = colonIdx + 1;
-  while (s < json.length() && !isDigit(json.charAt(s)) &&
-         json.charAt(s) != '-') {
-    s++;
-  }
-
-  if (s >= json.length())
-    return -1;
-
-  int e = s;
-  while (e < json.length() &&
-         (isDigit(json.charAt(e)) || json.charAt(e) == '-')) {
-    e++;
-  }
-  return json.substring(s, e).toInt();
-}
-
-// Helper to extract boolean JSON value (true/false or 1/0)
-bool extractJsonBool(String json, String key) {
-  int keyIdx = json.indexOf("\"" + key + "\"");
-  if (keyIdx < 0)
-    return false;
-
-  int colonIdx = json.indexOf(":", keyIdx);
-  if (colonIdx < 0)
-    return false;
-
-  // Look ahead for "true", "1", or "false", "0"
-  String remainder = json.substring(colonIdx + 1);
-  remainder.trim(); // Trim leading whitespace
-
-  if (remainder.startsWith("true") || remainder.startsWith("1"))
-    return true;
-  return false;
-}
-
-// Helper to get framesize from string
-framesize_t getFrameSizeFromName(String name) {
-  if (name == "QCIF")
-    return FRAMESIZE_QCIF;
-  if (name == "QVGA")
-    return FRAMESIZE_QVGA;
-  if (name == "CIF")
-    return FRAMESIZE_CIF;
-  if (name == "VGA")
-    return FRAMESIZE_VGA;
-  if (name == "SVGA")
-    return FRAMESIZE_SVGA;
-  if (name == "XGA")
-    return FRAMESIZE_XGA;
-  if (name == "HD")
-    return FRAMESIZE_HD;
-  if (name == "SXGA")
-    return FRAMESIZE_SXGA;
-  if (name == "UXGA")
-    return FRAMESIZE_UXGA;
-  if (name == "QXGA")
-    return FRAMESIZE_QXGA;
-  return FRAMESIZE_VGA; // Default
-}
-
-// Helper to get string name from framesize
-String getFrameSizeName(framesize_t size) {
-  switch (size) {
-  case FRAMESIZE_QCIF:
-    return "QCIF";
-  case FRAMESIZE_QVGA:
-    return "QVGA";
-  case FRAMESIZE_CIF:
-    return "CIF";
-  case FRAMESIZE_VGA:
-    return "VGA";
-  case FRAMESIZE_SVGA:
-    return "SVGA";
-  case FRAMESIZE_XGA:
-    return "XGA";
-  case FRAMESIZE_HD:
-    return "HD";
-  case FRAMESIZE_SXGA:
-    return "SXGA";
-  case FRAMESIZE_UXGA:
-    return "UXGA";
-  case FRAMESIZE_QXGA:
-    return "QXGA";
-  default:
-    return "Unknown";
-  }
-}
+// Frame Size helpers moved to camera_manager.cpp/h
 
 // Check for Factory Reset (Boot Button held manually during runtime)
 unsigned long buttonPressStart = 0;
@@ -570,232 +395,12 @@ void initDeviceUID() {
   deviceMAC = String(buf2);
 }
 
-bool initCamera() {
-  camera_config_t config;
-  config.ledc_channel = LEDC_CHANNEL_0;
-  config.ledc_timer = LEDC_TIMER_0;
-  config.pin_d0 = Y2_GPIO_NUM;
-  config.pin_d1 = Y3_GPIO_NUM;
-  config.pin_d2 = Y4_GPIO_NUM;
-  config.pin_d3 = Y5_GPIO_NUM;
-  config.pin_d4 = Y6_GPIO_NUM;
-  config.pin_d5 = Y7_GPIO_NUM;
-  config.pin_d6 = Y8_GPIO_NUM;
-  config.pin_d7 = Y9_GPIO_NUM;
-  config.pin_xclk = XCLK_GPIO_NUM;
-  config.pin_pclk = PCLK_GPIO_NUM;
-  config.pin_vsync = VSYNC_GPIO_NUM;
-  config.pin_href = HREF_GPIO_NUM;
-  config.pin_sccb_sda = SIOD_GPIO_NUM;
-  config.pin_sccb_scl = SIOC_GPIO_NUM;
-  config.pin_pwdn = PWDN_GPIO_NUM;
-  config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 10000000; // Reduced to 10MHz for OV3660 stability
-  config.pixel_format = PIXFORMAT_JPEG;
-  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY; // Only capture when buffer is free
-
-  if (psramFound()) {
-    Serial.printf("PSRAM Found! Size: %d bytes, Free: %d bytes\n",
-                  ESP.getPsramSize(), ESP.getFreePsram());
-    config.frame_size = FRAMESIZE_VGA;
-    config.jpeg_quality = 12;
-    config.fb_count = 2; // Double buffering to prevent tearing/overflow
-    config.fb_location = CAMERA_FB_IN_PSRAM;
-    config.grab_mode = CAMERA_GRAB_LATEST; // Always get the freshest frame
-  } else {
-    Serial.println("WARNING: No PSRAM! High-res will fail.");
-    config.frame_size = FRAMESIZE_QVGA;
-    config.jpeg_quality = 20;
-    config.fb_count = 1;
-    config.fb_location = CAMERA_FB_IN_DRAM;
-  }
-
-  esp_err_t err = esp_camera_init(&config);
-  if (err == ESP_OK) {
-    sensor_t *s = esp_camera_sensor_get();
-    if (s) {
-      s->set_hmirror(s, 1);
-      s->set_vflip(s, 1);
-    }
-  }
-  return err == ESP_OK;
-}
+// initCamera moved to camera_manager.cpp
 
 // ============================================================================
 // Handlers
 // ============================================================================
-void handleSetupRoot() { setupServer.send(200, "text/html", DASHBOARD_HTML); }
-
-void handleStream() {
-  WiFiClient client = setupServer.client();
-  String response = "HTTP/1.1 200 OK\r\nContent-Type: "
-                    "multipart/x-mixed-replace; boundary=frame\r\n\r\n";
-  setupServer.sendContent(response);
-
-  while (client.connected()) {
-    camera_fb_t *fb = esp_camera_fb_get();
-    if (!fb) {
-      setupServer.sendContent("\r\n");
-      break;
-    }
-
-    String head = "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " +
-                  String(fb->len) + "\r\n\r\n";
-    setupServer.sendContent(head);
-    client.write(fb->buf, fb->len);
-    setupServer.sendContent("\r\n");
-    esp_camera_fb_return(fb);
-    delay(1);
-  }
-}
-
-void handleAction() {
-  String type = setupServer.arg("type");
-  if (type == "led") {
-#ifdef LED_GPIO_NUM
-#if LED_GPIO_NUM == 48
-    torchState = !torchState;
-    neopixelWrite(LED_GPIO_NUM, torchState ? 255 : 0, torchState ? 255 : 0,
-                  torchState ? 255 : 0);
-#else
-    digitalWrite(LED_GPIO_NUM, HIGH);
-    delay(200);
-    digitalWrite(LED_GPIO_NUM, LOW);
-#endif
-#endif
-    setupServer.send(200, "text/plain", "OK");
-  } else if (type == "restart") {
-    setupServer.send(200, "text/plain", "Restarting...");
-    delay(100);
-    ESP.restart();
-  } else {
-    setupServer.send(400, "text/plain", "Unknown");
-  }
-}
-
-void handleDeviceInfo() {
-  String json = "{";
-  json += "\"device_uid\":\"" + deviceUID + "\",";
-  json += "\"mac_address\":\"" + deviceMAC + "\",";
-  json += "\"firmware_version\":\"" + String(FIRMWARE_VERSION) + "\",";
-  json += "\"device_type\":\"camera\","; // Added for Unified Onboarding
-  json += "\"status\":\"" +
-          String(isActivated() ? "configured" : "unconfigured") + "\"";
-  json += "}";
-  setupServer.send(200, "application/json", json);
-}
-
-// WoT (Web of Things) Discovery Endpoint
-void handleThingDescription() {
-  String json = "{";
-  json += "\"@context\": \"https://www.w3.org/2019/wot/td/v1\",";
-  json += "\"id\": \"urn:dev:ops:" + deviceUID + "\",";
-  json += "\"title\": \"Datum Camera\",";
-  json += "\"device_type\": \"camera\","; // Custom extension for App Factory
-  json +=
-      "\"securityDefinitions\": {\"bearer_sec\": {\"scheme\": \"bearer\"}},";
-  json += "\"security\": \"bearer_sec\",";
-  json += "\"properties\": {";
-  json += "  \"status\": {\"type\": \"string\", \"description\": \"Device "
-          "Status\"},";
-  json += "  \"rssi\": {\"type\": \"integer\", \"description\": \"WiFi Signal "
-          "Strength\"}";
-  json += "},";
-  json += "\"actions\": {";
-  json += "  \"snapshot\": {\"description\": \"Take a photo\"},";
-  json += "  \"stream\": {\"description\": \"Start video stream\"},";
-  json += "  \"toggle_led\": {\"description\": \"Toggle Flashlight\"},";
-  json += "  \"update_firmware\": {\"description\": \"OTA Update\"}";
-  json += "}";
-  json += "}";
-  setupServer.send(200, "application/td+json", json);
-}
-
-void handleCapture() {
-  camera_fb_t *fb = esp_camera_fb_get();
-  if (!fb) {
-    setupServer.send(500, "text/plain", "Error");
-    return;
-  }
-  setupServer.sendHeader("Content-Disposition", "inline; filename=capture.jpg");
-  setupServer.send_P(200, "image/jpeg", (const char *)fb->buf, fb->len);
-  esp_camera_fb_return(fb);
-}
-
-// Handle JSON provisioning from Mobile App
-void handleProvision() {
-  if (setupServer.method() != HTTP_POST) {
-    setupServer.send(405, "text/plain", "Method Not Allowed");
-    return;
-  }
-
-  String body = setupServer.arg("plain");
-  String u = extractJsonVal(body, "server_url");
-  String s = extractJsonVal(body, "wifi_ssid");
-  String p = extractJsonVal(body, "wifi_pass");
-
-  if (u.length() == 0 || s.length() == 0) {
-    setupServer.send(400, "application/json", "{\"error\":\"Missing fields\"}");
-    return;
-  }
-
-  saveCredentials(
-      u, s, p, "",
-      ""); // Clear user creds and name as they are not needed on device
-
-  setupServer.send(200, "application/json",
-                   "{\"status\":\"success\",\"message\":\"Credentials saved. "
-                   "Restarting...\"}");
-  delay(500);
-  ESP.restart();
-}
-
-// Scan for WiFi networks and return JSON list
-void handleScan() {
-  int n = WiFi.scanNetworks();
-  String json = "[";
-  for (int i = 0; i < n; ++i) {
-    if (i)
-      json += ",";
-    json += "{\"ssid\":\"" + WiFi.SSID(i) + "\",";
-    json += "\"rssi\":" + String(WiFi.RSSI(i)) + ",";
-    json +=
-        "\"auth\":" +
-        String(WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "false" : "true") +
-        "}";
-  }
-  json += "]";
-  setupServer.send(200, "application/json", json);
-}
-
-void handleConfigure() {
-  String u = setupServer.arg("server_url");
-  String s = setupServer.arg("wifi_ssid");
-  String p = setupServer.arg("wifi_pass");
-  String token = setupServer.arg("user_token");
-  String name = setupServer.arg("device_name");
-
-  if (u.length() == 0 || s.length() == 0 || token.length() == 0) {
-    setupServer.send(400, "text/plain", "Missing fields");
-    return;
-  }
-  // Save credentials including user token and device name for
-  // self-registration
-  saveCredentials(u, s, p, token, name);
-
-  String html =
-      R"(<html><body style='background:#1b1b1b;color:white;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif'>
-        <div style='background:#2d2d2d;padding:40px;border-radius:12px;text-align:center'>
-        <h1>✅ Saved!</h1><p>Restarting...</p></div></body></html>)";
-  setupServer.send(200, "text/html", html);
-  delay(2000);
-  ESP.restart();
-}
-
-void handleNotFound() {
-  setupServer.sendHeader("Location", "/");
-  setupServer.send(302, "text/plain", "Redirect");
-}
+// Handlers moved to web_routes.cpp
 
 void startSetupMode() {
   Serial.println("Starting Setup Mode"); // Always print critical state changes
@@ -805,17 +410,7 @@ void startSetupMode() {
   String ap = String(SETUP_AP_PREFIX) + deviceUID.substring(8);
   WiFi.softAP(ap.c_str(), SETUP_AP_PASSWORD);
 
-  setupServer.on("/", HTTP_GET, handleSetupRoot);
-  setupServer.on("/stream", HTTP_GET, handleStream);
-  setupServer.on("/capture", HTTP_GET, handleCapture);
-  setupServer.on("/info", HTTP_GET, handleDeviceInfo);
-  setupServer.on("/.well-known/wot-thing-description", HTTP_GET,
-                 handleThingDescription);        // WoT Discovery
-  setupServer.on("/scan", HTTP_GET, handleScan); // Add scan endpoint
-  setupServer.on("/action", HTTP_GET, handleAction);
-  setupServer.on("/configure", HTTP_POST, handleConfigure);
-  setupServer.on("/provision", HTTP_POST, handleProvision);
-  setupServer.onNotFound(handleNotFound);
+  setupWebRoutes(setupServer, apiKey);
   setupServer.begin();
 }
 
@@ -826,334 +421,15 @@ void startSetupMode() {
 // Forward declaration
 void ackCommand(String cmdId);
 
-bool reconnectMQTT() {
-  if (mqttClient.connected())
-    return true;
-
-  DEBUG_PRINT("Attempting MQTT connection to: ");
-  DEBUG_PRINTLN(mqttHost);
-
-  // Debug DNS Resolution
-  IPAddress ip;
-  if (WiFi.hostByName(mqttHost.c_str(), ip)) {
-    DEBUG_PRINT("Resolved IP: ");
-    DEBUG_PRINTLN(ip);
-  } else {
-    DEBUG_PRINTLN("DNS Resolution FAILED!");
-  }
-
-  if (apiKey.length() == 0) {
-    DEBUG_PRINTLN("Skipping MQTT connection: No API Key");
-    return false;
-  }
-
-  String clientId = deviceID;
-
-  if (mqttClient.connect(clientId.c_str(), deviceID.c_str(), apiKey.c_str())) {
-    DEBUG_PRINTLN("connected");
-    String cmdTopic = "cmd/" + deviceID;
-    mqttClient.subscribe(cmdTopic.c_str());
-    DEBUG_PRINTLN("Subscribed to " + cmdTopic);
-    return true;
-  } else {
-    DEBUG_PRINT("failed, rc=");
-    int rc = mqttClient.state();
-    DEBUG_PRINT(rc);
-    if (rc == 5) {
-      DEBUG_PRINTLN(" (MQTT_CONNECT_UNAUTHORIZED) - Check API Key or Factory "
-                    "Reset Device!");
-    }
-    DEBUG_PRINTLN(" try again in 5 seconds");
-    return false;
-  }
-}
-
-void mqttCallback(char *topic, byte *payload, unsigned int length) {
-  DEBUG_PRINT("Message arrived [");
-  DEBUG_PRINT(topic);
-  DEBUG_PRINT("] ");
-
-  String pl = "";
-  for (int i = 0; i < length; i++) {
-    pl += (char)payload[i];
-  }
-  DEBUG_PRINTLN(pl);
-
-  String pid = extractJsonVal(pl, "id");
-  if (pid.length() == 0)
-    pid = extractJsonVal(pl, "command_id");
-  String action = extractJsonVal(pl, "action");
-
-  String paramsBlock = "";
-  int pstart = pl.indexOf("\"params\":");
-  if (pstart > 0) {
-    int pvalStart = pl.indexOf('{', pstart);
-    if (pvalStart > 0) {
-      int pend = pvalStart;
-      int pcount = 1;
-      while (pcount > 0 && pend < pl.length() - 1) {
-        pend++;
-        if (pl.charAt(pend) == '{')
-          pcount++;
-        else if (pl.charAt(pend) == '}')
-          pcount--;
-      }
-      if (pcount == 0)
-        paramsBlock = pl.substring(pvalStart, pend + 1);
-    }
-  }
-
-  if (pid.length() > 0 && action.length() > 0) {
-    DEBUG_PRINTLN("Processing MQTT Command: " + pid + " Action: " + action);
-
-    ackCommand(pid);
-
-    if (action == "update_settings") {
-      // 1. Resolution (Stream) - "vres" or "resolution"
-      String vres = extractJsonVal(paramsBlock, "vres");
-      if (vres.length() == 0)
-        vres = extractJsonVal(paramsBlock, "resolution");
-
-      // 2. Resolution (Snapshot) - "ires"
-      String ires = extractJsonVal(paramsBlock, "ires");
-      if (ires.length() > 0) {
-        prefs.begin("datum", false);
-        prefs.putString("pref_ires", ires);
-        prefs.end();
-      }
-
-      // 3. LED Color - "lcol" or "led_color"
-      String lcol = extractJsonVal(paramsBlock, "lcol");
-      if (lcol.length() == 0)
-        lcol = extractJsonVal(paramsBlock, "led_color");
-      if (lcol.length() > 0) {
-        // Verify hex format #RRGGBB
-        if (lcol.startsWith("#")) {
-          long number = strtol(&lcol.c_str()[1], NULL, 16);
-          savedR = number >> 16;
-          savedG = number >> 8 & 0xFF;
-          savedB = number & 0xFF;
-
-          // Save to prefs
-          prefs.begin("datum", false);
-          prefs.putString("pref_lcol", lcol);
-          prefs.end();
-        }
-      }
-
-      // 4. LED Brightness - "lbri" or "led_brightness"
-      int lbri = extractJsonInt(paramsBlock, "lbri");
-      if (lbri == -1)
-        lbri = extractJsonInt(paramsBlock, "led_brightness");
-      if (lbri != -1) {
-        savedBrightness = lbri;
-        prefs.begin("datum", false);
-        prefs.putInt("pref_lbri", savedBrightness);
-        prefs.end();
-      }
-
-      // 5. LED Power - "led"
-      if (paramsBlock.indexOf("\"led\":") != -1) {
-        torchState = extractJsonBool(paramsBlock, "led");
-      }
-
-// Apply LED
-#ifdef LED_GPIO_NUM
-      int r = 0, g = 0, b = 0;
-      if (torchState) {
-        r = (savedR * savedBrightness) / 100;
-        g = (savedG * savedBrightness) / 100;
-        b = (savedB * savedBrightness) / 100;
-      }
-#if LED_GPIO_NUM == 48
-      neopixelWrite(LED_GPIO_NUM, r, g, b);
-#else
-      digitalWrite(LED_GPIO_NUM, (r + g + b > 0) ? HIGH : LOW);
-#endif
-#endif
-
-      // 6. Motion Settings
-      if (paramsBlock.indexOf("\"mot\":") != -1) {
-        motionEnabled = extractJsonBool(paramsBlock, "mot");
-        prefs.begin("datum", false);
-        prefs.putBool("pref_mot", motionEnabled);
-        prefs.end();
-      }
-
-      int msens = extractJsonInt(paramsBlock, "msens");
-      if (msens != -1) {
-        // High Sens (100) -> Low Thresholds
-        // Low Sens (0)   -> High Thresholds
-        motionThreshold =
-            map(msens, 0, 100, 60,
-                5); // Pixel Intensity: 60 (Low Sens) to 5 (High Sens)
-        // map() for floats isn't standard, do it manually or cast:
-        // Area: 0 -> 20%, 100 -> 1%
-        float areaMin = 1.0;
-        float areaMax = 20.0;
-        motionMinAreaPct =
-            areaMax - ((float)msens / 100.0 * (areaMax - areaMin));
-
-        prefs.begin("datum", false);
-        prefs.putInt("pref_msens", msens);
-        prefs.end();
-      }
-
-      int mper = extractJsonInt(paramsBlock, "mper");
-      if (mper != -1) {
-        motionPeriodMs = mper * 1000;
-        if (motionPeriodMs < 500)
-          motionPeriodMs = 500;
-        prefs.begin("datum", false);
-        prefs.putInt("pref_mper", mper);
-        prefs.end();
-      }
-
-      // 7. Orientation - "imir"/"hmirror", "iflip"/"vflip"
-      bool hasMirror = false, mirrorVal = false;
-      if (paramsBlock.indexOf("\"imir\":") != -1) {
-        hasMirror = true;
-        mirrorVal = extractJsonBool(paramsBlock, "imir");
-      } else if (paramsBlock.indexOf("\"hmirror\":") != -1) {
-        hasMirror = true;
-        mirrorVal = extractJsonBool(paramsBlock, "hmirror");
-      }
-
-      bool hasFlip = false, flipVal = false;
-      if (paramsBlock.indexOf("\"iflip\":") != -1) {
-        hasFlip = true;
-        flipVal = extractJsonBool(paramsBlock, "iflip");
-      } else if (paramsBlock.indexOf("\"vflip\":") != -1) {
-        hasFlip = true;
-        flipVal = extractJsonBool(paramsBlock, "vflip");
-      }
-
-      sensor_t *s = esp_camera_sensor_get();
-      if (s) {
-        if (vres.length() > 0) {
-          framesize_t newSize = getFrameSizeFromName(vres);
-          if (s->status.framesize != newSize) {
-            bool wasStreaming = streaming;
-            streaming = false;
-            delay(100);
-            s->set_framesize(s, newSize);
-            streaming = wasStreaming;
-
-            // Save Res
-            prefs.begin("datum", false);
-            prefs.putString("pref_vres", vres); // Changed from pref_res
-            prefs.end();
-          }
-        }
-
-        if (hasMirror) {
-          s->set_hmirror(s, mirrorVal ? 1 : 0);
-          prefs.begin("datum", false);
-          prefs.putBool("pref_imir", mirrorVal);
-          prefs.end();
-        }
-
-        if (hasFlip) {
-          s->set_vflip(s, flipVal ? 1 : 0);
-          prefs.begin("datum", false);
-          prefs.putBool("pref_iflip", flipVal);
-          prefs.end();
-        }
-      }
-    } else if (action == "stream") {
-      String state = extractJsonVal(paramsBlock, "state");
-      streaming = (state == "on");
-      DEBUG_PRINTLN(streaming ? "Streaming STARTED" : "Streaming STOPPED");
-
-    } else if (action == "snap") {
-      String snapRes = extractJsonVal(paramsBlock, "resolution");
-      handleSnap(snapRes);
-
-    } else if (action == "restart") {
-      ESP.restart();
-
-    } else if (action == "led") {
-#ifdef LED_GPIO_NUM
-#if LED_GPIO_NUM == 48
-      torchState = !torchState;
-      neopixelWrite(LED_GPIO_NUM, torchState ? 255 : 0, torchState ? 255 : 0,
-                    torchState ? 255 : 0);
-#endif
-#endif
-    }
-  }
-}
-
-String getMQTTHost() {
-  int start = serverURL.indexOf("://");
-  if (start == -1)
-    start = 0;
-  else
-    start += 3;
-
-  int end = serverURL.indexOf("/", start);
-  String host = (end == -1) ? serverURL.substring(start)
-                            : serverURL.substring(start, end);
-
-  int portIdx = host.indexOf(":");
-  if (portIdx != -1) {
-    host = host.substring(0, portIdx);
-  }
-  return host;
-}
-
-// Setup MQTT with Global Host string to prevent pointer reuse issues
-void setupMQTT() {
-  mqttHost = getMQTTHost();
-  DEBUG_PRINTLN("MQTT Host: " + mqttHost);
-
-  // Set timeout to 10s (10000 ms) for slow connections
-  espClient.setTimeout(10000);
-
-  // PubSubClient stores the pointer, so we MUST use a global/static string
-  mqttClient.setServer(mqttHost.c_str(), 1883);
-  mqttClient.setCallback(mqttCallback);
-
-  // 4096 was causing malformed packets? Reducing to safe 1024.
-  // Telemetry is ~300 bytes.
-  mqttClient.setBufferSize(1024);
-  mqttClient.setKeepAlive(60); // 60s keepalive
-}
+// mqttCallback, getMQTTHost, setupMQTT moved to mqtt_manager.cpp
 
 void startCameraServer() {
-  setupServer.on("/", HTTP_GET, handleSetupRoot);
-  setupServer.on("/stream", HTTP_GET, handleStream);
-  setupServer.on("/capture", HTTP_GET, handleCapture);
-  setupServer.on("/info", HTTP_GET, handleDeviceInfo);
-  setupServer.on("/.well-known/wot-thing-description", HTTP_GET,
-                 handleThingDescription); // WoT Discovery
-  setupServer.on("/action", HTTP_GET, handleAction);
-  setupServer.on("/configure", HTTP_POST, handleConfigure);
-  setupServer.on("/provision", HTTP_POST, handleProvision);
-  setupServer.onNotFound(handleNotFound);
+  setupWebRoutes(setupServer, apiKey);
   setupServer.begin();
 }
 
-bool connectToWiFi() {
-  Serial.printf("Connecting to %s\n", wifiSSID.c_str());
-  currentState = STATE_CONNECTING;
-  WiFi.setSleep(false); // Disable power saving to prevent connection crashes
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(wifiSSID.c_str(), wifiPass.c_str());
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 40) {
-    Serial.print(".");
-    delay(500);
-    updateLED();
-    attempts++;
-  }
-  Serial.println();
-  if (WiFi.status() == WL_CONNECTED) {
-    justConnected = true;
-    return true;
-  }
-  return false;
-}
+// connectToWiFi removal logic
+// connectToWiFi moved to wifi_manager.cpp
 
 bool attemptSelfRegistration() {
   if (userToken.length() == 0)
@@ -1240,104 +516,10 @@ bool activateProvisioning() {
 }
 
 // Helper to ACK commands so they don't loop
-void ackCommand(String cmdId) {
-  HTTPClient http;
-  http.begin(serverURL + "/devices/" + deviceID + "/commands/" + cmdId +
-             "/ack");
-  http.addHeader("Authorization", "Bearer " + apiKey);
-  http.addHeader("Content-Type", "application/json");
-  http.POST("{\"status\":\"executed\"}");
-  http.end();
-}
+// ackCommand moved to mqtt_manager.cpp
 
 // Telemetry Configuration
-const unsigned long TELEMETRY_INTERVAL = 60000; // 60s
-
-String getResetReasonString() {
-  esp_reset_reason_t reason = esp_reset_reason();
-  switch (reason) {
-  case ESP_RST_POWERON:
-    return "Power On";
-  case ESP_RST_SW:
-    return "Software Reset";
-  case ESP_RST_PANIC:
-    return "Exception/Panic";
-  case ESP_RST_INT_WDT:
-    return "Watchdog (Interrupt)";
-  case ESP_RST_TASK_WDT:
-    return "Watchdog (Task)";
-  case ESP_RST_WDT:
-    return "Watchdog (Other)";
-  case ESP_RST_DEEPSLEEP:
-    return "Deep Sleep";
-  case ESP_RST_BROWNOUT:
-    return "Brownout";
-  case ESP_RST_SDIO:
-    return "SDIO";
-  default:
-    return "Unknown";
-  }
-}
-
-void reportTelemetry(bool isBoot, bool isConnect) {
-  if (deviceID.length() == 0 || apiKey.length() == 0)
-    return;
-  if (!WiFi.isConnected())
-    return;
-
-  // Base Heartbeat Data (Always Sent)
-  String json = "{";
-  json += "\"rssi\":" + String(WiFi.RSSI()) + ",";
-  json += "\"uptime\":" + String(millis() / 1000) + ",";
-  json += "\"free_heap\":" + String(ESP.getFreeHeap()) + ",";
-  json += "\"status\":\"online\"";
-
-  // Connection Event Data
-  if (isConnect) {
-    json += ",";
-    json += "\"local_ip\":\"" + WiFi.localIP().toString() + "\",";
-    json += "\"ssid\":\"" + WiFi.SSID() + "\",";
-    json += "\"bssid\":\"" + WiFi.BSSIDstr() + "\",";
-    json += "\"channel\":" + String(WiFi.channel()) + "";
-  }
-
-  // Boot Event Data (Send Full State)
-  json += ",";
-  if (isBoot) {
-    json += "\"fw_ver\":\"" + String(FIRMWARE_VERSION) + "\",";
-    json += "\"reset_reason\":\"" + getResetReasonString() + "\",";
-  }
-
-  // Settings State
-  char hexColor[8];
-  sprintf(hexColor, "#%02X%02X%02X", savedR, savedG, savedB);
-  json += "\"led_color\":\"" + String(hexColor) + "\",";
-  json += "\"led_brightness\":" + String(savedBrightness) + ",";
-  json += "\"led_on\":" + String(torchState ? "true" : "false") + ",";
-
-  sensor_t *s = esp_camera_sensor_get();
-  if (s) {
-    json += "\"resolution\":\"" + getFrameSizeName(s->status.framesize) + "\",";
-    json += "\"hmirror\":" + String(s->status.hmirror ? "true" : "false") + ",";
-    json += "\"vflip\":" + String(s->status.vflip ? "true" : "false");
-  } else {
-    // Fallback defaults
-    json += "\"resolution\":\"VGA\",\"hmirror\":false,\"vflip\":false";
-  }
-
-  json += "}";
-
-  DEBUG_PRINTLN("Sending MQTT Telemetry (Boot=" + String(isBoot) +
-                ", Connect=" + String(isConnect) + "): " + json);
-
-  // Publish to MQTT
-  String topic = "data/" + deviceID;
-  if (mqttClient.connected()) {
-    mqttClient.publish(topic.c_str(), json.c_str());
-  } else {
-    DEBUG_PRINTLN("MQTT Not Connected! Telemetry skipped.");
-  }
-}
+// Telemetry moved to mqtt_manager.cpp
 
 void checkCommands() {
   // Check every 1 second
@@ -1433,20 +615,23 @@ void checkCommands() {
             if (resolution.length() > 0) {
               framesize_t newSize = getFrameSizeFromName(resolution);
 
-              // Cap Streaming Resolution to HD (1280x720) to prevent memory
-              // crashes Snapshots can still be higher (handled via "snap"
-              // action)
-              if (newSize > FRAMESIZE_HD) {
-                newSize = FRAMESIZE_HD;
-                Serial.println("Stream Resolution capped to HD");
-              }
+              // Removed Cap: Allow server to set any resolution to avoid
+              // command loops. User must choose appropriate resolution for
+              // stability.
 
               if (s->status.framesize != newSize) {
+                // Mutex Lock for Sensor Change
+                if (cameraMutex != NULL)
+                  xSemaphoreTake(cameraMutex, portMAX_DELAY);
+
                 bool wasStreaming = streaming;
                 streaming = false;
                 delay(100);
                 s->set_framesize(s, newSize);
                 streaming = wasStreaming;
+
+                if (cameraMutex != NULL)
+                  xSemaphoreGive(cameraMutex);
               }
             }
             if (paramsBlock.indexOf("hmirror") != -1)
@@ -1495,246 +680,95 @@ void checkCommands() {
   http.end();
 }
 
+#include <WiFiClientSecure.h>
+
+WiFiClientSecure uploadClient;
+bool uploadClientConnected = false;
+
 void uploadFrame(camera_fb_t *fb) {
-  // Use Global httpStream to allow Keep-Alive (reuse connection)
-  httpStream.setReuse(true);
-  httpStream.setTimeout(15000); // 15s for high-res uploads
-  httpStream.begin(serverURL + "/devices/" + deviceID + "/stream/frame");
-  httpStream.addHeader("Authorization", "Bearer " + apiKey);
-  httpStream.addHeader("Content-Type", "image/jpeg");
-
-  int httpCode = httpStream.POST(fb->buf, fb->len);
-
-  if (httpCode == 200) {
-    // Only print verbose logs if debugging or occasionally to reduce Serial
-    // overhead? Serial.printf("[UPLOAD] OK: %d bytes sent\n", fb->len);
-  } else {
-    Serial.printf("[UPLOAD] FAILED! HTTP %d, size: %d bytes\n", httpCode,
-                  fb->len);
+  // 1. Ensure TCP/SSL Connection is Open
+  if (!uploadClient.connected()) {
+    Serial.println("[UPLOAD] Connecting to server...");
+    uploadClient.setInsecure(); // Skip cert check for speed/simplicity
+    // Parse host and port from serverURL (assuming https://datum.bezg.in)
+    // Hardcoded for now based on DEFAULT_SERVER_URL, ideally parse it.
+    // datum.bezg.in:443
+    if (!uploadClient.connect("datum.bezg.in", 443)) {
+      Serial.println("[UPLOAD] Connection failed!");
+      return;
+    }
+    Serial.println("[UPLOAD] Connected!");
+    uploadClientConnected = true;
   }
-  // With setReuse(true), enc() should not close the TCP connection
-  httpStream.end();
+
+  // 2. Send HTTP Headers (Keep-Alive!)
+  String head = "";
+  head += "POST /devices/" + deviceID + "/stream/frame HTTP/1.1\r\n";
+  head += "Host: datum.bezg.in\r\n";
+  head += "Authorization: Bearer " + apiKey + "\r\n";
+  head += "Content-Type: image/jpeg\r\n";
+  head += "Content-Length: " + String(fb->len) + "\r\n";
+  head += "Connection: keep-alive\r\n"; // Critical for persistence
+  head += "\r\n";
+
+  uploadClient.print(head);
+
+  // 3. Send Body (Image Data)
+  // Split into chunks if needed, but client.write handles it usually.
+  // For large buffers, write in chunks to avoid watchdog?
+  // ESP32 client.write can handle ~15KB fine usually.
+
+  const uint8_t *data = fb->buf;
+  size_t len = fb->len;
+  size_t written = 0;
+  size_t chunkSize = 1024;
+
+  while (written < len) {
+    size_t toWrite = (len - written) > chunkSize ? chunkSize : (len - written);
+    size_t r = uploadClient.write(data + written, toWrite);
+    if (r == 0) {
+      Serial.println("[UPLOAD] Write failed/timeout");
+      uploadClient.stop();
+      return;
+    }
+    written += r;
+  }
+
+  // 4. Read Response (Non-blocking check or minimal wait)
+  // We don't want to wait for full body, just header to confirm 200 OK?
+  // Actually, for max speed, Fire-and-Forget style (pipelining) is risky but
+  // fast. Better: Read headers, disregard body.
+
+  // Simple read-until-end-of-headers loop with timeout
+  unsigned long timeout = millis();
+  while (uploadClient.connected()) {
+    if (uploadClient.available()) {
+      String line = uploadClient.readStringUntil('\n');
+      if (line == "\r")
+        break; // End of headers
+      if (millis() - timeout > 2000) {
+        Serial.println("[UPLOAD] Timeout waiting for response");
+        uploadClient.stop();
+        return;
+      }
+    } else {
+      if (millis() - timeout > 500) { // Wait only 500ms max for first byte
+        // Maybe lost connection?
+        break;
+      }
+      delay(1);
+    }
+  }
+
+  // Drain response body if any (usually short JSON)
+  while (uploadClient.available()) {
+    uploadClient.read();
+  }
 }
 
 // Motion: Check using EIF module (Grayscale Diff)
-bool checkMotion(camera_fb_t *fb) {
-  if (eif_motion_check(fb)) {
-    // Trigger Logic is handled inside, here we can do MQTT things if needed
-    // The module updates lastMotionTime automatically
-    return true;
-  }
-  return false;
-}
-
-// Unified Camera Loop: Handles Streaming AND Motion Detection
-void processCameraLoop() {
-  unsigned long now = millis();
-
-  // If both off, do nothing
-  if (!streaming && !motionEnabled)
-    return;
-
-  // Rate Limiting
-  // 1. Streaming: Fast as possible (0ms delay) or capped if needed
-  // 2. Motion Only: Slower (e.g. 5 FPS = 200ms) to save CPU/Heat
-  int minInterval = streaming ? 1 : 200;
-
-  if (now - lastFrameTime < minInterval)
-    return;
-
-  camera_fb_t *fb = esp_camera_fb_get();
-  if (!fb) {
-    delay(10);
-    return;
-  }
-
-  lastFrameTime = millis();
-
-  // 1. Upload Stream (If Active)
-  if (streaming) {
-    uploadFrame(fb);
-  }
-
-  // 2. Motion Check (If Enabled)
-  if (motionEnabled) {
-    // If streaming is active, we check every 10th frame (to not block stream)
-    // If motion ONLY, we check every frame (since FPS is already low)
-    int checkInterval = streaming ? 10 : 1;
-
-    if (++frameCounter >= checkInterval) {
-      frameCounter = 0;
-      if (checkMotion(fb)) {
-        // MOTION DETECTED!
-        // Option A: Save current frame (Fast, but low res if streaming)
-        // Option B: Take high-res snapshot (Slow, pauses stream)
-        // For now, let's save the current frame to limit latency
-        if (isSDAvailable()) {
-          saveFrameToSD(fb);
-        }
-      }
-    }
-  }
-
-  esp_camera_fb_return(fb);
-}
-
-void handleSnap(String resolution = "", bool saveToCard = false) {
-  if (resolution.length() == 0) {
-    // Load Default Snapshot Res
-    prefs.begin("datum", true);
-    resolution = prefs.getString("pref_ires", "UXGA");
-    prefs.end();
-  }
-  Serial.println("[SNAP] Starting high-res capture (full reinit)...");
-  Serial.println("[SNAP] Target Resolution: " + resolution);
-
-  // Save current state
-  framesize_t savedSize = FRAMESIZE_VGA;
-  int savedMirror = 1;
-  int savedFlip = 1;
-
-  sensor_t *s = esp_camera_sensor_get();
-  if (s) {
-    savedSize = s->status.framesize;
-    savedMirror = s->status.hmirror;
-    savedFlip = s->status.vflip;
-  }
-
-  framesize_t snapSize = getFrameSizeFromName(resolution);
-
-  unsigned long startTime = millis();
-
-  // Pause streaming
-  bool wasStreaming = streaming;
-  streaming = false;
-  delay(200);
-
-  // Deinit current camera
-  esp_camera_deinit();
-  delay(100);
-
-  // Reinit with HIGH RES config
-  camera_config_t config;
-  config.ledc_channel = LEDC_CHANNEL_0;
-  config.ledc_timer = LEDC_TIMER_0;
-  config.pin_d0 = Y2_GPIO_NUM;
-  config.pin_d1 = Y3_GPIO_NUM;
-  config.pin_d2 = Y4_GPIO_NUM;
-  config.pin_d3 = Y5_GPIO_NUM;
-  config.pin_d4 = Y6_GPIO_NUM;
-  config.pin_d5 = Y7_GPIO_NUM;
-  config.pin_d6 = Y8_GPIO_NUM;
-  config.pin_d7 = Y9_GPIO_NUM;
-  config.pin_xclk = XCLK_GPIO_NUM;
-  config.pin_pclk = PCLK_GPIO_NUM;
-  config.pin_vsync = VSYNC_GPIO_NUM;
-  config.pin_href = HREF_GPIO_NUM;
-  config.pin_sccb_sda = SIOD_GPIO_NUM;
-  config.pin_sccb_scl = SIOC_GPIO_NUM;
-  config.pin_pwdn = PWDN_GPIO_NUM;
-  config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 10000000; // Lower XCLK for stability
-  config.pixel_format = PIXFORMAT_JPEG;
-  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
-
-  config.frame_size = snapSize; // Use requested resolution
-  config.jpeg_quality = 10;
-  config.fb_count = 1;
-  config.fb_location = CAMERA_FB_IN_PSRAM;
-
-  esp_err_t err = esp_camera_init(&config);
-  if (err != ESP_OK) {
-    Serial.printf("[SNAP] High-res init FAILED: 0x%x\n", err);
-    initCamera();
-    streaming = wasStreaming;
-    return;
-  }
-
-  // Force resolution explicitly (Fix for sticky resolution issue)
-  s = esp_camera_sensor_get();
-  if (s) {
-    s->set_framesize(s, snapSize);
-    s->set_hmirror(s, savedMirror);
-    s->set_vflip(s, savedFlip);
-  }
-
-  // Skip a few frames to let the sensor settle and flush old buffers
-  // This is critical to ensure we get the NEW resolution, not a buffered OLD
-  // frame
-  Serial.println("[SNAP] Flushing buffer...");
-  for (int i = 0; i < 3; i++) {
-    camera_fb_t *fb = esp_camera_fb_get();
-    if (fb)
-      esp_camera_fb_return(fb);
-    delay(100);
-  }
-
-  delay(200);
-
-  // Capture
-  camera_fb_t *fb = esp_camera_fb_get();
-  if (!fb || fb->len < 5000) {
-    Serial.println("[SNAP] Failed to capture!");
-    if (fb)
-      esp_camera_fb_return(fb);
-    esp_camera_deinit();
-    initCamera();
-    streaming = wasStreaming;
-    return;
-  }
-
-  Serial.printf("[SNAP] Captured: %d bytes (%dx%d) in %dms\n", fb->len,
-                fb->width, fb->height, millis() - startTime);
-
-  // Action: Save to Card OR Upload
-  if (saveToCard) {
-    if (isSDAvailable()) {
-      saveFrameToSD(fb);
-      Serial.println("[SNAP] Saved to SD Card.");
-    } else {
-      Serial.println("[SNAP] SD Card not available for local save.");
-    }
-  } else {
-    // Upload directly from camera buffer (streaming is paused)
-    Serial.printf("[SNAP] Uploading %d bytes...\n", fb->len);
-    unsigned long uploadStart = millis();
-    uploadFrame(fb);
-    unsigned long uploadTime = millis() - uploadStart;
-    Serial.printf("[SNAP] Upload completed in %dms (%.1f KB/s)\n", uploadTime,
-                  (fb->len / 1024.0) / (uploadTime / 1000.0));
-  }
-
-  esp_camera_fb_return(fb);
-
-  // Deinit high-res and restore normal camera
-  esp_camera_deinit();
-  delay(50);
-  initCamera();
-
-  // Restore Settings
-  s = esp_camera_sensor_get();
-  if (s) {
-    s->set_hmirror(s, savedMirror);
-    s->set_vflip(s, savedFlip);
-    if (s->status.framesize != savedSize) {
-      s->set_framesize(s, savedSize);
-    }
-    Serial.printf("[SNAP] Restored State: Res=%d Mirror=%d Flip=%d\n",
-                  savedSize, savedMirror, savedFlip);
-  }
-
-  // CRITICAL: Wait before resuming stream!
-  // The server only stores the "last frame". If we send a new low-res
-  // frame immediately, the client won't have time to fetch the high-res
-  // snapshot we just uploaded.
-  if (wasStreaming) {
-    Serial.println("[SNAP] Waiting for client to fetch image...");
-    delay(4000); // Give client 4 seconds to download
-    streaming = true;
-  }
-
-  Serial.printf("[SNAP] Complete. Total time: %dms\n", millis() - startTime);
-}
+// Camera Logic (checkMotion, processCameraLoop, cameraTaskLoop,
+// startCameraTask, handleSnap) moved to camera_manager.cpp
 
 // Load Settings from NVS
 void loadStartupSettings() {
@@ -1814,7 +848,12 @@ void setup() {
   }
 
   // Try to connect to WiFi FIRST (without camera active)
-  if (connectToWiFi()) {
+  if (connectToWiFiBlocking()) {
+    justConnected = true; // Set flag for telemetry
+
+    // Sync time and set server URL
+    onWifiConnected();
+
     // Connection successful, NOW init camera
     initCamera();
     loadStartupSettings();
@@ -1829,88 +868,63 @@ void setup() {
         DEBUG_PRINTLN("SD Card Initialized");
       }
       setupWebRoutes(setupServer, apiKey);
+      setupServer.begin(); // !!! CRITICAL: Start the web server !!!
+      Serial.println("[WEB] Server started on port 80");
 
-      startCameraServer();
-      streaming = false;
-    } else if (attemptSelfRegistration()) { // Try self registration if
-                                            // we have user creds
-      currentState = STATE_ONLINE;
-      setupMQTT();
-      startCameraServer();
-      streaming = false;
-    } else if (activateProvisioning()) { // Fallback to old provisioning
-                                         // if pending request exists
-      currentState = STATE_ONLINE;
-      setupMQTT();
-      startCameraServer();
-      streaming = false;
-    } else {
-      currentState = STATE_OFFLINE;
-      // Activation failed, go to setup mode
-      startSetupMode();
-    }
-  } else {
-    // Connection failed
-    initCamera();
-    loadStartupSettings();
-    startSetupMode();
-  }
-}
+      // Create Network Task (Core 0) - Handles WiFi, MQTT, Web Server
+      xTaskCreatePinnedToCore(networkTask,        /* Task function */
+                              "NetworkTask",      /* Name */
+                              8192,               /* Stack size */
+                              NULL,               /* Parameters */
+                              1,                  /* Priority */
+                              &networkTaskHandle, /* Handle */
+                              0                   /* Core 0 (Pro Core) */
+      );
 
-void loop() {
-  if (currentState == STATE_SETUP_MODE) {
-    setupServer.handleClient();
-    updateLED();
-    handleFactoryResetButton();
-  } else if (currentState == STATE_ONLINE) {
-    unsigned long now = millis();
+      // Start Camera Task (Core 1)
+      startCameraTask();
 
-    // Check for "Just Connected" event
-    if (justConnected) {
-      reportTelemetry(initialBoot, true);
-      justConnected = false;
-      initialBoot = false; // Boot info consumed
-      lastTelemetryTime = now;
+      // Start Async Upload Task (Core 0) for non-blocking frame uploads
+      startUploadTask();
+    } // End if(apiKey)
+  } // End if(connected)
+} // End setup()
+
+// Main Loop
+// Main Loop - Now Empty or Minimal Supervision
+// Core 1 (App Core) is used by cameraTask (or loop if not pinned, but we
+// pinned it)
+void loop() { vTaskDelay(1000 / portTICK_PERIOD_MS); }
+
+// Network Task - Core 0
+void networkTask(void *pvParameters) {
+  unsigned long lastHeartbeat = 0;
+  for (;;) {
+    if (millis() - lastHeartbeat > 5000) {
+      Serial.printf("[CORE 0] Network Task Alive. WiFi: %d, Heap: %d\n",
+                    WiFi.status(), ESP.getFreeHeap());
+      lastHeartbeat = millis();
     }
 
-    // Periodic Heartbeat (Standard Telemetry)
-    if (now - lastTelemetryTime > TELEMETRY_INTERVAL) {
-      reportTelemetry(false, false);
-      lastTelemetryTime = now;
+    // 1. Connection State Machine
+    if (WiFi.status() == WL_CONNECTED) {
+      processMqttLoop();
+      checkCommands();
     }
 
-    // MQTT Loop
-    if (!mqttClient.connected()) {
-      // Non-blocking reconnect attempt (check every 5s logic inside or here?)
-      // Simpler: Just try reconnect if time passed
-      static unsigned long lastReconnectAttempt = 0;
-      if (now - lastReconnectAttempt > 5000) {
-        lastReconnectAttempt = now;
-        if (reconnectMQTT()) {
-          lastReconnectAttempt = 0;
-        }
-      }
-    } else {
-      mqttClient.loop();
-    }
+    // Handle WiFi Reconnection
+    handleWiFiLoop();
 
-    // Serve Web Routes (Portal/SD) even when Online
+    // 2. Web Server (Online or Setup Mode)
+    // NOTE: In Setup Mode, setupServer IS the main server.
+    // In Online Mode, setupServer is ALSO the main server (renamed
+    // conceptually?). Yes, 'setupServer' variable is used for both.
     setupServer.handleClient();
 
-    // Explicit Command Poll (HTTP) is REMOVED in favor of MQTT
-    // kept comment used to be checking commands manually
-
-    processCameraLoop();
-
+    // 3. LED & Button
     updateLED();
     handleFactoryResetButton();
-  } else {
-    updateLED();
-    handleFactoryResetButton();
-    // Reconnection logic if needed
-    if (WiFi.status() != WL_CONNECTED && currentState != STATE_SETUP_MODE) {
-      // Auto reconnect handling by ESP32 usually works, but we can restart if
-      // long offline
-    }
+
+    vTaskDelay(10 / portTICK_PERIOD_MS); // Yield to IDLE task
   }
 }

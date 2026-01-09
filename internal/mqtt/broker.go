@@ -276,12 +276,27 @@ func (h *IngestionHook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets.P
 				// Process data
 				// Use Client's IP for enrichment
 				ip, _, _ := net.SplitHostPort(cl.Net.Remote)
+
+				// --- ENRICHMENT START ---
+				// Inject public_ip into the payload so subscribers (Mobile App) see it
+				if ip != "" {
+					data["public_ip"] = ip
+				}
+
+				// Re-marshal to update the packet payload
+				if enrichedPayload, err := json.Marshal(data); err == nil {
+					pk.Payload = enrichedPayload
+				}
+				// --- ENRICHMENT END ---
+
+				// Send to processor (storage)
+				// Processor will also see the "public_ip" now since it's in data
 				h.processor.Process(deviceID, data, ip)
 			}
 		}
 	}
 
-	// Allow the message to continue (e.g. to subscribers)?
-	// For now, yes, maybe we have a dashboard subscribed.
+	// Allow the message to continue (e.g. to subscribers)
+	// Now subscribers get the enriched JSON with public_ip!
 	return pk, nil
 }
