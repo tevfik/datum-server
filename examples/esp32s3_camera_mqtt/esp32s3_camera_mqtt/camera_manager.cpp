@@ -556,8 +556,8 @@ void cameraTaskLoop(void *parameter) {
 // Was duplicate startCameraTask - Removed
 
 void handleSnap(String resolution, bool saveToCard) {
-  if (cameraTaskHandle != NULL) {
-    vTaskSuspend(cameraTaskHandle);
+  if (camTaskHandle != NULL) {
+    vTaskSuspend(camTaskHandle);
     delay(100); // Give it time to halt
   } else {
     // Fallback to mutex if task handle bad (shouldn't happen)
