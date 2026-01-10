@@ -119,9 +119,15 @@ test-load: ## Run HTTP load tests with Locust
 
 # Build commands
 # Build commands
-build-web: ## Build Web Dashboard (React)
+build-web: ## Build Web Dashboard (React) - Auto-detects npm or uses Docker
 	@echo "🎨 Building Web Dashboard..."
-	@cd web && npm install && npm run build
+	@if command -v npm >/dev/null 2>&1; then \
+		echo "Found npm locally. Building..."; \
+		cd web && npm install && npm run build; \
+	else \
+		echo "npm not found. Building using Docker (node:20-alpine)..."; \
+		docker run --rm -u $$(id -u):$$(id -g) -v $$(pwd)/web:/app/web -w /app/web node:20-alpine sh -c "npm ci && npm run build"; \
+	fi
 	@echo "✅ Web Dashboard built"
 
 build-server: build-web ## Build Go server binary locally
