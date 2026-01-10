@@ -44,3 +44,12 @@ export interface SendCommandResponse {
     message: string;
     expires_at: string;
 }
+
+export interface TelemetryPoint {
+    timestamp: number;
+    data: Record<string, number | string | boolean>;
+}
+
+export interface TelemetryHistoryResponse {
+    data: TelemetryPoint[];
+}

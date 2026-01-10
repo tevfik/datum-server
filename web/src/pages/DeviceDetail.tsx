@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Trash2, Calendar, HardDrive, Globe, Activity, Terminal, Send } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
+import { TelemetryChart } from '@/components/TelemetryChart';
 
 export default function DeviceDetail() {
     const { id } = useParams<{ id: string }>();
@@ -30,12 +31,19 @@ export default function DeviceDetail() {
         },
     });
 
+    const { data: history, isLoading: isHistoryLoading } = useQuery({
+        queryKey: ['history', id],
+        queryFn: () => deviceService.getHistory(id!),
+        enabled: !!id,
+        refetchInterval: 5000,
+    });
+
     if (isLoading) return <div className="p-8">Loading device details...</div>;
     if (error || !device) return <div className="p-8 text-destructive">Device not found</div>;
 
     return (
         <div className="space-y-6 p-6">
-            {/* Header */}
+            {/* ... Header ... */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <Button variant="outline" size="icon" onClick={() => navigate('/devices')}>
@@ -51,17 +59,8 @@ export default function DeviceDetail() {
                         </div>
                     </div>
                 </div>
-                <Button
-                    variant="destructive"
-                    onClick={() => {
-                        if (confirm('Are you sure you want to delete this device? This action cannot be undone.')) {
-                            deleteMutation.mutate(device.id);
-                        }
-                    }}
-                    disabled={deleteMutation.isPending}
-                >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Device
+                <Button variant="destructive" onClick={() => { if (window.confirm('Are you sure?')) deleteMutation.mutate(device.id); }} disabled={deleteMutation.isPending}>
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete Device
                 </Button>
             </div>
 
@@ -70,37 +69,26 @@ export default function DeviceDetail() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Device Information</CardTitle>
-                        <CardDescription>Technical details and connectivity status</CardDescription>
+                        <CardDescription>Technical details</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        {/* ... fields ... */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <p className="text-sm font-medium leading-none text-muted-foreground">Type</p>
-                                <div className="flex items-center gap-2">
-                                    <HardDrive className="h-4 w-4 text-primary" />
-                                    <span className="font-medium capitalize">{device.type}</span>
-                                </div>
+                                <div className="flex items-center gap-2"><HardDrive className="h-4 w-4 text-primary" /><span className="font-medium capitalize">{device.type}</span></div>
                             </div>
                             <div className="space-y-1">
                                 <p className="text-sm font-medium leading-none text-muted-foreground">Public IP</p>
-                                <div className="flex items-center gap-2">
-                                    <Globe className="h-4 w-4 text-primary" />
-                                    <span className="font-mono">{device.public_ip || 'N/A'}</span>
-                                </div>
+                                <div className="flex items-center gap-2"><Globe className="h-4 w-4 text-primary" /><span className="font-mono">{device.public_ip || 'N/A'}</span></div>
                             </div>
                             <div className="space-y-1">
                                 <p className="text-sm font-medium leading-none text-muted-foreground">Last Seen</p>
-                                <div className="flex items-center gap-2">
-                                    <Activity className="h-4 w-4 text-primary" />
-                                    <span>{format(new Date(device.last_seen), 'PPP p')}</span>
-                                </div>
+                                <div className="flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /><span>{format(new Date(device.last_seen), 'PPP p')}</span></div>
                             </div>
                             <div className="space-y-1">
                                 <p className="text-sm font-medium leading-none text-muted-foreground">Created At</p>
-                                <div className="flex items-center gap-2">
-                                    <Calendar className="h-4 w-4 text-primary" />
-                                    <span>{format(new Date(device.created_at), 'PPP')}</span>
-                                </div>
+                                <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" /><span>{format(new Date(device.created_at), 'PPP')}</span></div>
                             </div>
                         </div>
                     </CardContent>
@@ -121,6 +109,9 @@ export default function DeviceDetail() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Telemetry Chart */}
+            <TelemetryChart data={history || []} isLoading={isHistoryLoading} />
         </div>
     );
 }
