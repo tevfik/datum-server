@@ -99,7 +99,10 @@ datum-server/
 │   └── server/           # HTTP server, handlers, main.go
 ├── internal/
 │   ├── auth/            # Authentication, middleware, rate limiting
-│   └── storage/         # TSStorage + BuntDB implementations
+│   ├── storage/         # Dual backend: BuntDB+TStorage or PostgreSQL
+│   ├── mqtt/            # Embedded MQTT Broker (mochi-mqtt)
+│   ├── processing/      # Async Telemetry Processor
+│   └── email/           # Email service (SMTP)
 ├── docs/                # 12 documentation files
 ├── examples/
 │   ├── arduino/         # ESP32 firmware examples

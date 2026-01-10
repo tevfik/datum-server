@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -40,7 +42,17 @@ var streamManager = &StreamManager{
 
 var wsUpgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // TODO: Add proper CORS validation
+		// Check allowed origins from environment variable
+		// Defaults to allowing all if not set or set to "*"
+		allowedOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
+		if allowedOrigins == "" || allowedOrigins == "*" {
+			return true
+		}
+
+		origin := r.Header.Get("Origin")
+		// Check if origin is in the allowed list (comma separated)
+		// Simple string check for now
+		return strings.Contains(allowedOrigins, origin)
 	},
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024 * 1024, // 1MB for video frames

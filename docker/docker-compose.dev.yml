@@ -30,7 +30,7 @@ services:
       - RETENTION_CHECK_HOURS=1
       - LOG_LEVEL=DEBUG
       - LOG_FORMAT=pretty
-      - CORS_ORIGINS=*
+      - CORS_ALLOWED_ORIGINS=*
       - RATE_LIMIT_REQUESTS=10000
     # Direct port exposure for development
     ports:

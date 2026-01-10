@@ -2,7 +2,6 @@ package processing
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -108,15 +107,7 @@ type ProcessingResult struct {
 }
 
 // Process handles the ingestion of a telemetry data point asynchronously
-func (tp *TelemetryProcessor) Process(deviceID string, data map[string]interface{}, clientIP string) (*ProcessingResult, error) {
-	// ---------------------------------------------------------
-	// Enrichment: Server-Side Tagging
-	// ---------------------------------------------------------
-	if clientIP != "" && !strings.HasPrefix(clientIP, "172.") {
-		if val, ok := data["public_ip"]; !ok || val == "" {
-			data["public_ip"] = clientIP
-		}
-	}
+func (tp *TelemetryProcessor) Process(deviceID string, data map[string]interface{}) (*ProcessingResult, error) {
 	data["server_time"] = time.Now().Unix()
 
 	point := &storage.DataPoint{

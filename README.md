@@ -45,6 +45,12 @@ See [docs/performance/FINAL_PERFORMANCE_REPORT.md](docs/performance/FINAL_PERFOR
 - `examples/datum_camera_app/` - Flutter Mobile App
 - `examples/esp32-s3-camera/` - ESP32-S3 Firmware (C++)
 
+### Advanced Components (Undocumented)
+
+- **MQTT Broker**: Integrated MQTT v5 broker running on ports 1883 (TCP) and 1884 (WS).
+- **Telemetry Processor**: Asynchronous high-throughput data ingestion pipeline (`internal/processing`).
+- **PostgreSQL Support**: Optional backend controllable via `DATABASE_URL`.
+
 ## 🛠️ Quick Start
 
 ### Prerequisites
@@ -259,6 +265,22 @@ RATE_LIMIT_WINDOW=60
 # Security
 JWT_SECRET=<your-secret-key>
 ADMIN_PASSWORD=<admin-password>
+```
+
+### Advanced Configuration
+
+```bash
+# Storage Backend
+# If set, overrides file-based storage and uses PostgreSQL
+DATABASE_URL=postgres://user:pass@localhost:5432/datum?sslmode=disable
+
+# Security
+# Comma-separated list of allowed origins for WebSocket streams.
+# Defaults to "*" (allow all) if empty.
+CORS_ALLOWED_ORIGINS=https://myapp.com,https://admin.myapp.com
+
+# MQTT
+# MQTT ports are currently fixed at 1883 (TCP) and 1884 (WS)
 ```
 
 

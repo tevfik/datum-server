@@ -32,7 +32,7 @@ func TestTelemetryProcessor_Process(t *testing.T) {
 	}
 
 	// EXECUTE
-	_, err = tp.Process(deviceID, payload, "127.0.0.1")
+	_, err = tp.Process(deviceID, payload)
 	assert.NoError(t, err)
 
 	// Force flush by closing
@@ -42,8 +42,9 @@ func TestTelemetryProcessor_Process(t *testing.T) {
 	latest, err := store.GetLatestData(deviceID)
 	assert.NoError(t, err)
 	assert.Equal(t, 25.5, latest.Data["temp"])
-	assert.Equal(t, "127.0.0.1", latest.Data["public_ip"]) // enriched
-	assert.Contains(t, latest.Data, "server_time")         // enriched
+	// Public IP should not be enriched automatically anymore
+	// assert.Equal(t, "127.0.0.1", latest.Data["public_ip"])
+	assert.Contains(t, latest.Data, "server_time") // enriched
 }
 
 func TestTelemetryProcessor_Batching(t *testing.T) {
@@ -63,9 +64,12 @@ func TestTelemetryProcessor_Batching(t *testing.T) {
 	// Send 10 points
 	for i := 0; i < 10; i++ {
 		payload := map[string]interface{}{"value": float64(i)}
-		_, err := tp.Process(deviceID, payload, "")
+		_, err := tp.Process(deviceID, payload)
 		assert.NoError(t, err)
 	}
+
+	// Allow time for async workers to pick up data from channel
+	time.Sleep(200 * time.Millisecond)
 
 	// Force flush
 	tp.Close()
@@ -106,7 +110,7 @@ func TestTelemetryProcessor_CommandCheck(t *testing.T) {
 	store.CreateCommand(cmd)
 
 	// Process data
-	res, err := tp.Process(deviceID, map[string]interface{}{"a": 1}, "1.1.1.1")
+	res, err := tp.Process(deviceID, map[string]interface{}{"a": 1})
 	assert.NoError(t, err)
 
 	// Check pending count

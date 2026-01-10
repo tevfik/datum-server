@@ -195,7 +195,8 @@ func (h *AuthHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) boo
 	// But `storage` interface has `GetDeviceByAPIKey`.
 
 	// Let's support API Key for now as it's simplest.
-	// TODO: Support Dynamic Tokens (dk_) by verifying JWT signature.
+	// Limitation: Dynamic Tokens (dk_) are not yet fully validated by signature in this hook.
+	// Currently relying on matching against known device tokens or falling back to API keys.
 
 	// Validate API Key (sk_ or dk_)
 	if strings.HasPrefix(token, "sk_") || strings.HasPrefix(token, "dk_") {
@@ -274,28 +275,8 @@ func (h *IngestionHook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets.P
 			var data map[string]interface{}
 			if err := json.Unmarshal(pk.Payload, &data); err == nil {
 				// Process data
-				// Use Client's IP for enrichment
-				ip, _, _ := net.SplitHostPort(cl.Net.Remote)
-
-				// --- ENRICHMENT START ---
-				// Inject public_ip into the payload so subscribers (Mobile App) see it
-				if ip != "" && !strings.HasPrefix(ip, "172.") {
-					// Only override if client didn't send it (or sent empty)
-					// And if it's NOT a Docker internal IP (172.x.x.x)
-					if existing, ok := data["public_ip"]; !ok || existing == "" {
-						data["public_ip"] = ip
-					}
-				}
-
-				// Re-marshal to update the packet payload
-				if enrichedPayload, err := json.Marshal(data); err == nil {
-					pk.Payload = enrichedPayload
-				}
-				// --- ENRICHMENT END ---
-
 				// Send to processor (storage)
-				// Processor will also see the "public_ip" now since it's in data
-				h.processor.Process(deviceID, data, ip)
+				h.processor.Process(deviceID, data)
 			}
 		}
 	}

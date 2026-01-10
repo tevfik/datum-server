@@ -43,7 +43,7 @@ func postDataHandler(c *gin.Context) {
 		return
 	}
 
-	result, err := telemetryProcessor.Process(deviceID, data, c.ClientIP())
+	result, err := telemetryProcessor.Process(deviceID, data)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -82,7 +82,7 @@ func getLatestDataHandler(c *gin.Context) {
 	}
 
 	// Sanitize Public IP (fix for Docker/Internal IP leak)
-	if data, ok := point.Data.(map[string]interface{}); ok {
+	if data := point.Data; data != nil {
 		if ip, ok := data["public_ip"].(string); ok && strings.HasPrefix(ip, "172.") {
 			data["public_ip"] = ""
 		}
@@ -325,7 +325,7 @@ func pushDataViaGetHandler(c *gin.Context) {
 		return
 	}
 
-	result, err := telemetryProcessor.Process(deviceID, data, c.ClientIP())
+	result, err := telemetryProcessor.Process(deviceID, data)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

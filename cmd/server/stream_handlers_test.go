@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -569,16 +570,47 @@ func TestWebSocketStreamHandler(t *testing.T) {
 }
 
 func TestWebSocketUpgraderConfig(t *testing.T) {
+	// Save original env var and restore after test
+	originalCors := os.Getenv("CORS_ALLOWED_ORIGINS")
+	t.Cleanup(func() {
+		os.Setenv("CORS_ALLOWED_ORIGINS", originalCors)
+	})
+
 	t.Run("wsUpgrader has correct buffer sizes", func(t *testing.T) {
 		assert.Equal(t, 1024, wsUpgrader.ReadBufferSize)
 		assert.Equal(t, 1024*1024, wsUpgrader.WriteBufferSize)
 	})
 
-	t.Run("wsUpgrader CheckOrigin allows all", func(t *testing.T) {
+	t.Run("Default allows all (empty env)", func(t *testing.T) {
+		os.Setenv("CORS_ALLOWED_ORIGINS", "")
 		req := httptest.NewRequest("GET", "/test", nil)
 		req.Header.Set("Origin", "http://example.com")
 		allowed := wsUpgrader.CheckOrigin(req)
 		assert.True(t, allowed)
+	})
+
+	t.Run("Explicit wildcard allows all", func(t *testing.T) {
+		os.Setenv("CORS_ALLOWED_ORIGINS", "*")
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set("Origin", "http://malicious.com")
+		allowed := wsUpgrader.CheckOrigin(req)
+		assert.True(t, allowed)
+	})
+
+	t.Run("Specific origin allowed", func(t *testing.T) {
+		os.Setenv("CORS_ALLOWED_ORIGINS", "https://app.example.com,https://admin.example.com")
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set("Origin", "https://app.example.com")
+		allowed := wsUpgrader.CheckOrigin(req)
+		assert.True(t, allowed)
+	})
+
+	t.Run("Disallowed origin rejected", func(t *testing.T) {
+		os.Setenv("CORS_ALLOWED_ORIGINS", "https://app.example.com")
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set("Origin", "http://evil.com")
+		allowed := wsUpgrader.CheckOrigin(req)
+		assert.False(t, allowed)
 	})
 }
 
