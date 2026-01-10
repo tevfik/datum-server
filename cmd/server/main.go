@@ -326,7 +326,9 @@ func main() {
 	devicesGroup.Use(UserAuthMiddleware(store))
 	{
 		devicesGroup.POST("", createDeviceHandler)
+		devicesGroup.POST("", createDeviceHandler)
 		devicesGroup.GET("", listDevicesHandler)
+		devicesGroup.GET("/:device_id", getDeviceHandler)
 		devicesGroup.DELETE("/:device_id", deleteDeviceHandler)
 
 		// Command endpoints (user sends commands)

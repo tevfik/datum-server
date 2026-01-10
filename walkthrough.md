@@ -36,6 +36,13 @@ Implemented full frontend authentication flow.
 -   **UI**: Implemented `web/src/pages/Login.tsx` with `Shadcn` components (Input, Label, Card).
 -   **Security**: Wrapped main application routes in `ProtectedRoute` (`App.tsx`) and added `Authorization` header interceptor (`api.ts`).
 
+### Device Detail Implementation
+Implemented the detailed view for individual devices.
+-   **Backend**: Added `GET /devices/:id` to `handlers_device.go` with security checks.
+-   **Frontend**: Created `web/src/pages/DeviceDetail.tsx` displaying device metadata and status.
+-   **Refactor**: Fixed `deleteDeviceHandler` signature mismatch and removed duplicate handler code.
+
+
 
 
 ## 1. Documentation Updates (`README.md`, `docs/PROJECT.md`)

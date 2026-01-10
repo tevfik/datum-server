@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { deviceService } from '@/services/deviceService';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -15,6 +16,7 @@ import { RefreshCw, Plus, Monitor } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function Devices() {
+    const navigate = useNavigate();
     const { data: devices, isLoading, isError, refetch } = useQuery({
         queryKey: ['devices'],
         queryFn: deviceService.getAll,
@@ -73,7 +75,11 @@ export default function Devices() {
                             </TableHeader>
                             <TableBody>
                                 {devices?.map((device) => (
-                                    <TableRow key={device.id}>
+                                    <TableRow
+                                        key={device.id}
+                                        className="cursor-pointer hover:bg-muted/50"
+                                        onClick={() => navigate(`/devices/${device.id}`)}
+                                    >
                                         <TableCell>
                                             <Badge variant={device.status === 'online' ? 'default' : 'secondary'} className={device.status === 'online' ? 'bg-green-500 hover:bg-green-600' : ''}>
                                                 {device.status}

@@ -8,6 +8,12 @@ export const deviceService = {
         return data.devices;
     },
 
+    // Get a single device
+    getById: async (id: string): Promise<Device> => {
+        const { data } = await api.get<Device>(`/devices/${id}`);
+        return data;
+    },
+
     // Create a new device
     create: async (device: CreateDeviceRequest): Promise<CreateDeviceResponse> => {
         const { data } = await api.post<CreateDeviceResponse>('/devices', device);

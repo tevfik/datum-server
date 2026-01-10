@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import SidebarLayout from "./layouts/SidebarLayout";
 import Devices from "./pages/Devices";
+import DeviceDetail from "./pages/DeviceDetail";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import { ThemeProvider } from "./components/theme-provider";
@@ -42,6 +43,7 @@ function App() {
               }>
                 <Route index element={<Dashboard />} />
                 <Route path="devices" element={<Devices />} />
+                <Route path="devices/:id" element={<DeviceDetail />} />
                 <Route path="commands" element={<div className="p-4">Commands Page (Coming Soon)</div>} />
               </Route>
 

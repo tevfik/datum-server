@@ -187,24 +187,6 @@ func ackCommandHandler(c *gin.Context) {
 	})
 }
 
-func deleteDeviceHandler(c *gin.Context) {
-	deviceID := c.Param("device_id")
-	userID, _ := auth.GetUserID(c)
-
-	if err := store.DeleteDevice(deviceID, userID); err != nil {
-		if err.Error() == "device not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		} else if err.Error() == "access denied" {
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
-		return
-	}
-
-	c.Status(http.StatusNoContent)
-}
-
 func generateCommandID() string {
 	bytes := make([]byte, 8)
 	rand.Read(bytes)

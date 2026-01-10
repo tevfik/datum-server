@@ -110,3 +110,69 @@ func listDevicesHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"devices": response})
 }
+
+// getDeviceHandler gets a single device by ID
+// GET /devices/:device_id
+func getDeviceHandler(c *gin.Context) {
+	userID, _ := auth.GetUserID(c)
+	role, _ := auth.GetUserRole(c)
+	deviceID := c.Param("device_id")
+
+	device, err := store.GetDevice(deviceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
+		return
+	}
+
+	// Authorization check
+	if role != "admin" && device.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Delete handler also uses similar logic
+	status := "offline"
+	if time.Since(device.LastSeen) < 5*time.Minute {
+		status = "online"
+	}
+
+	resp := DeviceResponse{
+		ID:        device.ID,
+		Name:      device.Name,
+		Type:      device.Type,
+		DeviceUID: device.DeviceUID,
+		PublicIP:  device.PublicIP,
+		LastSeen:  device.LastSeen,
+		CreatedAt: device.CreatedAt,
+		Status:    status,
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// deleteDeviceHandler deletes a device
+// DELETE /devices/:device_id
+func deleteDeviceHandler(c *gin.Context) {
+	userID, _ := auth.GetUserID(c)
+	role, _ := auth.GetUserRole(c)
+	deviceID := c.Param("device_id")
+
+	device, err := store.GetDevice(deviceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
+		return
+	}
+
+	// Authorization check
+	if role != "admin" && device.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	if err := store.DeleteDevice(deviceID, userID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete device"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "Device deleted"})
+}
