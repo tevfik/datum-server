@@ -2,7 +2,14 @@
 
 I have successfully addressed the findings from the project audit. This walkthrough details the changes made to the codebase and documentation.
 
-## Recent Changes (Session 2)
+## Recent Changes (Session 3: Web Dashboard)
+
+### Web Dashboard Implementation
+Initialize a modern Web Dashboard using React, Vite, and Tailwind CSS.
+- **Created**: `web/` directory with full React stack.
+- **Updated**: `cmd/server/main.go` to serve embedded frontend assets.
+- **Updated**: `Makefile` to include `build-web` and `build-all`.
+- **Updated**: `docker/Dockerfile` to allow multi-stage builds (Node.js + Go) for remote compatibility.
 
 ### Removed Automatic Public IP Enrichment
 Removed the logic that automatically injected the client's IP into the `public_ip` field. This ensures that `public_ip` is only present if the device explicitly sends it.
