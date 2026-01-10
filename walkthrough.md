@@ -18,6 +18,18 @@ Removed the logic that automatically injected the client's IP into the `public_i
 -   **Modified**: `internal/processing/telemetry.go` (Updated `Process` signature)
 -   **Updated**: `cmd/server/handlers_data.go` and tests to match new signature.
 
+### Device List Implementation
+Implemented a full-featured "Device List" page in the Web Dashboard.
+- **Components**: Created Shadcn UI `Table`, `Badge`, `Button`, `Card` in `web/src/components/ui`.
+- **Services**: Added `deviceService.ts` and `api.ts` (Axios) to interface with the Go backend.
+- **Page**: Created `web/src/pages/Devices.tsx` fetching real-time data via React Query.
+- **Routing**: Updated `App.tsx` and `SidebarLayout.tsx` to include the new page.
+
+### Bug Fixes
+-   **Routing**: Fixed `cmd/server/main.go` to correctly serve `/assets` and handle SPA fallback for deep links, resolving 404/redirect loops.
+-   **Redirect Loop**: Fixed a 301 loop caused by `c.FileFromFS` on the root path by serving `index.html` content directly.
+
+
 ## 1. Documentation Updates (`README.md`, `docs/PROJECT.md`)
 
 I updated the documentation to reflect the actual capabilities of the server.
