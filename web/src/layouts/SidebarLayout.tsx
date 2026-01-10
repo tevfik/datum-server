@@ -8,9 +8,11 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 export default function SidebarLayout() {
     const [isOpen, setIsOpen] = useState(false);
+    const { logout } = useAuth();
 
     // Mock toggle for mobile
     const toggleSidebar = () => setIsOpen(!isOpen);
@@ -58,7 +60,10 @@ export default function SidebarLayout() {
                 </nav>
 
                 <div className="border-t p-4">
-                    <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
+                    <button
+                        onClick={() => logout()}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                    >
                         <LogOut className="h-5 w-5" />
                         Sign Out
                     </button>
