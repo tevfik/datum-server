@@ -1,5 +1,13 @@
 import { api } from './api';
-import type { Device, DeviceListResponse, CreateDeviceRequest, CreateDeviceResponse } from '@/types/device';
+import type {
+    Device,
+    DeviceListResponse,
+    CreateDeviceRequest,
+    CreateDeviceResponse,
+    Command,
+    SendCommandRequest,
+    SendCommandResponse
+} from '@/types/device';
 
 export const deviceService = {
     // List all devices
@@ -24,4 +32,16 @@ export const deviceService = {
     delete: async (id: string): Promise<void> => {
         await api.delete(`/devices/${id}`);
     },
+
+    // Get pending commands for a device
+    getCommands: async (deviceId: string): Promise<Command[]> => {
+        const { data } = await api.get<{ commands: Command[] }>(`/devices/${deviceId}/commands`);
+        return data.commands || [];
+    },
+
+    // Send a command to a device
+    sendCommand: async (deviceId: string, command: SendCommandRequest): Promise<SendCommandResponse> => {
+        const { data } = await api.post<SendCommandResponse>(`/devices/${deviceId}/commands`, command);
+        return data;
+    }
 };

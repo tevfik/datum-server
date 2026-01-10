@@ -23,3 +23,24 @@ export interface CreateDeviceResponse {
     api_key: string;
     message: string;
 }
+
+export interface Command {
+    command_id: string;
+    action: string;
+    params: Record<string, any>;
+    status?: string;
+    created_at: string;
+}
+
+export interface SendCommandRequest {
+    action: string;
+    params?: Record<string, any>;
+    expires_in?: number;
+}
+
+export interface SendCommandResponse {
+    command_id: string;
+    status: string;
+    message: string;
+    expires_at: string;
+}

@@ -4,8 +4,12 @@ import { deviceService } from '@/services/deviceService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Trash2, Calendar, HardDrive, Globe, Activity } from 'lucide-react';
-import { format } from 'date-fns';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowLeft, Trash2, Calendar, HardDrive, Globe, Activity, Terminal, Send } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { useState } from 'react';
 
 export default function DeviceDetail() {
     const { id } = useParams<{ id: string }>();
@@ -102,19 +106,109 @@ export default function DeviceDetail() {
                     </CardContent>
                 </Card>
 
-                {/* Placeholder for Commands / Telemetry */}
-                <Card>
+                {/* Command Center */}
+                <Card className="flex flex-col">
                     <CardHeader>
-                        <CardTitle>Actions & State</CardTitle>
-                        <CardDescription>Control and monitor your device</CardDescription>
+                        <CardTitle className="flex items-center gap-2">
+                            <Terminal className="h-5 w-5" />
+                            Command Center
+                        </CardTitle>
+                        <CardDescription>Send commands to your device</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <div className="flex h-32 items-center justify-center rounded-md border border-dashed text-muted-foreground">
-                            Telemetry & Command Center Coming Soon
-                        </div>
+                    <CardContent className="space-y-4">
+                        <CommandSender deviceId={device.id} />
+                        <CommandHistory deviceId={device.id} />
                     </CardContent>
                 </Card>
             </div>
+        </div>
+    );
+}
+
+function CommandSender({ deviceId }: { deviceId: string }) {
+    const [action, setAction] = useState('reboot');
+    const [params, setParams] = useState('{}');
+    const queryClient = useQueryClient();
+
+    const sendMutation = useMutation({
+        mutationFn: (data: { action: string; params: any }) =>
+            deviceService.sendCommand(deviceId, data),
+        onSuccess: (data) => {
+            alert(`Command sent! ID: ${data.command_id}`);
+            queryClient.invalidateQueries({ queryKey: ['commands', deviceId] });
+            setParams('{}');
+        },
+        onError: (err) => {
+            alert('Failed to send command');
+            console.error(err);
+        }
+    });
+
+    const handleSend = () => {
+        try {
+            const parsedParams = JSON.parse(params);
+            sendMutation.mutate({ action, params: parsedParams });
+        } catch (e: any) {
+            alert('Invalid JSON params');
+        }
+    };
+
+    return (
+        <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
+            <div className="grid gap-2">
+                <Label>Action</Label>
+                <Input
+                    placeholder="e.g. reboot, update_config"
+                    value={action}
+                    onChange={(e) => setAction(e.target.value)}
+                />
+            </div>
+            <div className="grid gap-2">
+                <Label>Parameters (JSON)</Label>
+                <Textarea
+                    placeholder="{}"
+                    className="font-mono text-xs"
+                    value={params}
+                    onChange={(e) => setParams(e.target.value)}
+                />
+            </div>
+            <Button className="w-full" onClick={handleSend} disabled={sendMutation.isPending}>
+                <Send className="mr-2 h-4 w-4" />
+                {sendMutation.isPending ? 'Sending...' : 'Send Command'}
+            </Button>
+        </div>
+    );
+}
+
+function CommandHistory({ deviceId }: { deviceId: string }) {
+    const { data: commands, isLoading } = useQuery({
+        queryKey: ['commands', deviceId],
+        queryFn: () => deviceService.getCommands(deviceId),
+        refetchInterval: 5000,
+    });
+
+    if (isLoading) return <div className="text-sm text-muted-foreground">Loading history...</div>;
+
+    return (
+        <div className="space-y-2">
+            <h4 className="text-sm font-medium text-muted-foreground">Pending / Recent Commands</h4>
+            {!commands || commands.length === 0 ? (
+                <div className="text-xs text-muted-foreground italic">No pending commands</div>
+            ) : (
+                <div className="max-h-40 overflow-y-auto space-y-2">
+                    {commands.map((cmd) => (
+                        <div key={cmd.command_id} className="text-xs border p-2 rounded flex justify-between items-center bg-background">
+                            <div>
+                                <span className="font-bold text-primary">{cmd.action}</span>
+                                <span className="ml-2 text-muted-foreground">
+                                    {formatDistanceToNow(new Date(cmd.created_at), { addSuffix: true })}
+                                </span>
+                            </div>
+                            <Badge variant="outline" className="text-[10px]">{cmd.status || 'pending'}</Badge>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
