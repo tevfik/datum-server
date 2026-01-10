@@ -1,4 +1,12 @@
-# Build Stage
+# Frontend Build Stage
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web/ .
+RUN npm run build
+
+# Go Build Stage
 FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
@@ -9,6 +17,9 @@ RUN go mod download && go mod verify
 
 # Copy source code
 COPY . .
+
+# Copy frontend build artifacts to expected location
+COPY --from=frontend-builder /app/web/dist ./cmd/server/dist
 
 # Build arguments
 ARG VERSION=1.0.0
