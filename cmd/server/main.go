@@ -241,7 +241,13 @@ func main() {
 				c.String(http.StatusInternalServerError, "Web assets error")
 				return
 			}
-			c.FileFromFS("index.html", http.FS(f))
+			// Read and serve index.html directly to avoid 301 redirects from FileServer
+			content, err := fs.ReadFile(f, "index.html")
+			if err != nil {
+				c.String(http.StatusInternalServerError, "index.html not found")
+				return
+			}
+			c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 			return
 		}
 		// Otherwise 404
@@ -257,7 +263,13 @@ func main() {
 				c.String(http.StatusInternalServerError, "Web assets error")
 				return
 			}
-			c.FileFromFS("index.html", http.FS(f))
+			// Read and serve index.html directly
+			content, err := fs.ReadFile(f, "index.html")
+			if err != nil {
+				c.String(http.StatusInternalServerError, "index.html not found")
+				return
+			}
+			c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 			return
 		}
 
