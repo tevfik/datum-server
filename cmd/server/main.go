@@ -227,8 +227,55 @@ func main() {
 		c.Next()
 	})
 
-	// Root handler
-	r.GET("/", rootHandler)
+	// Static Assets
+	// Serve /assets from embedded "dist/assets"
+	r.StaticFS("/assets", http.FS(mustSubFS(webFS, "dist/assets")))
+
+	// SPA Fallback / Root Handler
+	// If no route matches (e.g. /dashboard, /devices), serve index.html
+	r.NoRoute(func(c *gin.Context) {
+		// If accepting HTML, serve index.html (SPA)
+		if strings.Contains(c.Request.Header.Get("Accept"), "text/html") {
+			f, err := fs.Sub(webFS, "dist")
+			if err != nil {
+				c.String(http.StatusInternalServerError, "Web assets error")
+				return
+			}
+			c.FileFromFS("index.html", http.FS(f))
+			return
+		}
+		// Otherwise 404
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
+	})
+
+	// Root handler (Explicit /)
+	r.GET("/", func(c *gin.Context) {
+		// If accepting HTML, serve index.html
+		if strings.Contains(c.Request.Header.Get("Accept"), "text/html") {
+			f, err := fs.Sub(webFS, "dist")
+			if err != nil {
+				c.String(http.StatusInternalServerError, "Web assets error")
+				return
+			}
+			c.FileFromFS("index.html", http.FS(f))
+			return
+		}
+
+		// Otherwise, serve API info (legacy JSON behavior)
+		c.JSON(http.StatusOK, gin.H{
+			"service": "Datum IoT Platform",
+			"version": Version,
+			"endpoints": gin.H{
+				"auth":         []string{"POST /auth/register", "POST /auth/login"},
+				"devices":      []string{"POST /devices", "GET /devices", "DELETE /devices/{id}"},
+				"commands":     []string{"POST /devices/{id}/commands", "GET /devices/{id}/commands"},
+				"data":         []string{"POST /data/{id}", "GET /data/{id}", "GET /data/{id}/history"},
+				"public":       []string{"POST /public/data/{id}", "GET /public/data/{id}"},
+				"provisioning": []string{"POST /devices/register", "GET /devices/provisioning", "POST /provisioning/activate/{id}"},
+			},
+		})
+	})
+
 	r.GET("/health", healthHandler)
 	r.GET("/healthz", healthHandler)
 	r.GET("/live", livenessHandler)
@@ -394,42 +441,13 @@ func main() {
 	log.Info().Msg("Server exiting")
 }
 
-func rootHandler(c *gin.Context) {
-	// If accepting HTML, serve the Dashboard (SPA)
-	if strings.Contains(c.Request.Header.Get("Accept"), "text/html") {
-		// Serve index.html from embedded FS
-		// Note: dist is the root of the embedded FS
-
-		f, err := fs.Sub(webFS, "dist")
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Web assets error"})
-			return
-		}
-
-		// Try to serve file
-		path := c.Request.URL.Path
-		if path == "/" {
-			path = "index.html"
-		}
-
-		// Serve static file
-		c.FileFromFS(path, http.FS(f))
-		return
+// Helper to get sub-fs without error return (panics on error, safe for init)
+func mustSubFS(f fs.FS, dir string) fs.FS {
+	sub, err := fs.Sub(f, dir)
+	if err != nil {
+		panic(err)
 	}
-
-	// Otherwise, serve API info (legacy JSON behavior)
-	c.JSON(http.StatusOK, gin.H{
-		"service": "Datum IoT Platform",
-		"version": Version,
-		"endpoints": gin.H{
-			"auth":         []string{"POST /auth/register", "POST /auth/login"},
-			"devices":      []string{"POST /devices", "GET /devices", "DELETE /devices/{id}"},
-			"commands":     []string{"POST /devices/{id}/commands", "GET /devices/{id}/commands"},
-			"data":         []string{"POST /data/{id}", "GET /data/{id}", "GET /data/{id}/history"},
-			"public":       []string{"POST /public/data/{id}", "GET /public/data/{id}"},
-			"provisioning": []string{"POST /devices/register", "GET /devices/provisioning", "POST /provisioning/activate/{id}"},
-		},
-	})
+	return sub
 }
 
 // Health check handlers
