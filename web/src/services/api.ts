@@ -2,7 +2,9 @@ import axios from 'axios';
 
 // Create base axios instance
 export const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || '/api', // Proxy handles /api locally, direct integration in prod
+    // In production (PROD), the React app is served by the Go server, so APIs are at root (/)
+    // In development (DEV), we use the Vite proxy at /api -> localhost:8000
+    baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : '/'),
     headers: {
         'Content-Type': 'application/json',
     },
