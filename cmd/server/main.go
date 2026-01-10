@@ -232,60 +232,62 @@ func main() {
 	r.StaticFS("/assets", http.FS(mustSubFS(webFS, "dist/assets")))
 
 	// SPA Fallback / Root Handler
-	// If no route matches (e.g. /dashboard, /devices), serve index.html
+	// If no route matches, check if it's an API call or UI
 	r.NoRoute(func(c *gin.Context) {
-		// If accepting HTML, serve index.html (SPA)
-		if strings.Contains(c.Request.Header.Get("Accept"), "text/html") {
-			f, err := fs.Sub(webFS, "dist")
-			if err != nil {
-				c.String(http.StatusInternalServerError, "Web assets error")
-				return
-			}
-			// Read and serve index.html directly to avoid 301 redirects from FileServer
-			content, err := fs.ReadFile(f, "index.html")
-			if err != nil {
-				c.String(http.StatusInternalServerError, "index.html not found")
-				return
-			}
-			c.Data(http.StatusOK, "text/html; charset=utf-8", content)
+		path := c.Request.URL.Path
+		// If it looks like an API call, return JSON 404
+		if strings.HasPrefix(path, "/auth/") ||
+			strings.HasPrefix(path, "/api/") ||
+			strings.HasPrefix(path, "/devices/") ||
+			strings.HasPrefix(path, "/data/") ||
+			strings.HasPrefix(path, "/public/") ||
+			strings.HasPrefix(path, "/system/") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
 			return
 		}
-		// Otherwise 404
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
+
+		// Otherwise serve index.html (SPA)
+		f, err := fs.Sub(webFS, "dist")
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Web assets error")
+			return
+		}
+		// Read and serve index.html directly
+		content, err := fs.ReadFile(f, "index.html")
+		if err != nil {
+			c.String(http.StatusInternalServerError, "index.html not found")
+			return
+		}
+		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 	})
 
 	// Root handler (Explicit /)
 	r.GET("/", func(c *gin.Context) {
-		// If accepting HTML, serve index.html
-		if strings.Contains(c.Request.Header.Get("Accept"), "text/html") {
-			f, err := fs.Sub(webFS, "dist")
-			if err != nil {
-				c.String(http.StatusInternalServerError, "Web assets error")
-				return
-			}
-			// Read and serve index.html directly
-			content, err := fs.ReadFile(f, "index.html")
-			if err != nil {
-				c.String(http.StatusInternalServerError, "index.html not found")
-				return
-			}
-			c.Data(http.StatusOK, "text/html; charset=utf-8", content)
+		// If explicitly asking for JSON, return API info
+		if c.Request.Header.Get("Accept") == "application/json" {
+			c.JSON(http.StatusOK, gin.H{
+				"service": "Datum IoT Platform",
+				"version": Version,
+				"endpoints": gin.H{
+					"auth":    []string{"POST /auth/register", "POST /auth/login"},
+					"devices": []string{"POST /devices", "GET /devices", "DELETE /devices/{id}"},
+				},
+			})
 			return
 		}
 
-		// Otherwise, serve API info (legacy JSON behavior)
-		c.JSON(http.StatusOK, gin.H{
-			"service": "Datum IoT Platform",
-			"version": Version,
-			"endpoints": gin.H{
-				"auth":         []string{"POST /auth/register", "POST /auth/login"},
-				"devices":      []string{"POST /devices", "GET /devices", "DELETE /devices/{id}"},
-				"commands":     []string{"POST /devices/{id}/commands", "GET /devices/{id}/commands"},
-				"data":         []string{"POST /data/{id}", "GET /data/{id}", "GET /data/{id}/history"},
-				"public":       []string{"POST /public/data/{id}", "GET /public/data/{id}"},
-				"provisioning": []string{"POST /devices/register", "GET /devices/provisioning", "POST /provisioning/activate/{id}"},
-			},
-		})
+		// Default to serving index.html
+		f, err := fs.Sub(webFS, "dist")
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Web assets error")
+			return
+		}
+		content, err := fs.ReadFile(f, "index.html")
+		if err != nil {
+			c.String(http.StatusInternalServerError, "index.html not found")
+			return
+		}
+		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 	})
 
 	r.GET("/health", healthHandler)
@@ -325,7 +327,6 @@ func main() {
 	devicesGroup := r.Group("/devices")
 	devicesGroup.Use(UserAuthMiddleware(store))
 	{
-		devicesGroup.POST("", createDeviceHandler)
 		devicesGroup.POST("", createDeviceHandler)
 		devicesGroup.GET("", listDevicesHandler)
 		devicesGroup.GET("/:device_id", getDeviceHandler)
