@@ -16,8 +16,10 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # Docker commands
-build: ## Build all Docker images
+docker-build: ## Build all Docker images
 	docker compose -f docker/docker-compose.yml build
+
+build: build-all ## Build all binaries (Server + CLI + Web)
 
 release: ## Build release Docker image (usage: make release VERSION=1.2.3 DEFAULT_SERVER_URL=http://api.example.com)
 	docker build \
@@ -116,9 +118,18 @@ test-load: ## Run HTTP load tests with Locust
 	@bash tests/run_load_test.sh
 
 # Build commands
-build-server: ## Build Go server binary locally
+# Build commands
+build-web: ## Build Web Dashboard (React)
+	@echo "🎨 Building Web Dashboard..."
+	@cd web && npm install && npm run build
+	@echo "✅ Web Dashboard built"
+
+build-server: build-web ## Build Go server binary locally
 	@echo "🔨 Building Go server..."
 	@mkdir -p build/binaries
+	@echo "📦 Copying web assets..."
+	@rm -rf cmd/server/dist
+	@cp -r web/dist cmd/server/dist
 	@go build -o $(SERVER_BINARY) ./cmd/server
 	@echo "✅ Binary created: $(SERVER_BINARY)"
 
@@ -131,14 +142,14 @@ build-cli: ## Build datumctl CLI tool
 build-all: build-server build-cli ## Build server and CLI
 
 # Cross-platform build targets
-build-linux: ## Build Linux binaries (AMD64)
+build-linux: build-web ## Build Linux binaries (AMD64)
 	@echo "🔨 Building Linux binaries..."
 	@mkdir -p build/release
 	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datum-server-linux-amd64 ./cmd/server
 	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datumctl-linux-amd64 ./cmd/datumctl
 	@echo "✅ Linux binaries created in build/release/"
 
-build-windows: ## Build Windows binaries (AMD64)
+build-windows: build-web ## Build Windows binaries (AMD64)
 	@echo "🔨 Building Windows binaries..."
 	@mkdir -p build/release
 	@GOOS=windows GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datum-server-windows-amd64.exe ./cmd/server

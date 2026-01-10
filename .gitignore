@@ -60,3 +60,6 @@ docker-data/
 
 # Theia IDE
 .theia/
+
+# Web build artifacts in server location
+cmd/server/dist/

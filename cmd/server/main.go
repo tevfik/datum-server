@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"embed"
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/signal"
@@ -24,6 +26,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
+
+//go:embed dist/*
+var webFS embed.FS
 
 var (
 	Version   = "1.1.0"
@@ -390,6 +395,29 @@ func main() {
 }
 
 func rootHandler(c *gin.Context) {
+	// If accepting HTML, serve the Dashboard (SPA)
+	if strings.Contains(c.Request.Header.Get("Accept"), "text/html") {
+		// Serve index.html from embedded FS
+		// Note: dist is the root of the embedded FS
+
+		f, err := fs.Sub(webFS, "dist")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Web assets error"})
+			return
+		}
+
+		// Try to serve file
+		path := c.Request.URL.Path
+		if path == "/" {
+			path = "index.html"
+		}
+
+		// Serve static file
+		c.FileFromFS(path, http.FS(f))
+		return
+	}
+
+	// Otherwise, serve API info (legacy JSON behavior)
 	c.JSON(http.StatusOK, gin.H{
 		"service": "Datum IoT Platform",
 		"version": Version,
