@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { deviceService } from '@/services/deviceService';
 import { useNavigate } from 'react-router-dom';
@@ -14,10 +15,13 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { RefreshCw, Plus, Monitor, Pencil, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { SortableHeader } from '@/components/ui/sortable-header';
 
 export default function Devices() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const [sortColumn, setSortColumn] = useState('status');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
     const { data: devices, isLoading, isError, refetch } = useQuery({
         queryKey: ['devices'],
@@ -42,6 +46,36 @@ export default function Devices() {
         e.stopPropagation();
         navigate(`/devices/${id}`);
     };
+
+    const handleSort = (column: string) => {
+        if (sortColumn === column) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortColumn(column);
+            setSortDirection('asc');
+        }
+    };
+
+    const sortedDevices = devices ? [...devices].sort((a: any, b: any) => {
+        let aVal = a[sortColumn];
+        let bVal = b[sortColumn];
+
+        // Handle string comparison
+        if (typeof aVal === 'string') {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+        }
+
+        // Handle dates
+        if (['last_seen', 'created_at'].includes(sortColumn)) {
+            aVal = aVal ? new Date(aVal).getTime() : 0;
+            bVal = bVal ? new Date(bVal).getTime() : 0;
+        }
+
+        if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    }) : [];
 
     return (
         <div className="space-y-6">
@@ -86,16 +120,26 @@ export default function Devices() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Public IP</TableHead>
-                                    <TableHead>Last Seen</TableHead>
+                                    <TableHead>
+                                        <SortableHeader column="status" label="Status" currentSort={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                                    </TableHead>
+                                    <TableHead>
+                                        <SortableHeader column="name" label="Name" currentSort={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                                    </TableHead>
+                                    <TableHead>
+                                        <SortableHeader column="type" label="Type" currentSort={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                                    </TableHead>
+                                    <TableHead>
+                                        <SortableHeader column="public_ip" label="Public IP" currentSort={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                                    </TableHead>
+                                    <TableHead>
+                                        <SortableHeader column="last_seen" label="Last Seen" currentSort={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                                    </TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {devices?.map((device) => (
+                                {sortedDevices.map((device) => (
                                     <TableRow
                                         key={device.id}
                                         className="cursor-pointer hover:bg-muted/50"
