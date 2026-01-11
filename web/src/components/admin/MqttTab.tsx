@@ -29,7 +29,8 @@ export function MqttTab() {
     const [apiKey, setApiKey] = useState("");
     const [wsUrl, setWsUrl] = useState(() => {
         const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        return `${protocol}://${window.location.hostname}:1884`;
+        // Use standard port (443/80) with /mqtt path, instead of custom port 1884
+        return `${protocol}://${window.location.host}/mqtt`;
     });
     const [isConnected, setIsConnected] = useState(false);
     const [messages, setMessages] = useState<MqttMessage[]>([]);
