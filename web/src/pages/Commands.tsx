@@ -61,8 +61,11 @@ export default function Commands() {
                 </div>
 
                 <div className="md:col-span-8">
-                    {selectedDeviceId ? (
-                        <CommandBuilder deviceId={selectedDeviceId} />
+                    {selectedDeviceId && devices ? (
+                        <CommandBuilder
+                            deviceId={selectedDeviceId}
+                            deviceType={devices.find(d => d.id === selectedDeviceId)?.type || 'unknown'}
+                        />
                     ) : (
                         <Card className="h-full flex items-center justify-center p-12 text-muted-foreground border-dashed">
                             <div className="text-center">
@@ -77,8 +80,9 @@ export default function Commands() {
     );
 }
 
-function CommandBuilder({ deviceId }: { deviceId: string }) {
+function CommandBuilder({ deviceId, deviceType }: { deviceId: string, deviceType: string }) {
     const [activeTab, setActiveTab] = useState("presets");
+    // ... existing state ...
     const [customAction, setCustomAction] = useState("");
     const [customParams, setCustomParams] = useState("{}");
     const queryClient = useQueryClient();
@@ -88,8 +92,6 @@ function CommandBuilder({ deviceId }: { deviceId: string }) {
             deviceService.sendCommand(deviceId, data),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['commands', deviceId] });
-            // Don't alert on presets for smoother flow, maybe toast?
-            // For now just console
             console.log("Command sent", data);
         },
         onError: (err: any) => {
@@ -101,6 +103,8 @@ function CommandBuilder({ deviceId }: { deviceId: string }) {
         sendMutation.mutate({ action, params });
     };
 
+    const isCamera = deviceType?.toLowerCase().includes('camera');
+
     return (
         <Card>
             <CardHeader>
@@ -108,7 +112,7 @@ function CommandBuilder({ deviceId }: { deviceId: string }) {
                     <Zap className="h-5 w-5 text-yellow-500" />
                     New Command
                 </CardTitle>
-                <CardDescription>Send an instruction to {deviceId}</CardDescription>
+                <CardDescription>Send an instruction to {deviceId} ({deviceType})</CardDescription>
             </CardHeader>
             <CardContent>
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -119,24 +123,8 @@ function CommandBuilder({ deviceId }: { deviceId: string }) {
 
                     <TabsContent value="presets" className="space-y-4 pt-4">
                         <div className="grid grid-cols-2 gap-4">
-                            {/* Streaming Controls */}
-                            <div className="space-y-2 p-4 border rounded-md bg-muted/20">
-                                <h3 className="font-medium text-sm flex items-center gap-2"><Camera className="h-4 w-4" /> Streaming</h3>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => send("stream", { state: "on" })} disabled={sendMutation.isPending}>
-                                        <Play className="mr-2 h-3 w-3" /> Start
-                                    </Button>
-                                    <Button variant="outline" size="sm" onClick={() => send("stream", { state: "off" })} disabled={sendMutation.isPending}>
-                                        <Square className="mr-2 h-3 w-3" /> Stop
-                                    </Button>
-                                    <Button variant="secondary" size="sm" className="col-span-2" onClick={() => send("snap", { resolution: "HD" })} disabled={sendMutation.isPending}>
-                                        <Camera className="mr-2 h-3 w-3" /> Take Snapshot
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* System Controls */}
-                            <div className="space-y-2 p-4 border rounded-md bg-muted/20">
+                            {/* System Controls - Always Visible */}
+                            <div className="space-y-2 p-4 border rounded-md bg-muted/20 col-span-2 md:col-span-1">
                                 <h3 className="font-medium text-sm flex items-center gap-2"><Power className="h-4 w-4" /> System</h3>
                                 <div className="grid grid-cols-1 gap-2">
                                     <Button variant="destructive" size="sm" onClick={() => send("restart")} disabled={sendMutation.isPending}>
@@ -148,37 +136,58 @@ function CommandBuilder({ deviceId }: { deviceId: string }) {
                                 </div>
                             </div>
 
-                            {/* LED Controls */}
-                            <div className="space-y-2 p-4 border rounded-md bg-muted/20">
-                                <h3 className="font-medium text-sm flex items-center gap-2"><Sun className="h-4 w-4" /> LED / Flash</h3>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => send("led", { led: true })} disabled={sendMutation.isPending}>
-                                        On
-                                    </Button>
-                                    <Button variant="outline" size="sm" onClick={() => send("led", { led: false })} disabled={sendMutation.isPending}>
-                                        Off
-                                    </Button>
-                                    <Button variant="outline" size="sm" className="col-span-2" onClick={() => send("update_settings", { lcol: "#FFFFFF" })} disabled={sendMutation.isPending}>
-                                        White
-                                    </Button>
-                                    <Button variant="outline" size="sm" className="col-span-2" onClick={() => send("update_settings", { lcol: "#FF0000" })} disabled={sendMutation.isPending}>
-                                        Red
-                                    </Button>
-                                </div>
-                            </div>
+                            {/* Camera Specific Controls */}
+                            {isCamera && (
+                                <>
+                                    {/* Streaming Controls */}
+                                    <div className="space-y-2 p-4 border rounded-md bg-muted/20 col-span-2 md:col-span-1">
+                                        <h3 className="font-medium text-sm flex items-center gap-2"><Camera className="h-4 w-4" /> Streaming</h3>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Button variant="outline" size="sm" onClick={() => send("stream", { state: "on" })} disabled={sendMutation.isPending}>
+                                                <Play className="mr-2 h-3 w-3" /> Start
+                                            </Button>
+                                            <Button variant="outline" size="sm" onClick={() => send("stream", { state: "off" })} disabled={sendMutation.isPending}>
+                                                <Square className="mr-2 h-3 w-3" /> Stop
+                                            </Button>
+                                            <Button variant="secondary" size="sm" className="col-span-2" onClick={() => send("snap", { resolution: "HD" })} disabled={sendMutation.isPending}>
+                                                <Camera className="mr-2 h-3 w-3" /> Take Snapshot
+                                            </Button>
+                                        </div>
+                                    </div>
 
-                            {/* Config Controls */}
-                            <div className="space-y-2 p-4 border rounded-md bg-muted/20">
-                                <h3 className="font-medium text-sm flex items-center gap-2"><Terminal className="h-4 w-4" /> Config</h3>
-                                <div className="grid grid-cols-1 gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => send("update_settings", { vres: "VGA" })} disabled={sendMutation.isPending}>
-                                        Set VGA (Low Res)
-                                    </Button>
-                                    <Button variant="outline" size="sm" onClick={() => send("update_settings", { vres: "HD" })} disabled={sendMutation.isPending}>
-                                        Set HD (High Res)
-                                    </Button>
-                                </div>
-                            </div>
+                                    {/* LED Controls */}
+                                    <div className="space-y-2 p-4 border rounded-md bg-muted/20 col-span-2 md:col-span-1">
+                                        <h3 className="font-medium text-sm flex items-center gap-2"><Sun className="h-4 w-4" /> LED / Flash</h3>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Button variant="outline" size="sm" onClick={() => send("led", { led: true })} disabled={sendMutation.isPending}>
+                                                On
+                                            </Button>
+                                            <Button variant="outline" size="sm" onClick={() => send("led", { led: false })} disabled={sendMutation.isPending}>
+                                                Off
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="col-span-2" onClick={() => send("update_settings", { lcol: "#FFFFFF" })} disabled={sendMutation.isPending}>
+                                                White
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="col-span-2" onClick={() => send("update_settings", { lcol: "#FF0000" })} disabled={sendMutation.isPending}>
+                                                Red
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Config Controls */}
+                                    <div className="space-y-2 p-4 border rounded-md bg-muted/20 col-span-2 md:col-span-1">
+                                        <h3 className="font-medium text-sm flex items-center gap-2"><Terminal className="h-4 w-4" /> Config</h3>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            <Button variant="outline" size="sm" onClick={() => send("update_settings", { vres: "VGA" })} disabled={sendMutation.isPending}>
+                                                Set VGA (Low Res)
+                                            </Button>
+                                            <Button variant="outline" size="sm" onClick={() => send("update_settings", { vres: "HD" })} disabled={sendMutation.isPending}>
+                                                Set HD (High Res)
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </TabsContent>
 
