@@ -132,7 +132,7 @@ build-web: ## Build Web Dashboard (React) - Auto-detects npm or uses Docker
 		cd web && npm install && npm run build; \
 	else \
 		echo "npm not found. Building using Docker (node:20-alpine)..."; \
-		docker run --rm -u $$(id -u):$$(id -g) -v $$(pwd)/web:/app/web -w /app/web node:20-alpine sh -c "npm ci && npm run build"; \
+		docker run --rm -u $$(id -u):$$(id -g) -v $$(pwd):/app -w /app/web node:20-alpine sh -c "npm ci && npm run build"; \
 	fi
 	@if [ ! -f web/dist/index.html ]; then echo "❌ web/dist/index.html missing! Build failed."; exit 1; fi
 	@echo "✅ Web Dashboard built"

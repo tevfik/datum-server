@@ -1,7 +1,10 @@
 # Frontend Build Stage
 FROM node:20-alpine AS frontend-builder
+WORKDIR /app
+# Copy OpenAPI spec for type generation
+COPY cmd/server/openapi.yaml ./cmd/server/openapi.yaml
+COPY web/package.json web/package-lock.json ./web/
 WORKDIR /app/web
-COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ .
 RUN npm run build
