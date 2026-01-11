@@ -19,3 +19,4 @@ services:
       - CORS_ORIGINS=*
     volumes:
       - ${DATA_DIR:-../data}:/root/data
+      - ../firmware:/root/firmware
