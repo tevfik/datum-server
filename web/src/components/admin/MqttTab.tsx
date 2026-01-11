@@ -27,7 +27,7 @@ export function MqttTab() {
     // Subscribe State
     const [subTopic, setSubTopic] = useState("#");
     const [apiKey, setApiKey] = useState("");
-    const [wsUrl, setWsUrl] = useState("ws://localhost:1884");
+    const [wsUrl, setWsUrl] = useState(`ws://${window.location.hostname}:1884`);
     const [isConnected, setIsConnected] = useState(false);
     const [messages, setMessages] = useState<MqttMessage[]>([]);
     const clientRef = useRef<mqtt.MqttClient | null>(null);
@@ -318,7 +318,6 @@ export function MqttTab() {
                             <Input
                                 value={subTopic}
                                 onChange={(e) => setSubTopic(e.target.value)}
-                                disabled={!isConnected}
                                 placeholder="#"
                             />
                         </div>

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { deviceService } from '@/services/deviceService';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -12,15 +12,36 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { RefreshCw, Plus, Monitor } from 'lucide-react';
+import { RefreshCw, Plus, Monitor, Pencil, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function Devices() {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
+
     const { data: devices, isLoading, isError, refetch } = useQuery({
         queryKey: ['devices'],
         queryFn: deviceService.getAll,
     });
+
+    const deleteMutation = useMutation({
+        mutationFn: deviceService.delete,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['devices'] });
+        },
+    });
+
+    const handleDelete = (e: React.MouseEvent, id: string, name: string) => {
+        e.stopPropagation(); // Prevent row click
+        if (window.confirm(`Are you sure you want to delete device "${name}"? This action cannot be undone.`)) {
+            deleteMutation.mutate(id);
+        }
+    };
+
+    const handleEdit = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        navigate(`/devices/${id}`);
+    };
 
     return (
         <div className="space-y-6">
@@ -97,7 +118,26 @@ export default function Devices() {
                                             {device.last_seen ? formatDistanceToNow(new Date(device.last_seen), { addSuffix: true }) : 'Never'}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button variant="ghost" size="sm">Manage</Button>
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                                    onClick={(e) => handleEdit(e, device.id)}
+                                                    title="Manage Device"
+                                                >
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                    onClick={(e) => handleDelete(e, device.id, device.name)}
+                                                    title="Delete Device"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}

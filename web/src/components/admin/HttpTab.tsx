@@ -25,6 +25,8 @@ export function HttpTab() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const [autoAuth, setAutoAuth] = useState(true);
+
     const handleSend = async () => {
         setIsLoading(true);
         setError(null);
@@ -34,11 +36,19 @@ export function HttpTab() {
 
         try {
             // Parse headers
-            let headerObj = {};
+            let headerObj: Record<string, string> = {};
             try {
                 headerObj = JSON.parse(headers);
             } catch (e) {
                 throw new Error("Invalid Headers JSON");
+            }
+
+            // Auto-Inject Auth Token
+            if (autoAuth) {
+                const token = localStorage.getItem('datum_token');
+                if (token) {
+                    headerObj['Authorization'] = `Bearer ${token}`;
+                }
             }
 
             // Parse body
@@ -52,10 +62,6 @@ export function HttpTab() {
             }
 
             // Execute Request
-            // Note: We use the configured axios instance or a fresh one? 
-            // Better a fresh one to allow full control, but maybe strictly relative URLs for now.
-            // Using axios directly to bypass interceptors if needed, but interceptors handle Auth...
-            // User likely wants to use their current Auth session.
             const res = await axios({
                 method,
                 url,
@@ -117,6 +123,19 @@ export function HttpTab() {
                             {isLoading ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
                             Send
                         </Button>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                        <input
+                            type="checkbox"
+                            id="autoAuth"
+                            checked={autoAuth}
+                            onChange={(e) => setAutoAuth(e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <label htmlFor="autoAuth" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                            Auto-Inject Auth Token
+                        </label>
                     </div>
 
                     {/* Editors */}
