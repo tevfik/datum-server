@@ -18,14 +18,15 @@ type CreateDeviceRequest struct {
 }
 
 type DeviceResponse struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Type      string    `json:"type"`
-	DeviceUID string    `json:"device_uid"` // Add DeviceUID
-	PublicIP  string    `json:"public_ip"`  // Add PublicIP
-	LastSeen  time.Time `json:"last_seen"`
-	CreatedAt time.Time `json:"created_at"`
-	Status    string    `json:"status"`
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Type        string                 `json:"type"`
+	DeviceUID   string                 `json:"device_uid"` // Add DeviceUID
+	PublicIP    string                 `json:"public_ip"`  // Add PublicIP
+	LastSeen    time.Time              `json:"last_seen"`
+	CreatedAt   time.Time              `json:"created_at"`
+	Status      string                 `json:"status"`
+	ShadowState map[string]interface{} `json:"shadow_state"` // Added ShadowState
 }
 
 // ============ Device Handlers ============
@@ -130,21 +131,28 @@ func getDeviceHandler(c *gin.Context) {
 		return
 	}
 
-	// Delete handler also uses similar logic
+	// Get latest shadow state
+	shadowData, err := store.GetLatestData(deviceID)
+	var shadowState map[string]interface{}
+	if err == nil && shadowData != nil {
+		shadowState = shadowData.Data
+	}
+
 	status := "offline"
 	if time.Since(device.LastSeen) < 5*time.Minute {
 		status = "online"
 	}
 
 	resp := DeviceResponse{
-		ID:        device.ID,
-		Name:      device.Name,
-		Type:      device.Type,
-		DeviceUID: device.DeviceUID,
-		PublicIP:  device.PublicIP,
-		LastSeen:  device.LastSeen,
-		CreatedAt: device.CreatedAt,
-		Status:    status,
+		ID:          device.ID,
+		Name:        device.Name,
+		Type:        device.Type,
+		DeviceUID:   device.DeviceUID,
+		PublicIP:    device.PublicIP,
+		LastSeen:    device.LastSeen,
+		CreatedAt:   device.CreatedAt,
+		Status:      status,
+		ShadowState: shadowState,
 	}
 
 	c.JSON(http.StatusOK, resp)

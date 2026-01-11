@@ -7,6 +7,7 @@ export interface Device {
     last_seen: string;
     created_at: string;
     status: 'online' | 'offline';
+    shadow_state?: Record<string, any>;
 }
 
 export interface DeviceListResponse {

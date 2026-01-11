@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { deviceService } from '@/services/deviceService';
+import { adminService } from '@/services/adminService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,7 @@ export default function DeviceDetail() {
         queryKey: ['device', id],
         queryFn: () => deviceService.getById(id!),
         enabled: !!id,
+        refetchInterval: 2000, // Refresh shadow every 2s
     });
 
     const deleteMutation = useMutation({
@@ -94,6 +96,26 @@ export default function DeviceDetail() {
                     </CardContent>
                 </Card>
 
+                {/* Device Shadow Card */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Activity className="h-5 w-5" />
+                            Device Shadow
+                        </CardTitle>
+                        <CardDescription>Latest reported state (Live)</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="bg-zinc-950 p-4 rounded-md overflow-x-auto h-[200px] font-mono text-xs text-green-400">
+                            <pre>
+                                {device.shadow_state
+                                    ? JSON.stringify(device.shadow_state, null, 2)
+                                    : "// No shadow state available"}
+                            </pre>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* Command Center */}
                 <Card className="flex flex-col">
                     <CardHeader>
@@ -106,6 +128,20 @@ export default function DeviceDetail() {
                     <CardContent className="space-y-4">
                         <CommandSender deviceId={device.id} />
                         <CommandHistory deviceId={device.id} />
+                    </CardContent>
+                </Card>
+
+                {/* Firmware Update */}
+                <Card className="flex flex-col">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <HardDrive className="h-5 w-5" />
+                            Firmware Update
+                        </CardTitle>
+                        <CardDescription>OTA Update (Upload .bin or URL)</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <FirmwareUpdate deviceId={device.id} />
                     </CardContent>
                 </Card>
             </div>
@@ -200,6 +236,93 @@ function CommandHistory({ deviceId }: { deviceId: string }) {
                     ))}
                 </div>
             )}
+        </div>
+    );
+}
+
+function FirmwareUpdate({ deviceId }: { deviceId: string }) {
+    const [url, setUrl] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+
+    // Upload Mutation
+    const uploadMutation = useMutation({
+        mutationFn: (file: File) => adminService.uploadFirmware(file),
+        onSuccess: (data) => {
+            setUrl(data.url);
+            setFile(null); // Clear file after upload
+            alert(`Firmware uploaded! URL: ${data.url}`);
+        },
+        onError: (err: any) => {
+            alert(`Upload failed: ${err.response?.data?.error || err.message}`);
+        }
+    });
+
+    // Command Mutation
+    const sendMutation = useMutation({
+        mutationFn: (data: { action: string; params: any }) =>
+            deviceService.sendCommand(deviceId, data),
+        onSuccess: () => {
+            alert('OTA Update Command Sent!');
+        },
+        onError: () => {
+            alert('Failed to send command');
+        }
+    });
+
+    const handleUpload = async () => {
+        if (!file) return;
+        uploadMutation.mutate(file);
+    };
+
+    const handleUpdate = () => {
+        if (!url) {
+            alert("Please provide a URL or upload a file first");
+            return;
+        }
+        sendMutation.mutate({
+            action: 'update_firmware',
+            params: { url: url }
+        });
+    };
+
+    return (
+        <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+            {/* Tab-like toggle or just two sections? Let's do simple stack */}
+
+            <div className="space-y-2 pb-4 border-b">
+                <Label>Option 1: Upload .bin File</Label>
+                <div className="flex gap-2">
+                    <Input
+                        type="file"
+                        accept=".bin"
+                        onChange={(e) => setFile(e.target.files?.[0] || null)}
+                        className="text-xs"
+                    />
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={!file || uploadMutation.isPending}
+                        onClick={handleUpload}
+                    >
+                        {uploadMutation.isPending ? 'Uploading...' : 'Upload'}
+                    </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Uploads to server and generates URL automatically.</p>
+            </div>
+
+            <div className="space-y-2">
+                <Label>Option 2: Firmware URL</Label>
+                <Input
+                    placeholder="http://..."
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                />
+            </div>
+
+            <Button className="w-full" onClick={handleUpdate} disabled={sendMutation.isPending || !url}>
+                <Send className="mr-2 h-4 w-4" />
+                {sendMutation.isPending ? 'Sending Command...' : 'Start OTA Update'}
+            </Button>
         </div>
     );
 }

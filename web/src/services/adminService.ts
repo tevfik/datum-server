@@ -59,6 +59,15 @@ export const adminService = {
         await api.delete('/admin/logs');
     },
 
+    uploadFirmware: async (file: File): Promise<{ url: string; filename: string }> => {
+        const formData = new FormData();
+        formData.append('firmware', file);
+        const { data } = await api.post('/admin/firmware', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return data;
+    },
+
     resetSystem: async (): Promise<void> => {
         await api.delete('/admin/database/reset', { data: { confirm: 'RESET' } });
     }

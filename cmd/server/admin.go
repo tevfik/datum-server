@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -80,6 +81,9 @@ func setupAdminRoutes(r *gin.Engine, store storage.Provider) {
 		admin.GET("/mqtt/stats", getMQTTStatsHandler)
 		admin.GET("/mqtt/clients", getMQTTClientsHandler)
 		admin.POST("/mqtt/publish", postMQTTPublishHandler)
+
+		// Firmware Management
+		admin.POST("/firmware", uploadFirmwareHandler)
 	}
 
 	// Device auth routes for token refresh
@@ -959,5 +963,51 @@ func revokeDeviceKeyHandler(c *gin.Context) {
 	logger.Logger.Info().Msgf("Revoked API key for device %s by admin", deviceID)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Key revoked successfully",
+	})
+}
+
+// uploadFirmwareHandler handles firmware binary uploads
+// POST /admin/firmware
+func uploadFirmwareHandler(c *gin.Context) {
+	file, err := c.FormFile("firmware")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No firmware file uploaded"})
+		return
+	}
+
+	// Validate extension
+	ext := filepath.Ext(file.Filename)
+	if ext != ".bin" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Only .bin files are allowed"})
+		return
+	}
+
+	// Create firmware directory if not exists
+	firmwareDir := "./firmware"
+	if err := os.MkdirAll(firmwareDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create firmware directory"})
+		return
+	}
+
+	// Sanitize filename
+	safeFilename := filepath.Base(file.Filename)
+	dst := filepath.Join(firmwareDir, safeFilename)
+
+	if err := c.SaveUploadedFile(file, dst); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save firmware file"})
+		return
+	}
+
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	host := c.Request.Host
+	publicURL := fmt.Sprintf("%s://%s/devices/firmware/%s", scheme, host, safeFilename)
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message":  "Firmware uploaded successfully",
+		"filename": safeFilename,
+		"url":      publicURL,
 	})
 }
