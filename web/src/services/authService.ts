@@ -17,7 +17,12 @@ export const authService = {
         return data;
     },
 
+
     deleteKey: async (id: string): Promise<void> => {
         await api.delete(`/auth/keys/${id}`);
+    },
+
+    changePassword: async (password: string): Promise<void> => {
+        await api.put('/auth/password', { password });
     }
 };

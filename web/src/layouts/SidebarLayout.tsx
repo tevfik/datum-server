@@ -36,7 +36,7 @@ export default function SidebarLayout() {
             >
                 <div className="flex h-16 items-center border-b px-6">
                     <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                        Datum
+                        datum
                     </span>
                 </div>
 

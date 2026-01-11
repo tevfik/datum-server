@@ -15,8 +15,135 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/context/AuthContext';
+import { adminService } from '@/services/adminService';
+
+// Subcomponent for Admin Tab to keep main file clean-ish
+function AdminSettings() {
+    const queryClient = useQueryClient();
+
+    // Fetch Users
+    const { data: users = [], isLoading } = useQuery({
+        queryKey: ['admin-users'],
+        queryFn: adminService.getUsers,
+    });
+
+    // Fetch Stats
+    const { data: stats } = useQuery({
+        queryKey: ['admin-stats'],
+        queryFn: adminService.getSystemStats,
+    });
+
+    // Delete User
+    const deleteMutation = useMutation({
+        mutationFn: adminService.deleteUser,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+        },
+    });
+
+    // Bytes to MB
+    const formatBytes = (bytes: number) => (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+
+    return (
+        <div className="space-y-6">
+            {/* System Stats Cards */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats?.total_users || '-'}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Devices</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats?.total_devices || '-'}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">DB Size</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats ? formatBytes(stats.db_size_bytes) : '-'}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Platform</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats?.platform_name || 'Datum'}</div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Users List */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>User Management</CardTitle>
+                    <CardDescription>Manage platform users.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {isLoading ? (
+                        <div>Loading users...</div>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Role</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Devices</TableHead>
+                                    <TableHead>Joined</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {users.map((u) => (
+                                    <TableRow key={u.id}>
+                                        <TableCell className="font-medium">{u.email}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>
+                                                {u.role}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>{u.status}</TableCell>
+                                        <TableCell>{u.device_count}</TableCell>
+                                        <TableCell>{format(new Date(u.created_at), 'MMM d, yyyy')}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                disabled={u.role === 'admin'} // Cannot delete admins easily for safety
+                                                onClick={() => {
+                                                    if (window.confirm(`Delete user "${u.email}"?`)) {
+                                                        deleteMutation.mutate(u.id);
+                                                    }
+                                                }}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
 
 export default function Settings() {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('api-keys');
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newKeyName, setNewKeyName] = useState('');
@@ -66,6 +193,29 @@ export default function Settings() {
         // Could add a toast here
     };
 
+    const [newPassword, setNewPassword] = useState('');
+    const passwordMutation = useMutation({
+        mutationFn: authService.changePassword,
+        onSuccess: () => {
+            alert("Password updated successfully");
+            setNewPassword('');
+        },
+        onError: () => {
+            alert("Failed to update password");
+        }
+    });
+
+    const handleChangePassword = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newPassword.length < 8) {
+            alert("Password must be at least 8 characters");
+            return;
+        }
+        if (window.confirm("Are you sure you want to change your password?")) {
+            passwordMutation.mutate(newPassword);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
@@ -84,6 +234,14 @@ export default function Settings() {
                 >
                     API Keys
                 </button>
+                {user?.role === 'admin' && (
+                    <button
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'admin' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                        onClick={() => setActiveTab('admin')}
+                    >
+                        Admin
+                    </button>
+                )}
             </div>
 
             {/* API Keys Content */}
@@ -153,14 +311,35 @@ export default function Settings() {
                 </Card>
             )}
 
+            {activeTab === 'admin' && user?.role === 'admin' && (
+                <AdminSettings />
+            )}
+
             {activeTab === 'general' && (
                 <Card>
                     <CardHeader>
                         <CardTitle>General Settings</CardTitle>
-                        <CardDescription>Application preferences and configuration.</CardDescription>
+                        <CardDescription>Application preferences and security.</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <p className="text-muted-foreground">No general settings available yet.</p>
+                    <CardContent className="space-y-6">
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-medium">Change Password</h3>
+                            <form onSubmit={handleChangePassword} className="space-y-4 max-w-sm">
+                                <div className="space-y-2">
+                                    <label htmlFor="new-password">New Password</label>
+                                    <Input
+                                        id="new-password"
+                                        type="password"
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                        placeholder="Min. 8 characters"
+                                    />
+                                </div>
+                                <Button type="submit" disabled={!newPassword || passwordMutation.isPending}>
+                                    {passwordMutation.isPending ? 'Updating...' : 'Update Password'}
+                                </Button>
+                            </form>
+                        </div>
                     </CardContent>
                 </Card>
             )}
