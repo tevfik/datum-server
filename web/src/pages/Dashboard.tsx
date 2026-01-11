@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { deviceService } from "@/services/deviceService";
+import { AddDeviceModal } from "@/components/AddDeviceModal";
 
 // Mock data for chart (until we have system-wide metrics API)
 const chartData = [
@@ -47,9 +48,10 @@ export default function Dashboard() {
                 <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
                 <div className="flex items-center gap-2">
                     <span className={`flex h-2 w-2 rounded-full animate-pulse ${systemHealth > 80 ? 'bg-green-500' : 'bg-amber-500'}`}></span>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-muted-foreground mr-4">
                         {isLoading ? 'Connecting...' : `System ${systemHealth > 80 ? 'Optimal' : 'Standard'}`}
                     </span>
+                    <AddDeviceModal />
                 </div>
             </div>
 

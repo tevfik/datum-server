@@ -16,6 +16,7 @@ export interface DeviceListResponse {
 export interface CreateDeviceRequest {
     name: string;
     type: string;
+    device_uid?: string;
 }
 
 export interface CreateDeviceResponse {

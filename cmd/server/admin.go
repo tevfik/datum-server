@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -487,6 +488,36 @@ func getDatabaseStatsHandler(c *gin.Context) {
 	stats["platform_name"] = config.PlatformName
 	stats["allow_register"] = config.AllowRegister
 	stats["data_retention_days"] = config.DataRetention
+
+	// Add Server Time
+	stats["server_time"] = time.Now().Format(time.RFC3339)
+
+	// Add DB Size (Approximate size of data directory)
+	var size int64
+	filepath.Walk("data", func(_ string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
+	})
+	stats["db_size_bytes"] = size
+
+	// Add Environment Variables (Filtered)
+	envVars := make(map[string]string)
+	for _, e := range os.Environ() {
+		pair := strings.SplitN(e, "=", 2)
+		if len(pair) == 2 {
+			key := pair[0]
+			// Value filtering for security
+			val := pair[1]
+			upperKey := strings.ToUpper(key)
+			if strings.Contains(upperKey, "SECRET") || strings.Contains(upperKey, "PASSWORD") || strings.Contains(upperKey, "KEY") || strings.Contains(upperKey, "TOKEN") {
+				val = "******"
+			}
+			envVars[key] = val
+		}
+	}
+	stats["env_vars"] = envVars
 
 	c.JSON(http.StatusOK, stats)
 }

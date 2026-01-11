@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { AdminUser, AdminUserListResponse, SystemStats } from '@/types/admin';
+import type { AdminUser, AdminUserListResponse, SystemStats, BrokerStats, MqttClient, PublishRequest, SystemConfig, LogsResponse, UpdateRetentionRequest, UpdateRegistrationRequest } from '@/types/admin';
 
 export const adminService = {
     getUsers: async (): Promise<AdminUser[]> => {
@@ -14,5 +14,52 @@ export const adminService = {
     getSystemStats: async (): Promise<SystemStats> => {
         const { data } = await api.get<SystemStats>('/admin/database/stats');
         return data;
+    },
+
+    // MQTT
+    getMqttStats: async (): Promise<BrokerStats> => {
+        const { data } = await api.get<BrokerStats>('/admin/mqtt/stats');
+        return data;
+    },
+
+    getMqttClients: async (): Promise<MqttClient[]> => {
+        const { data } = await api.get<{ clients: MqttClient[] }>('/admin/mqtt/clients');
+        return data.clients || [];
+    },
+
+    publishMqttMessage: async (req: PublishRequest): Promise<void> => {
+        await api.post('/admin/mqtt/publish', req);
+    },
+
+    // System Config & Logs
+    getSystemConfig: async (): Promise<SystemConfig> => {
+        const { data } = await api.get<SystemConfig>('/admin/config');
+        return data;
+    },
+
+    updateRetention: async (req: UpdateRetentionRequest): Promise<void> => {
+        await api.put('/admin/config/retention', req);
+    },
+
+    updateRegistration: async (req: UpdateRegistrationRequest): Promise<void> => {
+        await api.put('/admin/config/registration', req);
+    },
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    getLogs: async (_lines: number = 100): Promise<LogsResponse> => {
+        // admin.go uses 'limit' or just returns max 500, but let's just GET
+        // Actually admin.go doesn't support limit param in readLastLines call directly in handler (hardcoded 500)
+        // But handler accepts query? No, handler calls readLastLines(path, 500).
+        // It accepts `type`, `level`, `search`.
+        const { data } = await api.get<LogsResponse>(`/admin/logs`);
+        return data;
+    },
+
+    clearLogs: async (): Promise<void> => {
+        await api.delete('/admin/logs');
+    },
+
+    resetSystem: async (): Promise<void> => {
+        await api.delete('/admin/database/reset', { data: { confirm: 'RESET' } });
     }
 };

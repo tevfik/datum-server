@@ -17,6 +17,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import { adminService } from '@/services/adminService';
+import { MqttTab } from '@/components/admin/MqttTab';
+import { SystemTab } from '@/components/admin/SystemTab';
 
 // Subcomponent for Admin Tab to keep main file clean-ish
 function AdminSettings() {
@@ -48,6 +50,7 @@ function AdminSettings() {
     return (
         <div className="space-y-6">
             {/* System Stats Cards */}
+            {/* System Stats Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -70,18 +73,37 @@ function AdminSettings() {
                         <CardTitle className="text-sm font-medium">DB Size</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats ? formatBytes(stats.db_size_bytes) : '-'}</div>
+                        <div className="text-2xl font-bold">{stats?.db_size_bytes ? formatBytes(stats.db_size_bytes) : '-'}</div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Platform</CardTitle>
+                        <CardTitle className="text-sm font-medium">Server Time</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats?.platform_name || 'Datum'}</div>
+                        <div className="text-xs font-mono">{stats?.server_time ? format(new Date(stats.server_time), 'yyyy-MM-dd HH:mm:ss') : '-'}</div>
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Env Vars */}
+            {stats?.env_vars && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-sm font-medium">Environment Variables</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="h-48 overflow-y-auto rounded-md border p-2 bg-muted/50 text-xs font-mono">
+                            {Object.entries(stats.env_vars).map(([k, v]) => (
+                                <div key={k} className="flex gap-2">
+                                    <span className="font-semibold text-muted-foreground">{k}:</span>
+                                    <span className="break-all">{v}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Users List */}
             <Card>
@@ -242,6 +264,14 @@ export default function Settings() {
                         Admin
                     </button>
                 )}
+                {user?.role === 'admin' && (
+                    <button
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mqtt' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                        onClick={() => setActiveTab('mqtt')}
+                    >
+                        MQTT
+                    </button>
+                )}
             </div>
 
             {/* API Keys Content */}
@@ -313,6 +343,14 @@ export default function Settings() {
 
             {activeTab === 'admin' && user?.role === 'admin' && (
                 <AdminSettings />
+            )}
+
+            {activeTab === 'mqtt' && user?.role === 'admin' && (
+                <MqttTab />
+            )}
+
+            {activeTab === 'system' && user?.role === 'admin' && (
+                <SystemTab />
             )}
 
             {activeTab === 'general' && (
