@@ -1,6 +1,7 @@
 #include "mqtt_manager.h"
 #include "camera_manager.h" // For frame size, snap, streaming constants
 #include "eif_motion.h"     // For motion settings
+#include "ota_manager.h"    // For updateFirmware
 #include "wifi_manager.h"   // For getPublicIP
 #include <HTTPClient.h>     // For ackCommand
 #include <Preferences.h>
@@ -364,6 +365,17 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
                     torchState ? 255 : 0);
 #endif
 #endif
+    } else if (action == "update_firmware" || action == "update") {
+      String url = extractJsonVal(paramsBlock, "url");
+      // If URL is empty, try to construct it from version via server?
+      // For now, assume URL is passed.
+      if (url.length() > 0) {
+        ackCommand(pid); // Ack before update (it will reboot)
+        delay(500);
+        updateFirmware(url);
+      } else {
+        Serial.println("[MQTT] Update command missing URL");
+      }
     }
   }
 }

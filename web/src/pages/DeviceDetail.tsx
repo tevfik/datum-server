@@ -264,8 +264,9 @@ function FirmwareUpdate({ deviceId }: { deviceId: string }) {
         onSuccess: () => {
             alert('OTA Update Command Sent!');
         },
-        onError: () => {
-            alert('Failed to send command');
+        onError: (err: any) => {
+            console.error('OTA Command failed:', err);
+            alert(`Failed to send command: ${err.response?.data?.error || err.message}`);
         }
     });
 

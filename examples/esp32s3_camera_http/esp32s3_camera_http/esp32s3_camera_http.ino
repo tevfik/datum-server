@@ -654,6 +654,15 @@ void handleAction() {
     setupServer.send(200, "text/plain", "Restarting...");
     delay(100);
     ESP.restart();
+  } else if (type == "update") { // Helper for URL-based OTA
+    String url = setupServer.arg("url");
+    if (url.length() > 0) {
+      setupServer.send(200, "text/plain", "Starting OTA Update...");
+      delay(500);
+      updateFirmware(url);
+    } else {
+      setupServer.send(400, "text/plain", "Missing URL");
+    }
   } else {
     setupServer.send(400, "text/plain", "Unknown");
   }
