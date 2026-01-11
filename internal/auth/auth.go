@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -102,7 +103,7 @@ func GenerateTokenPair(userID, email, role string) (accessToken string, refreshT
 		Email:  email,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * 24 * time.Hour)), // 30 Days
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(getRefreshExpiryDays()) * 24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Subject:   "refresh",
 		},
@@ -150,4 +151,18 @@ func GenerateUserAPIKey() (string, error) {
 		return "", err
 	}
 	return "ak_" + hex.EncodeToString(bytes), nil
+}
+
+// getRefreshExpiryDays reads JWT_REFRESH_EXPIRY from env or returns default (30)
+func getRefreshExpiryDays() int {
+	val := os.Getenv("JWT_REFRESH_EXPIRY")
+	if val == "" {
+		return 30
+	}
+	days, err := strconv.Atoi(val)
+	if err != nil || days <= 0 {
+		log.Warn().Str("val", val).Msg("Invalid JWT_REFRESH_EXPIRY, using default 30 days")
+		return 30
+	}
+	return days
 }

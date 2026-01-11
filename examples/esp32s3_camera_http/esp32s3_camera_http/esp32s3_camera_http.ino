@@ -903,7 +903,7 @@ bool activateProvisioning() {
 
   // Call /provisioning/activate endpoint with Device UID
   // The server checks if there is a pending provisioning request for this UID
-  http.begin(serverURL + "/provisioning/activate");
+  http.begin(serverURL + "/prov/activate");
   http.addHeader("Content-Type", "application/json");
 
   // We send UID, Firmware Version, and Model
