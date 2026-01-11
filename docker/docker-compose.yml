@@ -42,8 +42,8 @@ services:
       dockerfile: docker/Dockerfile
     container_name: datum-server
     volumes:
-      - ${DATA_DIR:-./data}:/app/data
-      - ../firmware:/app/firmware
+      - ${DATA_DIR:-./data}:/root/data
+      - ../firmware:/root/firmware
     env_file:
       - .env
     environment:
