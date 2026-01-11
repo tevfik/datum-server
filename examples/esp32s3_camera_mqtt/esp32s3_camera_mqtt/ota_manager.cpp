@@ -28,7 +28,14 @@ void updateFirmware(String url) {
   // Assuming camera stops or WDT handles it.
   // If needed, include "esp_camera.h" and call esp_camera_deinit().
 
-  WiFiClient client;
+#include <WiFiClientSecure.h>
+
+  // ... imports ...
+
+  // ... inside function ...
+
+  WiFiClientSecure client;
+  client.setInsecure(); // Skip certificate validation for OTA
   client.setTimeout(60);
 
   // Add progress callback
