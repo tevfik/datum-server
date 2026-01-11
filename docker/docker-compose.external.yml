@@ -81,8 +81,6 @@ services:
       - "traefik.tcp.routers.datum-mqtts.service=datum-mqtts"
       - "traefik.tcp.services.datum-mqtts.loadbalancer.server.port=1883"
 
-      # --- MQTT WSS (Secure via 443/Path) ---
-      # Route /mqtt on main HTTPS port to internal 1884
       - "traefik.http.routers.datum-mqttws.rule=Host(`${DOMAIN:-datum.localhost}`) && PathPrefix(`/mqtt`)"
       - "traefik.http.routers.datum-mqttws.entrypoints=${TRAEFIK_ENTRYPOINT_HTTPS:-websecure}"
       - "traefik.http.routers.datum-mqttws.tls=true"
@@ -90,9 +88,7 @@ services:
       - "traefik.http.routers.datum-mqttws.service=datum-mqttws"
       - "traefik.http.services.datum-mqttws.loadbalancer.server.port=1884"
       - "traefik.http.middlewares.mqtt-strip.stripprefix.prefixes=/mqtt"
-      - "traefik.http.middlewares.mqtt-upgrade.headers.customrequestheaders.Connection=Upgrade"
-      - "traefik.http.middlewares.mqtt-upgrade.headers.customrequestheaders.Upgrade=websocket"
-      - "traefik.http.routers.datum-mqttws.middlewares=mqtt-strip,mqtt-upgrade"
+      - "traefik.http.routers.datum-mqttws.middlewares=mqtt-strip"
 
 networks:
   int_docker:
