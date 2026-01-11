@@ -88,7 +88,8 @@ services:
       - "traefik.http.routers.datum-mqttws.service=datum-mqttws"
       - "traefik.http.services.datum-mqttws.loadbalancer.server.port=1884"
       - "traefik.http.middlewares.mqtt-strip.stripprefix.prefixes=/mqtt"
-      - "traefik.http.routers.datum-mqttws.middlewares=mqtt-strip"
+      - "traefik.http.middlewares.mqtt-origin.headers.customrequestheaders.Origin=http://127.0.0.1:1884"
+      - "traefik.http.routers.datum-mqttws.middlewares=mqtt-strip,mqtt-origin"
 
 networks:
   int_docker:
