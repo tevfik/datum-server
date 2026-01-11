@@ -21,6 +21,7 @@ import { AddDeviceModal } from '@/components/AddDeviceModal';
 export default function Devices() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const [isAddOpen, setIsAddOpen] = useState(false);
     const [sortColumn, setSortColumn] = useState('status');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -191,6 +192,7 @@ export default function Devices() {
                     )}
                 </CardContent>
             </Card>
+            <AddDeviceModal open={isAddOpen} onOpenChange={setIsAddOpen} />
         </div>
     );
 }
