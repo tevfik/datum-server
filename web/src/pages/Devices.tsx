@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { RefreshCw, Plus, Monitor, Pencil, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { SortableHeader } from '@/components/ui/sortable-header';
+import { AddDeviceModal } from '@/components/AddDeviceModal';
 
 export default function Devices() {
     const navigate = useNavigate();
@@ -91,7 +92,7 @@ export default function Devices() {
                         <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                         Refresh
                     </Button>
-                    <Button size="sm">
+                    <Button size="sm" onClick={() => setIsAddOpen(true)}>
                         <Plus className="mr-2 h-4 w-4" />
                         Add Device
                     </Button>

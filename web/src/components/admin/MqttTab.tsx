@@ -44,6 +44,7 @@ export function MqttTab() {
         queryKey: ['mqtt-stats'],
         queryFn: adminService.getMqttStats,
         refetchInterval: 5000,
+        enabled: user?.role === 'admin',
     });
 
     // Fetch Clients
@@ -51,6 +52,7 @@ export function MqttTab() {
         queryKey: ['mqtt-clients'],
         queryFn: adminService.getMqttClients,
         refetchInterval: 5000,
+        enabled: user?.role === 'admin',
     });
 
     // Publish Mutation
