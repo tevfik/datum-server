@@ -1,10 +1,15 @@
 .PHONY: help build run stop clean test bench dev logs shell db-backup db-restore release
 
+# Load .env file if it exists (for SKIP_WEB, etc.)
+-include .env
+export
+
 # Variables
 GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "1.0.0-dev")
 VERSION ?= $(GIT_VERSION)
 BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 DEFAULT_SERVER_URL ?= http://localhost:8000
+SKIP_WEB ?= 0
 COMPOSE=docker compose -f docker/docker-compose.yml
 COMPOSE_DEV=docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml
 SERVER_BINARY=build/binaries/server
@@ -132,16 +137,29 @@ build-web: ## Build Web Dashboard (React) - Auto-detects npm or uses Docker
 	@if [ ! -f web/dist/index.html ]; then echo "❌ web/dist/index.html missing! Build failed."; exit 1; fi
 	@echo "✅ Web Dashboard built"
 
-prepare-assets: build-web ## Copy web assets to server directory
-	@echo "📦 Copying web assets..."
-	@rm -rf cmd/server/dist
-	@cp -r web/dist cmd/server/dist
+prepare-assets: ## Copy web assets to server directory (skip with SKIP_WEB=1)
+	@if [ "$(SKIP_WEB)" = "1" ]; then \
+		echo "⚠️  SKIP_WEB=1: Creating minimal placeholder for API-only build..."; \
+		rm -rf cmd/server/dist; \
+		mkdir -p cmd/server/dist; \
+		echo '<!DOCTYPE html><html><body><h1>API-Only Mode</h1><p>Web UI not included in this build.</p></body></html>' > cmd/server/dist/index.html; \
+	else \
+		$(MAKE) build-web; \
+		echo "📦 Copying web assets..."; \
+		rm -rf cmd/server/dist; \
+		cp -r web/dist cmd/server/dist; \
+	fi
 
 build-server: prepare-assets ## Build Go server binary locally
 	@echo "🔨 Building Go server..."
 	@mkdir -p build/binaries
 	@go build -o $(SERVER_BINARY) ./cmd/server
 	@echo "✅ Binary created: $(SERVER_BINARY)"
+
+build-api-only: ## Build server without web UI (API-only mode)
+	@echo "🔨 Building API-only server..."
+	@SKIP_WEB=1 $(MAKE) build-server
+	@echo "✅ API-only binary created: $(SERVER_BINARY)"
 
 build-cli: ## Build datumctl CLI tool
 	@echo "🔨 Building datumctl..."

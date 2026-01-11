@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"datum-go/internal/auth"
+	"datum-go/internal/handlers"
 	"datum-go/internal/processing"
 	"datum-go/internal/storage"
 	"encoding/json"
@@ -59,7 +60,8 @@ func TestListUsersHandlerStatusFilter(t *testing.T) {
 		store.CreateUser(user)
 	}
 
-	router.GET("/admin/users", listUsersHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/users", h.ListUsersHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users?status=active", nil)
 	w := httptest.NewRecorder()
@@ -99,7 +101,8 @@ func TestGetDatabaseStatsHandlerDetailed(t *testing.T) {
 		store.CreateDevice(device)
 	}
 
-	router.GET("/admin/database/stats", getDatabaseStatsHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/database/stats", h.GetDatabaseStatsHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/stats", nil)
 	w := httptest.NewRecorder()
@@ -133,7 +136,8 @@ func TestResetPasswordHandlerValidUpdate(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.POST("/admin/users/:username/reset-password", resetPasswordHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users/:username/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{
 		"new_password": "verystrongpassword",
@@ -170,7 +174,8 @@ func TestUpdateUserHandlerEmailUpdate(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.PUT("/admin/users/:user_id", updateUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.PUT("/admin/users/:user_id", h.UpdateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"email": "newmail@test.com",
@@ -192,7 +197,8 @@ func TestCreateUserHandlerValidInput(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/users", createUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users", h.CreateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"email":    "validuser@test.com",
@@ -214,7 +220,8 @@ func TestSetupSystemHandlerValidSetup(t *testing.T) {
 	router, cleanup := setupFinalTestServer(t)
 	defer cleanup()
 
-	router.POST("/system/setup", setupSystemHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/system/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
 		"platform_name":  "Test Platform",

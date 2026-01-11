@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"datum-go/internal/auth"
+	"datum-go/internal/handlers"
 	"datum-go/internal/processing"
 	"datum-go/internal/storage"
 
@@ -210,7 +211,8 @@ func TestDeleteDevice(t *testing.T) {
 	token, _ := auth.GenerateToken("admin-1", "admin@test.com", "admin")
 
 	r := gin.New()
-	setupAdminRoutes(r, testStore)
+	h := handlers.NewAdminHandler(testStore, nil)
+	h.RegisterRoutes(r)
 
 	req, _ := http.NewRequest("DELETE", "/admin/devices/device-to-delete", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -256,7 +258,8 @@ func TestGetDevice(t *testing.T) {
 	token, _ := auth.GenerateToken("admin-1", "admin@test.com", "admin")
 
 	r := gin.New()
-	setupAdminRoutes(r, testStore)
+	h := handlers.NewAdminHandler(testStore, nil)
+	h.RegisterRoutes(r)
 
 	req, _ := http.NewRequest("GET", "/admin/devices/device-123", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -303,7 +306,8 @@ func TestUpdateDevice(t *testing.T) {
 	token, _ := auth.GenerateToken("admin-1", "admin@test.com", "admin")
 
 	r := gin.New()
-	setupAdminRoutes(r, testStore)
+	h := handlers.NewAdminHandler(testStore, nil)
+	h.RegisterRoutes(r)
 
 	updateData := map[string]interface{}{
 		"status": "suspended",
@@ -386,7 +390,8 @@ func TestInvalidDeviceID(t *testing.T) {
 	token, _ := auth.GenerateToken("admin-1", "admin@test.com", "admin")
 
 	r := gin.New()
-	setupAdminRoutes(r, testStore)
+	h := handlers.NewAdminHandler(testStore, nil)
+	h.RegisterRoutes(r)
 
 	req, _ := http.NewRequest("GET", "/admin/devices/non-existent-device", nil)
 	req.Header.Set("Authorization", "Bearer "+token)

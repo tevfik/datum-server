@@ -235,23 +235,20 @@ func scanDeviceFromRow(scanner Scannable) (*storage.Device, error) {
 	var d storage.Device
 	var deviceUID, fwVer, mSec, cTok, pTok sql.NullString
 	var tIss, tExp, gEnd, kRev, upAt sql.NullTime
+	var shadowStateJSON []byte // For JSONB shadow_state column
 
-	// SELECT * order matches schema.sql definition?
-	// DANGEROUS to use SELECT * with scan. Should specify columns.
-	// For now, assuming explicit column list used in queries or mapping accurately.
-	// To be safe, I've used SELECT * in above queries, which relies on consistent column order.
-	// BETTER: Update queries to select explicit columns.
-
-	// Let's assume Scan aligns with CreateDevice INSERT order for simplicity in this artifact,
-	// but strictly we should list columns.
-	// I will update the SELECTs to specific columns in a real scenario.
-	// For this code block, I will assume the table structure exactly matches Scan order.
+	// SELECT * order must match schema.sql definition exactly:
+	// id, user_id, name, type, device_uid, api_key, status, last_seen,
+	// created_at, updated_at, firmware_version, master_secret, current_token,
+	// previous_token, token_issued_at, token_expires_at, grace_period_end,
+	// key_revoked_at, shadow_state (19 columns)
 
 	err := scanner.Scan(
 		&d.ID, &d.UserID, &d.Name, &d.Type, &deviceUID, &d.APIKey, &d.Status, &d.LastSeen,
 		&d.CreatedAt, &upAt, &fwVer,
 		&mSec, &cTok, &pTok,
 		&tIss, &tExp, &gEnd, &kRev,
+		&shadowStateJSON, // 19th column
 	)
 	if err != nil {
 		return nil, err
@@ -287,6 +284,9 @@ func scanDeviceFromRow(scanner Scannable) (*storage.Device, error) {
 	if upAt.Valid {
 		d.UpdatedAt = upAt.Time
 	}
+	// shadow_state is read but not parsed into Device struct as it's stored separately
+	// The shadow is accessed via GetLatestData, not from the Device struct directly
+	_ = shadowStateJSON
 
 	return &d, nil
 }

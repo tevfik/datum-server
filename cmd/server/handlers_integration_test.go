@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"datum-go/internal/auth"
+	"datum-go/internal/handlers"
 	"datum-go/internal/storage"
 	"encoding/json"
 	"net/http"
@@ -38,7 +39,8 @@ func TestCreateUserHandlerMissingEmail(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/users", createUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users", h.CreateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"password": "password123",
@@ -61,7 +63,8 @@ func TestCreateUserHandlerShortPassword(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/users", createUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users", h.CreateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"email":    "test@test.com",
@@ -85,7 +88,8 @@ func TestDeleteUserHandlerNonExistent(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.DELETE("/admin/users/:user_id", deleteUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/does-not-exist", nil)
 	w := httptest.NewRecorder()
@@ -101,7 +105,8 @@ func TestResetDatabaseHandlerConfirm(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/database/reset", resetDatabaseHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/database/reset", h.ResetDatabaseHandler)
 
 	requestBody := map[string]interface{}{
 		"confirm": "RESET",
@@ -123,7 +128,8 @@ func TestResetDatabaseHandlerNoConfirm(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/database/reset", resetDatabaseHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/database/reset", h.ResetDatabaseHandler)
 
 	requestBody := map[string]interface{}{
 		"confirm": "wrong",
@@ -145,7 +151,8 @@ func TestResetDatabaseHandlerInvalidJSON(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/database/reset", resetDatabaseHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/database/reset", h.ResetDatabaseHandler)
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/database/reset", bytes.NewBuffer([]byte("invalid json")))
 	req.Header.Set("Content-Type", "application/json")
@@ -160,7 +167,8 @@ func TestSetupSystemHandlerMissingPlatformName(t *testing.T) {
 	router, cleanup := setupComprehensiveTestServer(t)
 	defer cleanup()
 
-	router.POST("/system/setup", setupSystemHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/system/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
 		"admin_email":    "admin@test.com",
@@ -181,7 +189,8 @@ func TestSetupSystemHandlerInvalidJSON(t *testing.T) {
 	router, cleanup := setupComprehensiveTestServer(t)
 	defer cleanup()
 
-	router.POST("/system/setup", setupSystemHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/system/setup", h.SetupSystemHandler)
 
 	req := httptest.NewRequest(http.MethodPost, "/system/setup", bytes.NewBuffer([]byte("invalid")))
 	req.Header.Set("Content-Type", "application/json")
@@ -212,7 +221,8 @@ func TestListUsersHandlerPagination(t *testing.T) {
 		store.CreateUser(user)
 	}
 
-	router.GET("/admin/users", listUsersHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/users", h.ListUsersHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users?limit=3", nil)
 	w := httptest.NewRecorder()
@@ -255,7 +265,8 @@ func TestGetDatabaseStatsHandlerWithData(t *testing.T) {
 		store.CreateDevice(device)
 	}
 
-	router.GET("/admin/database/stats", getDatabaseStatsHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/database/stats", h.GetDatabaseStatsHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/stats", nil)
 	w := httptest.NewRecorder()
@@ -287,7 +298,8 @@ func TestUpdateUserHandlerOnlyStatus(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.PUT("/admin/users/:user_id", updateUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.PUT("/admin/users/:user_id", h.UpdateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"status": "suspended",
@@ -320,7 +332,8 @@ func TestUpdateUserHandlerOnlyRole(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.PUT("/admin/users/:user_id", updateUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.PUT("/admin/users/:user_id", h.UpdateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"role": "admin",
@@ -342,7 +355,8 @@ func TestUpdateUserHandlerInvalidJSON(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.PUT("/admin/users/:user_id", updateUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.PUT("/admin/users/:user_id", h.UpdateUserHandler)
 
 	req := httptest.NewRequest(http.MethodPut, "/admin/users/some-user", bytes.NewBuffer([]byte("invalid")))
 	req.Header.Set("Content-Type", "application/json")
@@ -393,7 +407,8 @@ func TestExportDatabaseHandlerEmpty(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.GET("/admin/database/export", exportDatabaseHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/database/export", h.ExportDatabaseHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/export", nil)
 	w := httptest.NewRecorder()
@@ -409,7 +424,8 @@ func TestForceDeleteDeviceHandlerNotFound(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.DELETE("/admin/devices/:device_id/force", forceDeleteDeviceHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.DELETE("/admin/devices/:device_id/force", h.ForceDeleteDeviceHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/devices/nonexistent/force", nil)
 	w := httptest.NewRecorder()

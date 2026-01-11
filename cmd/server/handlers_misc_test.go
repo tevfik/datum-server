@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"datum-go/internal/auth"
+	"datum-go/internal/handlers"
 	"datum-go/internal/storage"
 	"encoding/json"
 	"net/http"
@@ -36,7 +37,8 @@ func TestSetupSystemHandlerDefaultRetention(t *testing.T) {
 	router, cleanup := setupAdditionalTestServer(t)
 	defer cleanup()
 
-	router.POST("/system/setup", setupSystemHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/system/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
 		"platform_name":  "Test Platform",
@@ -62,7 +64,8 @@ func TestCreateUserHandlerDefaultRole(t *testing.T) {
 	// Initialize system
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/users", createUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users", h.CreateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"email":    "newuser@test.com",
@@ -98,7 +101,8 @@ func TestUpdateUserHandlerSuccess(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.PUT("/admin/users/:user_id", updateUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.PUT("/admin/users/:user_id", h.UpdateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"role":   "admin",
@@ -139,7 +143,8 @@ func TestDeleteUserHandlerSuccess(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.DELETE("/admin/users/:user_id", deleteUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/delete-user-1", nil)
 	w := httptest.NewRecorder()
@@ -172,7 +177,8 @@ func TestResetPasswordHandlerSuccess(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.POST("/admin/users/:username/reset-password", resetPasswordHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users/:username/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{
 		"new_password": "newpassword123",
@@ -207,7 +213,8 @@ func TestResetPasswordHandlerShortPassword(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.POST("/admin/users/:username/reset-password", resetPasswordHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users/:username/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{
 		"new_password": "short",
@@ -231,7 +238,8 @@ func TestGetSystemConfigHandlerSuccess(t *testing.T) {
 	// Initialize system
 	store.InitializeSystem("Test Platform", true, 14)
 
-	router.GET("/admin/config", getSystemConfigHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/config", h.GetSystemConfigHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/config", nil)
 	w := httptest.NewRecorder()
@@ -268,7 +276,8 @@ func TestUpdateDeviceHandlerSuspended(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.PUT("/admin/devices/:device_id", updateDeviceHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.PUT("/admin/devices/:device_id", h.UpdateDeviceHandler)
 
 	requestBody := map[string]interface{}{
 		"status": "suspended",
@@ -295,7 +304,8 @@ func TestUpdateDeviceHandlerNotFound(t *testing.T) {
 	// Initialize system
 	store.InitializeSystem("Test", true, 7)
 
-	router.PUT("/admin/devices/:device_id", updateDeviceHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.PUT("/admin/devices/:device_id", h.UpdateDeviceHandler)
 
 	requestBody := map[string]interface{}{
 		"status": "banned",
@@ -329,7 +339,8 @@ func TestForceDeleteDeviceHandlerWithData(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.DELETE("/admin/devices/:device_id", forceDeleteDeviceHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.DELETE("/admin/devices/:device_id", h.ForceDeleteDeviceHandler)
 
 	// Add some data using StoreData
 	dataPoint := &storage.DataPoint{
@@ -376,7 +387,8 @@ func TestExportDatabaseHandlerWithData(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.GET("/admin/database/export", exportDatabaseHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/database/export", h.ExportDatabaseHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/export", nil)
 	w := httptest.NewRecorder()

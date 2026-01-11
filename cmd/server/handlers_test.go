@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"datum-go/internal/auth"
+	"datum-go/internal/handlers"
 	"datum-go/internal/storage"
 	"encoding/json"
 	"net/http"
@@ -59,7 +60,8 @@ func TestGetUserHandler(t *testing.T) {
 	router := setupTestServerHandlers(t)
 	defer store.Close()
 
-	router.GET("/admin/users/:user_id", getUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/users/:user_id", h.GetUserHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/regular-user-001", nil)
 	w := httptest.NewRecorder()
@@ -81,7 +83,8 @@ func TestGetUserHandlerNotFound(t *testing.T) {
 	router := setupTestServerHandlers(t)
 	defer store.Close()
 
-	router.GET("/admin/users/:user_id", getUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/users/:user_id", h.GetUserHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/nonexistent", nil)
 	w := httptest.NewRecorder()
@@ -96,7 +99,8 @@ func TestUpdateUserHandlerRole(t *testing.T) {
 
 	router.PUT("/admin/users/:user_id", func(c *gin.Context) {
 		c.Set("user_id", "admin-user-001") // Simulate authenticated admin
-		updateUserHandler(c)
+		h := handlers.NewAdminHandler(store, nil)
+		h.UpdateUserHandler(c)
 	})
 
 	body := map[string]interface{}{
@@ -122,7 +126,8 @@ func TestUpdateUserHandlerStatus(t *testing.T) {
 
 	router.PUT("/admin/users/:user_id", func(c *gin.Context) {
 		c.Set("user_id", "admin-user-001") // Simulate authenticated admin
-		updateUserHandler(c)
+		h := handlers.NewAdminHandler(store, nil)
+		h.UpdateUserHandler(c)
 	})
 
 	body := map[string]interface{}{
@@ -148,7 +153,8 @@ func TestUpdateUserHandlerInvalidRole(t *testing.T) {
 
 	router.PUT("/admin/users/:user_id", func(c *gin.Context) {
 		c.Set("user_id", "admin-user-001")
-		updateUserHandler(c)
+		h := handlers.NewAdminHandler(store, nil)
+		h.UpdateUserHandler(c)
 	})
 
 	body := map[string]interface{}{
@@ -171,7 +177,8 @@ func TestUpdateUserHandlerInvalidStatus(t *testing.T) {
 
 	router.PUT("/admin/users/:user_id", func(c *gin.Context) {
 		c.Set("user_id", "admin-user-001")
-		updateUserHandler(c)
+		h := handlers.NewAdminHandler(store, nil)
+		h.UpdateUserHandler(c)
 	})
 
 	body := map[string]interface{}{
@@ -194,7 +201,8 @@ func TestUpdateUserHandlerCannotSuspendSelf(t *testing.T) {
 
 	router.PUT("/admin/users/:user_id", func(c *gin.Context) {
 		c.Set("user_id", "admin-user-001")
-		updateUserHandler(c)
+		h := handlers.NewAdminHandler(store, nil)
+		h.UpdateUserHandler(c)
 	})
 
 	body := map[string]interface{}{
@@ -218,7 +226,8 @@ func TestUpdateUserHandlerCannotDemoteSelf(t *testing.T) {
 
 	router.PUT("/admin/users/:user_id", func(c *gin.Context) {
 		c.Set("user_id", "admin-user-001")
-		updateUserHandler(c)
+		h := handlers.NewAdminHandler(store, nil)
+		h.UpdateUserHandler(c)
 	})
 
 	body := map[string]interface{}{
@@ -240,7 +249,8 @@ func TestExportDatabaseHandler(t *testing.T) {
 	router := setupTestServerHandlers(t)
 	defer store.Close()
 
-	router.GET("/admin/export", exportDatabaseHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/export", h.ExportDatabaseHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/export", nil)
 	w := httptest.NewRecorder()
@@ -254,7 +264,8 @@ func TestForceCleanupHandler(t *testing.T) {
 	router := setupTestServerHandlers(t)
 	defer store.Close()
 
-	router.POST("/admin/cleanup", forceCleanupHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/cleanup", h.ForceCleanupHandler)
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/cleanup", nil)
 	w := httptest.NewRecorder()
@@ -370,7 +381,8 @@ func TestUpdateDeviceHandler(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.PUT("/admin/devices/:device_id", updateDeviceHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.PUT("/admin/devices/:device_id", h.UpdateDeviceHandler)
 
 	body := map[string]interface{}{
 		"status": "suspended",
@@ -405,7 +417,8 @@ func TestForceDeleteDeviceHandler(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.DELETE("/admin/devices/:device_id/force", forceDeleteDeviceHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.DELETE("/admin/devices/:device_id/force", h.ForceDeleteDeviceHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/devices/delete-device-001/force", nil)
 	w := httptest.NewRecorder()

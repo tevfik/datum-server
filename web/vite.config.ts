@@ -6,9 +6,18 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+    alias: [
+      // Specific aliases first (order matters!)
+      { find: "@/features", replacement: path.resolve(__dirname, "./src/features") },
+      { find: "@/shared", replacement: path.resolve(__dirname, "./src/shared") },
+      { find: "@/components", replacement: path.resolve(__dirname, "./src/shared/components") },
+      { find: "@/context", replacement: path.resolve(__dirname, "./src/shared/context") },
+      { find: "@/lib", replacement: path.resolve(__dirname, "./src/shared/lib") },
+      { find: "@/types", replacement: path.resolve(__dirname, "./src/shared/types") },
+      { find: "@/services", replacement: path.resolve(__dirname, "./src/services") },
+      // Catch-all last
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+    ],
   },
   server: {
     proxy: {

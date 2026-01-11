@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"datum-go/internal/auth"
+	"datum-go/internal/handlers" // Import handlers
 	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -23,7 +24,7 @@ func setupTestEnvironment(t *testing.T) (*gin.Engine, *storage.Storage, string) 
 	testStore, err := storage.New(":memory:", "", 7*24*time.Hour)
 	assert.NoError(t, err)
 
-	store = testStore // Set global store
+	store = testStore // Set global store (legacy support)
 
 	// Initialize system
 	err = testStore.InitializeSystem("Test Platform", false, 7)
@@ -48,7 +49,12 @@ func setupTestEnvironment(t *testing.T) (*gin.Engine, *storage.Storage, string) 
 
 	// Setup router
 	r := gin.New()
-	setupAdminRoutes(r, testStore)
+
+	// Use new handlers
+	h := handlers.NewAdminHandler(testStore, nil)
+	h.RegisterRoutes(r)
+
+	// setupAdminRoutes(r, testStore) // Legacy
 
 	return r, testStore, token
 }
@@ -60,7 +66,10 @@ func TestSystemSetup(t *testing.T) {
 	store = testStore
 
 	r := gin.New()
-	r.POST("/system/setup", setupSystemHandler)
+
+	// Use new handler
+	h := handlers.NewAdminHandler(testStore, nil)
+	r.POST("/system/setup", h.SetupSystemHandler)
 
 	setupData := map[string]interface{}{
 		"platform_name":  "Test Platform",

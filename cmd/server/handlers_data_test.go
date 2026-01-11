@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"datum-go/internal/auth"
+	"datum-go/internal/handlers"
 	"datum-go/internal/storage"
 	"encoding/json"
 	"fmt"
@@ -450,7 +451,8 @@ func TestDeleteUserHandlerWithMultipleDevices(t *testing.T) {
 		store.CreateDevice(device)
 	}
 
-	router.DELETE("/admin/users/:user_id", deleteUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/del-user-md", nil)
 	w := httptest.NewRecorder()
@@ -478,7 +480,8 @@ func TestDeleteUserHandlerSuccessNoDevices(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.DELETE("/admin/users/:user_id", deleteUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/del-user-nd", nil)
 	w := httptest.NewRecorder()
@@ -498,7 +501,8 @@ func TestDeleteUserHandlerNonExistentUser(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.DELETE("/admin/users/:user_id", deleteUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/nonexistent-user-id", nil)
 	w := httptest.NewRecorder()
@@ -525,7 +529,8 @@ func TestDeleteUserHandlerSuspendedUser(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.DELETE("/admin/users/:user_id", deleteUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/del-user-susp", nil)
 	w := httptest.NewRecorder()
@@ -554,7 +559,8 @@ func TestResetPasswordHandlerGenerateRandom(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.POST("/admin/users/:username/reset-password", resetPasswordHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users/:username/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{
 		"new_password": "",
@@ -613,7 +619,8 @@ func TestGetDatabaseStatsHandlerWithVariousData(t *testing.T) {
 		store.CreateDevice(device)
 	}
 
-	router.GET("/admin/database/stats", getDatabaseStatsHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/database/stats", h.GetDatabaseStatsHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/stats", nil)
 	w := httptest.NewRecorder()
@@ -649,7 +656,8 @@ func TestListUsersHandlerWithMultipleRoles(t *testing.T) {
 		store.CreateUser(user)
 	}
 
-	router.GET("/admin/users", listUsersHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/users", h.ListUsersHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil)
 	w := httptest.NewRecorder()
@@ -681,7 +689,8 @@ func TestUpdateUserHandlerMultipleFields(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.PUT("/admin/users/:user_id", updateUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.PUT("/admin/users/:user_id", h.UpdateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"role":     "admin",

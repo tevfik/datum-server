@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"datum-go/internal/auth"
+	"datum-go/internal/handlers"
 	"datum-go/internal/processing"
 	"datum-go/internal/storage"
 	"encoding/json"
@@ -42,7 +43,8 @@ func TestCreateUserHandlerEmptyPassword(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/users", createUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users", h.CreateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"email":    "nopass@test.com",
@@ -65,7 +67,8 @@ func TestCreateUserHandlerWeakPassword(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/users", createUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users", h.CreateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"email":    "weak@test.com",
@@ -91,7 +94,8 @@ func TestResetPasswordHandlerNonExistentUser(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/users/:id/reset-password", resetPasswordHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users/:id/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{
 		"password": "newpass123",
@@ -123,7 +127,8 @@ func TestResetPasswordHandlerWeakPassword(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.POST("/admin/users/:id/reset-password", resetPasswordHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users/:id/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{
 		"password": "1",
@@ -173,7 +178,8 @@ func TestGetDatabaseStatsHandlerComplexScenario(t *testing.T) {
 		}
 	}
 
-	router.GET("/admin/database/stats", getDatabaseStatsHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/database/stats", h.GetDatabaseStatsHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/stats", nil)
 	w := httptest.NewRecorder()
@@ -209,7 +215,8 @@ func TestListUsersHandlerPaginationLimit(t *testing.T) {
 		store.CreateUser(user)
 	}
 
-	router.GET("/admin/users", listUsersHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/users", h.ListUsersHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users?limit=5", nil)
 	w := httptest.NewRecorder()
@@ -239,7 +246,8 @@ func TestListUsersHandlerStatusActive(t *testing.T) {
 		store.CreateUser(user)
 	}
 
-	router.GET("/admin/users", listUsersHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/users", h.ListUsersHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users?status=active", nil)
 	w := httptest.NewRecorder()
@@ -267,7 +275,8 @@ func TestUpdateUserHandlerChangeRole(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.PUT("/admin/users/:id", updateUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.PUT("/admin/users/:id", h.UpdateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"role": "admin",
@@ -300,7 +309,8 @@ func TestUpdateUserHandlerChangeStatus(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.PUT("/admin/users/:id", updateUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.PUT("/admin/users/:id", h.UpdateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"status": "suspended",
@@ -426,7 +436,8 @@ func TestUpdateRetentionPolicyHandlerInvalidValue(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/system/retention", updateRetentionPolicyHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/system/retention", h.UpdateRetentionPolicyHandler)
 
 	requestBody := map[string]interface{}{
 		"retention_days": -1,
@@ -447,7 +458,8 @@ func TestUpdateRetentionPolicyHandlerZeroValue(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/system/retention", updateRetentionPolicyHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/system/retention", h.UpdateRetentionPolicyHandler)
 
 	requestBody := map[string]interface{}{
 		"retention_days": 0,
@@ -548,7 +560,8 @@ func TestSetupSystemHandlerMissingPassword(t *testing.T) {
 	router, cleanup := setupQuickWinTestServer(t)
 	defer cleanup()
 
-	router.POST("/system/setup", setupSystemHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/system/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
 		"platform_name": "Test Platform",
@@ -568,7 +581,8 @@ func TestSetupSystemHandlerMissingEmail(t *testing.T) {
 	router, cleanup := setupQuickWinTestServer(t)
 	defer cleanup()
 
-	router.POST("/system/setup", setupSystemHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/system/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
 		"platform_name":  "Test Platform",
@@ -588,7 +602,8 @@ func TestSetupSystemHandlerNoPlatformName(t *testing.T) {
 	router, cleanup := setupQuickWinTestServer(t)
 	defer cleanup()
 
-	router.POST("/system/setup", setupSystemHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/system/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
 		"admin_email":    "admin@test.com",

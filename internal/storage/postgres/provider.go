@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"os"
+	"strconv"
+	"time"
 
 	_ "github.com/lib/pq" // PostgreSQL Driver
 )
@@ -23,6 +26,9 @@ func New(connString string) (*PostgresStore, error) {
 		return nil, fmt.Errorf("failed to open postgres connection: %w", err)
 	}
 
+	// Configure connection pool from environment variables
+	configureConnectionPool(db)
+
 	// Verify connection
 	if err := db.Ping(); err != nil {
 		db.Close()
@@ -38,6 +44,31 @@ func New(connString string) (*PostgresStore, error) {
 	}
 
 	return store, nil
+}
+
+// configureConnectionPool sets database pool settings from env vars or defaults.
+// Defaults: MaxOpen=25, MaxIdle=25, MaxLifetime=5m
+func configureConnectionPool(db *sql.DB) {
+	maxOpen := getEnvInt("POSTGRES_MAX_OPEN_CONNS", 25)
+	maxIdle := getEnvInt("POSTGRES_MAX_IDLE_CONNS", 25)
+	maxLifetimeMinutes := getEnvInt("POSTGRES_CONN_MAX_LIFETIME_MINUTES", 5)
+
+	db.SetMaxOpenConns(maxOpen)
+	db.SetMaxIdleConns(maxIdle)
+	db.SetConnMaxLifetime(time.Duration(maxLifetimeMinutes) * time.Minute)
+}
+
+// getEnvInt reads an integer from env, returning defaultVal if not set or invalid.
+func getEnvInt(key string, defaultVal int) int {
+	val := os.Getenv(key)
+	if val == "" {
+		return defaultVal
+	}
+	i, err := strconv.Atoi(val)
+	if err != nil {
+		return defaultVal
+	}
+	return i
 }
 
 // initSchema executes the embedded schema.sql

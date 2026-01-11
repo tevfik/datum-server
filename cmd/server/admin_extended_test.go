@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"datum-go/internal/auth"
+	"datum-go/internal/handlers"
 	"datum-go/internal/storage"
 	"encoding/json"
 	"net/http"
@@ -49,7 +50,8 @@ func TestDeleteUserHandlerExisting(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.DELETE("/admin/users/:user_id", deleteUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/delete-user-1", nil)
 	w := httptest.NewRecorder()
@@ -86,7 +88,8 @@ func TestDeleteUserHandlerWithDevices(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.DELETE("/admin/users/:user_id", deleteUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/user-with-dev", nil)
 	w := httptest.NewRecorder()
@@ -116,7 +119,8 @@ func TestExportDatabaseHandlerWithUsers(t *testing.T) {
 		store.CreateUser(user)
 	}
 
-	router.GET("/admin/database/export", exportDatabaseHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/database/export", h.ExportDatabaseHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/export", nil)
 	w := httptest.NewRecorder()
@@ -137,7 +141,8 @@ func TestGetSystemConfigHandlerDefaults(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.GET("/admin/system/config", getSystemConfigHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/system/config", h.GetSystemConfigHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/system/config", nil)
 	w := httptest.NewRecorder()
@@ -158,7 +163,8 @@ func TestGetSystemConfigHandlerCustom(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 14) // Custom retention
 
-	router.GET("/admin/system/config", getSystemConfigHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/system/config", h.GetSystemConfigHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/system/config", nil)
 	w := httptest.NewRecorder()
@@ -180,7 +186,8 @@ func TestUpdateRetentionPolicyHandlerValid(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/system/retention", updateRetentionPolicyHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/system/retention", h.UpdateRetentionPolicyHandler)
 
 	requestBody := map[string]interface{}{
 		"retention_days": 30,
@@ -202,7 +209,8 @@ func TestUpdateRetentionPolicyHandlerInvalidJSON(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/system/retention", updateRetentionPolicyHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/system/retention", h.UpdateRetentionPolicyHandler)
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/system/retention", bytes.NewBuffer([]byte("invalid")))
 	req.Header.Set("Content-Type", "application/json")
@@ -240,7 +248,8 @@ func TestListUsersHandlerWithFilters(t *testing.T) {
 	}
 	store.CreateUser(user2)
 
-	router.GET("/admin/users", listUsersHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/users", h.ListUsersHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users?role=admin", nil)
 	w := httptest.NewRecorder()
@@ -256,7 +265,8 @@ func TestGetDatabaseStatsHandlerEmpty(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.GET("/admin/database/stats", getDatabaseStatsHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/database/stats", h.GetDatabaseStatsHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/stats", nil)
 	w := httptest.NewRecorder()
@@ -288,7 +298,8 @@ func TestResetPasswordHandlerNonEmpty(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.POST("/admin/users/:username/reset-password", resetPasswordHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users/:username/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{
 		"new_password": "newpassword456",

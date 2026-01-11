@@ -17,6 +17,7 @@ import (
 
 	"datum-go/internal/auth"
 	"datum-go/internal/email"
+	"datum-go/internal/handlers"
 	"datum-go/internal/logger"
 	mqtt_internal "datum-go/internal/mqtt"
 	"datum-go/internal/processing"
@@ -379,8 +380,20 @@ func main() {
 		c.File(filePath)
 	})
 
+	// Public command access (for demo purposes)
+	// r.POST("/api/devices/:device_id/commands", commandHandler)
+
+	// Auth routes
+	// setupAuthRoutes(r, store) // Assuming this is a new call, but not explicitly in the original file.
 	// Admin routes
-	setupAdminRoutes(r, store)
+	adminHandler := handlers.NewAdminHandler(store, mqttBroker)
+	adminHandler.RegisterRoutes(r)
+
+	// Legacy setup call removed
+	// setupAdminRoutes(r, store)
+
+	// API Key routes
+	// setupKeyRoutes(r, store) // Assuming this is a new call, but not explicitly in the original file.
 
 	// Provisioning routes (Mobile App & Device Activation)
 	RegisterProvisioningRoutes(r, UserAuthMiddleware(store))

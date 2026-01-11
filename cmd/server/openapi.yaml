@@ -1454,6 +1454,7 @@ paths:
           schema:
             type: string
       responses:
+        '200':
           description: Device deleted
 
   /admin/devices/{device_id}/rotate-key:

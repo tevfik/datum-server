@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"datum-go/internal/auth"
+	"datum-go/internal/handlers"
 	"datum-go/internal/processing"
 	"datum-go/internal/storage"
 	"encoding/json"
@@ -65,7 +66,8 @@ func TestExportDatabaseHandlerWithDevices(t *testing.T) {
 		store.CreateDevice(device)
 	}
 
-	router.GET("/admin/database/export", exportDatabaseHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/database/export", h.ExportDatabaseHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/export", nil)
 	w := httptest.NewRecorder()
@@ -107,7 +109,8 @@ func TestExportDatabaseHandlerCompleteData(t *testing.T) {
 		store.CreateUser(user)
 	}
 
-	router.GET("/admin/database/export", exportDatabaseHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/database/export", h.ExportDatabaseHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/export", nil)
 	w := httptest.NewRecorder()
@@ -133,7 +136,8 @@ func TestGetSystemConfigHandlerRateLimit(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.GET("/admin/system/config", getSystemConfigHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.GET("/admin/system/config", h.GetSystemConfigHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/system/config", nil)
 	w := httptest.NewRecorder()
@@ -274,7 +278,8 @@ func TestCreateUserHandlerDuplicateEmail(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	router.POST("/admin/users", createUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users", h.CreateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"email":    "duplicate@test.com",
@@ -297,7 +302,8 @@ func TestCreateUserHandlerEmailValidation(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/users", createUserHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/users", h.CreateUserHandler)
 
 	requestBody := map[string]interface{}{
 		"email":    "invalid-email-format",
@@ -411,7 +417,8 @@ func TestUpdateRetentionPolicyHandlerMinValue(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/system/retention", updateRetentionPolicyHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/system/retention", h.UpdateRetentionPolicyHandler)
 
 	requestBody := map[string]interface{}{
 		"retention_days": 1,
@@ -433,7 +440,8 @@ func TestUpdateRetentionPolicyHandlerMaxValue(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	router.POST("/admin/system/retention", updateRetentionPolicyHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/admin/system/retention", h.UpdateRetentionPolicyHandler)
 
 	requestBody := map[string]interface{}{
 		"retention_days": 365,
@@ -712,7 +720,8 @@ func TestSetupSystemHandlerMinimalData(t *testing.T) {
 	router, cleanup := setupMediumCoverageTestServer(t)
 	defer cleanup()
 
-	router.POST("/system/setup", setupSystemHandler)
+	h := handlers.NewAdminHandler(store, nil)
+	router.POST("/system/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
 		"platform_name":  "Minimal Platform",

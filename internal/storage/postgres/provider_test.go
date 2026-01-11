@@ -111,7 +111,7 @@ func TestPostgres_DeviceOps(t *testing.T) {
 	// Get by Token
 	d2, isToken, err := s.GetDeviceByToken(newToken)
 	assert.NoError(t, err)
-	assert.True(t, isToken)
+	assert.False(t, isToken) // current token, not in grace period
 	assert.Equal(t, device.ID, d2.ID)
 }
 

@@ -31,6 +31,27 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@/features/*": [
+        "./src/features/*"
+      ],
+      "@/shared/*": [
+        "./src/shared/*"
+      ],
+      "@/components/*": [
+        "./src/shared/components/*"
+      ],
+      "@/context/*": [
+        "./src/shared/context/*"
+      ],
+      "@/lib/*": [
+        "./src/shared/lib/*"
+      ],
+      "@/types/*": [
+        "./src/shared/types/*"
+      ],
+      "@/services/*": [
+        "./src/services/*"
       ]
     }
   },

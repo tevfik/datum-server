@@ -16,16 +16,18 @@ var Logger zerolog.Logger
 var LogFilePath string
 
 // InitLogger initializes the global structured logger
+// Environment variables:
+//   - LOG_LEVEL: DEBUG, INFO, WARN, ERROR, FATAL (default: INFO)
+//   - LOG_OUTPUT: console (pretty, default), json (pure JSON to stdout), file (JSON to file)
 func InitLogger(logPath string) {
 	LogFilePath = logPath
 
-	// Configure based on environment
+	// Configure log level
 	logLevel := strings.ToUpper(os.Getenv("LOG_LEVEL"))
 	if logLevel == "" {
 		logLevel = "INFO"
 	}
 
-	// Set log level
 	var level zerolog.Level
 	switch logLevel {
 	case "DEBUG":
@@ -42,33 +44,61 @@ func InitLogger(logPath string) {
 		level = zerolog.InfoLevel
 	}
 
+	// Configure output mode
+	logOutput := strings.ToLower(os.Getenv("LOG_OUTPUT"))
+	if logOutput == "" {
+		logOutput = "console"
+	}
+
 	var logWriter zerolog.LevelWriter
 
-	// Configure pretty logging for development (console)
-	consoleWriter := zerolog.ConsoleWriter{
-		Out:        os.Stdout,
-		TimeFormat: time.RFC3339,
-	}
+	switch logOutput {
+	case "json":
+		// Pure JSON to stdout - ideal for Docker/Kubernetes
+		logWriter = multiLevelWriter{os.Stdout}
 
-	if logPath != "" {
-		// Create/Open log file
-		file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			// Fallback to console only if file fails
-			log.Error().Err(err).Msg("Failed to open log file")
-			logWriter = multiLevelWriter{consoleWriter}
-		} else {
-			// Write to both console and file
-			// Note: File will get JSON logs, Console gets pretty logs if configured
-			// For simplicity, let's write JSON to file and Pretty to console
-			logWriter = zerolog.MultiLevelWriter(consoleWriter, file)
+	case "file":
+		// JSON to file (legacy behavior with console fallback)
+		consoleWriter := zerolog.ConsoleWriter{
+			Out:        os.Stdout,
+			TimeFormat: time.RFC3339,
 		}
-	} else {
-		logWriter = multiLevelWriter{consoleWriter}
+		if logPath != "" {
+			file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to open log file")
+				logWriter = multiLevelWriter{consoleWriter}
+			} else {
+				logWriter = zerolog.MultiLevelWriter(consoleWriter, file)
+			}
+		} else {
+			logWriter = multiLevelWriter{consoleWriter}
+		}
+
+	default: // "console"
+		// Pretty console output - development default
+		consoleWriter := zerolog.ConsoleWriter{
+			Out:        os.Stdout,
+			TimeFormat: time.RFC3339,
+		}
+		if logPath != "" {
+			file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to open log file")
+				logWriter = multiLevelWriter{consoleWriter}
+			} else {
+				logWriter = zerolog.MultiLevelWriter(consoleWriter, file)
+			}
+		} else {
+			logWriter = multiLevelWriter{consoleWriter}
+		}
 	}
 
-	// Configure global logger
-	Logger = zerolog.New(logWriter).
+	// Configure global logger with broadcast support for WebSocket streaming
+	// Always include the broadcast writer so logs can be streamed to CLI
+	combinedWriter := zerolog.MultiLevelWriter(logWriter, BroadcastWriter{})
+
+	Logger = zerolog.New(combinedWriter).
 		Level(level).
 		With().
 		Timestamp().
@@ -79,7 +109,8 @@ func InitLogger(logPath string) {
 	log.Logger = Logger
 
 	Logger.Info().
-		Str("configured_level", logLevel).
+		Str("level", logLevel).
+		Str("output", logOutput).
 		Str("log_file", logPath).
 		Msg("Logger initialized")
 }

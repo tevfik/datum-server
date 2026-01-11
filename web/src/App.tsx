@@ -1,16 +1,16 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import SidebarLayout from "./layouts/SidebarLayout";
-import Devices from "./pages/Devices";
-import DeviceDetail from "./pages/DeviceDetail";
-import Commands from "./pages/Commands";
-import Dashboard from "./pages/Dashboard";
-import Settings from "./pages/Settings";
-import Login from "./pages/Login";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import { ThemeProvider } from "./components/theme-provider";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import Devices from "@/features/devices/pages/Devices";
+import DeviceDetail from "@/features/devices/pages/DeviceDetail";
+import Commands from "@/features/devices/pages/Commands";
+import Dashboard from "@/features/dashboard/pages/Dashboard";
+import Settings from "@/features/settings/pages/Settings";
+import Login from "@/features/auth/pages/Login";
+import ForgotPassword from "@/features/auth/pages/ForgotPassword";
+import ResetPassword from "@/features/auth/pages/ResetPassword";
+import { ThemeProvider } from "@/shared/components/theme-provider";
+import { AuthProvider, useAuth } from "@/shared/context/AuthContext";
 
 // Create a client
 const queryClient = new QueryClient();
