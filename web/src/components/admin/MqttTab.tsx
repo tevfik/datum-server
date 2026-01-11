@@ -27,7 +27,10 @@ export function MqttTab() {
     // Subscribe State
     const [subTopic, setSubTopic] = useState("#");
     const [apiKey, setApiKey] = useState("");
-    const [wsUrl, setWsUrl] = useState(`ws://${window.location.hostname}:1884`);
+    const [wsUrl, setWsUrl] = useState(() => {
+        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        return `${protocol}://${window.location.hostname}:1884`;
+    });
     const [isConnected, setIsConnected] = useState(false);
     const [messages, setMessages] = useState<MqttMessage[]>([]);
     const clientRef = useRef<mqtt.MqttClient | null>(null);
