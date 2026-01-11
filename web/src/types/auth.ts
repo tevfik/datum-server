@@ -18,3 +18,25 @@ export interface AuthState {
     isAuthenticated: boolean;
     isLoading: boolean;
 }
+
+export interface APIKey {
+    id: string;
+    name: string;
+    key: string; // Masked usually, full only on create response
+    created_at: string;
+}
+
+export interface CreateKeyRequest {
+    name: string;
+}
+
+export interface CreateKeyResponse {
+    id: string;
+    name: string;
+    key: string;
+    created_at: string;
+}
+
+export interface GetKeysResponse {
+    keys: APIKey[];
+}

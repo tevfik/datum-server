@@ -4,7 +4,8 @@ import {
     Server,
     Terminal,
     LogOut,
-    Menu
+    Menu,
+    Settings as SettingsIcon
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ export default function SidebarLayout() {
         { icon: LayoutDashboard, label: "Dashboard", href: "/" },
         { icon: Server, label: "Devices", href: "/devices" },
         { icon: Terminal, label: "Commands", href: "/commands" },
+        { icon: SettingsIcon, label: "Settings", href: "/settings" },
     ];
 
     return (

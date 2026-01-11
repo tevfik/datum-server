@@ -4,6 +4,7 @@ import SidebarLayout from "./layouts/SidebarLayout";
 import Devices from "./pages/Devices";
 import DeviceDetail from "./pages/DeviceDetail";
 import Dashboard from "./pages/Dashboard";
+import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import { ThemeProvider } from "./components/theme-provider";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -45,6 +46,7 @@ function App() {
                 <Route path="devices" element={<Devices />} />
                 <Route path="devices/:id" element={<DeviceDetail />} />
                 <Route path="commands" element={<div className="p-4">Commands Page (Coming Soon)</div>} />
+                <Route path="settings" element={<Settings />} />
               </Route>
 
               {/* Fallback */}
