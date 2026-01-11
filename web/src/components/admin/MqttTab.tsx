@@ -1,7 +1,25 @@
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { adminService } from "@/services/adminService";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertCircle, RefreshCw, Send, Wifi, Play, Square, PlugZap } from "lucide-react";
+import mqtt from "mqtt";
+import { useAuth } from "@/context/AuthContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { deviceService } from "@/services/deviceService";
 
-// ... (keep MqttMessage interface)
+interface MqttMessage {
+    id: number;
+    topic: string;
+    payload: string;
+    timestamp: Date;
+    retain: boolean;
+}
+
+import { deviceService } from "@/services/deviceService";
 
 export function MqttTab() {
     const { user } = useAuth();
