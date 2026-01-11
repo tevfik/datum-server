@@ -15,14 +15,24 @@ import {
 } from "@/components/ui/dialog"
 import { Plus, Copy, Check } from 'lucide-react';
 
-export function AddDeviceModal() {
-    const [open, setOpen] = useState(false);
+export interface AddDeviceModalProps {
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+}
+
+export function AddDeviceModal({ open: externalOpen, onOpenChange: externalOnOpenChange }: AddDeviceModalProps = {}) {
+    const [internalOpen, setInternalOpen] = useState(false);
     const [name, setName] = useState('');
     const [type, setType] = useState('generic');
     const [uid, setUid] = useState('');
     const [createdDevice, setCreatedDevice] = useState<{ id: string, api_key: string } | null>(null);
 
     const queryClient = useQueryClient();
+
+    // Controlled vs Uncontrolled Logic
+    const isControlled = externalOpen !== undefined;
+    const open = isControlled ? externalOpen : internalOpen;
+    const setOpen = isControlled ? (externalOnOpenChange || (() => { })) : setInternalOpen;
 
     const createMutation = useMutation({
         mutationFn: deviceService.create,
@@ -61,11 +71,13 @@ export function AddDeviceModal() {
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button>
-                    <Plus className="mr-2 h-4 w-4" /> Add Device
-                </Button>
-            </DialogTrigger>
+            {!isControlled && (
+                <DialogTrigger asChild>
+                    <Button>
+                        <Plus className="mr-2 h-4 w-4" /> Add Device
+                    </Button>
+                </DialogTrigger>
+            )}
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>{createdDevice ? 'Device Created' : 'Add New Device'}</DialogTitle>
