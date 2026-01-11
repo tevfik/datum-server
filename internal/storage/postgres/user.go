@@ -11,8 +11,8 @@ import (
 // CreateUser inserts a new user
 func (s *PostgresStore) CreateUser(user *storage.User) error {
 	query := `
-		INSERT INTO users (id, email, password_hash, role, status, created_at, updated_at, last_login_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO users (id, email, password_hash, role, status, created_at, updated_at, last_login_at, refresh_token)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 	_, err := s.db.Exec(query,
 		user.ID,
@@ -23,6 +23,7 @@ func (s *PostgresStore) CreateUser(user *storage.User) error {
 		user.CreatedAt,
 		user.UpdatedAt,
 		user.LastLoginAt,
+		user.RefreshToken,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
@@ -33,7 +34,7 @@ func (s *PostgresStore) CreateUser(user *storage.User) error {
 // GetUserByEmail retrieves a user by email
 func (s *PostgresStore) GetUserByEmail(email string) (*storage.User, error) {
 	query := `
-		SELECT id, email, password_hash, role, status, created_at, updated_at, last_login_at
+		SELECT id, email, password_hash, role, status, created_at, updated_at, last_login_at, refresh_token
 		FROM users WHERE email = $1
 	`
 	row := s.db.QueryRow(query, email)
@@ -43,7 +44,7 @@ func (s *PostgresStore) GetUserByEmail(email string) (*storage.User, error) {
 // GetUserByID retrieves a user by ID
 func (s *PostgresStore) GetUserByID(userID string) (*storage.User, error) {
 	query := `
-		SELECT id, email, password_hash, role, status, created_at, updated_at, last_login_at
+		SELECT id, email, password_hash, role, status, created_at, updated_at, last_login_at, refresh_token
 		FROM users WHERE id = $1
 	`
 	row := s.db.QueryRow(query, userID)
@@ -60,7 +61,7 @@ func (s *PostgresStore) GetUserCount() (int, error) {
 // ListAllUsers returns all users
 func (s *PostgresStore) ListAllUsers() ([]storage.User, error) {
 	query := `
-		SELECT id, email, password_hash, role, status, created_at, updated_at, last_login_at
+		SELECT id, email, password_hash, role, status, created_at, updated_at, last_login_at, refresh_token
 		FROM users
 	`
 	rows, err := s.db.Query(query)
@@ -101,6 +102,13 @@ func (s *PostgresStore) UpdateUserPassword(userID string, passwordHash string) e
 	return err
 }
 
+// UpdateUserRefreshToken updates the valid refresh token for a user
+func (s *PostgresStore) UpdateUserRefreshToken(userID, refreshToken string) error {
+	query := `UPDATE users SET refresh_token = $1, updated_at = $2 WHERE id = $3`
+	_, err := s.db.Exec(query, refreshToken, time.Now(), userID)
+	return err
+}
+
 // DeleteUser removes a user
 func (s *PostgresStore) DeleteUser(userID string) error {
 	// Cascade delete handles devices, provisioning_requests
@@ -113,10 +121,11 @@ func (s *PostgresStore) DeleteUser(userID string) error {
 func scanUser(row *sql.Row) (*storage.User, error) {
 	var u storage.User
 	var updatedAt, lastLoginAt sql.NullTime
+	var refreshToken sql.NullString
 
 	err := row.Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.Status,
-		&u.CreatedAt, &updatedAt, &lastLoginAt,
+		&u.CreatedAt, &updatedAt, &lastLoginAt, &refreshToken,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -131,14 +140,18 @@ func scanUser(row *sql.Row) (*storage.User, error) {
 	if lastLoginAt.Valid {
 		u.LastLoginAt = lastLoginAt.Time
 	}
+	if refreshToken.Valid {
+		u.RefreshToken = refreshToken.String
+	}
 	return &u, nil
 }
 
 func scanUserRow(rows *sql.Rows, u *storage.User) error {
 	var updatedAt, lastLoginAt sql.NullTime
+	var refreshToken sql.NullString
 	err := rows.Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.Status,
-		&u.CreatedAt, &updatedAt, &lastLoginAt,
+		&u.CreatedAt, &updatedAt, &lastLoginAt, &refreshToken,
 	)
 	if err != nil {
 		return err
@@ -148,6 +161,9 @@ func scanUserRow(rows *sql.Rows, u *storage.User) error {
 	}
 	if lastLoginAt.Valid {
 		u.LastLoginAt = lastLoginAt.Time
+	}
+	if refreshToken.Valid {
+		u.RefreshToken = refreshToken.String
 	}
 	return nil
 }
@@ -166,7 +182,7 @@ func (s *PostgresStore) SavePasswordResetToken(userID, token string, ttl time.Du
 
 func (s *PostgresStore) GetUserByResetToken(token string) (*storage.User, error) {
 	query := `
-		SELECT u.id, u.email, u.password_hash, u.role, u.status, u.created_at, u.updated_at, u.last_login_at
+		SELECT u.id, u.email, u.password_hash, u.role, u.status, u.created_at, u.updated_at, u.last_login_at, u.refresh_token
 		FROM users u
 		JOIN password_reset_tokens t ON u.id = t.user_id
 		WHERE t.token = $1 AND t.expires_at > $2

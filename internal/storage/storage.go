@@ -59,6 +59,7 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at,omitempty"`
 	LastLoginAt  time.Time `json:"last_login_at,omitempty"`
+	RefreshToken string    `json:"refresh_token,omitempty"` // Active refresh token
 }
 
 func (s *Storage) CreateUser(user *User) error {
@@ -811,6 +812,28 @@ func (s *Storage) UpdateUserLastLogin(userID string) error {
 		var user User
 		json.Unmarshal([]byte(userData), &user)
 		user.LastLoginAt = time.Now()
+
+		data, _ := json.Marshal(user)
+		tx.Set(userKey, string(data), nil)
+		return nil
+	})
+}
+
+// UpdateUserRefreshToken updates the valid refresh token for a user
+func (s *Storage) UpdateUserRefreshToken(userID, refreshToken string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		userKey := fmt.Sprintf("user:%s", userID)
+		userData, err := tx.Get(userKey)
+		if err != nil {
+			return err
+		}
+
+		var user User
+		if err := json.Unmarshal([]byte(userData), &user); err != nil {
+			return err
+		}
+
+		user.RefreshToken = refreshToken
 
 		data, _ := json.Marshal(user)
 		tx.Set(userKey, string(data), nil)

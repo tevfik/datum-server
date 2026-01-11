@@ -77,6 +77,45 @@ func GenerateToken(userID, email, role string) (string, error) {
 	return token.SignedString(jwtSecret)
 }
 
+// GenerateTokenPair creates an access token (15 min) and a refresh token (30 days)
+func GenerateTokenPair(userID, email, role string) (accessToken string, refreshToken string, err error) {
+	// 1. Access Token (Short-lived)
+	accessClaims := Claims{
+		UserID: userID,
+		Email:  email,
+		Role:   role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)), // Short lived
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
+	accessToken, err = token.SignedString(jwtSecret)
+	if err != nil {
+		return "", "", err
+	}
+
+	// 2. Refresh Token (Long-lived, Opaque or JWT)
+	// We use a long-lived JWT for simplicity so it carries user info, but we will check it against DB whitelist
+	refreshClaims := Claims{
+		UserID: userID,
+		Email:  email,
+		Role:   role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * 24 * time.Hour)), // 30 Days
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Subject:   "refresh",
+		},
+	}
+	rToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+	refreshToken, err = rToken.SignedString(jwtSecret)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, refreshToken, nil
+}
+
 // ValidateToken validates a JWT token and returns the claims
 func ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {

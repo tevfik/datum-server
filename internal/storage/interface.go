@@ -18,6 +18,7 @@ type Provider interface {
 	UpdateUser(userID string, role, status string) error
 	UpdateUserLastLogin(userID string) error
 	UpdateUserPassword(userID string, passwordHash string) error
+	UpdateUserRefreshToken(userID, refreshToken string) error
 	DeleteUser(userID string) error
 
 	// Device management

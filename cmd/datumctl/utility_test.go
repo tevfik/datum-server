@@ -22,7 +22,7 @@ func TestSaveToken(t *testing.T) {
 	serverURL = "http://localhost:8080"
 
 	tokenVal := "test-token-xyz-12345"
-	err := saveToken(tokenVal)
+	err := saveToken(tokenVal, "")
 	assert.NoError(t, err)
 
 	// Verify token was saved

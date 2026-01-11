@@ -93,7 +93,7 @@ func runRegister(cmd *cobra.Command, args []string) error {
 
 	// Save credentials if requested
 	if registerSave && registerResp.Token != "" {
-		if err := saveToken(registerResp.Token); err != nil {
+		if err := saveToken(registerResp.Token, ""); err != nil {
 			fmt.Printf("⚠️  Failed to save token: %v\n", err)
 		} else {
 			fmt.Printf("✅ Logged in and token saved to config.\n")

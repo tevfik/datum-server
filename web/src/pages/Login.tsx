@@ -26,7 +26,7 @@ export default function Login() {
 
         try {
             const response = await authService.login(email, password);
-            login(response.token, {
+            login(response.token, response.refresh_token, {
                 id: response.user_id,
                 email: response.email,
                 role: response.role

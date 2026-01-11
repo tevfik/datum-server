@@ -32,6 +32,7 @@ func TestRootHandler(t *testing.T) {
 	r.GET("/", rootHandler)
 
 	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set("Accept", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 

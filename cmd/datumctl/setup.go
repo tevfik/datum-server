@@ -169,7 +169,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 		fmt.Printf("\n🔑 Your access token:\n%s\n", tokenStr)
 
 		// Auto-save token
-		saveToken(tokenStr)
+		saveToken(tokenStr, "")
 		fmt.Println("\n✅ Token saved to ~/.datumctl.yaml")
 		fmt.Println("You are now logged in!")
 	}

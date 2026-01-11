@@ -81,8 +81,9 @@ func runLogin(cmd *cobra.Command, args []string) error {
 	}
 
 	var loginResp struct {
-		Token string `json:"token"`
-		User  struct {
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
+		User         struct {
 			ID    string `json:"id"`
 			Email string `json:"email"`
 			Role  string `json:"role"`
@@ -99,7 +100,7 @@ func runLogin(cmd *cobra.Command, args []string) error {
 
 	// Save credentials
 	if loginSaveKey {
-		if err := saveToken(loginResp.Token); err != nil {
+		if err := saveToken(loginResp.Token, loginResp.RefreshToken); err != nil {
 			return fmt.Errorf("failed to save token: %w", err)
 		}
 		fmt.Printf("   Saved to: %s\n", getConfigPath())
@@ -108,9 +109,12 @@ func runLogin(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func saveToken(token string) error {
+func saveToken(token, refreshToken string) error {
 	viper.Set("server", serverURL)
 	viper.Set("token", token)
+	if refreshToken != "" {
+		viper.Set("refresh_token", refreshToken)
+	}
 
 	configPath := getConfigPath()
 	if err := os.MkdirAll(filepath.Dir(configPath), 0700); err != nil {
@@ -176,6 +180,11 @@ func loadConfig() {
 	}
 	if token == "" && viper.IsSet("token") {
 		token = viper.GetString("token")
+	}
+	if viper.IsSet("refresh_token") {
+		// We don't have a global var for refresh_token in main package yet, strictly speaking.
+		// But let's assume we might need it.
+		// Actually, let's just leave it in viper for now, the client will read it.
 	}
 	if apiKey == "" && viper.IsSet("api_key") {
 		apiKey = viper.GetString("api_key")

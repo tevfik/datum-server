@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS users (
     status TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ,
-    last_login_at TIMESTAMPTZ
+    last_login_at TIMESTAMPTZ,
+    refresh_token TEXT
 );
 
 -- Devices Table

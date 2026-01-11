@@ -31,7 +31,7 @@ import (
 var webFS embed.FS
 
 var (
-	Version   = "1.1.0"
+	Version   = "1.4.0"
 	BuildDate = "unknown"
 )
 
@@ -262,34 +262,7 @@ func main() {
 	})
 
 	// Root handler (Explicit /)
-	r.GET("/", func(c *gin.Context) {
-		// If explicitly asking for JSON, return API info
-		if c.Request.Header.Get("Accept") == "application/json" {
-			c.JSON(http.StatusOK, gin.H{
-				"service": "Datum IoT Platform",
-				"version": Version,
-				"endpoints": gin.H{
-					"auth":    []string{"POST /auth/register", "POST /auth/login"},
-					"devices": []string{"POST /devices", "GET /devices", "DELETE /devices/{id}"},
-				},
-			})
-			return
-		}
-
-		// Default to serving index.html
-		f, err := fs.Sub(webFS, "dist")
-		if err != nil {
-			c.String(http.StatusInternalServerError, "Web assets error")
-			return
-		}
-		content, err := fs.ReadFile(f, "index.html")
-		if err != nil {
-			c.String(http.StatusInternalServerError, "index.html not found")
-			return
-		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
-	})
-
+	r.GET("/", rootHandler)
 	r.GET("/health", healthHandler)
 	r.GET("/healthz", healthHandler)
 	r.GET("/live", livenessHandler)
@@ -302,6 +275,7 @@ func main() {
 	{
 		authGroup.POST("/register", registerHandler)
 		authGroup.POST("/login", loginHandler)
+		authGroup.POST("/refresh", refreshTokenHandler)
 		// Password Reset
 		authGroup.POST("/forgot-password", forgotPasswordHandler)
 		authGroup.POST("/reset-password", completeResetPasswordHandler)
@@ -547,4 +521,33 @@ func startPeriodicCleanup() {
 			}
 		}
 	}()
+}
+
+func rootHandler(c *gin.Context) {
+	// If explicitly asking for JSON, return API info
+	if c.Request.Header.Get("Accept") == "application/json" {
+		c.JSON(http.StatusOK, gin.H{
+			"service": "Datum IoT Platform",
+			"version": Version,
+			"endpoints": gin.H{
+				"auth":    []string{"POST /auth/register", "POST /auth/login"},
+				"devices": []string{"POST /devices", "GET /devices", "DELETE /devices/{id}"},
+			},
+		})
+		return
+	}
+
+	// Default to serving index.html
+	f, err := fs.Sub(webFS, "dist")
+	if err != nil {
+		// If dist is empty (e.g. valid during development), return simple message
+		c.String(http.StatusOK, "Datum IoT Server is running. (Web UI not embedded)")
+		return
+	}
+	content, err := fs.ReadFile(f, "index.html")
+	if err != nil {
+		c.String(http.StatusOK, "Datum IoT Server is running. (index.html not found in dist)")
+		return
+	}
+	c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 }

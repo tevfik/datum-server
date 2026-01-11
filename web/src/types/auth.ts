@@ -6,6 +6,7 @@ export interface User {
 
 export interface LoginResponse {
     token: string;
+    refresh_token?: string;
     user_id: string;
     email: string;
     role: string;

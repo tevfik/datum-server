@@ -274,6 +274,12 @@ func (h *IngestionHook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets.P
 			// Parse JSON payload
 			var data map[string]interface{}
 			if err := json.Unmarshal(pk.Payload, &data); err == nil {
+				// Add public_ip if client connection is available
+				if cl.Net.Remote != "" {
+					host, _, _ := net.SplitHostPort(cl.Net.Remote)
+					data["public_ip"] = host
+				}
+
 				// Process data
 				// Send to processor (storage)
 				h.processor.Process(deviceID, data)

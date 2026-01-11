@@ -119,6 +119,7 @@ test-load: ## Run HTTP load tests with Locust
 
 # Build commands
 # Build commands
+# Build commands
 build-web: ## Build Web Dashboard (React) - Auto-detects npm or uses Docker
 	@echo "🎨 Building Web Dashboard..."
 	@if command -v npm >/dev/null 2>&1; then \
@@ -131,12 +132,14 @@ build-web: ## Build Web Dashboard (React) - Auto-detects npm or uses Docker
 	@if [ ! -f web/dist/index.html ]; then echo "❌ web/dist/index.html missing! Build failed."; exit 1; fi
 	@echo "✅ Web Dashboard built"
 
-build-server: build-web ## Build Go server binary locally
-	@echo "🔨 Building Go server..."
-	@mkdir -p build/binaries
+prepare-assets: build-web ## Copy web assets to server directory
 	@echo "📦 Copying web assets..."
 	@rm -rf cmd/server/dist
 	@cp -r web/dist cmd/server/dist
+
+build-server: prepare-assets ## Build Go server binary locally
+	@echo "🔨 Building Go server..."
+	@mkdir -p build/binaries
 	@go build -o $(SERVER_BINARY) ./cmd/server
 	@echo "✅ Binary created: $(SERVER_BINARY)"
 
@@ -149,14 +152,14 @@ build-cli: ## Build datumctl CLI tool
 build-all: build-server build-cli ## Build server and CLI
 
 # Cross-platform build targets
-build-linux: build-web ## Build Linux binaries (AMD64)
+build-linux: prepare-assets ## Build Linux binaries (AMD64)
 	@echo "🔨 Building Linux binaries..."
 	@mkdir -p build/release
 	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datum-server-linux-amd64 ./cmd/server
 	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datumctl-linux-amd64 ./cmd/datumctl
 	@echo "✅ Linux binaries created in build/release/"
 
-build-windows: build-web ## Build Windows binaries (AMD64)
+build-windows: prepare-assets ## Build Windows binaries (AMD64)
 	@echo "🔨 Building Windows binaries..."
 	@mkdir -p build/release
 	@GOOS=windows GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datum-server-windows-amd64.exe ./cmd/server

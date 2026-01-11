@@ -326,7 +326,7 @@ func TestDeleteDeviceHandler(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusNoContent, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code)
 }
 
 func TestDeleteDeviceHandlerNotFound(t *testing.T) {

@@ -126,18 +126,87 @@ func loginHandler(c *gin.Context) {
 	// Update last login
 	store.UpdateUserLastLogin(user.ID)
 
-	token, err := auth.GenerateToken(user.ID, user.Email, user.Role)
+	accessToken, refreshToken, err := auth.GenerateTokenPair(user.ID, user.Email, user.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
 
+	// Save refresh token
+	if err := store.UpdateUserRefreshToken(user.ID, refreshToken); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save session"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"token":      token,
-		"user_id":    user.ID,
-		"email":      user.Email,
-		"role":       user.Role,
-		"expires_at": time.Now().Add(24 * time.Hour).Format(time.RFC3339),
+		"token":         accessToken,
+		"refresh_token": refreshToken,
+		"user_id":       user.ID,
+		"email":         user.Email,
+		"role":          user.Role,
+		"expires_at":    time.Now().Add(15 * time.Minute).Format(time.RFC3339),
+	})
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+// refreshTokenHandler handles token refresh
+// POST /auth/refresh
+func refreshTokenHandler(c *gin.Context) {
+	var req RefreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate refresh token format/claims
+	claims, err := auth.ValidateToken(req.RefreshToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		return
+	}
+
+	// Check if this is a refresh token (subject should be 'refresh')
+	// In GenerateTokenPair we set Subject: "refresh"
+	sub, _ := claims.GetSubject()
+	if sub != "refresh" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not a refresh token"})
+		return
+	}
+
+	// Check against DB whitelisted token for this user
+	user, err := store.GetUserByID(claims.UserID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+		return
+	}
+
+	if user.RefreshToken != req.RefreshToken {
+		// Token mismatch (maybe old token reused, or revoked)
+		// Security: potentially invalidate all sessions here? For now just deny.
+		logger.GetLogger().Warn().Str("user_id", user.ID).Msg("Refresh token mismatch (potential reuse)")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token (revoked)"})
+		return
+	}
+
+	// Generate NEW pair (Rotation)
+	accessToken, newRefreshToken, err := auth.GenerateTokenPair(user.ID, user.Email, user.Role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+		return
+	}
+
+	// Update DB with new refresh token
+	if err := store.UpdateUserRefreshToken(user.ID, newRefreshToken); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save refresh token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"token":         accessToken,
+		"refresh_token": newRefreshToken,
 	})
 }
 
