@@ -999,7 +999,7 @@ func uploadFirmwareHandler(c *gin.Context) {
 	}
 
 	scheme := "http"
-	if c.Request.TLS != nil {
+	if c.Request.TLS != nil || c.Request.Header.Get("X-Forwarded-Proto") == "https" {
 		scheme = "https"
 	}
 	host := c.Request.Host

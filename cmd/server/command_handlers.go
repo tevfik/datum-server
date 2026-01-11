@@ -25,6 +25,7 @@ type SendCommandRequest struct {
 func sendCommandHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 	userID, _ := auth.GetUserID(c)
+	role, _ := auth.GetUserRole(c)
 
 	// Verify device ownership
 	device, err := store.GetDevice(deviceID)
@@ -32,7 +33,8 @@ func sendCommandHandler(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
 		return
 	}
-	if device.UserID != userID {
+	// Allow owner OR admin
+	if role != "admin" && device.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
