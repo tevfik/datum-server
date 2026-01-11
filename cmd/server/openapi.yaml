@@ -3,29 +3,32 @@ info:
   title: Datumpy IoT Platform API
   description: |
     High-performance IoT data ingestion and device management platform.
-    
+
     ## Authentication
     - **User Auth**: JWT token in `Authorization: Bearer {token}` header
     - **Device Auth**: API key in `Authorization: Bearer {api_key}` header
-    
+
     ## Quick Start
-    1. Register user: `POST /auth/register`
-    2. Create device: `POST /devices`
-    3. Send data (HTTP): `POST /data/{device_id}`
+    - **Register user**: `POST /auth/register`
+    - **Create device**: `POST /dev`
+    - **Send data (HTTP)**: `POST /dev/{device_id}/data`
 
     ## MQTT / IoT Integration
     For real-time data and low-overhead communication, use MQTT:
-    - **Brokers**:
-      - `TCP`: Port `1883` (No TLS)
-      - `MQTTS`: Port `8883` (Secure TLS)
-      - `WS`: Port `1884` (WebSocket Secure - via Traefik)
-    - **Authentication**:
-      - Username: `{device_id}`
-      - Password: `{api_key}`
-    - **Topics**:
-      - Data (Pub): `data/{device_id}`
-      - Commands (Sub): `commands/{device_id}`
-      - Firmware (Sub): `firmware/{device_id}`
+
+    ### Brokers:
+    - **TCP**: Port 1883 (Local/Internal)
+    - **MQTTS**: Port 8883 (Secure TLS)
+    - **WS**: Port 1884 (WebSocket - via Traefik/Nginx)
+
+    ### Authentication:
+    - **Username**: `{device_id}`
+    - **Password**: `{api_key}`
+
+    ### Topics:
+    - **Data (Pub)**: `dev/{device_id}/data`
+    - **Commands (Sub)**: `dev/{device_id}/cmd`
+    - **Firmware (Sub)**: `dev/{device_id}/fw`
   version: 1.1.0
   contact:
     name: API Support
