@@ -42,6 +42,23 @@ Implemented the detailed view for individual devices.
 -   **Frontend**: Created `web/src/pages/DeviceDetail.tsx` displaying device metadata and status.
 -   **Refactor**: Fixed `deleteDeviceHandler` signature mismatch and removed duplicate handler code.
 
+### Command Center Implementation
+- **Integration**: Integrated inside **Device Detail** page.
+- **Features**:
+    - **Send Command**: Form to send commands (Action + JSON Params).
+    - **Command History**: List of pending and recent commands using `GET /devices/:id/commands`.
+- **UI**: Added `Textarea` component for JSON input.
+
+### Telemetry Graphs Implementation
+- **Implementation**: `TelemetryChart.tsx` using `recharts`.
+- **Functionality**: Visualizes numeric data from `GET /data/:id/history`.
+- **Features**: Auto-detects numeric keys (e.g. `temp`, `humidity`) and plots multiple lines dynamically.
+
+### Dashboard Stats Implementation
+- **Implementation**: `Dashboard.tsx` fetches real device list.
+- **Stats**: Total Devices, Online Count, Offline Count.
+- **Visuals**: Dynamic "System Status" indicator based on uptime percentage.
+
 
 
 
