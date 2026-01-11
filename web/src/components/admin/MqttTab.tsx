@@ -185,7 +185,8 @@ export function MqttTab() {
         const device = devices?.find(d => d.id === deviceId);
         if (device) {
             // Suggest a topic. Priority: specific UID -> ID
-            const target = device.device_uid || device.id;
+            // Firmware subscribes to "cmd/" + deviceID. Use ID.
+            const target = device.id;
             setTopic(`cmd/${target}`);
         }
     };
