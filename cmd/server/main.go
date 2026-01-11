@@ -372,6 +372,18 @@ func main() {
 
 		filePath := "./firmware/" + filename
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			// DEBUG: Log what we have
+			files, _ := os.ReadDir("./firmware")
+			var fileList []string
+			for _, f := range files {
+				fileList = append(fileList, f.Name())
+			}
+			logger.GetLogger().Error().
+				Str("requested_filename", filename).
+				Str("resolved_path", filePath).
+				Strs("existing_files", fileList).
+				Msg("Firmware file not found")
+
 			c.JSON(http.StatusNotFound, gin.H{"error": "Firmware not found"})
 			return
 		}
