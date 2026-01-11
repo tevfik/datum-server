@@ -19,6 +19,7 @@ import { useAuth } from '@/context/AuthContext';
 import { adminService } from '@/services/adminService';
 import { MqttTab } from '@/components/admin/MqttTab';
 import { SystemTab } from '@/components/admin/SystemTab';
+import { HttpTab } from '@/components/admin/HttpTab';
 
 // Subcomponent for Admin Tab to keep main file clean-ish
 function AdminSettings() {
@@ -280,6 +281,14 @@ export default function Settings() {
                         System
                     </button>
                 )}
+                {user?.role === 'admin' && (
+                    <button
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'http' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                        onClick={() => setActiveTab('http')}
+                    >
+                        HTTP
+                    </button>
+                )}
             </div>
 
             {/* API Keys Content */}
@@ -359,6 +368,10 @@ export default function Settings() {
 
             {activeTab === 'system' && user?.role === 'admin' && (
                 <SystemTab />
+            )}
+
+            {activeTab === 'http' && user?.role === 'admin' && (
+                <HttpTab />
             )}
 
             {activeTab === 'general' && (
