@@ -272,6 +272,14 @@ export default function Settings() {
                         MQTT
                     </button>
                 )}
+                {user?.role === 'admin' && (
+                    <button
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'system' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                        onClick={() => setActiveTab('system')}
+                    >
+                        System
+                    </button>
+                )}
             </div>
 
             {/* API Keys Content */}
