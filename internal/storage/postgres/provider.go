@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"database/sql"
+	"datum-go/internal/storage"
 	_ "embed"
 	"fmt"
 	"os"
@@ -105,4 +106,8 @@ func (s *PostgresStore) UpdateDocument(userID, collection, docID string, doc map
 
 func (s *PostgresStore) DeleteDocument(userID, collection, docID string) error {
 	return fmt.Errorf("not implemented for postgres yet")
+}
+
+func (s *PostgresStore) ListAllCollections() ([]storage.CollectionInfo, error) {
+	return nil, fmt.Errorf("not implemented for postgres yet")
 }

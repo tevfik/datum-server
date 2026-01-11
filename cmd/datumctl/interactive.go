@@ -75,6 +75,10 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 			if err := provisionMenu(); err != nil {
 				fmt.Printf("\n❌ Error: %v\n", err)
 			}
+		case "Document Database":
+			if err := dbMenu(); err != nil {
+				fmt.Printf("\n❌ Error: %v\n", err)
+			}
 
 		// System & Admin
 		case "System Status":
@@ -149,6 +153,7 @@ func showMainMenu() (string, error) {
 			"Data Queries",
 			"Command & Control",
 			"Provisioning",
+			"Document Database",
 			"── System & Admin ──",
 			"System Status",
 			"MQTT Management",

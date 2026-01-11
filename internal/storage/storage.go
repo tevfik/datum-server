@@ -2001,3 +2001,44 @@ func (s *Storage) DeleteDocument(userID, collection, docID string) error {
 		return err
 	})
 }
+
+// ListAllCollections returns all unique collections across all users
+func (s *Storage) ListAllCollections() ([]CollectionInfo, error) {
+	collectionMap := make(map[string]map[string]int) // userID -> collection -> count
+
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		// Iterate over all keys with prefix "doc:"
+		tx.AscendKeys("doc:*", func(key, value string) bool {
+			// Key format: doc:{user_id}:{collection}:{doc_id}
+			parts := strings.SplitN(key, ":", 4)
+			if len(parts) >= 4 {
+				userID := parts[1]
+				collection := parts[2]
+
+				if collectionMap[userID] == nil {
+					collectionMap[userID] = make(map[string]int)
+				}
+				collectionMap[userID][collection]++
+			}
+			return true
+		})
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	var result []CollectionInfo
+	for userID, collections := range collectionMap {
+		for collName, count := range collections {
+			result = append(result, CollectionInfo{
+				UserID:     userID,
+				Collection: collName,
+				DocCount:   count,
+			})
+		}
+	}
+
+	return result, nil
+}

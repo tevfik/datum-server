@@ -20,6 +20,7 @@ import { adminService } from '@/features/settings/services/adminService';
 import { MqttTab } from '@/features/settings/components/MqttTab';
 import { SystemTab } from '@/features/settings/components/SystemTab';
 import { HttpTab } from '@/features/settings/components/HttpTab';
+import { CollectionsTab } from '@/features/settings/components/CollectionsTab';
 import { SortableHeader } from '@/components/ui/sortable-header';
 
 // Subcomponent for Admin Tab to keep main file clean-ish
@@ -321,6 +322,14 @@ export default function Settings() {
                         System
                     </button>
                 )}
+                {user?.role === 'admin' && (
+                    <button
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'collections' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                        onClick={() => setActiveTab('collections')}
+                    >
+                        Collections
+                    </button>
+                )}
                 <button
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mqtt' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                     onClick={() => setActiveTab('mqtt')}
@@ -408,6 +417,10 @@ export default function Settings() {
 
             {activeTab === 'system' && user?.role === 'admin' && (
                 <SystemTab />
+            )}
+
+            {activeTab === 'collections' && user?.role === 'admin' && (
+                <CollectionsTab />
             )}
 
             {activeTab === 'mqtt' && (

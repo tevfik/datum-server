@@ -390,6 +390,10 @@ func main() {
 	adminHandler := handlers.NewAdminHandler(store, mqttBroker)
 	adminHandler.RegisterRoutes(r)
 
+	// Admin DB Collection Management routes
+	dbAdminHandler := NewDBAdminHandler(store)
+	dbAdminHandler.RegisterRoutes(r)
+
 	// Legacy setup call removed
 	// setupAdminRoutes(r, store)
 

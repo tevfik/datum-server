@@ -95,4 +95,12 @@ type Provider interface {
 	GetDocument(userID, collection, docID string) (map[string]interface{}, error)
 	UpdateDocument(userID, collection, docID string, doc map[string]interface{}) error
 	DeleteDocument(userID, collection, docID string) error
+	ListAllCollections() ([]CollectionInfo, error)
+}
+
+// CollectionInfo represents metadata about a collection
+type CollectionInfo struct {
+	UserID     string `json:"user_id"`
+	Collection string `json:"collection"`
+	DocCount   int    `json:"doc_count"`
 }

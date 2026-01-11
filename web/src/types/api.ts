@@ -1202,66 +1202,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dev/{device_id}/push": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Push data via GET (for constrained devices)
-         * @description Allows constrained IoT devices (like ESP8266, Arduino with limited HTTP libraries)
-         *     to submit sensor data via simple GET request with query parameters.
-         *     This is an alternative to POST /data/{device_id} for devices that cannot easily
-         *     construct POST requests with JSON bodies.
-         */
-        get: {
-            parameters: {
-                query: {
-                    /** @description Device API key (sk_live_XXX format) */
-                    key: string;
-                    /** @description Temperature (example sensor value) */
-                    temp?: number;
-                    /** @description Humidity (example sensor value) */
-                    humidity?: number;
-                };
-                header?: never;
-                path: {
-                    /** @description Device ID */
-                    device_id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Data stored successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example ok */
-                            status?: string;
-                            /** Format: date-time */
-                            timestamp?: string;
-                            /** @description Number of sensor values stored */
-                            fields_stored?: number;
-                            commands_pending?: number;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/dev/{device_id}/stream/frame": {
         parameters: {
             query?: never;
@@ -2711,6 +2651,173 @@ export interface paths {
             };
         };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/db/{collection}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Documents */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    collection: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of documents */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create Document */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    collection: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            responses: {
+                /** @description Document created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id?: string;
+                            status?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/db/{collection}/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Document */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    collection: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Document found */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Document not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /** Update Document */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    collection: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            responses: {
+                /** @description Document updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** Delete Document */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    collection: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Document deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;

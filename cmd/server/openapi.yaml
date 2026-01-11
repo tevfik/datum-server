@@ -1864,3 +1864,83 @@ paths:
       responses:
         '200':
           description: Document deleted
+
+  /sys/db/collections:
+    get:
+      summary: List all collections (Admin)
+      tags: [Admin, Database]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of all collections across all users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  collections:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        user_id:
+                          type: string
+                        collection:
+                          type: string
+                        doc_count:
+                          type: integer
+
+  /sys/db/{user_id}/{collection}:
+    get:
+      summary: List user documents (Admin)
+      tags: [Admin, Database]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of documents in user's collection
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+
+  /sys/db/{user_id}/{collection}/{doc_id}:
+    delete:
+      summary: Delete user document (Admin)
+      tags: [Admin, Database]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: doc_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document deleted
