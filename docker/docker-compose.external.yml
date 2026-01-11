@@ -31,7 +31,7 @@ services:
       - DATA_DIR=./data
     volumes:
       - ${DATA_DIR:-../data}:/root/data
-      - ./firmware:/root/firmware
+      - ../firmware:/root/firmware
     env_file:
       - .env
     networks:
