@@ -91,7 +91,7 @@ type DeviceInfoResponse struct {
 // ============ Mobile App Endpoints (JWT Auth Required) ============
 
 // registerDeviceHandler handles device registration from mobile app
-// POST /devices/register
+// POST /dev/register
 func registerDeviceHandler(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
@@ -203,7 +203,7 @@ func registerDeviceHandler(c *gin.Context) {
 }
 
 // checkDeviceUIDHandler checks if a device UID is already registered
-// GET /devices/check-uid/:uid
+// GET /dev/check-uid/:uid
 func checkDeviceUIDHandler(c *gin.Context) {
 	uid := c.Param("uid")
 	if uid == "" {
@@ -235,7 +235,7 @@ func checkDeviceUIDHandler(c *gin.Context) {
 }
 
 // getProvisioningStatusHandler returns the status of a provisioning request
-// GET /devices/provisioning/:request_id
+// GET /dev/prov/:request_id
 func getProvisioningStatusHandler(c *gin.Context) {
 	userID := c.GetString("user_id")
 	requestID := c.Param("request_id")
@@ -264,7 +264,7 @@ func getProvisioningStatusHandler(c *gin.Context) {
 }
 
 // cancelProvisioningHandler cancels a pending provisioning request
-// DELETE /devices/provisioning/:request_id
+// DELETE /dev/prov/:request_id
 func cancelProvisioningHandler(c *gin.Context) {
 	userID := c.GetString("user_id")
 	requestID := c.Param("request_id")
@@ -307,7 +307,7 @@ func cancelProvisioningHandler(c *gin.Context) {
 }
 
 // listProvisioningRequestsHandler lists all provisioning requests for the current user
-// GET /devices/provisioning
+// GET /dev/prov
 func listProvisioningRequestsHandler(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
@@ -342,7 +342,7 @@ func listProvisioningRequestsHandler(c *gin.Context) {
 // ============ Device Endpoints (No Auth - Called by IoT Device) ============
 
 // deviceActivateHandler handles device activation requests
-// POST /provisioning/activate
+// POST /prov/activate
 // Called by the device when it boots and has no credentials
 func deviceActivateHandler(c *gin.Context) {
 	var req DeviceActivateRequest
@@ -430,7 +430,7 @@ func deviceActivateHandler(c *gin.Context) {
 }
 
 // deviceCheckHandler allows device to check if there's a pending provisioning request
-// GET /provisioning/check/:uid
+// GET /prov/check/:uid
 // Called by device periodically when in setup mode
 func deviceCheckHandler(c *gin.Context) {
 	uid := c.Param("uid")
@@ -480,8 +480,8 @@ func deviceCheckHandler(c *gin.Context) {
 	// There's a valid pending request - device should activate
 	c.JSON(http.StatusOK, gin.H{
 		"status":       "pending",
-		"message":      "Provisioning request found. Call /provisioning/activate to complete.",
-		"activate_url": fmt.Sprintf("%s/provisioning/activate", provisioningConfig.ServerURL),
+		"message":      "Provisioning request found. Call /prov/activate to complete.",
+		"activate_url": fmt.Sprintf("%s/prov/activate", provisioningConfig.ServerURL),
 		"expires_at":   provReq.ExpiresAt,
 	})
 }
@@ -516,19 +516,19 @@ func generateProvisioningAPIKey() string {
 // RegisterProvisioningRoutes registers all provisioning-related routes
 func RegisterProvisioningRoutes(r *gin.Engine, authMiddleware gin.HandlerFunc) {
 	// Mobile app endpoints (require JWT auth)
-	devices := r.Group("/devices")
+	devices := r.Group("/dev")
 	devices.Use(authMiddleware)
 	{
 		devices.POST("/register", registerDeviceHandler)
 		devices.GET("/check-uid/:uid", checkDeviceUIDHandler)
-		devices.GET("/provisioning", listProvisioningRequestsHandler)
-		devices.GET("/provisioning/:request_id", getProvisioningStatusHandler)
-		devices.DELETE("/provisioning/:request_id", cancelProvisioningHandler)
+		devices.GET("/prov", listProvisioningRequestsHandler)
+		devices.GET("/prov/:request_id", getProvisioningStatusHandler)
+		devices.DELETE("/prov/:request_id", cancelProvisioningHandler)
 	}
 
 	// Device endpoints (no auth - device doesn't have credentials yet)
 	// Apply rate limiting to prevent abuse
-	provisioning := r.Group("/provisioning")
+	provisioning := r.Group("/prov")
 	provisioning.Use(auth.RateLimitMiddleware())
 	{
 		provisioning.POST("/activate", deviceActivateHandler)

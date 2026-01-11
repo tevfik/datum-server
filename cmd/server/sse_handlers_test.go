@@ -171,12 +171,12 @@ func TestSSECommandsHandlerUnauthorized(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.GET("/devices/:device_id/commands/sse", func(c *gin.Context) {
+	router.GET("/dev/:device_id/commands/sse", func(c *gin.Context) {
 		c.Set("api_key", "sk_wrong_key")
 		sseCommandsHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/sse-device-2/commands/sse", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/sse-device-2/commands/sse", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -197,7 +197,7 @@ func TestSSECommandsHandler_Success(t *testing.T) {
 	store.CreateDevice(device)
 
 	// Register route
-	router.GET("/devices/:device_id/commands/sse", func(c *gin.Context) {
+	router.GET("/dev/:device_id/commands/sse", func(c *gin.Context) {
 		c.Set("api_key", "sk_sse_success")
 		sseCommandsHandler(c)
 	})
@@ -211,7 +211,7 @@ func TestSSECommandsHandler_Success(t *testing.T) {
 	}
 	store.CreateCommand(command)
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/sse-device-success/commands/sse?wait=1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/sse-device-success/commands/sse?wait=1", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -236,13 +236,13 @@ func TestSSECommandsHandler_Timeout(t *testing.T) {
 	store.CreateDevice(device)
 
 	// Register route
-	router.GET("/devices/:device_id/commands/sse", func(c *gin.Context) {
+	router.GET("/dev/:device_id/commands/sse", func(c *gin.Context) {
 		c.Set("api_key", "sk_sse_timeout")
 		sseCommandsHandler(c)
 	})
 
 	// No commands, wait=1 second
-	req := httptest.NewRequest(http.MethodGet, "/devices/sse-device-timeout/commands/sse?wait=1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/sse-device-timeout/commands/sse?wait=1", nil)
 	w := httptest.NewRecorder()
 
 	start := time.Now()

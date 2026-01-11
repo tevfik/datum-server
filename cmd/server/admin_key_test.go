@@ -30,7 +30,7 @@ func TestRotateDeviceKeyHandler(t *testing.T) {
 	})
 
 	// Perform rotation
-	req, _ := http.NewRequest("POST", "/admin/devices/"+deviceID+"/rotate-key", nil)
+	req, _ := http.NewRequest("POST", "/admin/dev/"+deviceID+"/rotate-key", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -67,7 +67,7 @@ func TestRevokeDeviceKeyHandler(t *testing.T) {
 	})
 
 	// Perform revocation
-	req, _ := http.NewRequest("POST", "/admin/devices/"+deviceID+"/revoke-key", nil)
+	req, _ := http.NewRequest("POST", "/admin/dev/"+deviceID+"/revoke-key", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)

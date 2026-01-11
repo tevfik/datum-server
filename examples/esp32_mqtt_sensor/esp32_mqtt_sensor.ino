@@ -199,15 +199,15 @@ void handleWoT() {
   temp["readOnly"] = true;
   JsonArray forms = temp.createNestedArray("forms");
   JsonObject f = forms.createNestedObject();
-  f["href"] = "mqtt://" + getMQTTHost() + "/data/" +
-              deviceID; // Topic structure implied
+  f["href"] = "mqtt://" + getMQTTHost() + "/dev/" + deviceID +
+              "/data"; // Topic structure implied
   f["op"] = "readproperty";
 
   JsonObject actions = doc.createNestedObject("actions");
   JsonObject cmd = actions.createNestedObject("restart");
   JsonArray cmdForms = cmd.createNestedArray("forms");
   JsonObject cf = cmdForms.createNestedObject();
-  cf["href"] = "mqtt://" + getMQTTHost() + "/commands/" + deviceID;
+  cf["href"] = "mqtt://" + getMQTTHost() + "/dev/" + deviceID + "/cmd";
   cf["op"] = "invokeaction";
 
   String json;
@@ -258,7 +258,7 @@ bool registerDevice() {
 
   currentState = STATE_REGISTERING;
   HTTPClient http;
-  http.begin(serverURL + "/devices/register");
+  http.begin(serverURL + "/dev/register");
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", "Bearer " + userToken);
 
@@ -312,8 +312,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
     // We could publish ack via MQTT here if server supports it, or HTTP
     // Currently server expects HTTP ack
     HTTPClient http;
-    http.begin(serverURL + "/devices/" + deviceID + "/commands/" + cmdId +
-               "/ack");
+    http.begin(serverURL + "/dev/" + deviceID + "/cmd/" + cmdId + "/ack");
     http.addHeader("Authorization", "Bearer " + apiKey);
     http.POST("{}");
     http.end();
@@ -345,7 +344,7 @@ bool reconnectMQTT() {
 
   if (mqttClient.connect(deviceID.c_str(), deviceID.c_str(), apiKey.c_str())) {
     Serial.println("MQTT Connected!");
-    mqttClient.subscribe(("commands/" + deviceID).c_str());
+    mqttClient.subscribe(("dev/" + deviceID + "/cmd").c_str());
     return true;
   }
   return false;
@@ -364,7 +363,7 @@ void sendTelemetry() {
   String json;
   serializeJson(doc, json);
 
-  mqttClient.publish(("data/" + deviceID).c_str(), json.c_str());
+  mqttClient.publish(("dev/" + deviceID + "/data").c_str(), json.c_str());
   Serial.println("Telemetry Sent: " + json);
 }
 

@@ -47,7 +47,7 @@ void setup() {
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
-    String url = String(serverURL) + "/data/" + deviceID;
+    String url = String(serverURL) + "/dev/" + deviceID + "/data";
 
     http.begin(url);
     http.addHeader("Content-Type", "application/json");

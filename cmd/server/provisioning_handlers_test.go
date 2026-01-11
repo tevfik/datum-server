@@ -53,7 +53,7 @@ func TestRegisterDeviceHandler_Success(t *testing.T) {
 	defer cleanup()
 
 	// Register the handler with auth middleware simulation
-	router.POST("/devices/register", func(c *gin.Context) {
+	router.POST("/dev/register", func(c *gin.Context) {
 		c.Set("user_id", "prov-test-user")
 		registerDeviceHandler(c)
 	})
@@ -67,7 +67,7 @@ func TestRegisterDeviceHandler_Success(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/devices/register", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/dev/register", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -89,7 +89,7 @@ func TestRegisterDeviceHandler_MissingUID(t *testing.T) {
 	router, cleanup := setupProvisioningTestServer(t)
 	defer cleanup()
 
-	router.POST("/devices/register", func(c *gin.Context) {
+	router.POST("/dev/register", func(c *gin.Context) {
 		c.Set("user_id", "prov-test-user")
 		registerDeviceHandler(c)
 	})
@@ -99,7 +99,7 @@ func TestRegisterDeviceHandler_MissingUID(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/devices/register", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/dev/register", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -111,7 +111,7 @@ func TestRegisterDeviceHandler_DuplicateUID(t *testing.T) {
 	router, cleanup := setupProvisioningTestServer(t)
 	defer cleanup()
 
-	router.POST("/devices/register", func(c *gin.Context) {
+	router.POST("/dev/register", func(c *gin.Context) {
 		c.Set("user_id", "prov-test-user")
 		registerDeviceHandler(c)
 	})
@@ -123,7 +123,7 @@ func TestRegisterDeviceHandler_DuplicateUID(t *testing.T) {
 	bodyBytes, _ := json.Marshal(body)
 
 	// First registration
-	req1 := httptest.NewRequest(http.MethodPost, "/devices/register", bytes.NewReader(bodyBytes))
+	req1 := httptest.NewRequest(http.MethodPost, "/dev/register", bytes.NewReader(bodyBytes))
 	req1.Header.Set("Content-Type", "application/json")
 	w1 := httptest.NewRecorder()
 	router.ServeHTTP(w1, req1)
@@ -132,7 +132,7 @@ func TestRegisterDeviceHandler_DuplicateUID(t *testing.T) {
 	// Second registration with same UID
 	body["device_name"] = "Second Device"
 	bodyBytes, _ = json.Marshal(body)
-	req2 := httptest.NewRequest(http.MethodPost, "/devices/register", bytes.NewReader(bodyBytes))
+	req2 := httptest.NewRequest(http.MethodPost, "/dev/register", bytes.NewReader(bodyBytes))
 	req2.Header.Set("Content-Type", "application/json")
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
@@ -147,12 +147,12 @@ func TestCheckDeviceUIDHandler_NotRegistered(t *testing.T) {
 	router, cleanup := setupProvisioningTestServer(t)
 	defer cleanup()
 
-	router.GET("/devices/check-uid/:uid", func(c *gin.Context) {
+	router.GET("/dev/check-uid/:uid", func(c *gin.Context) {
 		c.Set("user_id", "prov-test-user")
 		checkDeviceUIDHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/check-uid/NEW:MAC:ADDR", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/check-uid/NEW:MAC:ADDR", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -180,12 +180,12 @@ func TestCheckDeviceUIDHandler_HasPending(t *testing.T) {
 	}
 	store.CreateProvisioningRequest(provReq)
 
-	router.GET("/devices/check-uid/:uid", func(c *gin.Context) {
+	router.GET("/dev/check-uid/:uid", func(c *gin.Context) {
 		c.Set("user_id", "prov-test-user")
 		checkDeviceUIDHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/check-uid/PENDING:MAC:ADDR", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/check-uid/PENDING:MAC:ADDR", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -217,12 +217,12 @@ func TestCheckDeviceUIDHandler_AlreadyRegistered(t *testing.T) {
 	}
 	store.CreateProvisioningRequest(provReq)
 
-	router.GET("/devices/check-uid/:uid", func(c *gin.Context) {
+	router.GET("/dev/check-uid/:uid", func(c *gin.Context) {
 		c.Set("user_id", "prov-test-user")
 		checkDeviceUIDHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/check-uid/REGISTERED:MAC:ADDR", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/check-uid/REGISTERED:MAC:ADDR", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -241,12 +241,12 @@ func TestListProvisioningRequestsHandler_Empty(t *testing.T) {
 	router, cleanup := setupProvisioningTestServer(t)
 	defer cleanup()
 
-	router.GET("/devices/provisioning", func(c *gin.Context) {
+	router.GET("/dev/prov", func(c *gin.Context) {
 		c.Set("user_id", "prov-test-user")
 		listProvisioningRequestsHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/provisioning", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/prov", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -275,12 +275,12 @@ func TestListProvisioningRequestsHandler_WithRequests(t *testing.T) {
 		store.CreateProvisioningRequest(provReq)
 	}
 
-	router.GET("/devices/provisioning", func(c *gin.Context) {
+	router.GET("/dev/prov", func(c *gin.Context) {
 		c.Set("user_id", "prov-test-user")
 		listProvisioningRequestsHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/provisioning", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/prov", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -311,12 +311,12 @@ func TestGetProvisioningStatusHandler_Success(t *testing.T) {
 	}
 	store.CreateProvisioningRequest(provReq)
 
-	router.GET("/devices/provisioning/:request_id", func(c *gin.Context) {
+	router.GET("/dev/prov/:request_id", func(c *gin.Context) {
 		c.Set("user_id", "prov-test-user")
 		getProvisioningStatusHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/provisioning/status-test-req", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/prov/status-test-req", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -332,12 +332,12 @@ func TestGetProvisioningStatusHandler_NotFound(t *testing.T) {
 	router, cleanup := setupProvisioningTestServer(t)
 	defer cleanup()
 
-	router.GET("/devices/provisioning/:request_id", func(c *gin.Context) {
+	router.GET("/dev/prov/:request_id", func(c *gin.Context) {
 		c.Set("user_id", "prov-test-user")
 		getProvisioningStatusHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/provisioning/nonexistent", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/prov/nonexistent", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -360,12 +360,12 @@ func TestGetProvisioningStatusHandler_WrongUser(t *testing.T) {
 	}
 	store.CreateProvisioningRequest(provReq)
 
-	router.GET("/devices/provisioning/:request_id", func(c *gin.Context) {
+	router.GET("/dev/prov/:request_id", func(c *gin.Context) {
 		c.Set("user_id", "prov-test-user") // Different user
 		getProvisioningStatusHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/provisioning/other-user-req", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/prov/other-user-req", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -390,12 +390,12 @@ func TestCancelProvisioningHandler_Success(t *testing.T) {
 	}
 	store.CreateProvisioningRequest(provReq)
 
-	router.DELETE("/devices/provisioning/:request_id", func(c *gin.Context) {
+	router.DELETE("/dev/prov/:request_id", func(c *gin.Context) {
 		c.Set("user_id", "prov-test-user")
 		cancelProvisioningHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodDelete, "/devices/provisioning/cancel-test-req", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/dev/prov/cancel-test-req", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -422,12 +422,12 @@ func TestCancelProvisioningHandler_AlreadyCompleted(t *testing.T) {
 	}
 	store.CreateProvisioningRequest(provReq)
 
-	router.DELETE("/devices/provisioning/:request_id", func(c *gin.Context) {
+	router.DELETE("/dev/prov/:request_id", func(c *gin.Context) {
 		c.Set("user_id", "prov-test-user")
 		cancelProvisioningHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodDelete, "/devices/provisioning/completed-req", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/dev/prov/completed-req", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -471,7 +471,7 @@ func TestDeviceActivateHandler_Success(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.POST("/provisioning/activate", deviceActivateHandler)
+	router.POST("/prov/activate", deviceActivateHandler)
 
 	body := map[string]interface{}{
 		"device_uid":       "ACTIVATE:MAC:ADDR",
@@ -480,7 +480,7 @@ func TestDeviceActivateHandler_Success(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/provisioning/activate", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/prov/activate", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -498,14 +498,14 @@ func TestDeviceActivateHandler_NoPendingRequest(t *testing.T) {
 	router, cleanup := setupProvisioningTestServer(t)
 	defer cleanup()
 
-	router.POST("/provisioning/activate", deviceActivateHandler)
+	router.POST("/prov/activate", deviceActivateHandler)
 
 	body := map[string]interface{}{
 		"device_uid": "UNKNOWN:MAC:ADDR",
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/provisioning/activate", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/prov/activate", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -529,14 +529,14 @@ func TestDeviceActivateHandler_ExpiredRequest(t *testing.T) {
 	}
 	store.CreateProvisioningRequest(provReq)
 
-	router.POST("/provisioning/activate", deviceActivateHandler)
+	router.POST("/prov/activate", deviceActivateHandler)
 
 	body := map[string]interface{}{
 		"device_uid": "EXPIRED:MAC:ADDR",
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/provisioning/activate", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/prov/activate", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -562,9 +562,9 @@ func TestDeviceCheckHandler_HasPending(t *testing.T) {
 	}
 	store.CreateProvisioningRequest(provReq)
 
-	router.GET("/provisioning/check/:uid", deviceCheckHandler)
+	router.GET("/prov/check/:uid", deviceCheckHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/provisioning/check/CHECK:MAC:ADDR", nil)
+	req := httptest.NewRequest(http.MethodGet, "/prov/check/CHECK:MAC:ADDR", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -573,16 +573,16 @@ func TestDeviceCheckHandler_HasPending(t *testing.T) {
 	var response map[string]interface{}
 	json.Unmarshal(w.Body.Bytes(), &response)
 	assert.Equal(t, "pending", response["status"])
-	assert.Contains(t, response["activate_url"], "/provisioning/activate")
+	assert.Contains(t, response["activate_url"], "/prov/activate")
 }
 
 func TestDeviceCheckHandler_NoPending(t *testing.T) {
 	router, cleanup := setupProvisioningTestServer(t)
 	defer cleanup()
 
-	router.GET("/provisioning/check/:uid", deviceCheckHandler)
+	router.GET("/prov/check/:uid", deviceCheckHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/provisioning/check/NO:PENDING:MAC", nil)
+	req := httptest.NewRequest(http.MethodGet, "/prov/check/NO:PENDING:MAC", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

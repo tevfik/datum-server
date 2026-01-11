@@ -62,7 +62,7 @@ Typically called by a mobile app after discovering a device via WiFi AP.`,
 		}
 
 		client := NewAPIClient(serverURL, token, apiKey)
-		resp, err := client.Post("/devices/register", payload)
+		resp, err := client.Post("/dev/register", payload)
 		if err != nil {
 			return err
 		}
@@ -102,7 +102,7 @@ var provisionListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loadConfig()
 		client := NewAPIClient(serverURL, token, apiKey)
-		resp, err := client.Get("/devices/provisioning")
+		resp, err := client.Get("/dev/prov")
 		if err != nil {
 			return err
 		}
@@ -151,7 +151,7 @@ var provisionStatusCmd = &cobra.Command{
 		loadConfig()
 		requestID := args[0]
 		client := NewAPIClient(serverURL, token, apiKey)
-		resp, err := client.Get("/devices/provisioning/" + requestID)
+		resp, err := client.Get("/dev/prov/" + requestID)
 		if err != nil {
 			return err
 		}
@@ -195,7 +195,7 @@ var provisionCancelCmd = &cobra.Command{
 		loadConfig()
 		requestID := args[0]
 		client := NewAPIClient(serverURL, token, apiKey)
-		resp, err := client.Delete("/devices/provisioning/"+requestID, nil)
+		resp, err := client.Delete("/dev/prov/"+requestID, nil)
 		if err != nil {
 			return err
 		}

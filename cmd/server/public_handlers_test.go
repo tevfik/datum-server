@@ -34,7 +34,7 @@ func TestPostPublicDataHandler(t *testing.T) {
 	router, cleanup := setupPublicTestServer(t)
 	defer cleanup()
 
-	router.POST("/public/:device_id/data", postPublicDataHandler)
+	router.POST("/pub/:device_id/data", postPublicDataHandler)
 
 	body := map[string]interface{}{
 		"temperature": 22.5,
@@ -42,7 +42,7 @@ func TestPostPublicDataHandler(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/public/test-device-123/data", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/pub/test-device-123/data", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -60,9 +60,9 @@ func TestPostPublicDataHandlerInvalidJSON(t *testing.T) {
 	router, cleanup := setupPublicTestServer(t)
 	defer cleanup()
 
-	router.POST("/public/:device_id/data", postPublicDataHandler)
+	router.POST("/pub/:device_id/data", postPublicDataHandler)
 
-	req := httptest.NewRequest(http.MethodPost, "/public/test-device-123/data", bytes.NewReader([]byte("{invalid")))
+	req := httptest.NewRequest(http.MethodPost, "/pub/test-device-123/data", bytes.NewReader([]byte("{invalid")))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -86,9 +86,9 @@ func TestGetPublicDataHandler(t *testing.T) {
 	store.StoreData(point)
 	time.Sleep(100 * time.Millisecond) // Allow time for storage
 
-	router.GET("/public/:device_id/data", getPublicDataHandler)
+	router.GET("/pub/:device_id/data", getPublicDataHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/public/test-device-456/data", nil)
+	req := httptest.NewRequest(http.MethodGet, "/pub/test-device-456/data", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -106,9 +106,9 @@ func TestGetPublicDataHandlerNoData(t *testing.T) {
 	router, cleanup := setupPublicTestServer(t)
 	defer cleanup()
 
-	router.GET("/public/:device_id/data", getPublicDataHandler)
+	router.GET("/pub/:device_id/data", getPublicDataHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/public/nonexistent/data", nil)
+	req := httptest.NewRequest(http.MethodGet, "/pub/nonexistent/data", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -132,9 +132,9 @@ func TestGetPublicDataHistoryHandler(t *testing.T) {
 	}
 	time.Sleep(200 * time.Millisecond) // Allow time for storage
 
-	router.GET("/public/:device_id/history", getPublicDataHistoryHandler)
+	router.GET("/pub/:device_id/history", getPublicDataHistoryHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/public/history-device/history", nil)
+	req := httptest.NewRequest(http.MethodGet, "/pub/history-device/history", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -164,9 +164,9 @@ func TestGetPublicDataHistoryHandlerWithLimit(t *testing.T) {
 	}
 	time.Sleep(200 * time.Millisecond)
 
-	router.GET("/public/:device_id/history", getPublicDataHistoryHandler)
+	router.GET("/pub/:device_id/history", getPublicDataHistoryHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/public/limit-device/history?limit=3", nil)
+	req := httptest.NewRequest(http.MethodGet, "/pub/limit-device/history?limit=3", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

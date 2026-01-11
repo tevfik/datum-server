@@ -239,10 +239,10 @@ func main() {
 		// If it looks like an API call, return JSON 404
 		if strings.HasPrefix(path, "/auth/") ||
 			strings.HasPrefix(path, "/api/") ||
-			strings.HasPrefix(path, "/devices/") ||
+			strings.HasPrefix(path, "/dev/") ||
 			strings.HasPrefix(path, "/data/") ||
-			strings.HasPrefix(path, "/public/") ||
-			strings.HasPrefix(path, "/system/") {
+			strings.HasPrefix(path, "/pub/") ||
+			strings.HasPrefix(path, "/sys/") {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
 			return
 		}
@@ -269,7 +269,9 @@ func main() {
 	r.GET("/live", livenessHandler)
 	r.GET("/ready", readinessHandler)
 	// System routes
-	r.GET("/system/time", getSystemTimeHandler)
+	r.GET("/sys/time", getSystemTimeHandler)
+	// Also map /sys/time for backward compatibility if desired, or just clean cut
+	// r.GET("/sys/time", getSystemTimeHandler)
 
 	// Auth routes
 	authGroup := r.Group("/auth")
@@ -299,63 +301,59 @@ func main() {
 	}
 
 	// Device management routes (require user auth)
-	devicesGroup := r.Group("/devices")
-	devicesGroup.Use(UserAuthMiddleware(store))
+	devGroup := r.Group("/dev")
+	devGroup.Use(UserAuthMiddleware(store))
 	{
-		devicesGroup.POST("", createDeviceHandler)
-		devicesGroup.GET("", listDevicesHandler)
-		devicesGroup.GET("/:device_id", getDeviceHandler)
-		devicesGroup.DELETE("/:device_id", deleteDeviceHandler)
+		// Management
+		devGroup.POST("", createDeviceHandler)
+		devGroup.GET("", listDevicesHandler)
+		devGroup.GET("/:device_id", getDeviceHandler)
+		devGroup.DELETE("/:device_id", deleteDeviceHandler)
 
-		// Command endpoints (user sends commands)
-		devicesGroup.POST("/:device_id/commands", sendCommandHandler)
-		devicesGroup.GET("/:device_id/commands", listCommandsHandler)
-	}
+		// Commands (User sends to device)
+		devGroup.POST("/:device_id/cmd", sendCommandHandler)
+		devGroup.GET("/:device_id/cmd", listCommandsHandler) // History of commands sent
 
-	// Device command polling (device auth)
-	deviceCommandGroup := r.Group("/devices")
-	deviceCommandGroup.Use(auth.DeviceAuthMiddleware())
-	{
-		// Renamed from /:device_id/commands to /:device_id/commands/pending to avoid collision with User List Commands
-		deviceCommandGroup.GET("/:device_id/commands/pending", pollCommandsHandler)
-		deviceCommandGroup.GET("/:device_id/commands/stream", sseCommandsHandler) // SSE long polling
-		deviceCommandGroup.GET("/:device_id/commands/poll", webhookPollHandler)   // HTTP long polling
-		deviceCommandGroup.POST("/:device_id/commands/:command_id/ack", ackCommandHandler)
-		deviceCommandGroup.GET("/:device_id/push", pushDataViaGetHandler) // For constrained devices (GET data push)
-
-		// Video streaming upload (device uploads frames)
-		deviceCommandGroup.POST("/:device_id/stream/frame", uploadFrameHandler)
-	}
-
-	// Data routes (require device auth)
-	dataGroup := r.Group("/data")
-	dataGroup.Use(auth.DeviceAuthMiddleware())
-	{
-		dataGroup.POST("/:device_id", postDataHandler)
-	}
-
-	// Data query routes (require user auth)
-	dataQueryGroup := r.Group("/data")
-	dataQueryGroup.Use(UserAuthMiddleware(store))
-	{
+		// Data Query (User gets data)
+		devGroup.GET("/:device_id/data", getLatestDataHandler)
+		devGroup.GET("/:device_id/rec", getDataHistoryHandler) // 'rec' for records/history
 
 		// Video streaming routes (require user auth)
-		streamGroup := r.Group("/devices")
-		streamGroup.Use(UserAuthMiddleware(store))
-		{
-			streamGroup.GET("/:device_id/stream/mjpeg", mjpegStreamHandler)       // MJPEG over HTTP (SSE-like)
-			streamGroup.GET("/:device_id/stream/snapshot", streamSnapshotHandler) // Current frame snapshot
-			streamGroup.GET("/:device_id/stream/ws", websocketStreamHandler)      // WebSocket binary stream
-			streamGroup.GET("/:device_id/stream/info", streamInfoHandler)         // Stream metadata
-		}
-		dataQueryGroup.GET("/:device_id", getLatestDataHandler)
-		dataQueryGroup.GET("/:device_id/history", getDataHistoryHandler)
+		devGroup.GET("/:device_id/stream/mjpeg", mjpegStreamHandler)       // MJPEG over HTTP
+		devGroup.GET("/:device_id/stream/snapshot", streamSnapshotHandler) // Current frame snapshot
+		devGroup.GET("/:device_id/stream/ws", websocketStreamHandler)      // WebSocket binary stream
+		devGroup.GET("/:device_id/stream/info", streamInfoHandler)         // Stream metadata
 	}
 
-	// Public data endpoint (NO authentication - for quick prototyping)
-	r.POST("/public/data/:device_id", postPublicDataHandler)
-	r.GET("/public/data/:device_id", getPublicDataHandler)
-	r.GET("/public/data/:device_id/history", getPublicDataHistoryHandler)
+	// Device-side routes (Device Auth)
+	devAuthGroup := r.Group("/dev")
+	devAuthGroup.Use(auth.DeviceAuthMiddleware())
+	{
+		// Data Ingestion
+		devAuthGroup.POST("/:device_id/data", postDataHandler)
+
+		// Command Polling (Device gets pending commands)
+		// Consolidating all polling to single GET /cmd endpoint
+		devAuthGroup.GET("/:device_id/cmd/pending", pollCommandsHandler)
+
+		// Legacy polling support aliases (can be deprecated later)
+		devAuthGroup.GET("/:device_id/cmd/stream", sseCommandsHandler) // SSE long polling
+		devAuthGroup.GET("/:device_id/cmd/poll", webhookPollHandler)   // HTTP long polling
+
+		// Command Ack
+		devAuthGroup.POST("/:device_id/cmd/:command_id/ack", ackCommandHandler)
+
+		// Video streaming upload (device uploads frames)
+		devAuthGroup.POST("/:device_id/stream/frame", uploadFrameHandler)
+	}
+
+	// Public routes (No Auth)
+	pubGroup := r.Group("/pub")
+	{
+		pubGroup.POST("/:device_id", postPublicDataHandler)
+		pubGroup.GET("/:device_id", getPublicDataHandler)
+		pubGroup.GET("/:device_id/rec", getPublicDataHistoryHandler)
+	}
 
 	// Serve firmware updates (protected)
 	// Devices must provide ?token=<API_KEY> query parameter
@@ -363,7 +361,7 @@ func main() {
 	// Serve firmware updates (protected)
 	// Devices must provide ?token=<API_KEY> query parameter
 	// This replaces public static serving
-	r.GET("/devices/firmware/:filename", auth.DeviceAuthMiddleware(), func(c *gin.Context) {
+	r.GET("/dev/fw/:filename", auth.DeviceAuthMiddleware(), func(c *gin.Context) {
 		filename := c.Param("filename")
 		// Prevent directory traversal
 		if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
@@ -381,7 +379,7 @@ func main() {
 	})
 
 	// Public command access (for demo purposes)
-	// r.POST("/api/devices/:device_id/commands", commandHandler)
+	// r.POST("/api/dev/:device_id/commands", commandHandler)
 
 	// Auth routes
 	// setupAuthRoutes(r, store) // Assuming this is a new call, but not explicitly in the original file.
@@ -404,7 +402,7 @@ func main() {
 	log.Info().
 		Str("port", serverPort).
 		Str("public_url", publicURL).
-		Str("endpoints", "/auth, /device, /data, /public/data, /provisioning").
+		Str("endpoints", "/auth, /dev, /dev/data, /pub, /prov").
 		Str("docs", publicURL+"/docs").
 		Msg("🚀 Datum IoT Platform starting")
 
@@ -543,8 +541,8 @@ func rootHandler(c *gin.Context) {
 			"service": "Datum IoT Platform",
 			"version": Version,
 			"endpoints": gin.H{
-				"auth":    []string{"POST /auth/register", "POST /auth/login"},
-				"devices": []string{"POST /devices", "GET /devices", "DELETE /devices/{id}"},
+				"auth": []string{"POST /auth/register", "POST /auth/login"},
+				"dev":  []string{"POST /dev", "GET /dev", "DELETE /dev/{id}"},
 			},
 		})
 		return

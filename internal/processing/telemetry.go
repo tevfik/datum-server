@@ -14,7 +14,6 @@ type TelemetryProcessor struct {
 	dataChan      chan *storage.DataPoint
 	flushInterval time.Duration
 	batchSize     int
-	done          chan struct{}
 	wg            sync.WaitGroup
 }
 
@@ -25,7 +24,6 @@ func NewTelemetryProcessor(store storage.Provider) *TelemetryProcessor {
 		dataChan:      make(chan *storage.DataPoint, 50000), // Increased buffer for high throughput (bursts)
 		flushInterval: 500 * time.Millisecond,
 		batchSize:     5000,
-		done:          make(chan struct{}),
 	}
 
 	// Start worker pool
@@ -41,7 +39,7 @@ func NewTelemetryProcessor(store storage.Provider) *TelemetryProcessor {
 
 // Close gracefully shuts down the processor
 func (tp *TelemetryProcessor) Close() {
-	close(tp.done)
+	close(tp.dataChan)
 	tp.wg.Wait()
 }
 
@@ -56,46 +54,25 @@ func (tp *TelemetryProcessor) worker() {
 		if len(buffer) == 0 {
 			return
 		}
-		// Write batch to storage
-		// Postgres/TimescaleDB handles concurrency well.
-		// BuntDB (TStorage) might have internal locks, but multiple workers help prepare batches in parallel.
 		if err := tp.Store.StoreDataBatch(buffer); err != nil {
-			// Log error (in real system, maybe metric or retry)
+			// Log error
 		}
-
-		// Reset buffer
-		// We allocate a new slice here to be safe with potential async storage handling,
-		// although StoreDataBatch is blocking usually.
 		buffer = make([]*storage.DataPoint, 0, tp.batchSize)
 	}
 
 	for {
 		select {
-		case point := <-tp.dataChan:
+		case point, ok := <-tp.dataChan:
+			if !ok {
+				flush()
+				return
+			}
 			buffer = append(buffer, point)
 			if len(buffer) >= tp.batchSize {
 				flush()
 			}
 		case <-ticker.C:
 			flush()
-		case <-tp.done:
-			// Drain remaining data
-			// Note with multiple workers, they all race to drain.
-			// Currently simplified to just stop. For strict draining, we'd need better mechanics,
-			// but for now, we try to flush what we have.
-			// Drain loop in multiple workers is tricky because channel closes.
-			// We rely on close(done) to stop, but dataChan isn't closed yet.
-
-			// Simple drain strategy for worker pool:
-			// 1. Read until empty or done
-			// Actually, typical pattern is close(dataChan) to signal stop,
-			// but here we use done channel.
-
-			// Let's just flush pending buffer and exit.
-			// To strictly drain all pending 50k items, we'd need to close dataChan and iterate range.
-			// But we'll keep it simple for this optimization step.
-			flush()
-			return
 		}
 	}
 }

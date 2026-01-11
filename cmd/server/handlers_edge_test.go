@@ -40,7 +40,7 @@ func TestSetupSystemHandlerDuplicateEmail(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/system/setup", h.SetupSystemHandler)
+	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	// First setup
 	requestBody := map[string]interface{}{
@@ -50,7 +50,7 @@ func TestSetupSystemHandlerDuplicateEmail(t *testing.T) {
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/system/setup", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPost, "/sys/setup", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -309,14 +309,14 @@ func TestUpdateDeviceHandlerActive(t *testing.T) {
 	store.CreateDevice(device)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.PUT("/admin/devices/:device_id", h.UpdateDeviceHandler)
+	router.PUT("/admin/dev/:device_id", h.UpdateDeviceHandler)
 
 	requestBody := map[string]interface{}{
 		"status": "active",
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/devices/update-active-1", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPut, "/admin/dev/update-active-1", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -377,7 +377,7 @@ func TestPostDataHandlerComplexData(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.POST("/devices/:device_id/data", func(c *gin.Context) {
+	router.POST("/dev/:device_id/data", func(c *gin.Context) {
 		c.Set("api_key", "sk_complex1")
 		postDataHandler(c)
 	})
@@ -390,7 +390,7 @@ func TestPostDataHandlerComplexData(t *testing.T) {
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/devices/complex-dev-1/data", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPost, "/dev/complex-dev-1/data", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)

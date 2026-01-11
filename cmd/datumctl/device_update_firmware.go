@@ -35,7 +35,7 @@ func runUpdateFirmwareDevice(cmd *cobra.Command, args []string) error {
 	}
 
 	client := NewAPIClient(serverURL, token, apiKey)
-	resp, err := client.Post(fmt.Sprintf("/devices/%s/commands", deviceID), requestBody)
+	resp, err := client.Post(fmt.Sprintf("/dev/%s/cmd", deviceID), requestBody)
 	if err != nil {
 		return err
 	}

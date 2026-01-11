@@ -59,7 +59,7 @@ var wsUpgrader = websocket.Upgrader{
 }
 
 // Device uploads video frames (MJPEG or individual JPEGs)
-// POST /devices/:device_id/stream/frame
+// POST /dev/:device_id/stream/frame
 func uploadFrameHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 
@@ -142,7 +142,7 @@ func uploadFrameHandler(c *gin.Context) {
 }
 
 // MJPEG stream endpoint for browsers (HTTP)
-// GET /devices/:device_id/stream/mjpeg
+// GET /dev/:device_id/stream/mjpeg
 func mjpegStreamHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 	userID, _ := auth.GetUserID(c)
@@ -205,7 +205,7 @@ func mjpegStreamHandler(c *gin.Context) {
 }
 
 // WebSocket stream endpoint (binary, low latency)
-// GET /devices/:device_id/stream/ws
+// GET /dev/:device_id/stream/ws
 func websocketStreamHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 	userID, _ := auth.GetUserID(c)
@@ -284,7 +284,7 @@ func websocketStreamHandler(c *gin.Context) {
 }
 
 // Stream info endpoint
-// GET /devices/:device_id/stream/snapshot
+// GET /dev/:device_id/stream/snapshot
 func streamSnapshotHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 	userID, _ := auth.GetUserID(c)
@@ -314,7 +314,7 @@ func streamSnapshotHandler(c *gin.Context) {
 }
 
 // Stream info endpoint
-// GET /devices/:device_id/stream/info
+// GET /dev/:device_id/stream/info
 func streamInfoHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 	userID, _ := auth.GetUserID(c)

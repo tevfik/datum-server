@@ -22,7 +22,7 @@ func setupMockServer() *httptest.Server {
 	})
 
 	// System status endpoint
-	mux.HandleFunc("/system/status", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/sys/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"initialized":   true,
@@ -74,7 +74,7 @@ func setupMockServer() *httptest.Server {
 	})
 
 	// Device endpoints
-	mux.HandleFunc("/admin/devices", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/admin/dev", func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
 		if auth != "Bearer test-jwt-token-123" {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -129,7 +129,7 @@ func setupMockServer() *httptest.Server {
 	})
 
 	// Individual device operations
-	mux.HandleFunc("/admin/devices/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/admin/dev/", func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
 		if auth != "Bearer test-jwt-token-123" {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -155,8 +155,8 @@ func setupMockServer() *httptest.Server {
 		}
 	})
 
-	// Device commands endpoint
-	mux.HandleFunc("/devices/", func(w http.ResponseWriter, r *http.Request) {
+	// Device commands and data endpoint
+	mux.HandleFunc("/dev/", func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
 		if auth != "Bearer test-jwt-token-123" {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -185,7 +185,20 @@ func setupMockServer() *httptest.Server {
 	})
 
 	// Data endpoints
-	mux.HandleFunc("/data/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/dev/device001/data", func(w http.ResponseWriter, r *http.Request) {
+		// Mock Data Endpoint
+		// Allows implicit Auth via API Key OR Token
+		auth := r.Header.Get("Authorization")
+		if auth == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		// Accept either token or api-key for test purposes
+		if auth != "Bearer test-jwt-token-123" && auth != "Bearer api-key-test-123" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		if r.Method == "POST" {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"status": "ok"}`))
@@ -217,7 +230,7 @@ func TestClientSystemStatus(t *testing.T) {
 	// Create API client
 	client := NewAPIClient(server.URL, "", "")
 
-	resp, err := client.Get("/system/status")
+	resp, err := client.Get("/sys/status")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -278,7 +291,7 @@ func TestClientDeviceList(t *testing.T) {
 
 	client := NewAPIClient(server.URL, "test-jwt-token-123", "")
 
-	resp, err := client.Get("/admin/devices")
+	resp, err := client.Get("/admin/dev")
 	require.NoError(t, err)
 
 	var result map[string]interface{}
@@ -300,7 +313,7 @@ func TestClientUnauthorizedAccess(t *testing.T) {
 	client := NewAPIClient(server.URL, "", "")
 
 	// Try to access protected endpoint without token
-	resp, err := client.Get("/admin/devices")
+	resp, err := client.Get("/admin/dev")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -338,14 +351,14 @@ func TestDataQueryConstruction(t *testing.T) {
 			start:    "2025-01-01",
 			end:      "2025-01-02",
 			limit:    "",
-			expected: "/data/device001?start=2025-01-01&end=2025-01-02",
+			expected: "/dev/device001/rec?start=2025-01-01&end=2025-01-02",
 		},
 		{
 			deviceID: "device002",
 			start:    "",
 			end:      "",
 			limit:    "10",
-			expected: "/data/device002/latest?limit=10",
+			expected: "/dev/device002/data?limit=10",
 		},
 	}
 
@@ -358,7 +371,7 @@ func TestDataQueryConstruction(t *testing.T) {
 // Helper function to build data query path
 func buildDataQueryPath(deviceID, start, end, limit string) string {
 	if start != "" || end != "" {
-		path := "/data/" + deviceID + "?"
+		path := "/dev/" + deviceID + "/rec?" // Use /rec for history
 		if start != "" {
 			path += "start=" + start
 		}
@@ -371,7 +384,7 @@ func buildDataQueryPath(deviceID, start, end, limit string) string {
 		return path
 	}
 
-	path := "/data/" + deviceID + "/latest"
+	path := "/dev/" + deviceID + "/data" // Use /data for latest
 	if limit != "" {
 		path += "?limit=" + limit
 	}
@@ -397,7 +410,7 @@ func TestHeadersInRequest(t *testing.T) {
 
 	// Make request with token
 	client := NewAPIClient(server.URL, "test-jwt-token-123", "")
-	resp, err := client.Get("/admin/devices")
+	resp, err := client.Get("/admin/dev")
 	require.NoError(t, err)
 
 	var result map[string]interface{}
@@ -430,7 +443,7 @@ func TestAPIClientGet(t *testing.T) {
 	defer server.Close()
 
 	client := NewAPIClient(server.URL, "", "")
-	resp, err := client.Get("/system/status")
+	resp, err := client.Get("/sys/status")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -448,7 +461,7 @@ func TestAPIClientPost(t *testing.T) {
 		"type": "sensor",
 	}
 
-	resp, err := client.Post("/admin/devices", reqBody)
+	resp, err := client.Post("/admin/dev", reqBody)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -461,7 +474,7 @@ func TestAPIClientDelete(t *testing.T) {
 
 	client := NewAPIClient(server.URL, "test-jwt-token-123", "")
 
-	resp, err := client.Delete("/admin/devices/device001", nil)
+	resp, err := client.Delete("/admin/dev/device001", nil)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -478,7 +491,7 @@ func TestAPIClientPut(t *testing.T) {
 		"status": "suspended",
 	}
 
-	resp, err := client.Put("/admin/devices/device001", updateBody)
+	resp, err := client.Put("/admin/dev/device001", updateBody)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -490,7 +503,7 @@ func TestParseResponse(t *testing.T) {
 	defer server.Close()
 
 	client := NewAPIClient(server.URL, "", "")
-	resp, err := client.Get("/system/status")
+	resp, err := client.Get("/sys/status")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -598,7 +611,7 @@ func TestBuildDataQueryPath(t *testing.T) {
 			start:    "2025-01-01",
 			end:      "2025-01-02",
 			limit:    "",
-			expected: "/data/dev001?start=2025-01-01&end=2025-01-02",
+			expected: "/dev/dev001/rec?start=2025-01-01&end=2025-01-02",
 		},
 		{
 			name:     "with start only",
@@ -606,7 +619,7 @@ func TestBuildDataQueryPath(t *testing.T) {
 			start:    "2025-01-01",
 			end:      "",
 			limit:    "",
-			expected: "/data/dev001?start=2025-01-01",
+			expected: "/dev/dev001/rec?start=2025-01-01",
 		},
 		{
 			name:     "with end only",
@@ -614,7 +627,7 @@ func TestBuildDataQueryPath(t *testing.T) {
 			start:    "",
 			end:      "2025-01-02",
 			limit:    "",
-			expected: "/data/dev001?end=2025-01-02",
+			expected: "/dev/dev001/rec?end=2025-01-02",
 		},
 		{
 			name:     "latest with limit",
@@ -622,7 +635,7 @@ func TestBuildDataQueryPath(t *testing.T) {
 			start:    "",
 			end:      "",
 			limit:    "10",
-			expected: "/data/dev001/latest?limit=10",
+			expected: "/dev/dev001/data?limit=10",
 		},
 		{
 			name:     "latest without limit",
@@ -630,7 +643,7 @@ func TestBuildDataQueryPath(t *testing.T) {
 			start:    "",
 			end:      "",
 			limit:    "",
-			expected: "/data/dev001/latest",
+			expected: "/dev/dev001/data",
 		},
 	}
 
@@ -654,7 +667,7 @@ func TestDeviceProvisioning(t *testing.T) {
 		"device_id": "custom-device-id",
 	}
 
-	resp, err := client.Post("/admin/devices", reqBody)
+	resp, err := client.Post("/admin/dev", reqBody)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -675,7 +688,7 @@ func TestDataQuery(t *testing.T) {
 
 	client := NewAPIClient(server.URL, "", "api-key-test-123")
 
-	resp, err := client.Get("/data/device001/latest?limit=5")
+	resp, err := client.Get("/dev/device001/data?limit=5")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -694,7 +707,7 @@ func TestDataPost(t *testing.T) {
 		"timestamp":   "2025-01-01T12:00:00Z",
 	}
 
-	resp, err := client.Post("/data/device001", dataPoint)
+	resp, err := client.Post("/dev/device001/data", dataPoint)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -714,7 +727,7 @@ func TestCommandSend(t *testing.T) {
 		},
 	}
 
-	resp, err := client.Post("/devices/device001/commands", command)
+	resp, err := client.Post("/dev/device001/cmd", command)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -748,7 +761,7 @@ func TestDeviceUpdate(t *testing.T) {
 		"name":   "Updated Device Name",
 	}
 
-	resp, err := client.Put("/admin/devices/device001", update)
+	resp, err := client.Put("/admin/dev/device001", update)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -776,7 +789,7 @@ func TestClientWithBothTokenAndAPIKey(t *testing.T) {
 	assert.Equal(t, "test-jwt-token-123", client.Token)
 	assert.Equal(t, "api-key-test-123", client.APIKey)
 
-	resp, err := client.Get("/admin/devices")
+	resp, err := client.Get("/admin/dev")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -792,7 +805,7 @@ func TestClientPostInvalidJSON(t *testing.T) {
 	// Channel cannot be marshaled to JSON
 	invalidData := make(chan int)
 
-	_, err := client.Post("/admin/devices", invalidData)
+	_, err := client.Post("/admin/dev", invalidData)
 	assert.Error(t, err)
 }
 
@@ -805,7 +818,7 @@ func TestClientPutInvalidJSON(t *testing.T) {
 	// Channel cannot be marshaled to JSON
 	invalidData := make(chan int)
 
-	_, err := client.Put("/admin/devices/device001", invalidData)
+	_, err := client.Put("/admin/dev/device001", invalidData)
 	assert.Error(t, err)
 }
 
@@ -819,7 +832,7 @@ func TestAPIPut(t *testing.T) {
 		"status": "active",
 	}
 
-	resp, err := client.Put("/admin/devices/device001", updateBody)
+	resp, err := client.Put("/admin/dev/device001", updateBody)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -832,7 +845,7 @@ func TestAPIDelete(t *testing.T) {
 
 	client := NewAPIClient(server.URL, "test-jwt-token-123", "")
 
-	resp, err := client.Delete("/admin/devices/device001", nil)
+	resp, err := client.Delete("/admin/dev/device001", nil)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 

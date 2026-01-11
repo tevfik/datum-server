@@ -11,8 +11,8 @@ func (h *AdminHandler) RegisterRoutes(r *gin.Engine) {
 	// System status (public - no auth needed)
 	// Note: These used to be in setupAdminRoutes but access global store.
 	// We map them to our struct handlers now.
-	r.GET("/system/status", h.GetSystemStatusHandler)
-	r.POST("/system/setup", h.SetupSystemHandler)
+	r.GET("/sys/status", h.GetSystemStatusHandler)
+	r.POST("/sys/setup", h.SetupSystemHandler)
 
 	// Admin routes (require admin role)
 	admin := r.Group("/admin")
@@ -27,15 +27,15 @@ func (h *AdminHandler) RegisterRoutes(r *gin.Engine) {
 		admin.POST("/users/:username/reset-password", h.ResetPasswordHandler)
 
 		// Device management (all devices across users)
-		admin.POST("/devices", h.ProvisionDeviceHandler)
-		admin.GET("/devices", h.ListAllDevicesHandler)
-		admin.GET("/devices/:device_id", h.GetDeviceAdminHandler)
-		admin.PUT("/devices/:device_id", h.UpdateDeviceHandler)
-		admin.DELETE("/devices/:device_id", h.ForceDeleteDeviceHandler)
+		admin.POST("/dev", h.ProvisionDeviceHandler)
+		admin.GET("/dev", h.ListAllDevicesHandler)
+		admin.GET("/dev/:device_id", h.GetDeviceAdminHandler)
+		admin.PUT("/dev/:device_id", h.UpdateDeviceHandler)
+		admin.DELETE("/dev/:device_id", h.ForceDeleteDeviceHandler)
 
 		// Key management (token rotation and revocation)
-		admin.POST("/devices/:device_id/rotate-key", h.RotateDeviceKeyHandler)
-		admin.POST("/devices/:device_id/revoke-key", h.RevokeDeviceKeyHandler)
+		admin.POST("/dev/:device_id/rotate-key", h.RotateDeviceKeyHandler)
+		admin.POST("/dev/:device_id/revoke-key", h.RevokeDeviceKeyHandler)
 
 		// Database operations
 		admin.GET("/database/stats", h.GetDatabaseStatsHandler)

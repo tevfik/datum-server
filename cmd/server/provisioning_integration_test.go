@@ -45,7 +45,7 @@ func TestProvisioningEndToEndFlow(t *testing.T) {
 	}) // Mock auth middleware for simplicity
 
 	// 2. User Registers Device (Mobile App)
-	// POST /devices/register
+	// POST /dev/register
 	regBody := map[string]string{
 		"device_uid":  "AA:BB:CC:DD:EE:01",
 		"device_name": "E2E Sensor",
@@ -54,7 +54,7 @@ func TestProvisioningEndToEndFlow(t *testing.T) {
 		"wifi_pass":   "SecretPass",
 	}
 	regBytes, _ := json.Marshal(regBody)
-	reqReg := httptest.NewRequest("POST", "/devices/register", bytes.NewReader(regBytes))
+	reqReg := httptest.NewRequest("POST", "/dev/register", bytes.NewReader(regBytes))
 	reqReg.Header.Set("Content-Type", "application/json")
 	wReg := httptest.NewRecorder()
 	router.ServeHTTP(wReg, reqReg)
@@ -66,8 +66,8 @@ func TestProvisioningEndToEndFlow(t *testing.T) {
 	assert.Equal(t, "active", regResp.Status)
 
 	// 3. User Lists Requests
-	// GET /devices/provisioning
-	reqList := httptest.NewRequest("GET", "/devices/provisioning", nil)
+	// GET /dev/prov
+	reqList := httptest.NewRequest("GET", "/dev/prov", nil)
 	wList := httptest.NewRecorder()
 	router.ServeHTTP(wList, reqList)
 
@@ -86,7 +86,7 @@ func TestProvisioningEndToEndFlow(t *testing.T) {
 	// 4. Device Activation (simulated Device)
 
 	// Device Check UID (Public Device Endpoint)
-	reqCheck := httptest.NewRequest("GET", "/provisioning/check/AA:BB:CC:DD:EE:01", nil)
+	reqCheck := httptest.NewRequest("GET", "/prov/check/AA:BB:CC:DD:EE:01", nil)
 	wCheck := httptest.NewRecorder()
 	router.ServeHTTP(wCheck, reqCheck)
 	assert.Equal(t, http.StatusOK, wCheck.Code)
@@ -96,13 +96,13 @@ func TestProvisioningEndToEndFlow(t *testing.T) {
 	assert.Equal(t, "active", checkResp["status"])
 
 	// Device Activate
-	// POST /provisioning/activate with payload
+	// POST /prov/activate with payload
 	actBody := map[string]string{
 		"request_id": regResp.RequestID,
 		"device_uid": "AA:BB:CC:DD:EE:01",
 	}
 	actBytes, _ := json.Marshal(actBody)
-	reqAct := httptest.NewRequest("POST", "/provisioning/activate", bytes.NewReader(actBytes))
+	reqAct := httptest.NewRequest("POST", "/prov/activate", bytes.NewReader(actBytes))
 	reqAct.Header.Set("Content-Type", "application/json")
 	wAct := httptest.NewRecorder()
 	router.ServeHTTP(wAct, reqAct)
@@ -119,7 +119,7 @@ func TestProvisioningEndToEndFlow(t *testing.T) {
 	// assert.NotEmpty(t, actResp.DeviceID)
 
 	// 5. Verify Request Completed
-	reqList2 := httptest.NewRequest("GET", "/devices/provisioning", nil)
+	reqList2 := httptest.NewRequest("GET", "/dev/prov", nil)
 	wList2 := httptest.NewRecorder()
 	router.ServeHTTP(wList2, reqList2)
 
@@ -140,7 +140,7 @@ func TestProvisioningEndToEndFlow(t *testing.T) {
 		"device_type": "sensor",
 	}
 	regBytes2, _ := json.Marshal(regBody2)
-	reqReg2 := httptest.NewRequest("POST", "/devices/register", bytes.NewReader(regBytes2))
+	reqReg2 := httptest.NewRequest("POST", "/dev/register", bytes.NewReader(regBytes2))
 	reqReg2.Header.Set("Content-Type", "application/json")
 	wReg2 := httptest.NewRecorder()
 	router.ServeHTTP(wReg2, reqReg2)
@@ -158,7 +158,7 @@ func TestProvisioningEndToEndFlow(t *testing.T) {
 	assert.GreaterOrEqual(t, count, 1) // Should delete the completed request
 
 	// Verify it's gone
-	reqList3 := httptest.NewRequest("GET", "/devices/provisioning", nil)
+	reqList3 := httptest.NewRequest("GET", "/dev/prov", nil)
 	wList3 := httptest.NewRecorder()
 	router.ServeHTTP(wList3, reqList3)
 

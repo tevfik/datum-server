@@ -279,10 +279,10 @@ func getDataHistoryHandler(c *gin.Context) {
 
 // pushDataViaGetHandler allows constrained devices to push data via GET request
 // using query parameters instead of JSON body
-// Example: GET /devices/:device_id/push?temp=25.5&humidity=60&battery=85
+// Example: GET /dev/:device_id/push?temp=25.5&humidity=60&battery=85
 // pushDataViaGetHandler allows constrained devices to push data via GET request
 // using query parameters instead of JSON body
-// Example: GET /devices/:device_id/push?temp=25.5&humidity=60&battery=85
+// Example: GET /dev/:device_id/push?temp=25.5&humidity=60&battery=85
 func pushDataViaGetHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 	apiKey, exists := c.Get("api_key")

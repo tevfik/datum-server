@@ -66,12 +66,12 @@ func TestAuthHook_OnACLCheck(t *testing.T) {
 		write    bool
 		want     bool
 	}{
-		{"Write Own Data", "dev-1", "data/dev-1", true, true},
-		{"Write Other Data", "dev-1", "data/dev-2", true, false},
-		{"Read Own Cmd", "dev-1", "cmd/dev-1", false, true},
-		{"Read Other Cmd", "dev-1", "cmd/dev-2", false, false},
-		{"Write Cmd (Denied)", "dev-1", "cmd/dev-1", true, false},   // Devices can't write to cmd
-		{"Read Data (Denied)", "dev-1", "data/dev-1", false, false}, // Devices can't read data (privacy?) or just not supported yet
+		{"Write Own Data", "dev-1", "dev/dev-1/data", true, true},
+		{"Write Other Data", "dev-1", "dev/dev-2/data", true, false},
+		{"Read Own Cmd", "dev-1", "dev/dev-1/cmd", false, true},
+		{"Read Other Cmd", "dev-1", "dev/dev-2/cmd", false, false},
+		{"Write Cmd (Denied)", "dev-1", "dev/dev-1/cmd", true, false},   // Devices can't write to cmd
+		{"Read Data (Denied)", "dev-1", "dev/dev-1/data", false, false}, // Devices can't read data (privacy?) or just not supported yet
 	}
 
 	for _, tt := range tests {
@@ -101,7 +101,7 @@ func TestIngestionHook_OnPublish(t *testing.T) {
 		Net: mqtt.ClientConnection{Remote: "192.168.1.50:12345"},
 	}
 	pk := packets.Packet{
-		TopicName: "data/dev-1",
+		TopicName: "dev/dev-1/data",
 		Payload:   payloadBytes,
 	}
 

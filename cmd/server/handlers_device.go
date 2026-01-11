@@ -113,7 +113,7 @@ func listDevicesHandler(c *gin.Context) {
 }
 
 // getDeviceHandler gets a single device by ID
-// GET /devices/:device_id
+// GET /dev/:device_id
 func getDeviceHandler(c *gin.Context) {
 	userID, _ := auth.GetUserID(c)
 	role, _ := auth.GetUserRole(c)
@@ -159,7 +159,7 @@ func getDeviceHandler(c *gin.Context) {
 }
 
 // deleteDeviceHandler deletes a device
-// DELETE /devices/:device_id
+// DELETE /dev/:device_id
 func deleteDeviceHandler(c *gin.Context) {
 	userID, _ := auth.GetUserID(c)
 	role, _ := auth.GetUserRole(c)

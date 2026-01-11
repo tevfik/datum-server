@@ -390,7 +390,7 @@ bool attemptSelfRegistration() {
   // 1. Register Device directly using Token
   DEBUG_PRINTLN("Attempting registration with token");
 
-  http.begin(serverURL + "/devices/register");
+  http.begin(serverURL + "/dev/register");
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", "Bearer " + userToken); // Use User Token
 
@@ -434,7 +434,7 @@ bool activateProvisioning() {
 
   // Call /provisioning/activate endpoint with Device UID
   // The server checks if there is a pending provisioning request for this UID
-  http.begin(serverURL + "/provisioning/activate");
+  http.begin(serverURL + "/prov/activate");
   http.addHeader("Content-Type", "application/json");
 
   // We send UID, Firmware Version, and Model
@@ -479,7 +479,7 @@ void checkCommands() {
     return;
 
   HTTPClient http;
-  http.begin(serverURL + "/devices/" + deviceID + "/commands/pending");
+  http.begin(serverURL + "/dev/" + deviceID + "/cmd/pending");
   http.addHeader("Authorization", "Bearer " + apiKey);
   if (http.GET() == 200) {
     String pl = http.getString();
@@ -652,7 +652,7 @@ void uploadFrame(camera_fb_t *fb) {
 
   // 2. Send HTTP Headers (Keep-Alive!)
   String head = "";
-  head += "POST /devices/" + deviceID + "/stream/frame HTTP/1.1\r\n";
+  head += "POST /dev/" + deviceID + "/stream/frame HTTP/1.1\r\n";
   head += "Host: datum.bezg.in\r\n";
   head += "Authorization: Bearer " + apiKey + "\r\n";
   head += "Content-Type: image/jpeg\r\n";

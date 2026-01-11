@@ -69,7 +69,7 @@ func TestSystemSetup(t *testing.T) {
 
 	// Use new handler
 	h := handlers.NewAdminHandler(testStore, nil)
-	r.POST("/system/setup", h.SetupSystemHandler)
+	r.POST("/sys/setup", h.SetupSystemHandler)
 
 	setupData := map[string]interface{}{
 		"platform_name":  "Test Platform",
@@ -80,7 +80,7 @@ func TestSystemSetup(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(setupData)
-	req, _ := http.NewRequest("POST", "/system/setup", bytes.NewBuffer(body))
+	req, _ := http.NewRequest("POST", "/sys/setup", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -105,7 +105,7 @@ func TestSystemSetupAlreadyInitialized(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(setupData)
-	req, _ := http.NewRequest("POST", "/system/setup", bytes.NewBuffer(body))
+	req, _ := http.NewRequest("POST", "/sys/setup", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -121,7 +121,7 @@ func TestSystemSetupAlreadyInitialized(t *testing.T) {
 func TestGetSystemStatus(t *testing.T) {
 	r, testStore, _ := setupTestEnvironment(t)
 
-	req, _ := http.NewRequest("GET", "/system/status", nil)
+	req, _ := http.NewRequest("GET", "/sys/status", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -148,7 +148,7 @@ func TestProvisionDevice(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(deviceData)
-	req, _ := http.NewRequest("POST", "/admin/devices", bytes.NewBuffer(body))
+	req, _ := http.NewRequest("POST", "/admin/dev", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
@@ -178,7 +178,7 @@ func TestProvisionDeviceWithCustomID(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(deviceData)
-	req, _ := http.NewRequest("POST", "/admin/devices", bytes.NewBuffer(body))
+	req, _ := http.NewRequest("POST", "/admin/dev", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
@@ -206,7 +206,7 @@ func TestProvisionDeviceDuplicateID(t *testing.T) {
 
 	// Create first device
 	body, _ := json.Marshal(deviceData)
-	req, _ := http.NewRequest("POST", "/admin/devices", bytes.NewBuffer(body))
+	req, _ := http.NewRequest("POST", "/admin/dev", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
@@ -214,7 +214,7 @@ func TestProvisionDeviceDuplicateID(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code)
 
 	// Try to create duplicate
-	req, _ = http.NewRequest("POST", "/admin/devices", bytes.NewBuffer(body))
+	req, _ = http.NewRequest("POST", "/admin/dev", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 	w = httptest.NewRecorder()
@@ -242,7 +242,7 @@ func TestListAllDevices(t *testing.T) {
 
 	for _, deviceData := range devices {
 		body, _ := json.Marshal(deviceData)
-		req, _ := http.NewRequest("POST", "/admin/devices", bytes.NewBuffer(body))
+		req, _ := http.NewRequest("POST", "/admin/dev", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
@@ -251,7 +251,7 @@ func TestListAllDevices(t *testing.T) {
 	}
 
 	// List devices
-	req, _ := http.NewRequest("GET", "/admin/devices", nil)
+	req, _ := http.NewRequest("GET", "/admin/dev", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -448,7 +448,7 @@ func TestDatabaseResetInvalidConfirmation(t *testing.T) {
 func TestUnauthorizedAccess(t *testing.T) {
 	r, testStore, _ := setupTestEnvironment(t)
 
-	req, _ := http.NewRequest("GET", "/admin/devices", nil)
+	req, _ := http.NewRequest("GET", "/admin/dev", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -461,7 +461,7 @@ func TestUnauthorizedAccess(t *testing.T) {
 func TestInvalidToken(t *testing.T) {
 	r, testStore, _ := setupTestEnvironment(t)
 
-	req, _ := http.NewRequest("GET", "/admin/devices", nil)
+	req, _ := http.NewRequest("GET", "/admin/dev", nil)
 	req.Header.Set("Authorization", "Bearer invalid-token-123")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)

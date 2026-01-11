@@ -116,8 +116,7 @@ void ackCommand(String cmdId) {
   if (deviceID.length() == 0 || apiKey.length() == 0)
     return;
   HTTPClient http;
-  http.begin(serverURL + "/devices/" + deviceID + "/commands/" + cmdId +
-             "/ack");
+  http.begin(serverURL + "/dev/" + deviceID + "/cmd/" + cmdId + "/ack");
   http.addHeader("Authorization", "Bearer " + apiKey);
   http.addHeader("Content-Type", "application/json");
   http.POST("{\"status\":\"executed\"}");
@@ -430,7 +429,7 @@ bool reconnectMQTT() {
     Serial.println("[MQTT] Connected");
 
     // Subscribe to cmd/{id}
-    String topic = "cmd/" + deviceID;
+    String topic = "dev/" + deviceID + "/cmd";
     mqttClient.subscribe(topic.c_str());
     Serial.println("[MQTT] Subscribed to " + topic);
 
@@ -545,7 +544,7 @@ void reportTelemetry(bool isBoot, bool isConnect) {
   json += ",\"public_ip\":\"" + pubIP + "\"";
   json += "}";
 
-  String topic = "data/" + deviceID;
+  String topic = "dev/" + deviceID + "/data";
   // Ensure topic is clean
   topic.trim();
 

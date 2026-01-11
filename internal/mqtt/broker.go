@@ -83,7 +83,7 @@ func (b *Broker) Stop() {
 
 // PublishCommand sends a command payload to a specific device
 func (b *Broker) PublishCommand(deviceID string, payload []byte) error {
-	topic := fmt.Sprintf("cmd/%s", deviceID)
+	topic := fmt.Sprintf("dev/%s/cmd", deviceID)
 	return b.server.Publish(topic, payload, false, 0)
 }
 
@@ -237,7 +237,16 @@ func (h *AuthHook) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
 			// Check if topic targets a specific device
 			topicParts := strings.Split(topic, "/")
 			if len(topicParts) >= 2 {
+				// Format: dev/{deviceID}/...
 				targetDeviceID := topicParts[1]
+				// If old format data/{deviceID} or cmd/{deviceID}, handle that too for safety
+				// But we are moving to dev/{deviceID}
+				if topicParts[0] != "dev" {
+					// Backward compatibility or rejection?
+					// Let's assume strict new format for now as requested
+					// Check targetID is the second part
+					targetDeviceID = topicParts[1]
+				}
 
 				// Verify ownership
 				// Optimization: GetUserDevices is fast (in-memory BuntDB)
@@ -261,12 +270,19 @@ func (h *AuthHook) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
 
 	// Split topic
 	parts := strings.Split(topic, "/")
-	if len(parts) < 2 {
+	// Expected format: dev/{deviceID}/{action}
+	if len(parts) < 3 {
 		return false
 	}
 
 	prefix := parts[0]
 	targetID := parts[1]
+	suffix := parts[2]
+
+	// Must start with dev
+	if prefix != "dev" {
+		return false
+	}
 
 	// Must match own ID
 	if targetID != deviceID {
@@ -274,11 +290,11 @@ func (h *AuthHook) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
 	}
 
 	if write {
-		// Can only write to data/{id}
-		return prefix == "data"
+		// Can only write to dev/{id}/data
+		return suffix == "data"
 	} else {
-		// Can only read from cmd/{id}
-		return prefix == "cmd"
+		// Can only read from dev/{id}/cmd or dev/{id}/fw
+		return suffix == "cmd" || suffix == "fw"
 	}
 }
 
@@ -306,26 +322,25 @@ func (h *IngestionHook) Provides(b byte) bool {
 }
 
 func (h *IngestionHook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets.Packet, error) {
-	// Intercept "data/+" messages
+	// Intercept "dev/+/data" messages
 	topic := pk.TopicName
-	if strings.HasPrefix(topic, "data/") {
-		parts := strings.Split(topic, "/")
-		if len(parts) >= 2 {
-			deviceID := parts[1]
+	// Check if it matches dev/{id}/data pattern
+	parts := strings.Split(topic, "/")
+	if len(parts) == 3 && parts[0] == "dev" && parts[2] == "data" {
+		deviceID := parts[1]
 
-			// Parse JSON payload
-			var data map[string]interface{}
-			if err := json.Unmarshal(pk.Payload, &data); err == nil {
-				// Add public_ip if client connection is available
-				if cl.Net.Remote != "" {
-					host, _, _ := net.SplitHostPort(cl.Net.Remote)
-					data["public_ip"] = host
-				}
-
-				// Process data
-				// Send to processor (storage)
-				h.processor.Process(deviceID, data)
+		// Parse JSON payload
+		var data map[string]interface{}
+		if err := json.Unmarshal(pk.Payload, &data); err == nil {
+			// Add public_ip if client connection is available
+			if cl.Net.Remote != "" {
+				host, _, _ := net.SplitHostPort(cl.Net.Remote)
+				data["public_ip"] = host
 			}
+
+			// Process data
+			// Send to processor (storage)
+			h.processor.Process(deviceID, data)
 		}
 	}
 

@@ -54,7 +54,7 @@ func runUpdateDevice(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no updates specified. Use --name, --type, or --status")
 	}
 
-	resp, err := client.Put("/admin/devices/"+deviceID, updates)
+	resp, err := client.Put("/admin/dev/"+deviceID, updates)
 	if err != nil {
 		return err
 	}

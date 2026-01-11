@@ -162,7 +162,7 @@ func runCommandSend(cmd *cobra.Command, args []string) error {
 	}
 
 	client := NewAPIClient(serverURL, token, apiKey)
-	resp, err := client.Post(fmt.Sprintf("/devices/%s/commands", deviceID), requestBody)
+	resp, err := client.Post(fmt.Sprintf("/dev/%s/cmd", deviceID), requestBody)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func runCommandSend(cmd *cobra.Command, args []string) error {
 		for i := 0; i < 30; i++ {
 			time.Sleep(1 * time.Second)
 
-			statusResp, err := client.Get(fmt.Sprintf("/devices/%s/commands/%s", deviceID, commandID))
+			statusResp, err := client.Get(fmt.Sprintf("/dev/%s/cmd/%s", deviceID, commandID))
 			if err != nil {
 				continue
 			}
@@ -227,7 +227,7 @@ func runCommandList(cmd *cobra.Command, args []string) error {
 	deviceID := args[0]
 
 	client := NewAPIClient(serverURL, token, apiKey)
-	resp, err := client.Get(fmt.Sprintf("/devices/%s/commands", deviceID))
+	resp, err := client.Get(fmt.Sprintf("/dev/%s/cmd", deviceID))
 	if err != nil {
 		return err
 	}
@@ -307,7 +307,7 @@ func runCommandGet(cmd *cobra.Command, args []string) error {
 	commandID := args[1]
 
 	client := NewAPIClient(serverURL, token, apiKey)
-	resp, err := client.Get(fmt.Sprintf("/devices/%s/commands/%s", deviceID, commandID))
+	resp, err := client.Get(fmt.Sprintf("/dev/%s/cmd/%s", deviceID, commandID))
 	if err != nil {
 		return err
 	}
@@ -382,7 +382,7 @@ func runCommandHistory(cmd *cobra.Command, args []string) error {
 	}
 
 	client := NewAPIClient(serverURL, token, apiKey)
-	resp, err := client.Get(fmt.Sprintf("/devices/%s/commands%s", deviceID, queryParams))
+	resp, err := client.Get(fmt.Sprintf("/dev/%s/cmd%s", deviceID, queryParams))
 	if err != nil {
 		return err
 	}
@@ -476,7 +476,7 @@ func runCommandCancel(cmd *cobra.Command, args []string) error {
 	commandID := args[1]
 
 	client := NewAPIClient(serverURL, token, apiKey)
-	resp, err := client.Delete(fmt.Sprintf("/devices/%s/commands/%s", deviceID, commandID), nil)
+	resp, err := client.Delete(fmt.Sprintf("/dev/%s/cmd/%s", deviceID, commandID), nil)
 	if err != nil {
 		return err
 	}

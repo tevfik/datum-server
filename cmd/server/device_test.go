@@ -112,7 +112,7 @@ func TestPublicDataEndpoint(t *testing.T) {
 	testStore.InitializeSystem("Test", false, 7)
 
 	r := gin.New()
-	r.POST("/public/data/:device_id", postPublicDataHandler)
+	r.POST("/pub/data/:device_id", postPublicDataHandler)
 
 	dataPayload := map[string]interface{}{
 		"temperature": 25.5,
@@ -120,7 +120,7 @@ func TestPublicDataEndpoint(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(dataPayload)
-	req, _ := http.NewRequest("POST", "/public/data/test-device", bytes.NewBuffer(body))
+	req, _ := http.NewRequest("POST", "/pub/data/test-device", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -214,7 +214,7 @@ func TestDeleteDevice(t *testing.T) {
 	h := handlers.NewAdminHandler(testStore, nil)
 	h.RegisterRoutes(r)
 
-	req, _ := http.NewRequest("DELETE", "/admin/devices/device-to-delete", nil)
+	req, _ := http.NewRequest("DELETE", "/admin/dev/device-to-delete", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -261,7 +261,7 @@ func TestGetDevice(t *testing.T) {
 	h := handlers.NewAdminHandler(testStore, nil)
 	h.RegisterRoutes(r)
 
-	req, _ := http.NewRequest("GET", "/admin/devices/device-123", nil)
+	req, _ := http.NewRequest("GET", "/admin/dev/device-123", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -314,7 +314,7 @@ func TestUpdateDevice(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(updateData)
-	req, _ := http.NewRequest("PUT", "/admin/devices/device-update", bytes.NewBuffer(body))
+	req, _ := http.NewRequest("PUT", "/admin/dev/device-update", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
@@ -393,7 +393,7 @@ func TestInvalidDeviceID(t *testing.T) {
 	h := handlers.NewAdminHandler(testStore, nil)
 	h.RegisterRoutes(r)
 
-	req, _ := http.NewRequest("GET", "/admin/devices/non-existent-device", nil)
+	req, _ := http.NewRequest("GET", "/admin/dev/non-existent-device", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -411,7 +411,7 @@ func TestRateLimitingOnPublicEndpoint(t *testing.T) {
 
 	r := gin.New()
 	r.Use(auth.RateLimitMiddleware())
-	r.POST("/public/data/:device_id", postPublicDataHandler)
+	r.POST("/pub/data/:device_id", postPublicDataHandler)
 
 	dataPayload := map[string]interface{}{
 		"value": 123,
@@ -421,7 +421,7 @@ func TestRateLimitingOnPublicEndpoint(t *testing.T) {
 	successCount := 0
 	for i := 0; i < 150; i++ { // Try to exceed rate limit
 		body, _ := json.Marshal(dataPayload)
-		req, _ := http.NewRequest("POST", "/public/data/test", bytes.NewBuffer(body))
+		req, _ := http.NewRequest("POST", "/pub/data/test", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.RemoteAddr = "127.0.0.1:12345" // Consistent IP
 		w := httptest.NewRecorder()

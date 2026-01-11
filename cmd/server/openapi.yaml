@@ -351,7 +351,7 @@ paths:
         '200':
           description: API information
 
-  /system/time:
+  /sys/time:
     get:
       summary: Get system time
       description: Returns current server time in Unix and ISO8601 formats. Useful for Christian's Algorithm time sync.
@@ -381,7 +381,7 @@ paths:
                     format: date-time
 
 
-  /system/status:
+  /sys/status:
     get:
       summary: Get system status
       tags: [System]
@@ -396,7 +396,7 @@ paths:
                   initialized:
                     type: boolean
 
-  /system/setup:
+  /sys/setup:
     post:
       summary: Initialize system
       tags: [System]
@@ -596,7 +596,7 @@ paths:
         '200':
           description: Account deleted
 
-  /devices/firmware/{filename}:
+  /dev/fw/{filename}:
     get:
       summary: Download Firmware (Secured)
       tags: [Devices]
@@ -624,7 +624,7 @@ paths:
                 format: binary
 
 
-  /devices:
+  /dev:
     post:
       summary: Create device
       tags: [Devices]
@@ -652,7 +652,7 @@ paths:
         '200':
           description: List of devices
 
-  /devices/register:
+  /dev/register:
     post:
       summary: Register device (Mobile App)
       tags: [Provisioning]
@@ -672,7 +672,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/RegisterDeviceResponse'
 
-  /devices/check-uid/{uid}:
+  /dev/check-uid/{uid}:
     get:
       summary: Check if device UID is registered
       tags: [Provisioning]
@@ -692,7 +692,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CheckUIDResponse'
 
-  /devices/provisioning:
+  /dev/prov:
     get:
       summary: List user provisioning requests
       tags: [Provisioning]
@@ -702,7 +702,7 @@ paths:
         '200':
           description: List of requests
 
-  /devices/provisioning/{request_id}:
+  /dev/prov/{request_id}:
     get:
       summary: Get provisioning request status
       tags: [Provisioning]
@@ -732,7 +732,7 @@ paths:
         '200':
           description: Cancelled
 
-  /provisioning/activate:
+  /prov/activate:
     post:
       summary: Activate device (Device side)
       tags: [Provisioning]
@@ -750,7 +750,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DeviceActivateResponse'
 
-  /provisioning/check/{uid}:
+  /prov/check/{uid}:
     get:
       summary: Check provisioning status (Device side)
       tags: [Provisioning]
@@ -764,7 +764,7 @@ paths:
         '200':
           description: Status check
 
-  /devices/{device_id}:
+  /dev/{device_id}:
     delete:
       summary: Delete device
       tags: [Devices]
@@ -780,7 +780,7 @@ paths:
         '204':
           description: Device deleted
 
-  /devices/{device_id}/commands:
+  /dev/{device_id}/cmd:
     post:
       summary: Send command to device
       tags: [Commands]
@@ -802,7 +802,7 @@ paths:
         '201':
           description: Command queued
 
-  /devices/{device_id}/commands/pending:
+  /dev/{device_id}/cmd/pending:
     get:
       summary: Poll for commands (device)
       tags: [Commands]
@@ -818,7 +818,7 @@ paths:
         '200':
           description: Pending commands
 
-  /devices/{device_id}/commands/poll:
+  /dev/{device_id}/cmd/poll:
     get:
       summary: Long poll for commands
       tags: [Commands]
@@ -841,7 +841,7 @@ paths:
         '200':
           description: Commands or timeout
 
-  /devices/{device_id}/commands/{command_id}/ack:
+  /dev/{device_id}/cmd/{command_id}/ack:
     post:
       summary: Acknowledge command execution
       tags: [Commands]
@@ -862,7 +862,7 @@ paths:
         '200':
           description: Command acknowledged
 
-  /devices/{device_id}/push:
+  /dev/{device_id}/push:
     get:
       summary: Push data via GET (for constrained devices)
       description: |
@@ -916,7 +916,7 @@ paths:
                   commands_pending:
                     type: integer
 
-  /devices/{device_id}/stream/frame:
+  /dev/{device_id}/stream/frame:
     post:
       summary: Upload video frame
       tags: [Streaming]
@@ -938,7 +938,7 @@ paths:
         '200':
           description: Frame processed
 
-  /devices/{device_id}/stream/mjpeg:
+  /dev/{device_id}/stream/mjpeg:
     get:
       summary: MJPEG Stream
       tags: [Streaming]
@@ -954,7 +954,7 @@ paths:
         '200':
           description: MJPEG Stream
 
-  /devices/{device_id}/stream/snapshot:
+  /dev/{device_id}/stream/snapshot:
     get:
       summary: Get current frame snapshot
       tags: [Streaming]
@@ -975,7 +975,7 @@ paths:
                 type: string
                 format: binary
 
-  /devices/{device_id}/stream/ws:
+  /dev/{device_id}/stream/ws:
     get:
       summary: WebSocket Stream
       tags: [Streaming]
@@ -991,7 +991,7 @@ paths:
         '101':
           description: WebSocket upgrade
 
-  /devices/{device_id}/stream/info:
+  /dev/{device_id}/stream/info:
     get:
       summary: Stream Metadata
       tags: [Streaming]
@@ -1019,7 +1019,7 @@ paths:
                     type: integer
                   height:
                     type: integer
-  /data/{device_id}:
+  /dev/{device_id}/data:
     post:
       summary: Send data (device)
       tags: [Data]
@@ -1055,7 +1055,7 @@ paths:
         '200':
           description: Latest data point
 
-  /data/{device_id}/history:
+  /dev/{device_id}/rec:
     get:
       summary: Get data history with time range filtering
       description: |
@@ -1171,7 +1171,7 @@ paths:
 
 
 
-  /public/data/{device_id}:
+  /pub/{device_id}:
     post:
       summary: Send public data (no auth)
       tags: [Public]
@@ -1203,7 +1203,7 @@ paths:
         '200':
           description: Latest data
 
-  /public/data/{device_id}/history:
+  /pub/{device_id}/rec:
     get:
       summary: Get public history with time range filtering (no auth)
       description: |
@@ -1247,7 +1247,7 @@ paths:
         '200':
           description: Historical data points
 
-  /devices/{device_id}/commands/stream:
+  /dev/{device_id}/cmd/stream:
     get:
       summary: SSE stream for real-time commands
       description: |
@@ -1376,7 +1376,7 @@ paths:
         '200':
           description: User deleted
 
-  /admin/devices:
+  /admin/dev:
     post:
       summary: Provision device manually (admin)
       tags: [Admin]
@@ -1404,7 +1404,7 @@ paths:
         '200':
           description: List of all platform devices
 
-  /admin/devices/{device_id}:
+  /admin/dev/{device_id}:
     get:
       summary: Get device details (including API key)
       tags: [Admin]
@@ -1457,7 +1457,7 @@ paths:
         '200':
           description: Device deleted
 
-  /admin/devices/{device_id}/rotate-key:
+  /admin/dev/{device_id}/rotate-key:
     post:
       summary: Rotate device API key
       tags: [Admin]
@@ -1482,7 +1482,7 @@ paths:
                   api_key:
                     type: string
 
-  /admin/devices/{device_id}/revoke-key:
+  /admin/dev/{device_id}/revoke-key:
     post:
       summary: Revoke device API key
       tags: [Admin]

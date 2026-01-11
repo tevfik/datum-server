@@ -56,7 +56,7 @@ func TestSendCommandHandler(t *testing.T) {
 	router, cleanup := setupCommandTestServer(t)
 	defer cleanup()
 
-	router.POST("/devices/:device_id/commands", func(c *gin.Context) {
+	router.POST("/dev/:device_id/commands", func(c *gin.Context) {
 		c.Set("user_id", "cmd-user-001")
 		sendCommandHandler(c)
 	})
@@ -69,7 +69,7 @@ func TestSendCommandHandler(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/devices/cmd-device-001/commands", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/dev/cmd-device-001/commands", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -86,7 +86,7 @@ func TestSendCommandHandlerDeviceNotFound(t *testing.T) {
 	router, cleanup := setupCommandTestServer(t)
 	defer cleanup()
 
-	router.POST("/devices/:device_id/commands", func(c *gin.Context) {
+	router.POST("/dev/:device_id/commands", func(c *gin.Context) {
 		c.Set("user_id", "cmd-user-001")
 		sendCommandHandler(c)
 	})
@@ -96,7 +96,7 @@ func TestSendCommandHandlerDeviceNotFound(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/devices/nonexistent/commands", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/dev/nonexistent/commands", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -108,7 +108,7 @@ func TestSendCommandHandlerAccessDenied(t *testing.T) {
 	router, cleanup := setupCommandTestServer(t)
 	defer cleanup()
 
-	router.POST("/devices/:device_id/commands", func(c *gin.Context) {
+	router.POST("/dev/:device_id/commands", func(c *gin.Context) {
 		c.Set("user_id", "different-user")
 		sendCommandHandler(c)
 	})
@@ -118,7 +118,7 @@ func TestSendCommandHandlerAccessDenied(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/devices/cmd-device-001/commands", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/dev/cmd-device-001/commands", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -130,12 +130,12 @@ func TestSendCommandHandlerInvalidJSON(t *testing.T) {
 	router, cleanup := setupCommandTestServer(t)
 	defer cleanup()
 
-	router.POST("/devices/:device_id/commands", func(c *gin.Context) {
+	router.POST("/dev/:device_id/commands", func(c *gin.Context) {
 		c.Set("user_id", "cmd-user-001")
 		sendCommandHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/devices/cmd-device-001/commands", bytes.NewReader([]byte("{invalid")))
+	req := httptest.NewRequest(http.MethodPost, "/dev/cmd-device-001/commands", bytes.NewReader([]byte("{invalid")))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -157,12 +157,12 @@ func TestListCommandsHandler(t *testing.T) {
 	}
 	store.CreateCommand(cmd)
 
-	router.GET("/devices/:device_id/commands", func(c *gin.Context) {
+	router.GET("/dev/:device_id/commands", func(c *gin.Context) {
 		c.Set("user_id", "cmd-user-001")
 		listCommandsHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/cmd-device-001/commands", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/cmd-device-001/commands", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -177,12 +177,12 @@ func TestListCommandsHandlerAccessDenied(t *testing.T) {
 	router, cleanup := setupCommandTestServer(t)
 	defer cleanup()
 
-	router.GET("/devices/:device_id/commands", func(c *gin.Context) {
+	router.GET("/dev/:device_id/commands", func(c *gin.Context) {
 		c.Set("user_id", "different-user")
 		listCommandsHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/cmd-device-001/commands", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/cmd-device-001/commands", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -204,12 +204,12 @@ func TestPollCommandsHandler(t *testing.T) {
 	}
 	store.CreateCommand(cmd)
 
-	router.GET("/devices/:device_id/commands/poll", func(c *gin.Context) {
+	router.GET("/dev/:device_id/commands/poll", func(c *gin.Context) {
 		c.Set("api_key", "sk_cmd_test_key")
 		pollCommandsHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/cmd-device-001/commands/poll", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/cmd-device-001/commands/poll", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -227,12 +227,12 @@ func TestPollCommandsHandlerUnauthorized(t *testing.T) {
 	router, cleanup := setupCommandTestServer(t)
 	defer cleanup()
 
-	router.GET("/devices/:device_id/commands/poll", func(c *gin.Context) {
+	router.GET("/dev/:device_id/commands/poll", func(c *gin.Context) {
 		c.Set("api_key", "invalid_key")
 		pollCommandsHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/devices/cmd-device-001/commands/poll", nil)
+	req := httptest.NewRequest(http.MethodGet, "/dev/cmd-device-001/commands/poll", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -253,7 +253,7 @@ func TestAckCommandHandler(t *testing.T) {
 	}
 	store.CreateCommand(cmd)
 
-	router.POST("/devices/:device_id/commands/:command_id/ack", func(c *gin.Context) {
+	router.POST("/dev/:device_id/commands/:command_id/ack", func(c *gin.Context) {
 		c.Set("api_key", "sk_cmd_test_key")
 		ackCommandHandler(c)
 	})
@@ -266,7 +266,7 @@ func TestAckCommandHandler(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/devices/cmd-device-001/commands/cmd_ack_001/ack", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/dev/cmd-device-001/commands/cmd_ack_001/ack", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -278,7 +278,7 @@ func TestAckCommandHandlerUnauthorized(t *testing.T) {
 	router, cleanup := setupCommandTestServer(t)
 	defer cleanup()
 
-	router.POST("/devices/:device_id/commands/:command_id/ack", func(c *gin.Context) {
+	router.POST("/dev/:device_id/commands/:command_id/ack", func(c *gin.Context) {
 		c.Set("api_key", "invalid_key")
 		ackCommandHandler(c)
 	})
@@ -288,7 +288,7 @@ func TestAckCommandHandlerUnauthorized(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/devices/cmd-device-001/commands/cmd_001/ack", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/dev/cmd-device-001/commands/cmd_001/ack", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -300,12 +300,12 @@ func TestAckCommandHandlerInvalidJSON(t *testing.T) {
 	router, cleanup := setupCommandTestServer(t)
 	defer cleanup()
 
-	router.POST("/devices/:device_id/commands/:command_id/ack", func(c *gin.Context) {
+	router.POST("/dev/:device_id/commands/:command_id/ack", func(c *gin.Context) {
 		c.Set("api_key", "sk_cmd_test_key")
 		ackCommandHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/devices/cmd-device-001/commands/cmd_001/ack", bytes.NewReader([]byte("{invalid")))
+	req := httptest.NewRequest(http.MethodPost, "/dev/cmd-device-001/commands/cmd_001/ack", bytes.NewReader([]byte("{invalid")))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -317,12 +317,12 @@ func TestDeleteDeviceHandler(t *testing.T) {
 	router, cleanup := setupCommandTestServer(t)
 	defer cleanup()
 
-	router.DELETE("/devices/:device_id", func(c *gin.Context) {
+	router.DELETE("/dev/:device_id", func(c *gin.Context) {
 		c.Set("user_id", "cmd-user-001")
 		deleteDeviceHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodDelete, "/devices/cmd-device-001", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/dev/cmd-device-001", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -333,12 +333,12 @@ func TestDeleteDeviceHandlerNotFound(t *testing.T) {
 	router, cleanup := setupCommandTestServer(t)
 	defer cleanup()
 
-	router.DELETE("/devices/:device_id", func(c *gin.Context) {
+	router.DELETE("/dev/:device_id", func(c *gin.Context) {
 		c.Set("user_id", "cmd-user-001")
 		deleteDeviceHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodDelete, "/devices/nonexistent", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/dev/nonexistent", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -349,12 +349,12 @@ func TestDeleteDeviceHandlerAccessDenied(t *testing.T) {
 	router, cleanup := setupCommandTestServer(t)
 	defer cleanup()
 
-	router.DELETE("/devices/:device_id", func(c *gin.Context) {
+	router.DELETE("/dev/:device_id", func(c *gin.Context) {
 		c.Set("user_id", "different-user")
 		deleteDeviceHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodDelete, "/devices/cmd-device-001", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/dev/cmd-device-001", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

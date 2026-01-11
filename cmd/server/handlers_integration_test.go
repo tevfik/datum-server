@@ -168,7 +168,7 @@ func TestSetupSystemHandlerMissingPlatformName(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/system/setup", h.SetupSystemHandler)
+	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
 		"admin_email":    "admin@test.com",
@@ -176,7 +176,7 @@ func TestSetupSystemHandlerMissingPlatformName(t *testing.T) {
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/system/setup", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPost, "/sys/setup", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -190,9 +190,9 @@ func TestSetupSystemHandlerInvalidJSON(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/system/setup", h.SetupSystemHandler)
+	router.POST("/sys/setup", h.SetupSystemHandler)
 
-	req := httptest.NewRequest(http.MethodPost, "/system/setup", bytes.NewBuffer([]byte("invalid")))
+	req := httptest.NewRequest(http.MethodPost, "/sys/setup", bytes.NewBuffer([]byte("invalid")))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -425,9 +425,9 @@ func TestForceDeleteDeviceHandlerNotFound(t *testing.T) {
 	store.InitializeSystem("Test", true, 7)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.DELETE("/admin/devices/:device_id/force", h.ForceDeleteDeviceHandler)
+	router.DELETE("/admin/dev/:device_id/force", h.ForceDeleteDeviceHandler)
 
-	req := httptest.NewRequest(http.MethodDelete, "/admin/devices/nonexistent/force", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/admin/dev/nonexistent/force", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

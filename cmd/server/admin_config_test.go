@@ -43,9 +43,9 @@ func TestGetSystemConfigHandler(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.GET("/admin/system/config", h.GetSystemConfigHandler)
+	router.GET("/admin/sys/config", h.GetSystemConfigHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/system/config", nil)
+	req := httptest.NewRequest(http.MethodGet, "/admin/sys/config", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -63,7 +63,7 @@ func TestUpdateRetentionPolicyHandler(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.PUT("/admin/system/retention", h.UpdateRetentionPolicyHandler)
+	router.PUT("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
 	body := map[string]interface{}{
 		"days":                 30,
@@ -71,7 +71,7 @@ func TestUpdateRetentionPolicyHandler(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/system/retention", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPut, "/admin/sys/retention", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -89,7 +89,7 @@ func TestUpdateRetentionPolicyHandlerInvalidDays(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.PUT("/admin/system/retention", h.UpdateRetentionPolicyHandler)
+	router.PUT("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
 	body := map[string]interface{}{
 		"days":                 0, // Invalid: less than min
@@ -97,7 +97,7 @@ func TestUpdateRetentionPolicyHandlerInvalidDays(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/system/retention", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPut, "/admin/sys/retention", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -110,7 +110,7 @@ func TestUpdateRetentionPolicyHandlerInvalidInterval(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.PUT("/admin/system/retention", h.UpdateRetentionPolicyHandler)
+	router.PUT("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
 	body := map[string]interface{}{
 		"days":                 30,
@@ -118,7 +118,7 @@ func TestUpdateRetentionPolicyHandlerInvalidInterval(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/system/retention", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPut, "/admin/sys/retention", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -131,7 +131,7 @@ func TestUpdateRateLimitHandler(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.PUT("/admin/system/ratelimit", h.UpdateRateLimitHandler)
+	router.PUT("/admin/sys/ratelimit", h.UpdateRateLimitHandler)
 
 	body := map[string]interface{}{
 		"max_requests":   200,
@@ -139,7 +139,7 @@ func TestUpdateRateLimitHandler(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/system/ratelimit", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPut, "/admin/sys/ratelimit", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -157,7 +157,7 @@ func TestUpdateRateLimitHandlerInvalidRequests(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.PUT("/admin/system/ratelimit", h.UpdateRateLimitHandler)
+	router.PUT("/admin/sys/ratelimit", h.UpdateRateLimitHandler)
 
 	body := map[string]interface{}{
 		"max_requests":   5, // Invalid: less than min
@@ -165,7 +165,7 @@ func TestUpdateRateLimitHandlerInvalidRequests(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/system/ratelimit", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPut, "/admin/sys/ratelimit", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -178,7 +178,7 @@ func TestUpdateAlertConfigHandler(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.PUT("/admin/system/alerts", h.UpdateAlertConfigHandler)
+	router.PUT("/admin/sys/alerts", h.UpdateAlertConfigHandler)
 
 	body := map[string]interface{}{
 		"email_enabled":    true,
@@ -187,7 +187,7 @@ func TestUpdateAlertConfigHandler(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/system/alerts", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPut, "/admin/sys/alerts", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -205,7 +205,7 @@ func TestUpdateAlertConfigHandlerInvalidThreshold(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.PUT("/admin/system/alerts", h.UpdateAlertConfigHandler)
+	router.PUT("/admin/sys/alerts", h.UpdateAlertConfigHandler)
 
 	body := map[string]interface{}{
 		"email_enabled":    true,
@@ -214,7 +214,7 @@ func TestUpdateAlertConfigHandlerInvalidThreshold(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/system/alerts", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPut, "/admin/sys/alerts", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -281,7 +281,7 @@ func TestSetupSystemHandler(t *testing.T) {
 	store.ResetSystem()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/system/setup", h.SetupSystemHandler)
+	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	body := map[string]interface{}{
 		"platform_name":  "Test Platform",
@@ -292,7 +292,7 @@ func TestSetupSystemHandler(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/system/setup", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/sys/setup", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -311,7 +311,7 @@ func TestSetupSystemHandlerAlreadyInitialized(t *testing.T) {
 
 	// System is already initialized in setup
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/system/setup", h.SetupSystemHandler)
+	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	body := map[string]interface{}{
 		"email":    "admin@test.com",
@@ -319,7 +319,7 @@ func TestSetupSystemHandlerAlreadyInitialized(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/system/setup", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/sys/setup", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -458,9 +458,9 @@ func TestGetSystemStatusHandler(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.GET("/api/system/status", h.GetSystemStatusHandler)
+	router.GET("/api/sys/status", h.GetSystemStatusHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/system/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sys/status", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -483,9 +483,9 @@ func TestGetSystemStatusHandlerNotInitialized(t *testing.T) {
 
 	router := gin.New()
 	h := handlers.NewAdminHandler(store, nil)
-	router.GET("/api/system/status", h.GetSystemStatusHandler)
+	router.GET("/api/sys/status", h.GetSystemStatusHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/system/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sys/status", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -513,9 +513,9 @@ func TestGetDeviceAdminHandler(t *testing.T) {
 	store.CreateDevice(device)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.GET("/admin/devices/:device_id", h.GetDeviceAdminHandler)
+	router.GET("/admin/dev/:device_id", h.GetDeviceAdminHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/devices/admin-device-001", nil)
+	req := httptest.NewRequest(http.MethodGet, "/admin/dev/admin-device-001", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -533,9 +533,9 @@ func TestGetDeviceAdminHandlerNotFound(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.GET("/admin/devices/:device_id", h.GetDeviceAdminHandler)
+	router.GET("/admin/dev/:device_id", h.GetDeviceAdminHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/devices/nonexistent", nil)
+	req := httptest.NewRequest(http.MethodGet, "/admin/dev/nonexistent", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -558,14 +558,14 @@ func TestUpdateDeviceHandlerInvalidStatus(t *testing.T) {
 	store.CreateDevice(device)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.PATCH("/admin/devices/:device_id", h.UpdateDeviceHandler)
+	router.PATCH("/admin/dev/:device_id", h.UpdateDeviceHandler)
 
 	body := map[string]interface{}{
 		"status": "invalid_status",
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPatch, "/admin/devices/invalid-status-device", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPatch, "/admin/dev/invalid-status-device", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -644,9 +644,9 @@ func TestListAllDevicesHandler(t *testing.T) {
 	store.CreateDevice(device2)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.GET("/admin/devices", h.ListAllDevicesHandler)
+	router.GET("/admin/dev", h.ListAllDevicesHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/devices", nil)
+	req := httptest.NewRequest(http.MethodGet, "/admin/dev", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

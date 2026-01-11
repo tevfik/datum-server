@@ -382,14 +382,14 @@ func TestUpdateDeviceHandler(t *testing.T) {
 	store.CreateDevice(device)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.PUT("/admin/devices/:device_id", h.UpdateDeviceHandler)
+	router.PUT("/admin/dev/:device_id", h.UpdateDeviceHandler)
 
 	body := map[string]interface{}{
 		"status": "suspended",
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/devices/update-device-001", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPut, "/admin/dev/update-device-001", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -418,9 +418,9 @@ func TestForceDeleteDeviceHandler(t *testing.T) {
 	store.CreateDevice(device)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.DELETE("/admin/devices/:device_id/force", h.ForceDeleteDeviceHandler)
+	router.DELETE("/admin/dev/:device_id/force", h.ForceDeleteDeviceHandler)
 
-	req := httptest.NewRequest(http.MethodDelete, "/admin/devices/delete-device-001/force", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/admin/dev/delete-device-001/force", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

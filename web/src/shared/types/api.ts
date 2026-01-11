@@ -38,7 +38,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/system/time": {
+    "/sys/time": {
         parameters: {
             query?: never;
             header?: never;
@@ -95,7 +95,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/system/status": {
+    "/sys/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -133,7 +133,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/system/setup": {
+    "/sys/setup": {
         parameters: {
             query?: never;
             header?: never;
@@ -671,7 +671,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/firmware/{filename}": {
+    "/dev/fw/{filename}": {
         parameters: {
             query?: never;
             header?: never;
@@ -712,7 +712,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices": {
+    "/dev": {
         parameters: {
             query?: never;
             header?: never;
@@ -770,7 +770,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/register": {
+    "/dev/register": {
         parameters: {
             query?: never;
             header?: never;
@@ -810,7 +810,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/check-uid/{uid}": {
+    "/dev/check-uid/{uid}": {
         parameters: {
             query?: never;
             header?: never;
@@ -848,7 +848,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/provisioning": {
+    "/dev/prov": {
         parameters: {
             query?: never;
             header?: never;
@@ -882,7 +882,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/provisioning/{request_id}": {
+    "/dev/prov/{request_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -938,7 +938,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/provisioning/activate": {
+    "/prov/activate": {
         parameters: {
             query?: never;
             header?: never;
@@ -978,7 +978,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/provisioning/check/{uid}": {
+    "/prov/check/{uid}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1014,7 +1014,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/{device_id}": {
+    "/dev/{device_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1050,7 +1050,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/{device_id}/commands": {
+    "/dev/{device_id}/cmd": {
         parameters: {
             query?: never;
             header?: never;
@@ -1090,7 +1090,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/{device_id}/commands/pending": {
+    "/dev/{device_id}/cmd/pending": {
         parameters: {
             query?: never;
             header?: never;
@@ -1126,7 +1126,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/{device_id}/commands/poll": {
+    "/dev/{device_id}/cmd/poll": {
         parameters: {
             query?: never;
             header?: never;
@@ -1165,7 +1165,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/{device_id}/commands/{command_id}/ack": {
+    "/dev/{device_id}/cmd/{command_id}/ack": {
         parameters: {
             query?: never;
             header?: never;
@@ -1202,7 +1202,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/{device_id}/push": {
+    "/dev/{device_id}/push": {
         parameters: {
             query?: never;
             header?: never;
@@ -1262,7 +1262,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/{device_id}/stream/frame": {
+    "/dev/{device_id}/stream/frame": {
         parameters: {
             query?: never;
             header?: never;
@@ -1302,7 +1302,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/{device_id}/stream/mjpeg": {
+    "/dev/{device_id}/stream/mjpeg": {
         parameters: {
             query?: never;
             header?: never;
@@ -1338,7 +1338,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/{device_id}/stream/snapshot": {
+    "/dev/{device_id}/stream/snapshot": {
         parameters: {
             query?: never;
             header?: never;
@@ -1376,7 +1376,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/{device_id}/stream/ws": {
+    "/dev/{device_id}/stream/ws": {
         parameters: {
             query?: never;
             header?: never;
@@ -1412,7 +1412,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/{device_id}/stream/info": {
+    "/dev/{device_id}/stream/info": {
         parameters: {
             query?: never;
             header?: never;
@@ -1455,7 +1455,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/data/{device_id}": {
+    "/dev/{device_id}/data": {
         parameters: {
             query?: never;
             header?: never;
@@ -1515,7 +1515,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/data/{device_id}/history": {
+    "/dev/{device_id}/rec": {
         parameters: {
             query?: never;
             header?: never;
@@ -1592,7 +1592,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/public/data/{device_id}": {
+    "/pub/{device_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1652,7 +1652,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/public/data/{device_id}/history": {
+    "/pub/{device_id}/rec": {
         parameters: {
             query?: never;
             header?: never;
@@ -1703,7 +1703,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/devices/{device_id}/commands/stream": {
+    "/dev/{device_id}/cmd/stream": {
         parameters: {
             query?: never;
             header?: never;
@@ -1917,7 +1917,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/devices": {
+    "/admin/dev": {
         parameters: {
             query?: never;
             header?: never;
@@ -1975,7 +1975,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/devices/{device_id}": {
+    "/admin/dev/{device_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2058,7 +2058,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/devices/{device_id}/rotate-key": {
+    "/admin/dev/{device_id}/rotate-key": {
         parameters: {
             query?: never;
             header?: never;
@@ -2099,7 +2099,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/devices/{device_id}/revoke-key": {
+    "/admin/dev/{device_id}/revoke-key": {
         parameters: {
             query?: never;
             header?: never;

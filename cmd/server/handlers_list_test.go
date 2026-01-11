@@ -221,7 +221,7 @@ func TestSetupSystemHandlerValidSetup(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/system/setup", h.SetupSystemHandler)
+	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
 		"platform_name":  "Test Platform",
@@ -231,7 +231,7 @@ func TestSetupSystemHandlerValidSetup(t *testing.T) {
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/system/setup", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPost, "/sys/setup", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)

@@ -8,7 +8,7 @@ import (
 )
 
 // getSystemTimeHandler returns the current server time
-// GET /system/time
+// GET /sys/time
 // Used for simple NTP-like sync via HTTP (Christian's Algorithm support)
 func getSystemTimeHandler(c *gin.Context) {
 	now := time.Now()

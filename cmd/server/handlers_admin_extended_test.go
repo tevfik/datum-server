@@ -437,14 +437,14 @@ func TestUpdateRetentionPolicyHandlerInvalidValue(t *testing.T) {
 	store.InitializeSystem("Test", true, 7)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/admin/system/retention", h.UpdateRetentionPolicyHandler)
+	router.POST("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
 	requestBody := map[string]interface{}{
 		"retention_days": -1,
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/system/retention", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPost, "/admin/sys/retention", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -459,14 +459,14 @@ func TestUpdateRetentionPolicyHandlerZeroValue(t *testing.T) {
 	store.InitializeSystem("Test", true, 7)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/admin/system/retention", h.UpdateRetentionPolicyHandler)
+	router.POST("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
 	requestBody := map[string]interface{}{
 		"retention_days": 0,
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/system/retention", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPost, "/admin/sys/retention", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -561,7 +561,7 @@ func TestSetupSystemHandlerMissingPassword(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/system/setup", h.SetupSystemHandler)
+	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
 		"platform_name": "Test Platform",
@@ -569,7 +569,7 @@ func TestSetupSystemHandlerMissingPassword(t *testing.T) {
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/system/setup", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPost, "/sys/setup", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -582,7 +582,7 @@ func TestSetupSystemHandlerMissingEmail(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/system/setup", h.SetupSystemHandler)
+	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
 		"platform_name":  "Test Platform",
@@ -590,7 +590,7 @@ func TestSetupSystemHandlerMissingEmail(t *testing.T) {
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/system/setup", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPost, "/sys/setup", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -603,7 +603,7 @@ func TestSetupSystemHandlerNoPlatformName(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/system/setup", h.SetupSystemHandler)
+	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
 		"admin_email":    "admin@test.com",
@@ -611,7 +611,7 @@ func TestSetupSystemHandlerNoPlatformName(t *testing.T) {
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/system/setup", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPost, "/sys/setup", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)

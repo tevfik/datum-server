@@ -142,9 +142,9 @@ func TestGetSystemConfigHandlerDefaults(t *testing.T) {
 	store.InitializeSystem("Test", true, 7)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.GET("/admin/system/config", h.GetSystemConfigHandler)
+	router.GET("/admin/sys/config", h.GetSystemConfigHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/system/config", nil)
+	req := httptest.NewRequest(http.MethodGet, "/admin/sys/config", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -164,9 +164,9 @@ func TestGetSystemConfigHandlerCustom(t *testing.T) {
 	store.InitializeSystem("Test", true, 14) // Custom retention
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.GET("/admin/system/config", h.GetSystemConfigHandler)
+	router.GET("/admin/sys/config", h.GetSystemConfigHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/system/config", nil)
+	req := httptest.NewRequest(http.MethodGet, "/admin/sys/config", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -187,14 +187,14 @@ func TestUpdateRetentionPolicyHandlerValid(t *testing.T) {
 	store.InitializeSystem("Test", true, 7)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/admin/system/retention", h.UpdateRetentionPolicyHandler)
+	router.POST("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
 	requestBody := map[string]interface{}{
 		"retention_days": 30,
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/system/retention", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPost, "/admin/sys/retention", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -210,9 +210,9 @@ func TestUpdateRetentionPolicyHandlerInvalidJSON(t *testing.T) {
 	store.InitializeSystem("Test", true, 7)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/admin/system/retention", h.UpdateRetentionPolicyHandler)
+	router.POST("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/system/retention", bytes.NewBuffer([]byte("invalid")))
+	req := httptest.NewRequest(http.MethodPost, "/admin/sys/retention", bytes.NewBuffer([]byte("invalid")))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)

@@ -43,7 +43,7 @@ func TestUploadFrameHandler(t *testing.T) {
 	store.CreateDevice(testDevice)
 
 	// Register route
-	router.POST("/devices/:device_id/stream/frame", func(c *gin.Context) {
+	router.POST("/dev/:device_id/stream/frame", func(c *gin.Context) {
 		// Simulate API key auth
 		apiKey := c.GetHeader("X-API-Key")
 		if apiKey != "" {
@@ -63,7 +63,7 @@ func TestUploadFrameHandler(t *testing.T) {
 		}
 		body, _ := json.Marshal(payload)
 
-		req := httptest.NewRequest("POST", "/devices/test-device-stream/stream/frame", bytes.NewBuffer(body))
+		req := httptest.NewRequest("POST", "/dev/test-device-stream/stream/frame", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-API-Key", testDevice.APIKey)
 		w := httptest.NewRecorder()
@@ -78,7 +78,7 @@ func TestUploadFrameHandler(t *testing.T) {
 	})
 
 	t.Run("upload frame with raw binary JPEG", func(t *testing.T) {
-		req := httptest.NewRequest("POST", "/devices/test-device-stream/stream/frame", bytes.NewBuffer(validJPEG))
+		req := httptest.NewRequest("POST", "/dev/test-device-stream/stream/frame", bytes.NewBuffer(validJPEG))
 		req.Header.Set("Content-Type", "image/jpeg")
 		req.Header.Set("X-API-Key", testDevice.APIKey)
 		w := httptest.NewRecorder()
@@ -92,7 +92,7 @@ func TestUploadFrameHandler(t *testing.T) {
 	})
 
 	t.Run("unauthorized - no API key", func(t *testing.T) {
-		req := httptest.NewRequest("POST", "/devices/test-device-stream/stream/frame", bytes.NewBuffer(validJPEG))
+		req := httptest.NewRequest("POST", "/dev/test-device-stream/stream/frame", bytes.NewBuffer(validJPEG))
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
@@ -101,7 +101,7 @@ func TestUploadFrameHandler(t *testing.T) {
 	})
 
 	t.Run("forbidden - wrong device ID", func(t *testing.T) {
-		req := httptest.NewRequest("POST", "/devices/wrong-device-id/stream/frame", bytes.NewBuffer(validJPEG))
+		req := httptest.NewRequest("POST", "/dev/wrong-device-id/stream/frame", bytes.NewBuffer(validJPEG))
 		req.Header.Set("X-API-Key", testDevice.APIKey)
 		w := httptest.NewRecorder()
 
@@ -111,7 +111,7 @@ func TestUploadFrameHandler(t *testing.T) {
 	})
 
 	t.Run("invalid JSON payload", func(t *testing.T) {
-		req := httptest.NewRequest("POST", "/devices/test-device-stream/stream/frame", bytes.NewBuffer([]byte("invalid-json")))
+		req := httptest.NewRequest("POST", "/dev/test-device-stream/stream/frame", bytes.NewBuffer([]byte("invalid-json")))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-API-Key", testDevice.APIKey)
 		w := httptest.NewRecorder()
@@ -128,7 +128,7 @@ func TestUploadFrameHandler(t *testing.T) {
 		}
 		body, _ := json.Marshal(payload)
 
-		req := httptest.NewRequest("POST", "/devices/test-device-stream/stream/frame", bytes.NewBuffer(body))
+		req := httptest.NewRequest("POST", "/dev/test-device-stream/stream/frame", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-API-Key", testDevice.APIKey)
 		w := httptest.NewRecorder()
@@ -141,7 +141,7 @@ func TestUploadFrameHandler(t *testing.T) {
 	t.Run("invalid JPEG format", func(t *testing.T) {
 		invalidJPEG := []byte{0x00, 0x00, 0x00, 0x00} // Not a JPEG
 
-		req := httptest.NewRequest("POST", "/devices/test-device-stream/stream/frame", bytes.NewBuffer(invalidJPEG))
+		req := httptest.NewRequest("POST", "/dev/test-device-stream/stream/frame", bytes.NewBuffer(invalidJPEG))
 		req.Header.Set("Content-Type", "image/jpeg")
 		req.Header.Set("X-API-Key", testDevice.APIKey)
 		w := httptest.NewRecorder()
@@ -181,7 +181,7 @@ func TestStreamInfoHandler(t *testing.T) {
 	adminToken, _ := auth.GenerateToken(testUser.ID, testUser.Email, "user")
 
 	// Register route
-	router.GET("/devices/:device_id/stream/info", func(c *gin.Context) {
+	router.GET("/dev/:device_id/stream/info", func(c *gin.Context) {
 		// Simulate auth middleware
 		token := c.GetHeader("Authorization")
 		if len(token) > 7 && token[:7] == "Bearer " {
@@ -191,7 +191,7 @@ func TestStreamInfoHandler(t *testing.T) {
 	})
 
 	t.Run("get stream info - no active stream", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/devices/test-device-streaminfo/stream/info", nil)
+		req := httptest.NewRequest("GET", "/dev/test-device-streaminfo/stream/info", nil)
 		req.Header.Set("Authorization", "Bearer "+adminToken)
 		w := httptest.NewRecorder()
 
@@ -210,7 +210,7 @@ func TestStreamInfoHandler(t *testing.T) {
 		validJPEG := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0xFF, 0xD9}
 		streamManager.BroadcastFrame("test-device-streaminfo", validJPEG)
 
-		req := httptest.NewRequest("GET", "/devices/test-device-streaminfo/stream/info", nil)
+		req := httptest.NewRequest("GET", "/dev/test-device-streaminfo/stream/info", nil)
 		req.Header.Set("Authorization", "Bearer "+adminToken)
 		w := httptest.NewRecorder()
 
@@ -226,7 +226,7 @@ func TestStreamInfoHandler(t *testing.T) {
 	})
 
 	t.Run("device not found", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/devices/nonexistent-device/stream/info", nil)
+		req := httptest.NewRequest("GET", "/dev/nonexistent-device/stream/info", nil)
 		req.Header.Set("Authorization", "Bearer "+adminToken)
 		w := httptest.NewRecorder()
 
@@ -251,12 +251,12 @@ func TestStreamInfoHandler(t *testing.T) {
 
 		// Create a separate router for this test that sets the other user's ID
 		otherRouter, _ := setupTestRouter()
-		otherRouter.GET("/devices/:device_id/stream/info", func(c *gin.Context) {
+		otherRouter.GET("/dev/:device_id/stream/info", func(c *gin.Context) {
 			c.Set("user_id", otherUser.ID) // Set different user ID
 			streamInfoHandler(c)
 		})
 
-		req := httptest.NewRequest("GET", "/devices/test-device-streaminfo/stream/info", nil)
+		req := httptest.NewRequest("GET", "/dev/test-device-streaminfo/stream/info", nil)
 		req.Header.Set("Authorization", "Bearer "+otherToken)
 		w := httptest.NewRecorder()
 
@@ -429,7 +429,7 @@ func TestMJPEGStreamHandler(t *testing.T) {
 	adminToken, _ := auth.GenerateToken(testUser.ID, testUser.Email, "user")
 
 	// Register route
-	router.GET("/devices/:device_id/stream/mjpeg", func(c *gin.Context) {
+	router.GET("/dev/:device_id/stream/mjpeg", func(c *gin.Context) {
 		token := c.GetHeader("Authorization")
 		if len(token) > 7 && token[:7] == "Bearer " {
 			c.Set("user_id", testUser.ID)
@@ -438,7 +438,7 @@ func TestMJPEGStreamHandler(t *testing.T) {
 	})
 
 	t.Run("device not found", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/devices/nonexistent/stream/mjpeg", nil)
+		req := httptest.NewRequest("GET", "/dev/nonexistent/stream/mjpeg", nil)
 		req.Header.Set("Authorization", "Bearer "+adminToken)
 		w := httptest.NewRecorder()
 
@@ -472,13 +472,13 @@ func TestMJPEGStreamHandler(t *testing.T) {
 
 		// Create router that sets otherUser's ID
 		otherRouter, _ := setupTestRouter()
-		otherRouter.GET("/devices/:device_id/stream/mjpeg", func(c *gin.Context) {
+		otherRouter.GET("/dev/:device_id/stream/mjpeg", func(c *gin.Context) {
 			c.Set("user_id", otherUser.ID)
 			mjpegStreamHandler(c)
 		})
 
 		// Try to access the first user's device
-		req := httptest.NewRequest("GET", "/devices/test-device-mjpeg/stream/mjpeg", nil)
+		req := httptest.NewRequest("GET", "/dev/test-device-mjpeg/stream/mjpeg", nil)
 		req.Header.Set("Authorization", "Bearer "+otherToken)
 		w := httptest.NewRecorder()
 
@@ -519,7 +519,7 @@ func TestWebSocketStreamHandler(t *testing.T) {
 	adminToken, _ := auth.GenerateToken(testUser.ID, testUser.Email, "user")
 
 	// Register route
-	router.GET("/devices/:device_id/stream/ws", func(c *gin.Context) {
+	router.GET("/dev/:device_id/stream/ws", func(c *gin.Context) {
 		token := c.GetHeader("Authorization")
 		if len(token) > 7 && token[:7] == "Bearer " {
 			c.Set("user_id", testUser.ID)
@@ -528,7 +528,7 @@ func TestWebSocketStreamHandler(t *testing.T) {
 	})
 
 	t.Run("device not found for websocket", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/devices/nonexistent/stream/ws", nil)
+		req := httptest.NewRequest("GET", "/dev/nonexistent/stream/ws", nil)
 		req.Header.Set("Authorization", "Bearer "+adminToken)
 		w := httptest.NewRecorder()
 
@@ -552,12 +552,12 @@ func TestWebSocketStreamHandler(t *testing.T) {
 
 		// Create router that sets otherUser's ID
 		otherRouter, _ := setupTestRouter()
-		otherRouter.GET("/devices/:device_id/stream/ws", func(c *gin.Context) {
+		otherRouter.GET("/dev/:device_id/stream/ws", func(c *gin.Context) {
 			c.Set("user_id", otherUser.ID)
 			websocketStreamHandler(c)
 		})
 
-		req := httptest.NewRequest("GET", "/devices/test-device-ws/stream/ws", nil)
+		req := httptest.NewRequest("GET", "/dev/test-device-ws/stream/ws", nil)
 		req.Header.Set("Authorization", "Bearer "+otherToken)
 		w := httptest.NewRecorder()
 
@@ -681,7 +681,7 @@ func TestStreamSnapshotHandler(t *testing.T) {
 
 	adminToken, _ := auth.GenerateToken(testUser.ID, testUser.Email, "user")
 
-	router.GET("/devices/:device_id/stream/snapshot", func(c *gin.Context) {
+	router.GET("/dev/:device_id/stream/snapshot", func(c *gin.Context) {
 		token := c.GetHeader("Authorization")
 		if len(token) > 7 && token[:7] == "Bearer " {
 			c.Set("user_id", testUser.ID)
@@ -690,7 +690,7 @@ func TestStreamSnapshotHandler(t *testing.T) {
 	})
 
 	t.Run("snapshot - no stream active", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/devices/test-device-snapshot/stream/snapshot", nil)
+		req := httptest.NewRequest("GET", "/dev/test-device-snapshot/stream/snapshot", nil)
 		req.Header.Set("Authorization", "Bearer "+adminToken)
 		w := httptest.NewRecorder()
 
@@ -703,7 +703,7 @@ func TestStreamSnapshotHandler(t *testing.T) {
 		validJPEG := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0xFF, 0xD9}
 		streamManager.BroadcastFrame("test-device-snapshot", validJPEG)
 
-		req := httptest.NewRequest("GET", "/devices/test-device-snapshot/stream/snapshot", nil)
+		req := httptest.NewRequest("GET", "/dev/test-device-snapshot/stream/snapshot", nil)
 		req.Header.Set("Authorization", "Bearer "+adminToken)
 		w := httptest.NewRecorder()
 
@@ -719,12 +719,12 @@ func TestStreamSnapshotHandler(t *testing.T) {
 		otherToken, _ := auth.GenerateToken(otherUser.ID, otherUser.Email, "user")
 
 		otherRouter, _ := setupTestRouter()
-		otherRouter.GET("/devices/:device_id/stream/snapshot", func(c *gin.Context) {
+		otherRouter.GET("/dev/:device_id/stream/snapshot", func(c *gin.Context) {
 			c.Set("user_id", otherUser.ID)
 			streamSnapshotHandler(c)
 		})
 
-		req := httptest.NewRequest("GET", "/devices/test-device-snapshot/stream/snapshot", nil)
+		req := httptest.NewRequest("GET", "/dev/test-device-snapshot/stream/snapshot", nil)
 		req.Header.Set("Authorization", "Bearer "+otherToken)
 		w := httptest.NewRecorder()
 

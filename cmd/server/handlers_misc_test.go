@@ -38,7 +38,7 @@ func TestSetupSystemHandlerDefaultRetention(t *testing.T) {
 	defer cleanup()
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.POST("/system/setup", h.SetupSystemHandler)
+	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
 		"platform_name":  "Test Platform",
@@ -48,7 +48,7 @@ func TestSetupSystemHandlerDefaultRetention(t *testing.T) {
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/system/setup", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPost, "/sys/setup", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -277,14 +277,14 @@ func TestUpdateDeviceHandlerSuspended(t *testing.T) {
 	store.CreateDevice(device)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.PUT("/admin/devices/:device_id", h.UpdateDeviceHandler)
+	router.PUT("/admin/dev/:device_id", h.UpdateDeviceHandler)
 
 	requestBody := map[string]interface{}{
 		"status": "suspended",
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/devices/update-dev-1", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPut, "/admin/dev/update-dev-1", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -305,14 +305,14 @@ func TestUpdateDeviceHandlerNotFound(t *testing.T) {
 	store.InitializeSystem("Test", true, 7)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.PUT("/admin/devices/:device_id", h.UpdateDeviceHandler)
+	router.PUT("/admin/dev/:device_id", h.UpdateDeviceHandler)
 
 	requestBody := map[string]interface{}{
 		"status": "banned",
 	}
 	jsonBody, _ := json.Marshal(requestBody)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/devices/nonexistent", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest(http.MethodPut, "/admin/dev/nonexistent", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -340,7 +340,7 @@ func TestForceDeleteDeviceHandlerWithData(t *testing.T) {
 	store.CreateDevice(device)
 
 	h := handlers.NewAdminHandler(store, nil)
-	router.DELETE("/admin/devices/:device_id", h.ForceDeleteDeviceHandler)
+	router.DELETE("/admin/dev/:device_id", h.ForceDeleteDeviceHandler)
 
 	// Add some data using StoreData
 	dataPoint := &storage.DataPoint{
@@ -350,7 +350,7 @@ func TestForceDeleteDeviceHandlerWithData(t *testing.T) {
 	}
 	store.StoreData(dataPoint)
 
-	req := httptest.NewRequest(http.MethodDelete, "/admin/devices/force-del-1", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/admin/dev/force-del-1", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

@@ -148,7 +148,7 @@ func runDeviceList(cmd *cobra.Command, args []string) error {
 	loadConfig()
 	client := NewAPIClient(serverURL, token, apiKey)
 
-	resp, err := client.Get("/admin/devices")
+	resp, err := client.Get("/admin/dev")
 	if err != nil {
 		return err
 	}
@@ -229,7 +229,7 @@ func runDeviceGet(cmd *cobra.Command, args []string) error {
 	client := NewAPIClient(serverURL, token, apiKey)
 
 	deviceID := args[0]
-	resp, err := client.Get("/admin/devices/" + deviceID)
+	resp, err := client.Get("/admin/dev/" + deviceID)
 	if err != nil {
 		return err
 	}
@@ -271,7 +271,7 @@ func runDeviceCreate(cmd *cobra.Command, args []string) error {
 		createReq["device_id"] = deviceID
 	}
 
-	resp, err := client.Post("/admin/devices", createReq)
+	resp, err := client.Post("/admin/dev", createReq)
 	if err != nil {
 		return err
 	}
@@ -296,7 +296,7 @@ func runDeviceCreate(cmd *cobra.Command, args []string) error {
 
 		fmt.Println("  📝 Usage examples:")
 		fmt.Printf("     # Send data from device:\n")
-		fmt.Printf("     curl -X POST %s/public/data \\\n", serverURL)
+		fmt.Printf("     curl -X POST %s/pub/%s \\\n", serverURL, getString(result, "device_id"))
 		fmt.Printf("       -H 'Authorization: Bearer %s' \\\n", apiKeyVal)
 		fmt.Printf("       -H 'Content-Type: application/json' \\\n")
 		fmt.Printf("       -d '{\"temperature\": 25.5, \"humidity\": 60}'\n\n")
@@ -325,7 +325,7 @@ func runDeviceDelete(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	resp, err := client.Delete("/admin/devices/"+deviceID, nil)
+	resp, err := client.Delete("/admin/dev/"+deviceID, nil)
 	if err != nil {
 		return err
 	}
@@ -349,7 +349,7 @@ func runDeviceRotateKey(cmd *cobra.Command, args []string) error {
 		"notify_device":     notifyDevice,
 	}
 
-	resp, err := client.Post("/admin/devices/"+deviceID+"/rotate-key", payload)
+	resp, err := client.Post("/admin/dev/"+deviceID+"/rotate-key", payload)
 	if err != nil {
 		return err
 	}
@@ -408,7 +408,7 @@ func runDeviceRevokeKey(cmd *cobra.Command, args []string) error {
 		"immediate": true,
 	}
 
-	resp, err := client.Post("/admin/devices/"+deviceID+"/revoke-key", payload)
+	resp, err := client.Post("/admin/dev/"+deviceID+"/revoke-key", payload)
 	if err != nil {
 		return err
 	}
@@ -437,7 +437,7 @@ func runDeviceTokenInfo(cmd *cobra.Command, args []string) error {
 
 	deviceID := args[0]
 
-	resp, err := client.Get("/admin/devices/" + deviceID + "/token-info")
+	resp, err := client.Get("/admin/dev/" + deviceID + "/token-info")
 	if err != nil {
 		return err
 	}

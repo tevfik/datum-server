@@ -2,7 +2,6 @@ import { Outlet, NavLink } from "react-router-dom";
 import {
     LayoutDashboard,
     Server,
-    Terminal,
     LogOut,
     Menu,
     Settings as SettingsIcon
@@ -21,7 +20,6 @@ export default function SidebarLayout() {
     const navItems = [
         { icon: LayoutDashboard, label: "Dashboard", href: "/" },
         { icon: Server, label: "Devices", href: "/devices" },
-        { icon: Terminal, label: "Commands", href: "/commands" },
         { icon: SettingsIcon, label: "Settings", href: "/settings" },
     ];
 
