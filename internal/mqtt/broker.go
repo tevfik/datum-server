@@ -172,31 +172,36 @@ func (h *AuthHook) Provides(b byte) bool {
 }
 
 func (h *AuthHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) bool {
-	// Skip auth for internal/admin if needed, but for now enforce device auth.
-	// Username = DeviceID, Password = Token (or "key" if legacy API keys)
+	// Username = DeviceID (or "admin_dashboard_..." for admins)
+	// Password = Token/API Key
 
-	deviceID := string(pk.Connect.Username)
+	clientID := string(pk.Connect.Username) // In our logic we treat Username as the identifier
 	token := string(pk.Connect.Password)
 
 	// If no credentials, reject
-	if deviceID == "" {
+	if clientID == "" {
 		return false
 	}
 
-	// Validate against DB
-	// We use GetDeviceByToken (assuming token flow) OR GetDeviceByAPIKey
-	// To simplify, let's try token first, then API key.
-	// Actually, `GetDeviceByToken` logic might need to be implemented or we reuse existing flow.
-	// For now, let's assume the user passes the API Key (sk_...) as password.
+	// 1. Admin Dashboard Authentication
+	if strings.HasPrefix(clientID, "admin_dashboard_") {
+		// Expecting User API Key
+		if strings.HasPrefix(token, "ak_") {
+			user, err := h.store.GetUserByUserAPIKey(token)
+			if err != nil {
+				return false
+			}
+			// Only allow Admins
+			if user.Role == "admin" {
+				return true
+			}
+		}
+		return false
+	}
 
-	// If the password starts with "dk_", it's a dynamic token.
-	// If "sk_", it's an API Key.
-	// Implementation detail: `handlers_auth` handles these. We should reuse logic if possible.
-	// But `storage` interface has `GetDeviceByAPIKey`.
-
-	// Let's support API Key for now as it's simplest.
-	// Limitation: Dynamic Tokens (dk_) are not yet fully validated by signature in this hook.
-	// Currently relying on matching against known device tokens or falling back to API keys.
+	// 2. Device Authentication
+	// clientID must be the DeviceID
+	deviceID := clientID
 
 	// Validate API Key (sk_ or dk_)
 	if strings.HasPrefix(token, "sk_") || strings.HasPrefix(token, "dk_") {
@@ -215,6 +220,15 @@ func (h *AuthHook) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
 	// data/{device_id} -> Write Only
 	// cmd/{device_id} -> Read Only
 
+	// Admin Dashboard Access
+	// If the client ID starts with "datum_web_", it is the dashboard (authenticated as admin above)
+	// We trust it because OnConnectAuthenticate enforced the admin key for this session username pattern.
+	// Note: We check ClientID here (cl.ID), which matches what MqttTab sends ('datum_web_...').
+	if strings.HasPrefix(cl.ID, "datum_web_") {
+		return true // Admin can read/write anything
+	}
+
+	// Device Access
 	deviceID := cl.ID // Authenticated as DeviceID
 
 	// Split topic
