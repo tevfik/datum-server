@@ -50,6 +50,16 @@ This example demonstrates real-time camera streaming from ESP32-S3 behind NAT/pr
 
 > **Note**: ESP32-S3 is recommended over ESP32-S2 for camera applications. The ESP32-S2 has limited camera interface support and may have compatibility issues with some sensors.
 
+### ⚠️ Important: Partition Scheme
+To support **OTA Updates over HTTPS**, the firmware size increases significantly. The default partition scheme (1.2MB) is not enough.
+
+**Required Setting:**
+- In Arduino IDE, go to **Tools > Partition Scheme**.
+- Select **"Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)"**.
+- *Alternatively, pick any scheme with at least 1.5MB for APP partition.*
+
+---
+
 ### ⚠️ Important: PSRAM Configuration
 Most ESP32-S3 Camera boards (especially Freenove S3 Cam and generic clones) use **8MB OPI PSRAM**.
 - **Error**: `E (226) quad_psram: PSRAM chip is not connected`

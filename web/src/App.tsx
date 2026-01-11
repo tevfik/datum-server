@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import SidebarLayout from "./layouts/SidebarLayout";
 import Devices from "./pages/Devices";
 import DeviceDetail from "./pages/DeviceDetail";
+import Commands from "./pages/Commands";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
@@ -49,7 +50,7 @@ function App() {
                 <Route index element={<Dashboard />} />
                 <Route path="devices" element={<Devices />} />
                 <Route path="devices/:id" element={<DeviceDetail />} />
-                <Route path="commands" element={<div className="p-4">Commands Page (Coming Soon)</div>} />
+                <Route path="commands" element={<Commands />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
 
