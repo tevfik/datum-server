@@ -10,10 +10,6 @@ void updateFirmware(String url) {
   if (url.length() == 0)
     return;
 
-  Serial.println("Starting OTA Update...");
-  Serial.print("Firmware URL: ");
-  Serial.println(url);
-
   // Append auth token if needed
   if (url.indexOf("token=") == -1 && apiKey.length() > 0) {
     if (url.indexOf('?') == -1) {
@@ -22,6 +18,10 @@ void updateFirmware(String url) {
       url += "&token=" + apiKey;
     }
   }
+
+  Serial.println("Starting OTA Update...");
+  Serial.print("Firmware URL: ");
+  Serial.println(url);
 
   // NOTE: esp_camera_deinit() is usually needed if camera uses PSRAM heavily,
   // but we can't access it here easily without including esp_camera.h.
