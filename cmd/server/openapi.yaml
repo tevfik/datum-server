@@ -865,59 +865,6 @@ paths:
         '200':
           description: Command acknowledged
 
-  /dev/{device_id}/push:
-    get:
-      summary: Push data via GET (for constrained devices)
-      description: |
-        Allows constrained IoT devices (like ESP8266, Arduino with limited HTTP libraries) 
-        to submit sensor data via simple GET request with query parameters.
-        This is an alternative to POST /data/{device_id} for devices that cannot easily 
-        construct POST requests with JSON bodies.
-      tags: [Data]
-      security:
-        - ApiKeyAuth: []
-      parameters:
-        - name: device_id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Device ID
-        - name: key
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Device API key (sk_live_XXX format)
-        - name: temp
-          in: query
-          schema:
-            type: number
-          description: Temperature (example sensor value)
-        - name: humidity
-          in: query
-          schema:
-            type: number
-          description: Humidity (example sensor value)
-      responses:
-        '200':
-          description: Data stored successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: ok
-                  timestamp:
-                    type: string
-                    format: date-time
-                  fields_stored:
-                    type: integer
-                    description: Number of sensor values stored
-                  commands_pending:
-                    type: integer
 
   /dev/{device_id}/stream/frame:
     post:

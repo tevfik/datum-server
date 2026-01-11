@@ -27,7 +27,7 @@ In this method, the device holds a **Master Secret** but never sends it over the
      | 2. Generate Token (HMSC-SHA256)                |
      |    "dk_{expiry}.{signature}"                   |
      |                                                |
-     | 3. POST /data/dev-1 (Auth: dk_...)             |
+     | 3. POST /dev/dev-1/data (Auth: dk_...)             |
      +----------------------------------------------->|
      |                                                | 4. Validate Token
      |                                                |    (Check Sign & Expiry)

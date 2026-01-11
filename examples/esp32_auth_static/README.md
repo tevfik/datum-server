@@ -32,7 +32,7 @@ The device uses a **Static Key** (`sk_...`) stored in its firmware or NVS. This 
 |  ESP32  |                    | Datum Server |
 +----+----+                    +-------+------+
      |                                 |
-     | POST /data/dev-1 (Auth: sk_...) |
+     | POST /dev/dev-1/data (Auth: sk_...) |
      +-------------------------------->|
      |                                 |
      |         200 OK (Saved)          |

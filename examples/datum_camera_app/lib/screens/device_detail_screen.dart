@@ -209,7 +209,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
   String _getStreamUrl() {
     // We need token synchronously for URL string.
     final token = ref.read(authProvider).value;
-    return 'https://datum.bezg.in/devices/${widget.device.id}/stream/mjpeg?token=$token';
+    return 'https://datum.bezg.in/dev/${widget.device.id}/stream/mjpeg?token=$token';
   }
 
   void _showSettingsDialog() {
@@ -739,7 +739,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                           if (!context.mounted) return;
                           final token = ref.read(authProvider).value;
                           final url =
-                              "https://datum.bezg.in/devices/${widget.device.id}/stream/snapshot";
+                              "https://datum.bezg.in/dev/${widget.device.id}/stream/snapshot";
 
                           for (int i = 0; i < 20; i++) {
                             // Retry 20 times (approx 10s)

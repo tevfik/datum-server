@@ -130,15 +130,15 @@ Y6:    GPIO 36
         │                            │                             │
         │ 1. Poll commands           │                             │
         │───────────────────────────>│                             │
-        │    GET /devices/:id/commands│                             │
+        │    GET /dev/:id/cmd         │                             │
         │                            │                             │
         │ 2. Receive "start-stream"  │    3. User connects         │
         │<───────────────────────────│<────────────────────────────│
-        │                            │    WS /devices/:id/stream/ws│
+        │                            │    WS /dev/:id/stream/ws    │
         │                            │                             │
         │ 4. POST JPEG frames        │                             │
         │───────────────────────────>│                             │
-        │  /devices/:id/stream/frame  │                             │
+        │  /dev/:id/stream/frame      │                             │
         │                            │ 5. Broadcast frames         │
         │                            │────────────────────────────>│
         │                            │    (WebSocket binary)       │
@@ -268,7 +268,7 @@ curl -X POST https://datum.bezg.in/devices/<DEVICE_ID>/commands \
   -d '{
     "action": "update_firmware",
     "params": {
-        "url": "https://datum.bezg.in/devices/firmware/my_fw.bin"
+    "url": "https://datum.bezg.in/dev/fw/my_fw.bin"
     }
 }'
 ```
@@ -427,7 +427,7 @@ curl -i -N \
 
 #### Upload Frame
 ```http
-POST /devices/:device_id/stream/frame
+POST /dev/:device_id/stream/frame
 X-API-Key: {device_api_key}
 Content-Type: image/jpeg
 
@@ -445,7 +445,7 @@ Content-Type: image/jpeg
 
 #### Poll Commands (Legacy - MQTT Preferred)
 ```http
-GET /devices/:device_id/commands
+GET /dev/:device_id/cmd
 X-API-Key: {device_api_key}
 ```
 
@@ -478,7 +478,7 @@ X-API-Key: {device_api_key}
 
 #### MJPEG Stream
 ```http
-GET /devices/:device_id/stream/mjpeg
+GET /dev/:device_id/stream/mjpeg
 Authorization: Bearer {jwt_token}
 ```
 
@@ -496,7 +496,7 @@ Content-Type: image/jpeg
 
 #### WebSocket Stream
 ```http
-GET /devices/:device_id/stream/ws
+GET /dev/:device_id/stream/ws
 Authorization: Bearer {jwt_token}
 Upgrade: websocket
 ```
@@ -507,7 +507,7 @@ Upgrade: websocket
 
 #### Stream Info
 ```http
-GET /devices/:device_id/stream/info
+GET /dev/:device_id/stream/info
 Authorization: Bearer {jwt_token}
 ```
 

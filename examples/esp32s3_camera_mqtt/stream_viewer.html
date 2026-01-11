@@ -465,7 +465,7 @@
             const token = document.getElementById('token').value;
 
             const wsURL = serverURL.replace('http://', 'ws://').replace('https://', 'wss://');
-            const url = `${wsURL}/devices/${deviceID}/stream/ws?token=${token}`;
+            const url = `${wsURL}/dev/${deviceID}/stream/ws?token=${token}`;
 
             log(`Connecting to WebSocket: ${url}`);
 
@@ -516,7 +516,7 @@
             const deviceID = document.getElementById('deviceID').value;
             const token = document.getElementById('token').value;
 
-            const url = `${serverURL}/devices/${deviceID}/stream/mjpeg?token=${token}`;
+            const url = `${serverURL}/dev/${deviceID}/stream/mjpeg?token=${token}`;
 
             log(`Connecting to MJPEG: ${url}`);
 
@@ -582,7 +582,7 @@
             const token = document.getElementById('token').value;
 
             try {
-                const res = await fetch(`${serverURL}/devices/${deviceID}/commands`, {
+                const res = await fetch(`${serverURL}/dev/${deviceID}/cmd`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -638,7 +638,7 @@
                 for (let i = 0; i < 20; i++) {
                     await new Promise(r => setTimeout(r, 500));
                     try {
-                        const snapshotURL = `${serverURL}/devices/${deviceID}/stream/snapshot?token=${token}&t=${Date.now()}`;
+                        const snapshotURL = `${serverURL}/dev/${deviceID}/stream/snapshot?token=${token}&t=${Date.now()}`;
                         const imgRes = await fetch(snapshotURL);
                         if (imgRes.ok) {
                             const blob = await imgRes.blob();

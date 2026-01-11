@@ -239,7 +239,7 @@ boolean connectMQTT() {
   if (mqttClient.connect(clientId.c_str(), user.c_str(), pass.c_str())) {
     Serial.println("Connected!");
     // Subscribe to commands
-    String cmdTopic = "cmd/" + String(config.device_id);
+    String cmdTopic = "dev/" + String(config.device_id) + "/cmd";
     mqttClient.subscribe(cmdTopic.c_str());
     Serial.println("Subscribed to " + cmdTopic);
     return true;
@@ -283,7 +283,7 @@ void sendData(bool isBoot, bool isConnect) {
 
   // Try MQTT first
   if (mqttClient.connected()) {
-    String topic = "data/" + String(config.device_id);
+    String topic = "dev/" + String(config.device_id) + "/data";
     mqttClient.publish(topic.c_str(), payload.c_str());
     Serial.println("MQTT Publish: " + payload);
   } else {
@@ -372,7 +372,7 @@ void registerDevice() {
   String srv = String(config.server_url);
   if (srv.endsWith("/"))
     srv.remove(srv.length() - 1);
-  String url = srv + "/devices";
+  String url = srv + "/dev";
   Serial.println("Registering Device at: " + url);
 
   // Client selection (HTTP vs HTTPS)

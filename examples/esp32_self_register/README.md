@@ -9,7 +9,7 @@ Unlike the [Provisioning Example](../esp32_provisioning/README.md), which requir
 When the device boots:
 1.  It connects to WiFi.
 2.  It checks if it is already registered (has an API Key validation).
-3.  If not, it calls the **Register Endpoint** (`POST /devices/register`) using the User Token.
+3.  If not, it calls the **Register Endpoint** (`POST /dev/register`) using the User Token.
 4.  It saves the returned **Device ID** and **API Key** to permanent storage (NVS).
 5.  It switches to normal operation, sending telemetry using its own API Key.
 
@@ -28,7 +28,7 @@ When the device boots:
        │    (Not found?)                                 │
        │                                                 │
        │ 3. Self-Register                                │
-       │    POST /devices/register                       │
+       │    POST /dev/register                       │
        │    Auth: Bearer {USER_TOKEN}                    │
        │    {uid, name, type}                            │
        │────────────────────────────────────────────────►│
@@ -79,7 +79,7 @@ In that "Hybrid" flow, the Mobile App connects to the device's WiFi and "pushes"
        │◄──────────────────│                   │
        │                   │                   │
        │ 5. Register       │                   │
-       │ POST /devices/re..│                   │
+       │ POST /dev/regis.. │                   │
        │ Auth: Bearer JWT  │                   │
        │───────────────────┼──────────────────►│
        │ { "api_key": ".."}|                   │
@@ -129,8 +129,8 @@ esp_efuse_mac_get_default(mac);
 This function constructs a JSON payload with the device's identity and sends it to the server.
 
 ```cpp
-// Endpoint: POST /devices/register
-http.begin(String(serverURL) + "/devices/register");
+// Endpoint: POST /dev/register
+http.begin(String(serverURL) + "/dev/register");
 http.addHeader("Authorization", "Bearer " + String(userToken));
 
 // Payload

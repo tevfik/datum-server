@@ -90,7 +90,7 @@ datumctl device command <DEVICE_ID> relay_control --params '{"relay_index": 0, "
 
 ### Control Relays (API)
 
-**POST** `/devices/<DEVICE_ID>/commands`
+**POST** `/dev/<DEVICE_ID>/cmd`
 ```json
 {
   "type": "relay_control",

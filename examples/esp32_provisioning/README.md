@@ -28,7 +28,7 @@ The device creates a WiFi access point when unconfigured. Users connect to this 
        │  {uid, model}     │                   │                   │
        │◄──────────────────│                   │                   │
        │                   │                   │                   │
-       │                   │ POST /devices/register               │
+       │                   │ POST /dev/register               │
        │                   │ {uid, name}       │                   │
        │                   │──────────────────►│                   │
        │                   │ {api_key, device_id}                 │

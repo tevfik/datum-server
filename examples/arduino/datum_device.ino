@@ -84,7 +84,7 @@ float readBattery() {
 }
 
 int sendData(float temp, float humidity, float battery) {
-  String url = String(API_URL) + "/data/" + DEVICE_ID;
+  String url = String(API_URL) + "/dev/" + DEVICE_ID + "/data";
 
   // Create JSON payload
   StaticJsonDocument<256> doc;
@@ -122,8 +122,7 @@ int sendData(float temp, float humidity, float battery) {
 }
 
 void pollAndExecuteCommands() {
-  String url =
-      String(API_URL) + "/devices/" + DEVICE_ID + "/commands/pending?wait=5";
+  String url = String(API_URL) + "/dev/" + DEVICE_ID + "/cmd?wait=5";
 
   http.begin(url);
   http.addHeader("Authorization", String("Bearer ") + API_KEY);
@@ -168,8 +167,7 @@ void pollAndExecuteCommands() {
 }
 
 void acknowledgeCommand(const char *cmdId, JsonDocument &result) {
-  String url =
-      String(API_URL) + "/devices/" + DEVICE_ID + "/commands/" + cmdId + "/ack";
+  String url = String(API_URL) + "/dev/" + DEVICE_ID + "/cmd/" + cmdId + "/ack";
 
   StaticJsonDocument<256> doc;
   doc["status"] = "success";
