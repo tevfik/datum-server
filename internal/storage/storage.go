@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -1884,4 +1885,119 @@ func (s *Storage) GetUserByUserAPIKey(apiKey string) (*User, error) {
 		return json.Unmarshal([]byte(userData), &user)
 	})
 	return &user, err
+}
+
+// ============ Generic Document Store (Collections) ============
+
+func (s *Storage) CreateDocument(userID, collection string, doc map[string]interface{}) (string, error) {
+	// Generate a unique ID if not present, otherwise use provided "id"
+	var docID string
+	if id, ok := doc["id"].(string); ok && id != "" {
+		docID = id
+	} else {
+		// Simple random ID generation
+		b := make([]byte, 12)
+		// Use time as seed part to ensure some order/uniqueness
+		t := time.Now().UnixNano()
+		rand.Read(b)
+		docID = fmt.Sprintf("%x-%d", b, t)
+	}
+
+	// Ensure auto-fields
+	doc["id"] = docID
+	doc["_owner_id"] = userID
+	doc["_collection"] = collection
+	doc["_created_at"] = time.Now().Format(time.RFC3339)
+	doc["_updated_at"] = time.Now().Format(time.RFC3339)
+
+	return docID, s.db.Update(func(tx *buntdb.Tx) error {
+		// Key format: doc:{user_id}:{collection}:{doc_id}
+		key := fmt.Sprintf("doc:%s:%s:%s", userID, collection, docID)
+
+		data, err := json.Marshal(doc)
+		if err != nil {
+			return err
+		}
+
+		_, _, err = tx.Set(key, string(data), nil)
+		return err
+	})
+}
+
+func (s *Storage) ListDocuments(userID, collection string) ([]map[string]interface{}, error) {
+	var docs []map[string]interface{}
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		// Prefix scan: doc:{user_id}:{collection}:
+		prefix := fmt.Sprintf("doc:%s:%s:", userID, collection)
+
+		tx.AscendKeys(prefix+"*", func(key, value string) bool {
+			// Double check prefix
+			if !strings.HasPrefix(key, prefix) {
+				return false
+			}
+
+			var doc map[string]interface{}
+			if err := json.Unmarshal([]byte(value), &doc); err == nil {
+				docs = append(docs, doc)
+			}
+			return true
+		})
+		return nil
+	})
+	return docs, err
+}
+
+func (s *Storage) GetDocument(userID, collection, docID string) (map[string]interface{}, error) {
+	var doc map[string]interface{}
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		key := fmt.Sprintf("doc:%s:%s:%s", userID, collection, docID)
+		val, err := tx.Get(key)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal([]byte(val), &doc)
+	})
+	return doc, err
+}
+
+func (s *Storage) UpdateDocument(userID, collection, docID string, doc map[string]interface{}) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		key := fmt.Sprintf("doc:%s:%s:%s", userID, collection, docID)
+
+		// Check existence
+		val, err := tx.Get(key)
+		if err != nil {
+			return err
+		}
+
+		// Unmarshal existing to preserve immutable fields if needed (like created_at)
+		var existing map[string]interface{}
+		json.Unmarshal([]byte(val), &existing)
+
+		// Merge/Overwrite
+		for k, v := range doc {
+			// Prevent changing owner or id via update if passed
+			if k == "_owner_id" || k == "id" {
+				continue
+			}
+			existing[k] = v
+		}
+		existing["_updated_at"] = time.Now().Format(time.RFC3339)
+
+		data, err := json.Marshal(existing)
+		if err != nil {
+			return err
+		}
+
+		_, _, err = tx.Set(key, string(data), nil)
+		return err
+	})
+}
+
+func (s *Storage) DeleteDocument(userID, collection, docID string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		key := fmt.Sprintf("doc:%s:%s:%s", userID, collection, docID)
+		_, err := tx.Delete(key)
+		return err
+	})
 }

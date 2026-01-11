@@ -298,6 +298,9 @@ func main() {
 		authProtectedGroup.POST("/keys", createKeyHandler)
 		authProtectedGroup.GET("/keys", listKeysHandler)
 		authProtectedGroup.DELETE("/keys/:id", deleteKeyHandler)
+
+		// Generic Database API (Collections)
+		RegisterDBRoutes(authProtectedGroup, store)
 	}
 
 	// Device management routes (require user auth)

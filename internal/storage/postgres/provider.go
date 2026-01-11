@@ -84,3 +84,25 @@ func (s *PostgresStore) initSchema() error {
 func (s *PostgresStore) Close() error {
 	return s.db.Close()
 }
+
+// ============ Generic Document Store (Collections) ============
+
+func (s *PostgresStore) CreateDocument(userID, collection string, doc map[string]interface{}) (string, error) {
+	return "", fmt.Errorf("not implemented for postgres yet")
+}
+
+func (s *PostgresStore) ListDocuments(userID, collection string) ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented for postgres yet")
+}
+
+func (s *PostgresStore) GetDocument(userID, collection, docID string) (map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented for postgres yet")
+}
+
+func (s *PostgresStore) UpdateDocument(userID, collection, docID string, doc map[string]interface{}) error {
+	return fmt.Errorf("not implemented for postgres yet")
+}
+
+func (s *PostgresStore) DeleteDocument(userID, collection, docID string) error {
+	return fmt.Errorf("not implemented for postgres yet")
+}

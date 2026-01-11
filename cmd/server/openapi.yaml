@@ -1738,3 +1738,129 @@ paths:
                 properties:
                   status:
                     type: string
+
+  /db/{collection}:
+    post:
+      summary: Create Document
+      tags: [Database]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Document created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+    get:
+      summary: List Documents
+      tags: [Database]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+
+  /db/{collection}/{id}:
+    get:
+      summary: Get Document
+      tags: [Database]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document found
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: Document not found
+    put:
+      summary: Update Document
+      tags: [Database]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Document updated
+    delete:
+      summary: Delete Document
+      tags: [Database]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document deleted
