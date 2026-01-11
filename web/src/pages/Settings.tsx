@@ -20,10 +20,13 @@ import { adminService } from '@/services/adminService';
 import { MqttTab } from '@/components/admin/MqttTab';
 import { SystemTab } from '@/components/admin/SystemTab';
 import { HttpTab } from '@/components/admin/HttpTab';
+import { SortableHeader } from '@/components/ui/sortable-header';
 
 // Subcomponent for Admin Tab to keep main file clean-ish
 function AdminSettings() {
     const queryClient = useQueryClient();
+    const [sortColumn, setSortColumn] = useState('created_at');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
     // Fetch Users
     const { data: users = [], isLoading } = useQuery({
@@ -48,9 +51,38 @@ function AdminSettings() {
     // Bytes to MB
     const formatBytes = (bytes: number) => (bytes / (1024 * 1024)).toFixed(2) + ' MB';
 
+    const handleSort = (column: string) => {
+        if (sortColumn === column) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortColumn(column);
+            setSortDirection('asc');
+        }
+    };
+
+    const sortedUsers = [...users].sort((a: any, b: any) => {
+        let aVal = a[sortColumn];
+        let bVal = b[sortColumn];
+
+        // Handle string comparison
+        if (typeof aVal === 'string') {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+        }
+
+        // Handle dates (if undefined, treat as old)
+        if (sortColumn === 'last_login_at') {
+            aVal = aVal ? new Date(aVal).getTime() : 0;
+            bVal = bVal ? new Date(bVal).getTime() : 0;
+        }
+
+        if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+
     return (
         <div className="space-y-6">
-            {/* System Stats Cards */}
             {/* System Stats Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
@@ -119,16 +151,29 @@ function AdminSettings() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Email</TableHead>
-                                    <TableHead>Role</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Devices</TableHead>
-                                    <TableHead>Joined</TableHead>
+                                    <TableHead>
+                                        <SortableHeader column="email" label="Email" currentSort={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                                    </TableHead>
+                                    <TableHead>
+                                        <SortableHeader column="role" label="Role" currentSort={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                                    </TableHead>
+                                    <TableHead>
+                                        <SortableHeader column="status" label="Status" currentSort={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                                    </TableHead>
+                                    <TableHead>
+                                        <SortableHeader column="device_count" label="Devices" currentSort={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                                    </TableHead>
+                                    <TableHead>
+                                        <SortableHeader column="created_at" label="Joined" currentSort={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                                    </TableHead>
+                                    <TableHead>
+                                        <SortableHeader column="last_login_at" label="Last Active" currentSort={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                                    </TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {users.map((u) => (
+                                {sortedUsers.map((u) => (
                                     <TableRow key={u.id}>
                                         <TableCell className="font-medium">{u.email}</TableCell>
                                         <TableCell>
@@ -139,6 +184,9 @@ function AdminSettings() {
                                         <TableCell>{u.status}</TableCell>
                                         <TableCell>{u.device_count}</TableCell>
                                         <TableCell>{format(new Date(u.created_at), 'MMM d, yyyy')}</TableCell>
+                                        <TableCell className="text-muted-foreground text-sm">
+                                            {u.last_login_at ? format(new Date(u.last_login_at), 'MMM d, HH:mm') : 'Never'}
+                                        </TableCell>
                                         <TableCell className="text-right">
                                             <Button
                                                 variant="ghost"
