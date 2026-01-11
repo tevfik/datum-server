@@ -267,28 +267,24 @@ export default function Settings() {
                 )}
                 {user?.role === 'admin' && (
                     <button
-                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mqtt' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                        onClick={() => setActiveTab('mqtt')}
-                    >
-                        MQTT
-                    </button>
-                )}
-                {user?.role === 'admin' && (
-                    <button
                         className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'system' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                         onClick={() => setActiveTab('system')}
                     >
                         System
                     </button>
                 )}
-                {user?.role === 'admin' && (
-                    <button
-                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'http' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                        onClick={() => setActiveTab('http')}
-                    >
-                        HTTP
-                    </button>
-                )}
+                <button
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mqtt' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                    onClick={() => setActiveTab('mqtt')}
+                >
+                    MQTT
+                </button>
+                <button
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'http' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                    onClick={() => setActiveTab('http')}
+                >
+                    HTTP
+                </button>
             </div>
 
             {/* API Keys Content */}
@@ -362,15 +358,15 @@ export default function Settings() {
                 <AdminSettings />
             )}
 
-            {activeTab === 'mqtt' && user?.role === 'admin' && (
-                <MqttTab />
-            )}
-
             {activeTab === 'system' && user?.role === 'admin' && (
                 <SystemTab />
             )}
 
-            {activeTab === 'http' && user?.role === 'admin' && (
+            {activeTab === 'mqtt' && (
+                <MqttTab />
+            )}
+
+            {activeTab === 'http' && (
                 <HttpTab />
             )}
 

@@ -17,7 +17,10 @@ interface MqttMessage {
     retain: boolean;
 }
 
+import { useAuth } from "@/context/AuthContext";
+
 export function MqttTab() {
+    const { user } = useAuth();
     // Publish State
     const [topic, setTopic] = useState("");
     const [message, setMessage] = useState("");
@@ -89,7 +92,14 @@ export function MqttTab() {
                 username: 'admin_dashboard_' + Math.floor(Math.random() * 1000),
                 password: apiKey,
                 clean: true,
-                clientId: 'datum_web_' + Math.floor(Math.random() * 100000),
+                // Embed role and user_id in client ID for Backend ACL
+                // Format: datum_web_ROLE_USERID_RANDOM
+                // We don't have user object here? We need to grab it from somewhere.
+                // Assuming we can get it from context or just use generic pending backend check.
+                // Wait, MqttTab is used inside Settings which has access to `user`.
+                // But MqttTab is a standalone component.
+                // I need to use `useAuth` here.
+                clientId: `datum_web_${user?.role}_${user?.id}_${Math.floor(Math.random() * 10000)}`,
             });
 
             client.on('connect', () => {

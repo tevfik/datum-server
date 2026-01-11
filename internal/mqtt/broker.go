@@ -183,7 +183,7 @@ func (h *AuthHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) boo
 		return false
 	}
 
-	// 1. Admin Dashboard Authentication
+	// 1. Admin/User Dashboard Authentication
 	if strings.HasPrefix(clientID, "admin_dashboard_") {
 		// Expecting User API Key
 		if strings.HasPrefix(token, "ak_") {
@@ -191,8 +191,8 @@ func (h *AuthHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) boo
 			if err != nil {
 				return false
 			}
-			// Only allow Admins
-			if user.Role == "admin" {
+			// Allow valid users (Role check moved to ACL)
+			if user != nil {
 				return true
 			}
 		}
@@ -220,12 +220,40 @@ func (h *AuthHook) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
 	// data/{device_id} -> Write Only
 	// cmd/{device_id} -> Read Only
 
-	// Admin Dashboard Access
-	// If the client ID starts with "datum_web_", it is the dashboard (authenticated as admin above)
-	// We trust it because OnConnectAuthenticate enforced the admin key for this session username pattern.
-	// Note: We check ClientID here (cl.ID), which matches what MqttTab sends ('datum_web_...').
+	// Dashboard Access (Admin vs User)
+	// Format: datum_web_{role}_{userid}_{random}
 	if strings.HasPrefix(cl.ID, "datum_web_") {
-		return true // Admin can read/write anything
+		parts := strings.Split(cl.ID, "_")
+		if len(parts) >= 4 {
+			role := parts[2]
+			userID := parts[3]
+
+			// Admin: All Access
+			if role == "admin" {
+				return true
+			}
+
+			// User: Own Devices Only
+			// Check if topic targets a specific device
+			topicParts := strings.Split(topic, "/")
+			if len(topicParts) >= 2 {
+				targetDeviceID := topicParts[1]
+
+				// Verify ownership
+				// Optimization: GetUserDevices is fast (in-memory BuntDB)
+				devices, err := h.store.GetUserDevices(userID)
+				if err == nil {
+					for _, d := range devices {
+						if d.ID == targetDeviceID {
+							return true // Allowed
+						}
+					}
+				}
+			}
+			return false // Block access to other devices
+		}
+		// Fallback for old clients or malformed IDs -> Block
+		return false
 	}
 
 	// Device Access
