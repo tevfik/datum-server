@@ -276,6 +276,7 @@ func main() {
 	r.GET("/sys/time", getSystemTimeHandler)
 	// Also map /sys/time for backward compatibility if desired, or just clean cut
 	// r.GET("/sys/time", getSystemTimeHandler)
+	r.GET("/sys/ip", getSystemIPHandler)
 
 	// Auth routes
 	authGroup := r.Group("/auth")
@@ -576,4 +577,10 @@ func rootHandler(c *gin.Context) {
 		return
 	}
 	c.Data(http.StatusOK, "text/html; charset=utf-8", content)
+}
+
+func getSystemIPHandler(c *gin.Context) {
+	// Returns the client's public IP as seen by the server
+	// Gin's ClientIP() handles X-Forwarded-For and X-Real-IP headers
+	c.String(http.StatusOK, c.ClientIP())
 }

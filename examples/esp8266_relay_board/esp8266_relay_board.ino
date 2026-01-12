@@ -44,7 +44,7 @@ void loop() {
 #define ADC_BATTERY A0
 
 // ======== FIRMWARE CONFIG ========
-#define FIRMWARE_VER "1.2.1" // Bumped version for MQTT
+#define FIRMWARE_VER "1.2.2" // Bumped version for MQTT
 #define DEVICE_TYPE_NAME "relay_board"
 #define DEVICE_FRIENDLY_NAME "ESP8266 Relay"
 
