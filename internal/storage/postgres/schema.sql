@@ -115,3 +115,17 @@ CREATE TABLE IF NOT EXISTS system_settings (
     value JSONB NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Generic Documents Table (Collections)
+CREATE TABLE IF NOT EXISTS documents (
+    id TEXT NOT NULL,          -- User provided ID or UUID
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    collection TEXT NOT NULL,  -- Collection name
+    data JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ,
+    
+    PRIMARY KEY (user_id, collection, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_documents_collection ON documents(user_id, collection);
