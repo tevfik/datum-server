@@ -86,19 +86,35 @@ def main():
     while current < now:
         ts_str = current.strftime("%Y-%m-%dT%H:%M:%SZ")
         
-        # Simulate sensor data
+        # Simulate sensor data - richer set
         hour = current.hour
+        
+        # Temperature: Daily cycle + random noise
         temp_cycle = 20 + 5 * math.sin((hour - 6) * 2 * math.pi / 24) 
         temp = temp_cycle + random.uniform(-0.5, 0.5)
+        
+        # Humidity: Inverse to temp
         hum = 60 - 15 * math.sin((hour - 6) * 2 * math.pi / 24) + random.uniform(-2, 2)
-        volt = 4.2 - (0.01 * (count % 100))
+        
+        # Voltage: Slow discharge
+        volt = 4.2 - (0.005 * (count % 200)) # Slower discharge cycle
         if volt < 3.3: volt = 4.2
+        
+        # RSSI (Signal Strength): Random fluctuation
+        rssi = -60 + random.uniform(-10, 5)
+        
+        # CPU Usage: Load spikes during "day"
+        cpu_load = 10 + random.uniform(0, 5)
+        if 9 <= hour <= 18:
+            cpu_load += random.uniform(20, 40) # Busy during day
         
         data_payload = json.dumps({
             "timestamp": ts_str, 
             "temperature": round(temp, 2),
             "humidity": round(hum, 1),
-            "battery_voltage": round(volt, 2)
+            "battery_voltage": round(volt, 2),
+            "wifi_signal": int(rssi),
+            "cpu_usage": round(cpu_load, 1)
         })
         
         try:
@@ -108,12 +124,12 @@ def main():
                 stdout=subprocess.DEVNULL
             )
             
-            if count % 10 == 0:
-                print(f"Posted data for {ts_str} -> Temp: {round(temp,1)}")
+            if count % 20 == 0:
+                print(f"Posted {ts_str} -> T:{round(temp,1)} C, CPU:{int(cpu_load)}%")
         except Exception as e:
             print(f"Failed to post {ts_str}: {e}")
             
-        current += timedelta(minutes=15)
+        current += timedelta(minutes=5) # 5-minute interval for denser data
         count += 1
         
     print(f"\nDone! Posted ~{count} data points for {dev_id}.")

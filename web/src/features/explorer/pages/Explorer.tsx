@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { deviceService } from '@/features/devices/services/deviceService';
 import { explorerService } from '@/features/explorer/services/explorerService';
@@ -97,11 +97,19 @@ export default function Explorer() {
         return Array.from(keys);
     }, [history]);
 
-    // Auto-select metrics if list changes and nothing selected
-    if (availableMetrics.length > 0 && selectedMetrics.length === 0) {
-        // Default to first 3 metrics
-        setSelectedMetrics(availableMetrics.slice(0, 3));
-    }
+    // Auto-select metrics ONLY when availableMetrics change (e.g. new device/range)
+    // and we don't have a valid selection yet.
+    useEffect(() => {
+        if (availableMetrics.length > 0) {
+            // Check if our current selection is valid (intersects with available)
+            const hasValidSelection = selectedMetrics.some(m => availableMetrics.includes(m));
+
+            if (!hasValidSelection) {
+                // Default to first 3 metrics
+                setSelectedMetrics(availableMetrics.slice(0, 3));
+            }
+        }
+    }, [availableMetrics]);
 
     const handleMetricToggle = (metric: string) => {
         setSelectedMetrics(prev =>
