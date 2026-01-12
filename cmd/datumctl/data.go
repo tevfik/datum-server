@@ -187,9 +187,9 @@ func runDataPost(cmd *cobra.Command, args []string) error {
 	// Determine endpoint
 	var path string
 	if dataDevice != "" {
-		path = fmt.Sprintf("/data/%s", dataDevice)
+		path = fmt.Sprintf("/dev/%s/data", dataDevice)
 	} else {
-		path = "/public/data"
+		path = "/pub/public/data" // Assuming public is also changed or verify pub handling
 	}
 
 	resp, err := client.Post(path, jsonData)

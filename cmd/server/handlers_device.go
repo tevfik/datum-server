@@ -13,6 +13,7 @@ import (
 // ============ Device Request/Response types ============
 
 type CreateDeviceRequest struct {
+	ID   string `json:"device_id"`
 	Name string `json:"name" binding:"required"`
 	Type string `json:"type" binding:"required"`
 }
@@ -42,7 +43,10 @@ func createDeviceHandler(c *gin.Context) {
 		return
 	}
 
-	deviceID := generateID("dev")
+	deviceID := req.ID
+	if deviceID == "" {
+		deviceID = generateID("dev")
+	}
 	apiKey, err := auth.GenerateAPIKey()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate API key"})

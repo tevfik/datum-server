@@ -87,9 +87,16 @@ type ProcessingResult struct {
 func (tp *TelemetryProcessor) Process(deviceID string, data map[string]interface{}) (*ProcessingResult, error) {
 	data["server_time"] = time.Now().Unix()
 
+	ts := time.Now()
+	if tStr, ok := data["timestamp"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, tStr); err == nil {
+			ts = t
+		}
+	}
+
 	point := &storage.DataPoint{
 		DeviceID:  deviceID,
-		Timestamp: time.Now(),
+		Timestamp: ts,
 		Data:      data,
 	}
 
