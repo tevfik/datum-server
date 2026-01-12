@@ -78,7 +78,7 @@ def main():
 
     # 3. Populate Data
     print("\n--- 3. Populating Data (Last 24h) ---")
-    now = datetime.now()
+    now = datetime.utcnow()
     start_time = now - timedelta(hours=24)
     current = start_time
     count = 0
