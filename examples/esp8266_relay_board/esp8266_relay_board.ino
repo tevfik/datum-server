@@ -50,7 +50,7 @@ void loop() {
 
 // ======== STORAGE CONFIG ========
 #define EEPROM_SIZE 2048
-#define CONFIG_MAGIC 0xD4701103 // Increment this when modifying struct
+#define CONFIG_MAGIC 0xD4701104 // Increment this when modifying struct
 
 struct Config {
   uint32_t magic;
@@ -62,6 +62,7 @@ struct Config {
   char device_name[33];
   char device_id[37];
   int boot_failures;
+  bool relay_states[4];
 };
 
 // Global Objects
@@ -101,7 +102,17 @@ void loadConfig() {
 void setRelay(int index, bool state) {
   if (index < 0 || index > 3)
     return;
+
+  // Update volatile state
   relays[index] = state;
+
+  // Persist State logic
+  if (config.relay_states[index] != state) {
+    config.relay_states[index] = state;
+    saveConfig();
+    Serial.printf("Relay %d State Saved: %s\n", index, state ? "ON" : "OFF");
+  }
+
   int pin;
   switch (index) {
   case 0:
@@ -567,11 +578,27 @@ void setup() {
   pinMode(GPIO_RELAY_1, OUTPUT);
   pinMode(GPIO_RELAY_2, OUTPUT);
   pinMode(GPIO_RELAY_3, OUTPUT);
-  // Default OFF
-  setRelay(0, false);
-  setRelay(1, false);
-  setRelay(2, false);
-  setRelay(3, false);
+  // Restore Relay States from EEPROM
+  Serial.println("Restoring Relay States...");
+  for (int i = 0; i < 4; i++) {
+    // Determine pin
+    int pin = -1;
+    if (i == 0)
+      pin = GPIO_RELAY_0;
+    else if (i == 1)
+      pin = GPIO_RELAY_1;
+    else if (i == 2)
+      pin = GPIO_RELAY_2;
+    else if (i == 3)
+      pin = GPIO_RELAY_3;
+
+    if (pin != -1) {
+      bool s = config.relay_states[i];
+      relays[i] = s;
+      digitalWrite(pin, s ? LOW : HIGH); // Active LOW
+      Serial.printf("Relay %d -> %s\n", i, s ? "ON" : "OFF");
+    }
+  }
 
   if (strlen(config.wifi_ssid) == 0) {
     setupProvisioning();
