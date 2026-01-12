@@ -207,6 +207,10 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 
+	// Trust all proxies (Private Networks) to resolve correct IP behind Nginx/Docker
+	// This enables ClientIP() to read X-Forwarded-For correctly
+	r.SetTrustedProxies([]string{"127.0.0.1", "192.168.0.0/16", "172.16.0.0/12", "10.0.0.0/8"})
+
 	// Middleware setup
 	r.Use(gin.Recovery())
 	// Use our custom structured logger for requests which filters noisy endpoints
