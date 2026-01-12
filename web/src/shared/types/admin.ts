@@ -18,6 +18,7 @@ export interface SystemStats {
     allow_register?: boolean;
     // New fields
     server_time?: string;
+    server_uptime_seconds?: number;
     env_vars?: Record<string, string>;
 }
 

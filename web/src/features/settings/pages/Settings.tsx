@@ -58,8 +58,19 @@ function AdminSettings() {
         },
     });
 
+
     // Bytes to MB
     const formatBytes = (bytes: number) => (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+
+    // Seconds to human-readable uptime
+    const formatUptime = (seconds: number) => {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        return `${minutes}m`;
+    };
 
     const handleSort = (column: string) => {
         if (sortColumn === column) {
@@ -125,6 +136,16 @@ function AdminSettings() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-xs font-mono">{stats?.server_time ? format(new Date(stats.server_time), 'yyyy-MM-dd HH:mm:ss') : '-'}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Server Uptime</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-xs font-mono">
+                            {stats?.server_uptime_seconds ? formatUptime(stats.server_uptime_seconds) : '-'}
+                        </div>
                     </CardContent>
                 </Card>
             </div>
