@@ -35,16 +35,16 @@ void loop() {
 
 // ======== HARDWARE CONFIG ========
 // Relay Pins (Active Low/High depends on board, typically Low for Relay Boards)
-#define GPIO_RELAY_0 16
-#define GPIO_RELAY_1 5
-#define GPIO_RELAY_2 4
-#define GPIO_RELAY_3 0 // Be careful, GPIO0 is boot mode pin
+#define GPIO_RELAY_0 5
+#define GPIO_RELAY_1 4
+#define GPIO_RELAY_2 0
+#define GPIO_RELAY_3 2 // Be careful, GPIO0 is boot mode pin
 
 // Battery Voltage ADC
 #define ADC_BATTERY A0
 
 // ======== FIRMWARE CONFIG ========
-#define FIRMWARE_VER "1.1.0" // Bumped version for MQTT
+#define FIRMWARE_VER "1.2.1" // Bumped version for MQTT
 #define DEVICE_TYPE_NAME "relay_board"
 #define DEVICE_FRIENDLY_NAME "ESP8266 Relay"
 
@@ -140,6 +140,24 @@ String getHostFromUrl(String url) {
   return url;
 }
 
+// Helper: Send Log via MQTT
+void sendLog(String msg) {
+  if (mqttClient.connected()) {
+    String topic = "dev/" + String(config.device_id) + "/logs";
+    // Create a simple JSON log object or just send text. Datum usually expects
+    // JSON or handles text? Let's send a JSON object: {"msg": "..."}
+    String payload =
+        "{\"msg\":\"" + msg + "\", \"ts\":" + String(millis() / 1000) + "}";
+    mqttClient.publish(topic.c_str(), payload.c_str());
+    Serial.println("LOG: " + msg);
+    // Give a moment for the message to leave the buffer
+    mqttClient.loop();
+    delay(50);
+  } else {
+    Serial.println("LOG (No MQTT): " + msg);
+  }
+}
+
 void mqttCallback(char *topic, byte *payload, unsigned int length) {
   // Print payload for debugging (be careful with large payloads)
   Serial.printf("MQTT Message [%s] (%d bytes)\n", topic, length);
@@ -197,8 +215,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
     else
       fwUrl += "&token=" + String(config.api_key);
 
-    Serial.println("Starting OTA Update...");
-    Serial.println("URL: " + fwUrl);
+    sendLog("OTA Update Initiated. URL: " + fwUrl);
 
     // Use Secure Client for HTTPS support
     WiFiClientSecure client;
@@ -209,17 +226,21 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       Serial.printf("OTA Progress: %d%%\n", (cur * 100) / total);
     });
 
+    // Ensure MQTT loop runs a bit before blocking update
+    mqttClient.loop();
+    delay(100);
+
     t_httpUpdate_return ret = ESPhttpUpdate.update(client, fwUrl);
     switch (ret) {
     case HTTP_UPDATE_FAILED:
-      Serial.printf("OTA Failed: %s\n",
-                    ESPhttpUpdate.getLastErrorString().c_str());
+      sendLog("OTA Failed: " + ESPhttpUpdate.getLastErrorString());
       break;
     case HTTP_UPDATE_NO_UPDATES:
-      Serial.println("OTA: No updates");
+      sendLog("OTA: No updates available");
       break;
     case HTTP_UPDATE_OK:
-      Serial.println("OTA: OK");
+      sendLog("OTA Success! Rebooting...");
+      delay(500); // Wait for message to send
       ESP.restart();
       break;
     }

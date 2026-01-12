@@ -230,6 +230,16 @@ func (h *AdminHandler) UploadFirmwareHandler(c *gin.Context) {
 	safeFilename := filepath.Base(file.Filename)
 	dst := filepath.Join(firmwareDir, safeFilename)
 
+	// Remove existing file if present to ensure clean overwrite
+	if _, err := os.Stat(dst); err == nil {
+		if err := os.Remove(dst); err != nil {
+			logger.Logger.Warn().Err(err).Msgf("Failed to delete existing firmware file: %s", dst)
+			// Continue anyway, SaveUploadedFile might overwrite (truncates)
+		} else {
+			logger.Logger.Info().Msgf("Deleted existing firmware file: %s", dst)
+		}
+	}
+
 	if err := c.SaveUploadedFile(file, dst); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save firmware file"})
 		return
