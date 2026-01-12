@@ -11,7 +11,7 @@ import sys
 DATUMCTL = "build/binaries/datumctl"
 SERVER = "https://datum.bezg.in"
 EMAIL = "tevfik.kadioglu@gmail.com"
-PASSWORD = "t0751234k" 
+PASSWORD = "**" 
 
 def run_cmd(args):
     # Capture output
