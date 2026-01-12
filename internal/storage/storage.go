@@ -370,6 +370,7 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 	var rows []tstorage.Row
 	for _, point := range points {
 		ts := point.Timestamp.UnixNano()
+		fmt.Printf("DEBUG: StoreDataBatch - Device: %s, Time: %v, Data: %v\n", point.DeviceID, point.Timestamp, point.Data)
 		for key, val := range point.Data {
 			var floatVal float64
 			switch v := val.(type) {
@@ -493,9 +494,10 @@ func (s *Storage) GetLatestData(deviceID string) (*DataPoint, error) {
 
 // GetDataHistoryWithRange retrieves historical data with time range filtering
 func (s *Storage) GetDataHistoryWithRange(deviceID string, start, end time.Time, limit int) ([]DataPoint, error) {
+	fmt.Printf("DEBUG: GetDataHistoryWithRange - Device: %s, Start: %v, End: %v\n", deviceID, start, end)
 	// Collect all timestamps and their values
 	tsMap := make(map[int64]map[string]float64)
-	metrics := []string{"temperature", "humidity", "pressure", "battery", "value"}
+	metrics := []string{"temperature", "humidity", "pressure", "battery", "battery_voltage", "value"}
 
 	for _, metric := range metrics {
 		metricName := fmt.Sprintf("%s.%s", deviceID, metric)
@@ -548,6 +550,7 @@ func (s *Storage) GetDataHistoryWithRange(deviceID string, start, end time.Time,
 
 // GetDataHistory retrieves historical data points for a device
 func (s *Storage) GetDataHistory(deviceID string, limit int) ([]DataPoint, error) {
+	fmt.Printf("DEBUG: GetDataHistory - Device: %s, Limit: %d\n", deviceID, limit)
 	end := time.Now()
 	start := end.Add(-7 * 24 * time.Hour) // Last 7 days
 
@@ -558,7 +561,7 @@ func (s *Storage) GetDataHistory(deviceID string, limit int) ([]DataPoint, error
 	}
 
 	tsMap := make(map[int64]map[string]float64)
-	metrics := []string{"temperature", "humidity", "pressure", "battery", "value"}
+	metrics := []string{"temperature", "humidity", "pressure", "battery", "battery_voltage", "value"}
 
 	for _, metric := range metrics {
 		metricName := fmt.Sprintf("%s.%s", deviceID, metric)
