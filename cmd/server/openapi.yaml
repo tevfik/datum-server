@@ -1919,7 +1919,76 @@ paths:
                   type: object
                   additionalProperties: true
 
+    post:
+      summary: Create user document (Admin)
+      tags: [Admin, Database]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Document content
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Document created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+
   /sys/db/{user_id}/{collection}/{doc_id}:
+    put:
+      summary: Update user document (Admin)
+      tags: [Admin, Database]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: doc_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Document content
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Document updated
     delete:
       summary: Delete user document (Admin)
       tags: [Admin, Database]
