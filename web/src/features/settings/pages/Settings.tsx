@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { Copy, Plus, Trash2, Key, Check } from 'lucide-react';
+import { Copy, Plus, Trash2, Key, Check, Pause, Play } from 'lucide-react';
 import { authService } from '@/features/auth/services/authService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,15 @@ function AdminSettings() {
     // Delete User
     const deleteMutation = useMutation({
         mutationFn: adminService.deleteUser,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+        },
+    });
+
+    // Suspend/Activate User
+    const suspendMutation = useMutation({
+        mutationFn: ({ id, status }: { id: string; status: 'active' | 'suspended' }) =>
+            adminService.updateUserStatus(id, status),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
         },
@@ -188,7 +197,24 @@ function AdminSettings() {
                                         <TableCell className="text-muted-foreground text-sm">
                                             {u.last_login_at ? format(new Date(u.last_login_at), 'MMM d, HH:mm') : 'Never'}
                                         </TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-right space-x-1">
+                                            {/* Suspend/Resume Button */}
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                title={u.status === 'suspended' ? 'Activate User' : 'Suspend User'}
+                                                onClick={() => {
+                                                    const newStatus = u.status === 'suspended' ? 'active' : 'suspended';
+                                                    suspendMutation.mutate({ id: u.id, status: newStatus });
+                                                }}
+                                            >
+                                                {u.status === 'suspended' ? (
+                                                    <Play className="h-4 w-4 text-emerald-500" />
+                                                ) : (
+                                                    <Pause className="h-4 w-4 text-amber-500" />
+                                                )}
+                                            </Button>
+                                            {/* Delete Button */}
                                             <Button
                                                 variant="ghost"
                                                 size="icon"

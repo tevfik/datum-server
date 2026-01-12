@@ -11,6 +11,10 @@ export const adminService = {
         await api.delete(`/admin/users/${id}`);
     },
 
+    updateUserStatus: async (id: string, status: 'active' | 'suspended'): Promise<void> => {
+        await api.put(`/admin/users/${id}`, { status });
+    },
+
     getSystemStats: async (): Promise<SystemStats> => {
         const { data } = await api.get<SystemStats>('/admin/database/stats');
         return data;
