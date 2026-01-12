@@ -341,8 +341,33 @@ func (s *Storage) StoreData(point *DataPoint) error {
 			return err
 		}
 
-		// Also update device LastSeen
+		// Also update device LastSeen and Metrics
 		deviceKey := fmt.Sprintf("device:%s", point.DeviceID)
+		metricsKey := fmt.Sprintf("device:%s:metrics", point.DeviceID)
+
+		// Update metrics list
+		var currentMetrics []string
+		if mVal, err := tx.Get(metricsKey); err == nil {
+			json.Unmarshal([]byte(mVal), &currentMetrics)
+		}
+
+		metricSet := make(map[string]bool)
+		for _, m := range currentMetrics {
+			metricSet[m] = true
+		}
+		changed := false
+		for k := range point.Data {
+			if !metricSet[k] {
+				metricSet[k] = true
+				currentMetrics = append(currentMetrics, k)
+				changed = true
+			}
+		}
+		if changed {
+			mJSON, _ := json.Marshal(currentMetrics)
+			tx.Set(metricsKey, string(mJSON), nil)
+		}
+
 		if deviceVal, err := tx.Get(deviceKey); err == nil {
 			var device Device
 			if err := json.Unmarshal([]byte(deviceVal), &device); err == nil {
@@ -434,13 +459,39 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 				return err
 			}
 
-			// Also update device LastSeen
+			// Also update device LastSeen and Metrics list
 			deviceKey := fmt.Sprintf("device:%s", deviceID)
+			metricsKey := fmt.Sprintf("device:%s:metrics", deviceID)
+
+			// Update metrics list
+			var currentMetrics []string
+			if mVal, err := tx.Get(metricsKey); err == nil {
+				json.Unmarshal([]byte(mVal), &currentMetrics)
+			}
+
+			// Add new keys
+			metricSet := make(map[string]bool)
+			for _, m := range currentMetrics {
+				metricSet[m] = true
+			}
+			changed := false
+			for k := range point.Data {
+				// Skip non-numeric if we only chart numbers, but let's keep all keys for now
+				if !metricSet[k] {
+					metricSet[k] = true
+					currentMetrics = append(currentMetrics, k)
+					changed = true
+				}
+			}
+			if changed {
+				mJSON, _ := json.Marshal(currentMetrics)
+				tx.Set(metricsKey, string(mJSON), nil)
+			}
+
 			if deviceVal, err := tx.Get(deviceKey); err == nil {
 				var device Device
 				if err := json.Unmarshal([]byte(deviceVal), &device); err == nil {
 					device.LastSeen = time.Now()
-					// Store public IP if present (prioritize latest)
 					// Store public IP if present (prioritize latest)
 					if ip, ok := point.Data["public_ip"].(string); ok && ip != "" {
 						device.PublicIP = ip
@@ -497,7 +548,23 @@ func (s *Storage) GetDataHistoryWithRange(deviceID string, start, end time.Time,
 	fmt.Printf("DEBUG: GetDataHistoryWithRange - Device: %s, Start: %v, End: %v\n", deviceID, start, end)
 	// Collect all timestamps and their values
 	tsMap := make(map[int64]map[string]float64)
-	metrics := []string{"temperature", "humidity", "pressure", "battery", "battery_voltage", "value"}
+
+	// Fetch dynamic metrics list from BuntDB
+	metricsKey := fmt.Sprintf("device:%s:metrics", deviceID)
+	var metrics []string
+	s.db.View(func(tx *buntdb.Tx) error {
+		if val, err := tx.Get(metricsKey); err == nil {
+			json.Unmarshal([]byte(val), &metrics)
+		}
+		return nil
+	})
+
+	// Fallback/Default metrics if empty
+	if len(metrics) == 0 {
+		metrics = []string{"temperature", "humidity", "pressure", "battery", "battery_voltage", "value"}
+	}
+
+	fmt.Printf("DEBUG: GetDataHistoryWithRange - Device: %s, Metrics: %v\n", deviceID, metrics)
 
 	for _, metric := range metrics {
 		metricName := fmt.Sprintf("%s.%s", deviceID, metric)
@@ -561,7 +628,21 @@ func (s *Storage) GetDataHistory(deviceID string, limit int) ([]DataPoint, error
 	}
 
 	tsMap := make(map[int64]map[string]float64)
-	metrics := []string{"temperature", "humidity", "pressure", "battery", "battery_voltage", "value"}
+	// Fetch dynamic metrics list from BuntDB
+	metricsKey := fmt.Sprintf("device:%s:metrics", deviceID)
+	var metrics []string
+	s.db.View(func(tx *buntdb.Tx) error {
+		if val, err := tx.Get(metricsKey); err == nil {
+			json.Unmarshal([]byte(val), &metrics)
+		}
+		return nil
+	})
+
+	if len(metrics) == 0 {
+		metrics = []string{"temperature", "humidity", "pressure", "battery", "battery_voltage", "value"}
+	}
+
+	fmt.Printf("DEBUG: GetDataHistory - Device: %s, Metrics: %v\n", deviceID, metrics)
 
 	for _, metric := range metrics {
 		metricName := fmt.Sprintf("%s.%s", deviceID, metric)
