@@ -93,7 +93,7 @@ func runDataGet(cmd *cobra.Command, args []string) error {
 	client := NewAPIClient(serverURL, token, apiKey)
 
 	// Build query parameters
-	path := fmt.Sprintf("/data/%s", dataDevice)
+	path := fmt.Sprintf("/dev/%s/rec", dataDevice)
 	queryParams := ""
 
 	if dataLast != "" {
