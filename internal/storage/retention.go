@@ -15,8 +15,9 @@ func GetRetentionConfigFromEnv() RetentionConfig {
 	if maxDays := os.Getenv("RETENTION_MAX_DAYS"); maxDays != "" {
 		if days, err := strconv.Atoi(maxDays); err == nil {
 			if days <= 0 {
-				// 0 or negative means infinite retention
-				config.MaxAge = 0
+				// 0 or negative means infinite retention (set to 100 years)
+				// tstorage might interpret 0 as "expire immediately", so we use a large value
+				config.MaxAge = 100 * 365 * 24 * time.Hour
 			} else {
 				config.MaxAge = time.Duration(days) * 24 * time.Hour
 			}
