@@ -22,11 +22,23 @@ interface TelemetryChartProps {
 export function TelemetryChart({ data, isLoading }: TelemetryChartProps) {
     const chartData = useMemo(() => {
         if (!data || data.length === 0) return [];
-        return data.map(point => ({
-            timestamp: point.timestamp,
-            date: format(new Date(point.timestamp * 1000), 'HH:mm:ss'),
-            ...point.data
-        })).reverse(); // Recharts wants ascending time usually, API might return desc? check backend. 
+        return data.map(point => {
+            let dateStr = 'N/A';
+            try {
+                // Ensure timestamp is a number and valid
+                const ts = Number(point.timestamp);
+                if (!isNaN(ts) && ts > 0) {
+                    dateStr = format(new Date(ts * 1000), 'HH:mm:ss');
+                }
+            } catch (e) {
+                // Ignore format errors
+            }
+            return {
+                timestamp: point.timestamp,
+                date: dateStr,
+                ...point.data
+            };
+        }).reverse();
         // If query is LIMIT 100, usually returns latest first? 
         // Postgres query in backend: Order("timestamp DESC"). 
         // So we need to reverse for chart (left to right time).
