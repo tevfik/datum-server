@@ -36,9 +36,14 @@ export const deviceService = {
         return data;
     },
 
-    // Delete a device
+    // Delete a device (user-scoped)
     delete: async (id: string): Promise<void> => {
         await api.delete(`/dev/${id}`);
+    },
+
+    // Delete any device (admin only)
+    deleteAdmin: async (id: string): Promise<void> => {
+        await api.delete(`/admin/dev/${id}`);
     },
 
     // Update device status (admin only)

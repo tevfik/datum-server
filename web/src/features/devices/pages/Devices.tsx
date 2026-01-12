@@ -42,7 +42,7 @@ export default function Devices() {
     });
 
     const deleteMutation = useMutation({
-        mutationFn: deviceService.delete,
+        mutationFn: isAdmin ? deviceService.deleteAdmin : deviceService.delete,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['devices'] });
         },
