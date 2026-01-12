@@ -89,14 +89,15 @@ func (h *AdminHandler) ListAllDevicesHandler(c *gin.Context) {
 		}
 
 		enrichedDevices = append(enrichedDevices, gin.H{
-			"id":          d.ID,
-			"name":        d.Name,
-			"type":        d.Type,
-			"status":      d.Status,
-			"owner_id":    d.UserID,
-			"owner_email": ownerEmail,
-			"last_seen":   d.LastSeen,
-			"created_at":  d.CreatedAt,
+			"id":           d.ID,
+			"name":         d.Name,
+			"type":         d.Type,
+			"status":       d.Status, // Admin status: active/suspended/banned
+			"admin_status": d.Status, // Explicit field for frontend clarity
+			"owner_id":     d.UserID,
+			"owner_email":  ownerEmail,
+			"last_seen":    d.LastSeen,
+			"created_at":   d.CreatedAt,
 		})
 	}
 

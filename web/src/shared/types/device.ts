@@ -6,7 +6,8 @@ export interface Device {
     public_ip: string;
     last_seen: string;
     created_at: string;
-    status: 'online' | 'offline';
+    status: 'online' | 'offline';  // Connection status
+    admin_status?: 'active' | 'suspended' | 'banned';  // Administrative status
     shadow_state?: Record<string, any>;
 }
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { deviceService } from '@/features/devices/services/deviceService';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/shared/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -13,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { RefreshCw, Plus, Monitor, Pencil, Trash2 } from 'lucide-react';
+import { RefreshCw, Plus, Monitor, Pencil, Trash2, Pause, Play } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { SortableHeader } from '@/components/ui/sortable-header';
 import { AddDeviceModal } from '@/features/devices/components/AddDeviceModal';
@@ -21,13 +22,23 @@ import { AddDeviceModal } from '@/features/devices/components/AddDeviceModal';
 export default function Devices() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'admin';
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [sortColumn, setSortColumn] = useState('status');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
     const { data: devices, isLoading, isError, refetch } = useQuery({
-        queryKey: ['devices'],
-        queryFn: deviceService.getAll,
+        queryKey: ['devices', isAdmin],
+        queryFn: isAdmin ? deviceService.getAllAdmin : deviceService.getAll,
+    });
+
+    const updateStatusMutation = useMutation({
+        mutationFn: (params: { id: string; status: 'active' | 'suspended' }) =>
+            deviceService.updateStatus(params.id, params.status),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['devices'] });
+        },
     });
 
     const deleteMutation = useMutation({
@@ -47,6 +58,12 @@ export default function Devices() {
     const handleEdit = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
         navigate(`/devices/${id}`);
+    };
+
+    const handleToggleStatus = (e: React.MouseEvent, id: string, currentAdminStatus: string | undefined) => {
+        e.stopPropagation();
+        const newStatus = currentAdminStatus === 'active' || !currentAdminStatus ? 'suspended' : 'active';
+        updateStatusMutation.mutate({ id, status: newStatus });
     };
 
     const handleSort = (column: string) => {
@@ -165,6 +182,21 @@ export default function Devices() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
+                                                {isAdmin && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                                        onClick={(e) => handleToggleStatus(e, device.id, device.admin_status)}
+                                                        title={(device.admin_status === 'active' || !device.admin_status) ? 'Suspend Device' : 'Resume Device'}
+                                                    >
+                                                        {(device.admin_status === 'active' || !device.admin_status) ? (
+                                                            <Pause className="h-4 w-4" />
+                                                        ) : (
+                                                            <Play className="h-4 w-4" />
+                                                        )}
+                                                    </Button>
+                                                )}
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"

@@ -12,9 +12,15 @@ import type {
 } from '@/types/device';
 
 export const deviceService = {
-    // List all devices
+    // List all devices (user-scoped)
     getAll: async (): Promise<Device[]> => {
         const { data } = await api.get<DeviceListResponse>('/dev');
+        return data.devices;
+    },
+
+    // List all devices (admin - all users)
+    getAllAdmin: async (): Promise<Device[]> => {
+        const { data } = await api.get<{ devices: Device[] }>('/admin/dev');
         return data.devices;
     },
 
@@ -33,6 +39,11 @@ export const deviceService = {
     // Delete a device
     delete: async (id: string): Promise<void> => {
         await api.delete(`/dev/${id}`);
+    },
+
+    // Update device status (admin only)
+    updateStatus: async (id: string, status: 'active' | 'suspended' | 'banned'): Promise<void> => {
+        await api.put(`/admin/dev/${id}`, { status });
     },
 
     // Get pending commands for a device
