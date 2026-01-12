@@ -56,7 +56,7 @@ struct Config {
   uint32_t magic;
   char wifi_ssid[32];
   char wifi_pass[64];
-  char api_key[64]; // Increased from 33 to support sk_ (35) and dk_ (38) keys
+  char api_key[64]; // Increased to support sk_, dk_, and ak_ keys
   char server_url[128];
   char user_token[1024];
   char device_name[33];
@@ -78,6 +78,7 @@ unsigned long lastDataReport = 0;
 // const unsigned long COMMAND_INTERVAL = 5000; // Not needed for MQTT (Push)
 const unsigned long REPORT_INTERVAL = 30000; // 30s
 unsigned long lastReconnectAttempt = 0;
+unsigned long lastWiFiCheck = 0;
 
 // Helper: Save/Load Config
 void saveConfig() {
@@ -138,6 +139,52 @@ String getHostFromUrl(String url) {
   if (port != -1)
     url = url.substring(0, port);
   return url;
+}
+
+// Global Public IP
+String publicIP = "";
+
+void updatePublicIP() {
+  if (WiFi.status() != WL_CONNECTED)
+    return;
+  if (strlen(config.server_url) == 0)
+    return;
+
+  String url = String(config.server_url);
+  if (url.endsWith("/"))
+    url.remove(url.length() - 1);
+  url += "/sys/ip";
+
+  Serial.println("Querying Public IP from: " + url);
+
+  std::unique_ptr<WiFiClient> client;
+  if (url.startsWith("https://")) {
+    WiFiClientSecure *secureClient = new WiFiClientSecure();
+    secureClient->setInsecure();
+    client.reset(secureClient);
+  } else {
+    client.reset(new WiFiClient());
+  }
+
+  HTTPClient http;
+  if (http.begin(*client, url)) {
+    http.setTimeout(5000);
+    int code = http.GET();
+    if (code > 0) {
+      String payload = http.getString();
+      payload.trim();
+      if (payload.length() > 0) {
+        publicIP = payload;
+        Serial.println("Public IP: " + publicIP);
+      }
+    } else {
+      Serial.printf("Public IP Check Failed: %s\n",
+                    http.errorToString(code).c_str());
+    }
+    http.end();
+  } else {
+    Serial.println("Public IP Check: Connection failed");
+  }
 }
 
 // Helper: Send Log via MQTT
@@ -309,6 +356,8 @@ void sendData(bool isBoot, bool isConnect) {
   if (isConnect) {
     doc["local_ip"] = WiFi.localIP().toString();
     doc["ssid"] = WiFi.SSID();
+    if (publicIP.length() > 0)
+      doc["public_ip"] = publicIP;
   }
   if (isBoot)
     doc["fw_ver"] = FIRMWARE_VER;
@@ -565,6 +614,7 @@ void setup() {
         setupProvisioning();
       } else {
         connectMQTT();
+        updatePublicIP(); // Get Public IP before first report
         sendData(true, true);
       }
       // CRITICAL END
@@ -602,6 +652,18 @@ void loop() {
       if (now - lastDataReport > REPORT_INTERVAL) {
         sendData(false, false);
         lastDataReport = now;
+      }
+    } else {
+      // WiFi Disconnected Logic (Similar to ESP32-S3)
+      unsigned long now = millis();
+      if (now - lastWiFiCheck > 10000) {
+        lastWiFiCheck = now;
+        Serial.println("WiFi Link Lost. Reconnecting...");
+        WiFi.disconnect();
+        WiFi.mode(WIFI_OFF);
+        delay(100);
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(config.wifi_ssid, config.wifi_pass);
       }
     }
   }

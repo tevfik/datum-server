@@ -384,7 +384,7 @@ export function MqttTab() {
                                 value={apiKey}
                                 onChange={(e) => setApiKey(e.target.value)}
                                 disabled={isConnected}
-                                placeholder="sk_..."
+                                placeholder="ak_..."
                             />
                         </div>
                         <div className="space-y-2">
