@@ -223,8 +223,9 @@ func (h *AdminHandler) GetDatabaseStatsHandler(c *gin.Context) {
 	stats["allow_register"] = config.AllowRegister
 	stats["data_retention_days"] = config.DataRetention
 
-	// Add Server Time
+	// Add Server Time and Uptime
 	stats["server_time"] = time.Now().Format(time.RFC3339)
+	stats["server_uptime_seconds"] = int64(time.Since(h.ServerStartTime).Seconds())
 
 	// Add DB Size (Approximate size of data directory)
 	var size int64

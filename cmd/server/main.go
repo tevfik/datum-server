@@ -41,6 +41,7 @@ var (
 	emailService       *email.EmailSender
 	telemetryProcessor *processing.TelemetryProcessor
 	mqttBroker         *mqtt_internal.Broker
+	serverStartTime    time.Time // Track server start time for uptime
 )
 
 // Security headers middleware
@@ -63,6 +64,9 @@ func securityHeadersMiddleware() gin.HandlerFunc {
 }
 
 func main() {
+	// Record server start time for uptime tracking
+	serverStartTime = time.Now()
+
 	// Load environment variables from .env file if it exists
 	if err := godotenv.Load(); err != nil {
 		// Just log, don't fail, as env vars might be set in the environment (e.g. Docker)
@@ -387,7 +391,7 @@ func main() {
 	// Auth routes
 	// setupAuthRoutes(r, store) // Assuming this is a new call, but not explicitly in the original file.
 	// Admin routes
-	adminHandler := handlers.NewAdminHandler(store, mqttBroker)
+	adminHandler := handlers.NewAdminHandler(store, mqttBroker, serverStartTime)
 	adminHandler.RegisterRoutes(r)
 
 	// Admin DB Collection Management routes
