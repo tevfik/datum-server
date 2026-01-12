@@ -37,7 +37,7 @@ export default function Explorer() {
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
 
     // Fetch Devices
-    const { data: devices = [] } = useQuery({
+    const { data: devices = [], isLoading: isLoadingDevices } = useQuery({
         queryKey: ['devices'],
         queryFn: deviceService.getAll,
     });
@@ -162,158 +162,168 @@ export default function Explorer() {
                 </div>
             </div>
 
-            {/* Controls Toolbar */}
-            <Card>
-                <CardContent className="p-4">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-end">
-                        {/* Device Selector */}
-                        <div className="space-y-2 min-w-[200px]">
-                            <Label>Device</Label>
-                            <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select Device" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {devices.map(d => (
-                                        <SelectItem key={d.id} value={d.id}>{d.name || d.id}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {/* Range Selector */}
-                        <div className="space-y-2 min-w-[150px]">
-                            <Label>Time Range</Label>
-                            <Select value={rangeType} onValueChange={(v) => setRangeType(v as RangeType)}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="1h">Last Hour</SelectItem>
-                                    <SelectItem value="24h">Last 24 Hours</SelectItem>
-                                    <SelectItem value="7d">Last 7 Days</SelectItem>
-                                    <SelectItem value="30d">Last 30 Days</SelectItem>
-                                    <SelectItem value="custom">Custom Range</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {/* Custom Date Inputs */}
-                        {rangeType === 'custom' && (
-                            <>
-                                <div className="space-y-2">
-                                    <Label>Start</Label>
-                                    <Input
-                                        type="datetime-local"
-                                        value={customStart}
-                                        onChange={e => setCustomStart(e.target.value)}
-                                        className="w-full md:w-auto"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>End</Label>
-                                    <Input
-                                        type="datetime-local"
-                                        value={customEnd}
-                                        onChange={e => setCustomEnd(e.target.value)}
-                                        className="w-full md:w-auto"
-                                    />
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Metric Selection */}
-            {availableMetrics.length > 0 && (
-                <div className="flex flex-wrap gap-4 p-4 border rounded-lg bg-card">
-                    <div className="text-sm font-medium flex items-center gap-2">
-                        <Activity className="h-4 w-4" /> Metrics:
-                    </div>
-                    {availableMetrics.map((metric, idx) => (
-                        <div key={metric} className="flex items-center space-x-2">
-                            <Checkbox
-                                id={`m-${metric}`}
-                                checked={selectedMetrics.includes(metric)}
-                                onCheckedChange={() => handleMetricToggle(metric)}
-                            />
-                            <label
-                                htmlFor={`m-${metric}`}
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                style={{ color: colors[idx % colors.length] }}
-                            >
-                                {metric}
-                            </label>
-                        </div>
-                    ))}
+            {/* Empty State */}
+            {!isLoadingDevices && devices.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-lg">
+                    <div className="text-xl font-semibold mb-2">No Devices Found</div>
+                    <p className="text-muted-foreground mb-4">Add a device to start exploring data.</p>
                 </div>
-            )}
+            ) : (
+                <>
+                    {/* Controls Toolbar */}
+                    <Card>
+                        <CardContent className="p-4">
+                            <div className="flex flex-col gap-4 md:flex-row md:items-end">
+                                {/* Device Selector */}
+                                <div className="space-y-2 min-w-[200px]">
+                                    <Label>Device</Label>
+                                    <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select Device" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {devices.map(d => (
+                                                <SelectItem key={d.id} value={d.id}>{d.name || d.id}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
 
-            {/* Chart Area */}
-            <Card className="min-h-[400px]">
-                <CardHeader>
-                    <CardTitle>Telemetry Chart</CardTitle>
-                    {history?.range && (
-                        <CardDescription>
-                            {format(new Date(history.range.start), 'MMM d HH:mm')} - {format(new Date(history.range.end), 'MMM d HH:mm')}
-                            {history.interval && ` (${history.count} points, interval: ${history.interval})`}
-                        </CardDescription>
-                    )}
-                </CardHeader>
-                <CardContent>
-                    {isLoading ? (
-                        <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading data...</div>
-                    ) : !history?.data || history.data.length === 0 ? (
-                        <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                            No data available for this range.
+                                {/* Range Selector */}
+                                <div className="space-y-2 min-w-[150px]">
+                                    <Label>Time Range</Label>
+                                    <Select value={rangeType} onValueChange={(v) => setRangeType(v as RangeType)}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="1h">Last Hour</SelectItem>
+                                            <SelectItem value="24h">Last 24 Hours</SelectItem>
+                                            <SelectItem value="7d">Last 7 Days</SelectItem>
+                                            <SelectItem value="30d">Last 30 Days</SelectItem>
+                                            <SelectItem value="custom">Custom Range</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Custom Date Inputs */}
+                                {rangeType === 'custom' && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label>Start</Label>
+                                            <Input
+                                                type="datetime-local"
+                                                value={customStart}
+                                                onChange={e => setCustomStart(e.target.value)}
+                                                className="w-full md:w-auto"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>End</Label>
+                                            <Input
+                                                type="datetime-local"
+                                                value={customEnd}
+                                                onChange={e => setCustomEnd(e.target.value)}
+                                                className="w-full md:w-auto"
+                                            />
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Metric Selection */}
+                    {availableMetrics.length > 0 && (
+                        <div className="flex flex-wrap gap-4 p-4 border rounded-lg bg-card">
+                            <div className="text-sm font-medium flex items-center gap-2">
+                                <Activity className="h-4 w-4" /> Metrics:
+                            </div>
+                            {availableMetrics.map((metric, idx) => (
+                                <div key={metric} className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id={`m-${metric}`}
+                                        checked={selectedMetrics.includes(metric)}
+                                        onCheckedChange={() => handleMetricToggle(metric)}
+                                    />
+                                    <label
+                                        htmlFor={`m-${metric}`}
+                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                        style={{ color: colors[idx % colors.length] }}
+                                    >
+                                        {metric}
+                                    </label>
+                                </div>
+                            ))}
                         </div>
-                    ) : (
-                        <div className="h-[400px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={history.data}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                                    <XAxis
-                                        dataKey="timestamp"
-                                        tickFormatter={(val) => format(new Date(val), rangeType === '1h' ? 'HH:mm' : 'd MMM HH:mm')}
-                                        stroke="#888888"
-                                        fontSize={12}
-                                        tickLine={false}
-                                        axisLine={false}
-                                    />
-                                    <YAxis
-                                        stroke="#888888"
-                                        fontSize={12}
-                                        tickLine={false}
-                                        axisLine={false}
-                                    />
-                                    <Tooltip
-                                        labelFormatter={(val) => format(new Date(val), 'yyyy-MM-dd HH:mm:ss')}
-                                        contentStyle={{
-                                            backgroundColor: 'hsl(var(--card))',
-                                            borderColor: 'hsl(var(--border))',
-                                            borderRadius: '6px'
-                                        }}
-                                    />
-                                    <Legend />
-                                    {selectedMetrics.map((metric, idx) => (
-                                        <Line
-                                            key={metric}
-                                            type="monotone"
-                                            dataKey={`data.${metric}`}
-                                            name={metric}
-                                            stroke={colors[idx % colors.length]}
-                                            strokeWidth={2}
-                                            dot={false}
-                                            activeDot={{ r: 4 }}
-                                        />
-                                    ))}
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
                     )}
-                </CardContent>
-            </Card>
+
+                    {/* Chart Area */}
+                    <Card className="min-h-[400px]">
+                        <CardHeader>
+                            <CardTitle>Telemetry Chart</CardTitle>
+                            {history?.range && (
+                                <CardDescription>
+                                    {format(new Date(history.range.start), 'MMM d HH:mm')} - {format(new Date(history.range.end), 'MMM d HH:mm')}
+                                    {history.interval && ` (${history.count} points, interval: ${history.interval})`}
+                                </CardDescription>
+                            )}
+                        </CardHeader>
+                        <CardContent>
+                            {isLoading ? (
+                                <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading data...</div>
+                            ) : !history?.data || history.data.length === 0 ? (
+                                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                                    No data available for this range.
+                                </div>
+                            ) : (
+                                <div className="h-[400px] w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={history.data}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                                            <XAxis
+                                                dataKey="timestamp"
+                                                tickFormatter={(val) => format(new Date(val), rangeType === '1h' ? 'HH:mm' : 'd MMM HH:mm')}
+                                                stroke="#888888"
+                                                fontSize={12}
+                                                tickLine={false}
+                                                axisLine={false}
+                                            />
+                                            <YAxis
+                                                stroke="#888888"
+                                                fontSize={12}
+                                                tickLine={false}
+                                                axisLine={false}
+                                            />
+                                            <Tooltip
+                                                labelFormatter={(val) => format(new Date(val), 'yyyy-MM-dd HH:mm:ss')}
+                                                contentStyle={{
+                                                    backgroundColor: 'hsl(var(--card))',
+                                                    borderColor: 'hsl(var(--border))',
+                                                    borderRadius: '6px'
+                                                }}
+                                            />
+                                            <Legend />
+                                            {selectedMetrics.map((metric, idx) => (
+                                                <Line
+                                                    key={metric}
+                                                    type="monotone"
+                                                    dataKey={`data.${metric}`}
+                                                    name={metric}
+                                                    stroke={colors[idx % colors.length]}
+                                                    strokeWidth={2}
+                                                    dot={false}
+                                                    activeDot={{ r: 4 }}
+                                                />
+                                            ))}
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </>
+            )}
         </div>
     );
 }
