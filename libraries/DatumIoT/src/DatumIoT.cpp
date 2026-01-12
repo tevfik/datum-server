@@ -101,17 +101,29 @@ bool DatumIoT::registerDevice(String serverBaseUrl, String userToken,
 
   if (deviceUid.length() == 0) {
     // Generate pseudo-UID from MAC if not provided
+#ifdef ESP8266
+    uint32_t chipid = ESP.getChipId();
+    char uid[13];
+    sprintf(uid, "%08X", chipid);
+    deviceUid = String(uid);
+#else
     uint64_t chipid = ESP.getEfuseMac();
     char uid[13];
     sprintf(uid, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
     deviceUid = String(uid);
+#endif
   }
 
   HTTPClient http;
   String url = _serverUrl + "/dev/register";
   DATUM_LOG("Registering at %s...", url.c_str());
 
+#ifdef ESP8266
+  WiFiClient client;
+  http.begin(client, url);
+#else
   http.begin(url);
+#endif
   http.addHeader("Content-Type", "application/json");
   // http.addHeader("Authorization", "Bearer " + userToken); // Usually Bearer?
   // Example code used: "Authorization: Bearer " + userToken (line 449
@@ -214,9 +226,14 @@ void DatumIoT::_ackCommand(String cmdId) {
   // Ack via HTTP (as per original logic, though MQTT Pub to ack topic would be
   // better if server supports it) Code says: POST /dev/:id/cmd/:id/ack
   HTTPClient http;
+  WiFiClient client;
   String url = _serverUrl + "/dev/" + _deviceId + "/cmd/" + cmdId + "/ack";
 
+#ifdef ESP8266
+  http.begin(client, url);
+#else
   http.begin(url);
+#endif
   http.addHeader("Authorization", "Bearer " + _apiKey);
   http.addHeader("Content-Type", "application/json");
   http.POST("{\"status\":\"executed\"}");

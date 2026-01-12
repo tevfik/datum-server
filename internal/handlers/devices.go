@@ -240,7 +240,7 @@ func (h *AdminHandler) UploadFirmwareHandler(c *gin.Context) {
 		scheme = "https"
 	}
 	host := c.Request.Host
-	publicURL := fmt.Sprintf("%s://%s/devices/firmware/%s", scheme, host, safeFilename)
+	publicURL := fmt.Sprintf("%s://%s/dev/fw/%s", scheme, host, safeFilename)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message":  "Firmware uploaded successfully",

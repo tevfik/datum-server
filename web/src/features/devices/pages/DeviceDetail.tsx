@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { deviceService } from '@/features/devices/services/deviceService';
 import { adminService } from '@/features/settings/services/adminService';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +29,7 @@ export default function DeviceDetail() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const { user } = useAuth();
 
     const { data: device, isLoading, error } = useQuery({
         queryKey: ['device', id],
@@ -142,19 +144,21 @@ export default function DeviceDetail() {
                     </CardContent>
                 </Card>
 
-                {/* Firmware Update */}
-                <Card className="flex flex-col">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <HardDrive className="h-5 w-5" />
-                            Firmware Update
-                        </CardTitle>
-                        <CardDescription>OTA Update (Upload .bin or URL)</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <FirmwareUpdate deviceId={device.id} />
-                    </CardContent>
-                </Card>
+                {/* Firmware Update - Admins Only */}
+                {user?.role === 'admin' && (
+                    <Card className="flex flex-col">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <HardDrive className="h-5 w-5" />
+                                Firmware Update
+                            </CardTitle>
+                            <CardDescription>OTA Update (Upload .bin or URL)</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <FirmwareUpdate deviceId={device.id} />
+                        </CardContent>
+                    </Card>
+                )}
             </div>
 
             {/* Telemetry Chart */}

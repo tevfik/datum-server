@@ -22,6 +22,7 @@ void loop() {
 */
 
 #include <ArduinoJson.h>
+#include <ArduinoOTA.h>
 #include <EEPROM.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WebServer.h>
@@ -60,6 +61,7 @@ struct Config {
   char user_token[1024];
   char device_name[33];
   char device_id[37];
+  int boot_failures;
 };
 
 // Global Objects
@@ -185,18 +187,29 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
     // Send immediate update
     sendData(false, false);
   } else if (type == "update_firmware") {
-    // ... handling code remains similar but simplified ...
     JsonObject params = doc["params"];
     String fwUrl = params["url"];
     if (fwUrl.length() == 0 && doc.containsKey("url"))
-      fwUrl = doc["url"].as<String>(); // Fallback if not in params
+      fwUrl = doc["url"].as<String>();
 
     if (fwUrl.indexOf('?') == -1)
       fwUrl += "?token=" + String(config.api_key);
     else
       fwUrl += "&token=" + String(config.api_key);
 
-    t_httpUpdate_return ret = ESPhttpUpdate.update(espClient, fwUrl);
+    Serial.println("Starting OTA Update...");
+    Serial.println("URL: " + fwUrl);
+
+    // Use Secure Client for HTTPS support
+    WiFiClientSecure client;
+    client.setInsecure();
+    client.setTimeout(10000);
+
+    ESPhttpUpdate.onProgress([](int cur, int total) {
+      Serial.printf("OTA Progress: %d%%\n", (cur * 100) / total);
+    });
+
+    t_httpUpdate_return ret = ESPhttpUpdate.update(client, fwUrl);
     switch (ret) {
     case HTTP_UPDATE_FAILED:
       Serial.printf("OTA Failed: %s\n",
@@ -207,6 +220,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       break;
     case HTTP_UPDATE_OK:
       Serial.println("OTA: OK");
+      ESP.restart();
       break;
     }
   } else {
@@ -450,6 +464,35 @@ void setup() {
   EEPROM.begin(EEPROM_SIZE);
   loadConfig();
 
+  // -- Boot Failure Logic --
+  // Sanitize garbage value from new struct field if OTA updated
+  if (config.boot_failures < 0 || config.boot_failures > 20) {
+    config.boot_failures = 0;
+  }
+
+  config.boot_failures++;
+  saveConfig();
+  Serial.printf("Boot Count: %d\n", config.boot_failures);
+
+  if (config.boot_failures >= 5) {
+    Serial.println("!!! 5 CONSECUTIVE BOOT FAILURES !!!");
+    Serial.println("Resetting Configuration...");
+    // Wipe
+    memset(&config, 0, sizeof(Config));
+    config.magic = CONFIG_MAGIC;
+    config.boot_failures = 0;
+    saveConfig();
+    // Blink to indicate reset
+    pinMode(2, OUTPUT); // LED on ESP module
+    for (int i = 0; i < 5; i++) {
+      digitalWrite(2, LOW);
+      delay(200);
+      digitalWrite(2, HIGH);
+      delay(200);
+    }
+    // Continue to loop, which will trigger provisioning since SSID is empty
+  }
+
   pinMode(GPIO_RELAY_0, OUTPUT);
   pinMode(GPIO_RELAY_1, OUTPUT);
   pinMode(GPIO_RELAY_2, OUTPUT);
@@ -479,6 +522,19 @@ void setup() {
         registerDevice();
       }
 
+      // Successful Connection Logic
+      if (strlen(config.api_key) > 0) {
+        // Reset boot failures on success
+        if (config.boot_failures > 0) {
+          config.boot_failures = 0;
+          saveConfig();
+        }
+
+        // Setup Local OTA
+        ArduinoOTA.setHostname("datum-relay");
+        ArduinoOTA.begin();
+      }
+
       // CRITICAL START: Auto-Provisioning Fallback
       // If we still have no API Key (registration failed or no token),
       // we MUST go to Provisioning Mode so user can fix it (since no button).
@@ -506,6 +562,7 @@ void loop() {
     server.handleClient();
   } else {
     if (WiFi.status() == WL_CONNECTED) {
+      ArduinoOTA.handle(); // Handle Local OTA
       // Manage MQTT
       if (!mqttClient.connected()) {
         unsigned long now = millis();
