@@ -1015,12 +1015,9 @@ func (s *Storage) GetAllDevices() ([]Device, error) {
 			// Key format: device:<ID>
 			// Must exclude device:uid:..., device:...:commands, etc.
 			// ID always starts with 'dev_'
-			if strings.HasPrefix(key, "device:dev_") {
+			if strings.HasPrefix(key, "device:") {
 				// Check if it's a subkey (e.g. device:dev_xxx:commands)
-				// The ID itself shouldn't have colons, so if there is a colon after "device:", it's a subkey
-				// "device:".Len() = 7
-				// But wait, key is "device:dev_xyz".
-				// So we check if key[7:] contains ":"
+				// key[7:] is the ID part. Check if it contains ":"
 				if !strings.Contains(key[7:], ":") {
 					var device Device
 					if err := json.Unmarshal([]byte(value), &device); err == nil {
@@ -1070,7 +1067,7 @@ func (s *Storage) GetDeviceByUID(uid string) (*Device, error) {
 	err := s.db.View(func(tx *buntdb.Tx) error {
 		var found bool
 		tx.Ascend("", func(key, value string) bool {
-			if strings.HasPrefix(key, "device:dev_") && !strings.Contains(key[7:], ":") {
+			if strings.HasPrefix(key, "device:") && !strings.Contains(key[7:], ":") {
 				var d Device
 				if err := json.Unmarshal([]byte(value), &d); err == nil {
 					if d.DeviceUID == uid {
