@@ -10,10 +10,12 @@ extern String wifiPass;
 extern const char *AP_SSID;
 
 // Functions
-void setupWiFi();                                    // Initial setup
-bool connectToWiFiBlocking(int timeoutSeconds = 20); // Startup blocking connect
-void handleWiFiLoop(); // Loop checker for reconnection
-void startAPMode();    // If connection fails
+void setupWiFi(); // Initial setup
+bool connectToWiFiBlocking(
+    int timeoutSeconds = 20,
+    void (*onLoopCallback)() = NULL); // Startup blocking connect
+void handleWiFiLoop();                // Loop checker for reconnection
+void startAPMode();                   // If connection fails
 String getIPAddress();
 int getRSSI();
 String getPublicIP();  // Returns cached public IP

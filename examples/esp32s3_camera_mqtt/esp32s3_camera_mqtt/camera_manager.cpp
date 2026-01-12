@@ -536,8 +536,9 @@ void processCameraLoop() {
 
             handleSnap("", true);
 
-            // Cooldown
-            ignoreMotionFor(2);
+            // Cooldown: Increase to 5 frames to let AEW/AGC settle after
+            // resolution switch
+            ignoreMotionFor(5);
           }
         }
       }
@@ -647,14 +648,14 @@ void handleSnap(String resolution, bool saveToCard) {
     s->set_vflip(s, savedFlip);
   }
 
-  // Flush
-  for (int i = 0; i < 3; i++) {
+  // Flush - Reduced delays
+  for (int i = 0; i < 2; i++) { // Reduced to 2 frames
     camera_fb_t *fb = esp_camera_fb_get();
     if (fb)
       esp_camera_fb_return(fb);
-    delay(100);
+    delay(50); // Reduced from 100
   }
-  delay(200);
+  delay(100); // Reduced from 200
 
   camera_fb_t *fb = esp_camera_fb_get();
   if (!fb || fb->len < 5000) {
@@ -682,7 +683,8 @@ void handleSnap(String resolution, bool saveToCard) {
   esp_camera_fb_return(fb);
 
   if (wasStreaming) {
-    delay(4000);
+    // Reduced delay to improve recovery speed
+    delay(500);
     streaming = true;
   }
 

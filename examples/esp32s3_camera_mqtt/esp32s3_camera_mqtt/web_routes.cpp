@@ -4,6 +4,7 @@
 #include "mqtt_manager.h" // For extractJsonVal
 #include "sd_storage.h"
 #include <Arduino.h>
+#include <HTTPClient.h> // Added for Login
 #include <WiFi.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
@@ -19,6 +20,23 @@ extern void neopixelWrite(uint8_t pin, uint8_t red, uint8_t green,
 extern void saveCredentials(String u, String s, String p, String token,
                             String name);
 extern bool isActivated();
+
+// ... (HTML Part)
+// Initial static snapshot - DISABLED to prevent brownout on AP connect
+// i.src = '/capture?t=' + Date.now();
+// i.src = ''; // Placeholder removed
+
+// ... (Handle Configure Part)
+// Moved handleConfigure to after externs or kept at bottom (we kept the one at
+// 263, but modified it) We need to REMOVE the one at lines 19-73 because I
+// updated the one at 263 in the previous step? Wait, my previous tool call
+// UPDATED 263. So I should DELETE 19-73.
+
+// Wait, the previous tool call updated 263 to be the "good" one.
+// So this tool call should:
+// 1. Remove the misplaced JS at line 15.
+// 2. Remove the "bad" handleConfigure at 19-73.
+// 3. Ensure externs are here.
 
 // Constants
 static const char *WWW_USERNAME = "admin";
@@ -198,15 +216,55 @@ void handleScan(WebServer &server) {
   server.send(200, "application/json", json);
 }
 
+// ... (Handle Configure Part) - Consolidating logic here
+// Removing duplicate definition at line 263
+// Making sure saveCredentials is declared before use
+
+// Forward declaration if needed, but it's extern somewhere below.
+// Best practice: Move externs to top.
+
 void handleConfigure(WebServer &server) {
   String u = server.arg("server_url");
   String s = server.arg("wifi_ssid");
   String p = server.arg("wifi_pass");
+  String email = server.arg("user_email");
+  String password = server.arg("user_password");
   String token = server.arg("user_token");
   String name = server.arg("device_name");
 
-  if (u.length() == 0 || s.length() == 0 || token.length() == 0) {
-    server.send(400, "text/plain", "Missing fields");
+  // Default Server URL if empty
+  if (u.length() == 0)
+    u = "https://datum.bezg.in";
+
+  // If we have Email/Pass but no Token, try to LOGIN to get token
+  if (token.length() == 0 && email.length() > 0 && password.length() > 0) {
+    Serial.println("[SETUP] Attempting Login to get Token...");
+    HTTPClient http;
+    http.begin(u + "/auth/login");
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{";
+    payload += "\"email\":\"" + email + "\",";
+    payload += "\"password\":\"" + password + "\"";
+    payload += "}";
+
+    int code = http.POST(payload);
+    Serial.printf("[SETUP] Login Code: %d\n", code);
+
+    if (code == 200) {
+      String resp = http.getString();
+      token = extractJsonVal(resp, "token");
+      Serial.println("[SETUP] Token acquired!");
+    } else {
+      server.send(401, "text/plain", "Login Failed! Check Email/Password.");
+      http.end();
+      return;
+    }
+    http.end();
+  }
+
+  if (s.length() == 0 || token.length() == 0) {
+    server.send(400, "text/plain", "Missing WiFi SSID or Login Failed");
     return;
   }
 
@@ -215,9 +273,9 @@ void handleConfigure(WebServer &server) {
   String html =
       R"(<html><body style='background:#1b1b1b;color:white;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif'>
         <div style='background:#2d2d2d;padding:40px;border-radius:12px;text-align:center'>
-        <h1>✅ Saved!</h1><p>Restarting...</p></div></body></html>)";
+        <h1>✅ Saved!</h1><p>Credentials saved. Device is restarting...</p><p>Please reconnect to your WiFi.</p></div></body></html>)";
   server.send(200, "text/html", html);
-  delay(2000);
+  delay(1000);
   ESP.restart();
 }
 

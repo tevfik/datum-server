@@ -11,7 +11,7 @@ unsigned long lastWiFiCheck = 0;
 bool wasConnected = false;
 
 // Blocking connect for startup
-bool connectToWiFiBlocking(int timeoutSeconds) {
+bool connectToWiFiBlocking(int timeoutSeconds, void (*onLoopCallback)()) {
   if (wifiSSID.length() == 0)
     return false;
 
@@ -25,13 +25,19 @@ bool connectToWiFiBlocking(int timeoutSeconds) {
   WiFi.begin(wifiSSID.c_str(), wifiPass.c_str());
 
   int attempts = 0;
-  // Convert seconds to 500ms intervals
-  int maxAttempts = timeoutSeconds * 2;
+  // Convert seconds to 50ms intervals for responsive button
+  int maxAttempts = timeoutSeconds * 20;
 
   while (WiFi.status() != WL_CONNECTED && attempts < maxAttempts) {
-    Serial.print(".");
-    delay(500);
-    updateLED(); // Keep LED logic alive
+    if (attempts % 10 == 0)
+      Serial.print("."); // Print dot every 500ms
+
+    // Call the callback (Button Handler)
+    if (onLoopCallback)
+      onLoopCallback();
+
+    updateLED();
+    delay(50); // Faster polling
     attempts++;
   }
   Serial.println();

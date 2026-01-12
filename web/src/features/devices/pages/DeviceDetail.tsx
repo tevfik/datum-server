@@ -13,6 +13,17 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
 import { TelemetryChart } from '@/features/devices/components/TelemetryChart';
 
+const safeFormat = (dateStr: string | undefined | null, fmtStr: string) => {
+    if (!dateStr) return 'N/A';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return 'Invalid Date';
+        return format(d, fmtStr);
+    } catch (e) {
+        return 'Error';
+    }
+};
+
 export default function DeviceDetail() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -86,11 +97,11 @@ export default function DeviceDetail() {
                             </div>
                             <div className="space-y-1">
                                 <p className="text-sm font-medium leading-none text-muted-foreground">Last Seen</p>
-                                <div className="flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /><span>{format(new Date(device.last_seen), 'PPP p')}</span></div>
+                                <div className="flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /><span>{safeFormat(device.last_seen, 'PPP p')}</span></div>
                             </div>
                             <div className="space-y-1">
                                 <p className="text-sm font-medium leading-none text-muted-foreground">Created At</p>
-                                <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" /><span>{format(new Date(device.created_at), 'PPP')}</span></div>
+                                <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" /><span>{safeFormat(device.created_at, 'PPP')}</span></div>
                             </div>
                         </div>
                     </CardContent>
@@ -228,7 +239,13 @@ function CommandHistory({ deviceId }: { deviceId: string }) {
                             <div>
                                 <span className="font-bold text-primary">{cmd.action}</span>
                                 <span className="ml-2 text-muted-foreground">
-                                    {formatDistanceToNow(new Date(cmd.created_at), { addSuffix: true })}
+                                    {(() => {
+                                        try {
+                                            return formatDistanceToNow(new Date(cmd.created_at), { addSuffix: true });
+                                        } catch {
+                                            return 'unknown time';
+                                        }
+                                    })()}
                                 </span>
                             </div>
                             <Badge variant="outline" className="text-[10px]">{cmd.status || 'pending'}</Badge>

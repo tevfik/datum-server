@@ -183,42 +183,56 @@ void onWifiConnected() {
 // Check for Factory Reset (Boot Button held manually during runtime)
 unsigned long buttonPressStart = 0;
 
+// Button Handler with improved feedback
 void handleFactoryResetButton() {
-  pinMode(0, INPUT_PULLUP);
+  // Use GPIO 0 for Boot Button
+  const int BTN_PIN = 0;
+  pinMode(BTN_PIN, INPUT_PULLUP);
 
-  if (digitalRead(0) == LOW) {
-    // Button pressed
-    if (buttonPressStart == 0) {
-      buttonPressStart = millis();
-      Serial.println("Button Pressed... Hold for 3s to Reset");
+  static unsigned long pressStart = 0;
+  static bool isPressed = false;
+
+  // Read button (Active LOW)
+  if (digitalRead(BTN_PIN) == LOW) {
+    if (!isPressed) {
+      // Just pressed
+      isPressed = true;
+      pressStart = millis();
+      Serial.println("[BTN] Button Pressed... Hold 3s to Reset");
     }
 
-    // Check duration
-    if (millis() - buttonPressStart > 3000) {
-      Serial.println("Factory Reset: TRIGGERED!");
+    // Check if held long enough
+    if (millis() - pressStart > 3000) {
+      Serial.println("[BTN] Factory Reset TRIGGERED!");
 
-      // Visual feedback
-      for (int i = 0; i < 5; i++) {
+// Visual Feedback (Fast Blink)
 #ifdef LED_GPIO_NUM
+      for (int i = 0; i < 10; i++) {
         digitalWrite(LED_GPIO_NUM, !digitalRead(LED_GPIO_NUM));
-#endif
-        delay(100);
+        delay(50);
       }
+      digitalWrite(LED_GPIO_NUM, LOW);
+#endif
 
       // Clear NVS
       prefs.begin("datum", false);
       prefs.clear();
       prefs.end();
 
-      Serial.println("Factory Reset: Complete. Restarting...");
+      Serial.println("[BTN] Reset Complete. Restarting...");
+      delay(100);
       ESP.restart();
     }
   } else {
-    // Button released
-    if (buttonPressStart != 0) {
-      Serial.println("Button Released (Reset Cancelled)");
+    // Button is HIGH (Released)
+    if (isPressed) {
+      // Just released
+      long duration = millis() - pressStart;
+      Serial.printf("[BTN] Button Released after %ld ms (Action Cancelled)\n",
+                    duration);
+      isPressed = false;
+      pressStart = 0;
     }
-    buttonPressStart = 0;
   }
 }
 
@@ -351,6 +365,10 @@ void initDeviceUID() {
 // ============================================================================
 // Handlers moved to web_routes.cpp
 
+// Include DNSServer for Captive Portal
+#include <DNSServer.h>
+DNSServer dnsServer;
+
 void startSetupMode() {
   Serial.println("Starting Setup Mode"); // Always print critical state changes
   currentState = STATE_SETUP_MODE;
@@ -359,8 +377,44 @@ void startSetupMode() {
   String ap = String(SETUP_AP_PREFIX) + deviceUID.substring(8);
   WiFi.softAP(ap.c_str(), SETUP_AP_PASSWORD);
 
+  // Setup DNS Server for Captive Portal (Redirect all to AP IP)
+  dnsServer.start(53, "*", WiFi.softAPIP());
+
   setupWebRoutes(setupServer, apiKey);
   setupServer.begin();
+
+  Serial.println("AP Started: " + ap);
+  Serial.println("Gateway IP: " + WiFi.softAPIP().toString());
+
+// Blink LED rapidly to indicate Setup Mode
+#ifdef LED_GPIO_NUM
+  pinMode(LED_GPIO_NUM, OUTPUT);
+  digitalWrite(LED_GPIO_NUM, HIGH);
+#endif
+
+  // BLOCKING LOOP for Setup Mode
+  while (true) {
+    dnsServer.processNextRequest();
+    setupServer.handleClient();
+
+    // Simple non-blocking LED blink
+    static unsigned long lastBlink = 0;
+    if (millis() - lastBlink > 200) {
+      lastBlink = millis();
+#ifdef LED_GPIO_NUM
+#if LED_GPIO_NUM != 48
+      digitalWrite(LED_GPIO_NUM, !digitalRead(LED_GPIO_NUM));
+#else
+      static bool s = false;
+      s = !s;
+      neopixelWrite(LED_GPIO_NUM, 0, 0, s ? 50 : 0);
+#endif
+#endif
+    }
+
+    handleFactoryResetButton();
+    delay(5); // Yield
+  }
 }
 
 // ============================================================================
@@ -798,7 +852,7 @@ void setup() {
   }
 
   // Try to connect to WiFi FIRST (without camera active)
-  if (connectToWiFiBlocking()) {
+  if (connectToWiFiBlocking(30, handleFactoryResetButton)) {
     justConnected = true; // Set flag for telemetry
 
     // Sync time and set server URL
@@ -809,6 +863,19 @@ void setup() {
     loadStartupSettings();
 
     // Check activation
+    if (apiKey.length() == 0 && userToken.length() > 0) {
+      Serial.println(
+          "[SETUP] No API Key, attempting registration with User Token...");
+      if (attemptSelfRegistration()) {
+        Serial.println(
+            "[SETUP] Registration Successful! New API Key acquired.");
+      } else {
+        Serial.println(
+            "[SETUP] Registration Failed. Will retry later or check logs.");
+        // Optional: Panic blink?
+      }
+    }
+
     if (apiKey.length() > 0) {
       currentState = STATE_ONLINE;
       setupMQTT();
@@ -836,15 +903,19 @@ void setup() {
 
       // Start Async Upload Task (Core 0) for non-blocking frame uploads
       startUploadTask();
-    } // End if(apiKey)
+    } else {
+      Serial.println("[SETUP] Device not activated. Waiting for config...");
+      // Fallback: Start web server anyway so user can re-configure if needed?
+      // Or just wait in loop.
+    }
   } // End if(connected)
 } // End setup()
 
 // Main Loop
-// Main Loop - Now Empty or Minimal Supervision
-// Core 1 (App Core) is used by cameraTask (or loop if not pinned, but we
-// pinned it)
-void loop() { vTaskDelay(1000 / portTICK_PERIOD_MS); }
+void loop() {
+  handleFactoryResetButton();
+  vTaskDelay(20 / portTICK_PERIOD_MS);
+}
 
 // Network Task - Core 0
 void networkTask(void *pvParameters) {
