@@ -319,6 +319,24 @@ void handleDeviceInfo(WebServer &server) {
 }
 
 void handleThingDescription(WebServer &server) {
+  String ip = WiFi.localIP().toString();
+  String mqttUrl = "";
+  if (serverURL.length() > 0) {
+    String host = serverURL;
+    int idx = host.indexOf("://");
+    if (idx != -1)
+      host = host.substring(idx + 3);
+    // Strip trailing slash
+    if (host.endsWith("/"))
+      host.remove(host.length() - 1);
+    // Strip path if any (e.g. :8080/api) - usually serverURL is just base
+    idx = host.indexOf("/");
+    if (idx != -1)
+      host = host.substring(0, idx);
+
+    mqttUrl = "mqtt://" + host + "/dev/" + deviceID + "/cmd";
+  }
+
   String json = "{";
   json += "\"@context\": \"https://www.w3.org/2019/wot/td/v1\",";
   json += "\"id\": \"urn:dev:ops:" + deviceUID + "\",";
@@ -327,19 +345,80 @@ void handleThingDescription(WebServer &server) {
   json +=
       "\"securityDefinitions\": {\"bearer_sec\": {\"scheme\": \"bearer\"}},";
   json += "\"security\": \"bearer_sec\",";
+
+  // Properties
   json += "\"properties\": {";
-  json += "  \"status\": {\"type\": \"string\", \"description\": \"Device "
-          "Status\"},";
-  json += "  \"rssi\": {\"type\": \"integer\", \"description\": \"WiFi Signal "
-          "Strength\"}";
+  json += "  \"status\": {\"type\": \"string\", \"readOnly\": true},";
+  json += "  \"rssi\": {\"type\": \"integer\", \"readOnly\": true}";
   json += "},";
+
+  // Actions
   json += "\"actions\": {";
-  json += "  \"snapshot\": {\"description\": \"Take a photo\"},";
-  json += "  \"stream\": {\"description\": \"Start video stream\"},";
-  json += "  \"toggle_led\": {\"description\": \"Toggle Flashlight\"},";
-  json += "  \"update_firmware\": {\"description\": \"OTA Update\"}";
-  json += "}";
-  json += "}";
+
+  // Action: Snapshot
+  json += "  \"snapshot\": {";
+  json += "    \"description\": \"Take a photo\",";
+  json += "    \"forms\": [";
+  json += "      {\"href\": \"http://" + ip +
+          "/capture\", \"op\": \"invokeaction\", \"method\": \"GET\"}";
+  if (mqttUrl.length() > 0) {
+    json += "      ,{\"href\": \"" + mqttUrl +
+            "\", \"op\": \"invokeaction\", \"mqv:controlPacketValue\": "
+            "\"{\\\"action\\\":\\\"snap\\\"}\"}";
+  }
+  json += "    ]";
+  json += "  },";
+
+  // Action: Stream
+  json += "  \"stream\": {";
+  json += "    \"description\": \"Start video stream\",";
+  json += "    \"forms\": [";
+  json += "      {\"href\": \"http://" + ip +
+          "/stream\", \"op\": \"invokeaction\", \"method\": \"GET\"}";
+  if (mqttUrl.length() > 0) {
+    json += "      ,{\"href\": \"" + mqttUrl +
+            "\", \"op\": \"invokeaction\", \"mqv:controlPacketValue\": "
+            "\"{\\\"action\\\":\\\"stream\\\", \\\"params\\\": {\\\"state\\\": "
+            "\\\"on\\\"}}\"}";
+  }
+  json += "    ]";
+  json += "  },";
+
+  // Action: Toggle LED
+  json += "  \"toggle_led\": {";
+  json += "    \"description\": \"Toggle Flashlight\",";
+  json += "    \"forms\": [";
+  json += "      {\"href\": \"http://" + ip +
+          "/action?type=led\", \"op\": \"invokeaction\", \"method\": \"GET\"}";
+  if (mqttUrl.length() > 0) {
+    json += "      ,{\"href\": \"" + mqttUrl +
+            "\", \"op\": \"invokeaction\", \"mqv:controlPacketValue\": "
+            "\"{\\\"action\\\":\\\"led\\\"}\"}";
+  }
+  json += "    ]";
+  json += "  },";
+
+  // Action: Update Firmware (MQTT Only for safe URL handling?)
+  // Actually HTTP form could just be a POST to /update? But we don't have
+  // /update handler exposed easily. Let's list MQTT only for Update for now as
+  // it takes parameters.
+  json += "  \"update_firmware\": {";
+  json += "    \"description\": \"OTA Update\",";
+  json += "    \"forms\": [";
+  if (mqttUrl.length() > 0) {
+    json += "      {\"href\": \"" + mqttUrl +
+            "\", \"op\": \"invokeaction\", \"mqv:controlPacketValue\": "
+            "\"{\\\"action\\\":\\\"update_firmware\\\", \\\"params\\\": "
+            "{\\\"url\\\": \\\"...\\\"}}\"}";
+  } else {
+    json += " []"; // Empty forms if no MQTT
+  }
+  json += "    ]";
+  json += "  }";
+
+  json += "}"; // End Actions
+  json += "}"; // End TD
+
   server.send(200, "application/td+json", json);
 }
 

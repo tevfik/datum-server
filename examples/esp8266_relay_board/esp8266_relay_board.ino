@@ -391,17 +391,72 @@ void sendData(bool isBoot, bool isConnect) {
 // ===========================
 //       PROVISIONING (Simplified)
 // ===========================
-void setupProvisioning() {
-  provisioningMode = true;
-  WiFi.mode(WIFI_AP);
-  String apName = "Datum-Relay-" + String(ESP.getChipId(), HEX);
-  WiFi.softAP(apName.c_str(), NULL);
+// Helper: WoT Thing Description
+void handleThingDescription() {
+  // Estimate Voltage/Current based on A0 for now (User requested)
+  int adc = analogRead(ADC_BATTERY);
+  float voltage = adc * (3.3 / 1023.0); // Rough guess, calibration needed
 
+  DynamicJsonDocument doc(1024);
+  doc["@context"] = "https://www.w3.org/2019/wot/td/v1";
+  doc["id"] = "urn:dev:ops:" + String(config.device_id);
+  doc["title"] = DEVICE_FRIENDLY_NAME;
+  doc["description"] = "ESP8266 Relay Board with Voltage/Current Sensing";
+  doc["device_type"] = DEVICE_TYPE_NAME; // "relay_board"
+
+  // Security
+  JsonObject sec = doc.createNestedObject("securityDefinitions");
+  JsonObject bearer = sec.createNestedObject("bearer_sec");
+  bearer["scheme"] = "bearer";
+  doc["security"] = "bearer_sec";
+
+  // Properties
+  JsonObject props = doc.createNestedObject("properties");
+
+  // Relays
+  for (int i = 0; i < 4; i++) {
+    String key = "relay_" + String(i);
+    JsonObject r = props.createNestedObject(key);
+    r["type"] = "boolean";
+    r["description"] = "Relay " + String(i) + " State";
+    r["readOnly"] = false;
+  }
+
+  // Sensors
+  JsonObject v = props.createNestedObject("voltage");
+  v["type"] = "number";
+  v["unit"] = "V";
+  v["readOnly"] = true;
+
+  JsonObject c = props.createNestedObject("current");
+  c["type"] = "number";
+  c["unit"] = "A";
+  c["readOnly"] = true;
+  c["description"] = "Total Current (Placeholder)";
+
+  // Actions
+  JsonObject actions = doc.createNestedObject("actions");
+  JsonObject toggle = actions.createNestedObject("toggle_relay");
+  toggle["description"] = "Toggle a relay";
+  JsonObject input = toggle.createNestedObject("input");
+  input["type"] = "object";
+  JsonObject propsIn = input.createNestedObject("properties");
+  propsIn.createNestedObject("index")["type"] = "integer";
+  propsIn.createNestedObject("state")["type"] = "boolean";
+
+  String response;
+  serializeJson(doc, response);
+  server.send(200, "application/td+json", response);
+}
+
+void setupRoutes() {
   server.on("/info", HTTP_GET, []() {
     StaticJsonDocument<200> doc;
     doc["device_uid"] = String(ESP.getChipId());
     doc["firmware_version"] = FIRMWARE_VER;
     doc["device_type"] = DEVICE_TYPE_NAME;
+    doc["uptime"] = millis() / 1000;
+    doc["rssi"] = WiFi.RSSI();
     String response;
     serializeJson(doc, response);
     server.send(200, "application/json", response);
@@ -433,9 +488,8 @@ void setupProvisioning() {
             sizeof(config.wifi_pass));
     if (server.hasArg("server_url")) {
       String url = server.arg("server_url");
-      if (url.endsWith("/")) {
+      if (url.endsWith("/"))
         url.remove(url.length() - 1);
-      }
       strncpy(config.server_url, url.c_str(), sizeof(config.server_url));
     }
     if (server.hasArg("user_token"))
@@ -445,13 +499,28 @@ void setupProvisioning() {
       strncpy(config.device_name, server.arg("device_name").c_str(),
               sizeof(config.device_name));
 
-    // Clear old key to force re-register
     memset(config.api_key, 0, sizeof(config.api_key));
     saveConfig();
     server.send(200, "text/plain", "Saved. Restarting...");
     delay(1000);
     ESP.restart();
   });
+
+  // WoT Endpoint
+  server.on("/.well-known/wot-thing-description", HTTP_GET,
+            handleThingDescription);
+}
+
+// ===========================
+//       PROVISIONING (Simplified)
+// ===========================
+void setupProvisioning() {
+  provisioningMode = true;
+  WiFi.mode(WIFI_AP);
+  String apName = "Datum-Relay-" + String(ESP.getChipId(), HEX);
+  WiFi.softAP(apName.c_str(), NULL);
+
+  // Routes are already set up in setup() via setupRoutes()
 
   server.begin();
   Serial.println("Provisioning Mode Started: " + apName);
@@ -544,6 +613,8 @@ void setup() {
   delay(500);
   EEPROM.begin(EEPROM_SIZE);
   loadConfig();
+
+  setupRoutes();
 
   // -- Boot Failure Logic --
   // Sanitize garbage value from new struct field if OTA updated
@@ -640,6 +711,10 @@ void setup() {
             "No API Key and Registration Failed -> Entering Provisioning Mode");
         setupProvisioning();
       } else {
+        // Start Web Server in Normal Mode too (for WoT)
+        server.begin();
+        Serial.println("Web Server Started (STA Mode)");
+
         connectMQTT();
         updatePublicIP(); // Get Public IP before first report
         sendData(true, true);
@@ -660,7 +735,8 @@ void loop() {
     server.handleClient();
   } else {
     if (WiFi.status() == WL_CONNECTED) {
-      ArduinoOTA.handle(); // Handle Local OTA
+      server.handleClient(); // Handle WoT requests
+      ArduinoOTA.handle();   // Handle Local OTA
       // Manage MQTT
       if (!mqttClient.connected()) {
         unsigned long now = millis();
