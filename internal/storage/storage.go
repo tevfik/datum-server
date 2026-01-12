@@ -435,48 +435,22 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 
 	return s.db.Update(func(tx *buntdb.Tx) error {
 		for deviceID, point := range latestState {
-			shadowKey := fmt.Sprintf("device:%s:shadow", deviceID)
-
-			// Get existing shadow
-			var shadowData map[string]interface{}
-			existingJSON, err := tx.Get(shadowKey)
-			if err == nil {
-				json.Unmarshal([]byte(existingJSON), &shadowData)
-			} else {
-				shadowData = make(map[string]interface{})
-			}
-
-			// Merge new data
-			for k, v := range point.Data {
-				shadowData[k] = v
-			}
-			shadowData["timestamp"] = point.Timestamp.Unix()
-			shadowData["_last_updated"] = time.Now().Format(time.RFC3339)
-
-			// Save back
-			newJSON, _ := json.Marshal(shadowData)
-			if _, _, err = tx.Set(shadowKey, string(newJSON), nil); err != nil {
-				return err
-			}
-
-			// Also update device LastSeen and Metrics list
 			deviceKey := fmt.Sprintf("device:%s", deviceID)
+			shadowKey := fmt.Sprintf("device:%s:shadow", deviceID)
 			metricsKey := fmt.Sprintf("device:%s:metrics", deviceID)
 
-			// Update metrics list
+			// 1. Update metrics list
 			var currentMetrics []string
 			if mVal, err := tx.Get(metricsKey); err == nil {
 				json.Unmarshal([]byte(mVal), &currentMetrics)
 			}
 
-			// Add new keys
 			metricSet := make(map[string]bool)
 			for _, m := range currentMetrics {
 				metricSet[m] = true
 			}
 			changed := false
 			for k := range point.Data {
-				// Skip non-numeric if we only chart numbers, but let's keep all keys for now
 				if !metricSet[k] {
 					metricSet[k] = true
 					currentMetrics = append(currentMetrics, k)
@@ -488,16 +462,34 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 				tx.Set(metricsKey, string(mJSON), nil)
 			}
 
+			// 2. Update Shadow
+			var shadowData map[string]interface{}
+			existingJSON, err := tx.Get(shadowKey)
+			if err == nil {
+				json.Unmarshal([]byte(existingJSON), &shadowData)
+			} else {
+				shadowData = make(map[string]interface{})
+			}
+
+			for k, v := range point.Data {
+				shadowData[k] = v
+			}
+			shadowData["timestamp"] = point.Timestamp.Unix()
+			shadowData["_last_updated"] = time.Now().Format(time.RFC3339)
+
+			newJSON, _ := json.Marshal(shadowData)
+			if _, _, err = tx.Set(shadowKey, string(newJSON), nil); err != nil {
+				return err
+			}
+
+			// 3. Update Device LastSeen and Public IP
 			if deviceVal, err := tx.Get(deviceKey); err == nil {
 				var device Device
 				if err := json.Unmarshal([]byte(deviceVal), &device); err == nil {
 					device.LastSeen = time.Now()
-					// Store public IP if present (prioritize latest)
 					if ip, ok := point.Data["public_ip"].(string); ok && ip != "" {
 						device.PublicIP = ip
 					}
-
-					// Save device back
 					dJSON, _ := json.Marshal(device)
 					tx.Set(deviceKey, string(dJSON), nil)
 				}

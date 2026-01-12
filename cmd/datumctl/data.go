@@ -124,10 +124,13 @@ func runDataGet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var data []map[string]interface{}
-	if err := ParseResponse(resp, &data); err != nil {
+	var respData struct {
+		Data []map[string]interface{} `json:"data"`
+	}
+	if err := ParseResponse(resp, &respData); err != nil {
 		return err
 	}
+	data := respData.Data
 
 	if outputJSON {
 		return printJSON(data)
