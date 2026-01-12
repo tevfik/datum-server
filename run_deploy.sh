@@ -4,7 +4,7 @@
 git pull
 
 # Remove old build artifacts from host (optional)
-make clean
+# make clean # Disabled to prevent data loss (removes named volumes)
 
 # Calculate version and build date
 VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "1.0.0-dev")
