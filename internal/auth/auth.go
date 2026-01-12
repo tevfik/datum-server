@@ -86,7 +86,7 @@ func GenerateTokenPair(userID, email, role string) (accessToken string, refreshT
 		Email:  email,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)), // Short lived
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(getAccessExpiryMinutes()) * time.Minute)), // Configurable duration
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
@@ -165,4 +165,18 @@ func getRefreshExpiryDays() int {
 		return 30
 	}
 	return days
+}
+
+// getAccessExpiryMinutes reads JWT_ACCESS_EXPIRY_MINUTES from env or returns default (15)
+func getAccessExpiryMinutes() int {
+	val := os.Getenv("JWT_ACCESS_EXPIRY_MINUTES")
+	if val == "" {
+		return 15 // Default 15 minutes
+	}
+	mins, err := strconv.Atoi(val)
+	if err != nil || mins <= 0 {
+		log.Warn().Str("val", val).Msg("Invalid JWT_ACCESS_EXPIRY_MINUTES, using default 15 minutes")
+		return 15
+	}
+	return mins
 }
