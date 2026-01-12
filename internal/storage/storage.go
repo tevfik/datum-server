@@ -38,11 +38,13 @@ func New(metaPath, dataPath string, retention time.Duration) (*Storage, error) {
 		db.Close()
 		return nil, fmt.Errorf("tstorage: %w", err)
 	}
+	fmt.Printf("DEBUG: tstorage initialized at %s\n", dataPath)
 
 	return &Storage{db: db, ts: ts}, nil
 }
 
 func (s *Storage) Close() error {
+	fmt.Println("DEBUG: Closing tstorage...")
 	if err := s.ts.Close(); err != nil {
 		return err
 	}
