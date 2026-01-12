@@ -393,49 +393,14 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 		return nil
 	}
 
-	// 1. Prepare Time-Series Data (tstorage)
-	var rows []tstorage.Row
-	for _, point := range points {
-		ts := point.Timestamp.UnixNano()
-		fmt.Printf("DEBUG: StoreDataBatch - Device: %s, Time: %v, Data: %v\n", point.DeviceID, point.Timestamp, point.Data)
-		for key, val := range point.Data {
-			var floatVal float64
-			switch v := val.(type) {
-			case float64:
-				floatVal = v
-			case float32:
-				floatVal = float64(v)
-			case int:
-				floatVal = float64(v)
-			case int64:
-				floatVal = float64(v)
-			default:
-				continue
-			}
-
-			metricName := fmt.Sprintf("%s.%s", point.DeviceID, key)
-			rows = append(rows, tstorage.Row{
-				Metric:    metricName,
-				DataPoint: tstorage.DataPoint{Timestamp: ts, Value: floatVal},
-			})
-		}
-	}
-
-	if len(rows) > 0 {
-		if err := s.ts.InsertRows(rows); err != nil {
-			return err
-		}
-	}
-
-	// 2. Update Device Shadows in BuntDB (Atomic Batch)
-	// For efficiency, we group by device to only update each device once per batch
+	// 1. Group by device for efficient metadata updates
 	latestState := make(map[string]*DataPoint)
 	for _, p := range points {
-		// Since we process in order, the last one for a device is the latest
 		latestState[p.DeviceID] = p
 	}
 
-	return s.db.Update(func(tx *buntdb.Tx) error {
+	// 2. Update Device Shadows to ensure LastSeen is updated immediately
+	if err := s.db.Update(func(tx *buntdb.Tx) error {
 		for deviceID, point := range latestState {
 			deviceKey := fmt.Sprintf("device:%s", deviceID)
 			shadowKey := fmt.Sprintf("device:%s:shadow", deviceID)
@@ -498,7 +463,45 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		return fmt.Errorf("metadata update failed: %w", err)
+	}
+
+	// 3. Store Time-Series Data (tstorage)
+	var rows []tstorage.Row
+	for _, point := range points {
+		ts := point.Timestamp.UnixNano()
+		fmt.Printf("DEBUG: StoreDataBatch - Device: %s, Time: %v, Data: %v\n", point.DeviceID, point.Timestamp, point.Data)
+		for key, val := range point.Data {
+			var floatVal float64
+			switch v := val.(type) {
+			case float64:
+				floatVal = v
+			case float32:
+				floatVal = float64(v)
+			case int:
+				floatVal = float64(v)
+			case int64:
+				floatVal = float64(v)
+			default:
+				continue
+			}
+
+			metricName := fmt.Sprintf("%s.%s", point.DeviceID, key)
+			rows = append(rows, tstorage.Row{
+				Metric:    metricName,
+				DataPoint: tstorage.DataPoint{Timestamp: ts, Value: floatVal},
+			})
+		}
+	}
+
+	if len(rows) > 0 {
+		if err := s.ts.InsertRows(rows); err != nil {
+			return fmt.Errorf("tstorage insert failed: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // GetLatestData retrieves the merged shadow state from BuntDB

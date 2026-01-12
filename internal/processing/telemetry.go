@@ -55,7 +55,7 @@ func (tp *TelemetryProcessor) worker() {
 			return
 		}
 		if err := tp.Store.StoreDataBatch(buffer); err != nil {
-			// Log error
+			fmt.Printf("ERROR: Failed to store data batch: %v\n", err)
 		}
 		buffer = make([]*storage.DataPoint, 0, tp.batchSize)
 	}
