@@ -49,18 +49,28 @@ export default function Explorer() {
 
     // Prepare Query Params
     const queryParams = useMemo(() => {
+        const now = new Date();
+        let start: Date | undefined;
+        let end: Date = now;
+
         if (rangeType === 'custom') {
             if (!customStart || !customEnd) return null;
-            return {
-                start_rfc: new Date(customStart).toISOString(),
-                end_rfc: new Date(customEnd).toISOString(),
-                int: '1m' // Default aggregation for custom
+            start = new Date(customStart);
+            end = new Date(customEnd);
+        } else {
+            const timeMap: Record<string, number> = {
+                '1h': 60 * 60 * 1000,
+                '24h': 24 * 60 * 60 * 1000,
+                '7d': 7 * 24 * 60 * 60 * 1000,
+                '30d': 30 * 24 * 60 * 60 * 1000,
             };
+            const duration = timeMap[rangeType];
+            if (duration) {
+                start = new Date(now.getTime() - duration);
+            }
         }
-        return {
-            range: rangeType,
-            int: rangeType === '1h' ? '1m' : rangeType === '24h' ? '15m' : '1h'
-        };
+
+        return { start, end };
     }, [rangeType, customStart, customEnd]);
 
     // Fetch History
