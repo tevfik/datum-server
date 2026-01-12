@@ -394,6 +394,10 @@ func main() {
 	dbAdminHandler := NewDBAdminHandler(store)
 	dbAdminHandler.RegisterRoutes(r)
 
+	// System Info routes (Version, Build Date)
+	sysInfoHandler := NewSystemInfoHandler()
+	sysInfoHandler.RegisterRoutes(r)
+
 	// Legacy setup call removed
 	// setupAdminRoutes(r, store)
 

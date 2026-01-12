@@ -2013,3 +2013,26 @@ paths:
       responses:
         '200':
           description: Document deleted
+
+  /sys/info:
+    get:
+      summary: Get system information
+      tags: [System]
+      responses:
+        '200':
+          description: System information including version and build date
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                  build_date:
+                    type: string
+                  go_version:
+                    type: string
+                  os:
+                    type: string
+                  arch:
+                    type: string

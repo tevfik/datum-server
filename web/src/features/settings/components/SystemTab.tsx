@@ -94,11 +94,40 @@ export function SystemTab() {
         }
     };
 
+    // Fetch System Info
+    const { data: sysInfo } = useQuery({
+        queryKey: ['sys-info'],
+        queryFn: adminService.getSystemInfo,
+    });
+
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
+                {/* Build Info Card */}
+                <Card className="col-span-2 md:col-span-1">
+                    <CardHeader>
+                        <CardTitle>Build Information</CardTitle>
+                        <CardDescription>Server version and runtime details.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 gap-y-2 text-sm">
+                            <div className="font-semibold text-muted-foreground">Version:</div>
+                            <div className="font-mono">{sysInfo?.version || '...'}</div>
+
+                            <div className="font-semibold text-muted-foreground">Build Date:</div>
+                            <div className="font-mono">{sysInfo?.build_date || '...'}</div>
+
+                            <div className="font-semibold text-muted-foreground">Go Version:</div>
+                            <div className="font-mono">{sysInfo?.go_version || '...'}</div>
+
+                            <div className="font-semibold text-muted-foreground">OS/Arch:</div>
+                            <div className="font-mono">{sysInfo?.os} / {sysInfo?.arch}</div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* Configuration Card */}
-                <Card>
+                <Card className="col-span-2 md:col-span-1">
                     <CardHeader>
                         <CardTitle>System Configuration</CardTitle>
                         <CardDescription>Manage core system settings.</CardDescription>

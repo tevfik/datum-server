@@ -70,5 +70,10 @@ export const adminService = {
 
     resetSystem: async (): Promise<void> => {
         await api.delete('/admin/database/reset', { data: { confirm: 'RESET' } });
+    },
+
+    getSystemInfo: async (): Promise<{ version: string; build_date: string; go_version: string; os: string; arch: string }> => {
+        const { data } = await api.get('/sys/info');
+        return data;
     }
 };
