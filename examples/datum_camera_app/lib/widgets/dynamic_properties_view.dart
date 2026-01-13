@@ -63,6 +63,33 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
     if (!mounted) return;
     try {
       final api = await ref.read(authenticatedApiClientProvider.future);
+
+      // If we don't have properties yet (TD missing), fetch full device info
+      if (_properties.isEmpty) {
+        final deviceJson = await api.getDevice(widget.device.id);
+        if (deviceJson.containsKey('thing_description') &&
+            deviceJson['thing_description'] != null) {
+          // Hot-swap the TD into the widget's device model (hacky but works for now) because widget.device is final
+          // Better: Re-run parse logic with new TD
+          final td = deviceJson['thing_description'];
+          if (td != null) {
+            _properties.clear();
+            final props = td['properties'] as Map<String, dynamic>;
+            props.forEach((key, val) {
+              if (val is Map<String, dynamic>) {
+                _properties.add({
+                  'key': key,
+                  'title': (val['title'] ?? key).toString(),
+                  'type': (val['type'] ?? 'string').toString(),
+                  'unit': (val['unit'] ?? '').toString(),
+                  'readOnly': (val['readOnly'] ?? true).toString(),
+                });
+              }
+            });
+          }
+        }
+      }
+
       final data = await api.getDeviceData(widget.device.id);
 
       if (mounted) {
