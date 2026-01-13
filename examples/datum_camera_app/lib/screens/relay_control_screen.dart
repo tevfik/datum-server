@@ -190,7 +190,7 @@ class _RelayControlScreenState extends ConsumerState<RelayControlScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.grey[900],
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
           BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))
@@ -206,7 +206,7 @@ class _RelayControlScreenState extends ConsumerState<RelayControlScreen> {
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey)),
+                      color: Colors.white70)),
               const SizedBox(height: 4),
               // If val is > 20 likely ADC, otherwise Voltage. quick hack
               Text(val > 50 ? "$val (ADC)" : "${val.toStringAsFixed(1)} V",
@@ -244,11 +244,11 @@ class _RelayControlScreenState extends ConsumerState<RelayControlScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.grey[900],
         borderRadius: BorderRadius.circular(16),
         border: isOn ? Border.all(color: Colors.blueAccent, width: 2) : null,
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)
+          BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 8)
         ],
       ),
       child: Column(
@@ -259,7 +259,7 @@ class _RelayControlScreenState extends ConsumerState<RelayControlScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Icon(Icons.power_settings_new,
-                  color: isOn ? Colors.blueAccent : Colors.grey),
+                  color: isOn ? Colors.blueAccent : Colors.white38),
               Switch(
                 value: isOn,
                 onChanged: (v) => _toggleRelay(index, v),
@@ -269,7 +269,8 @@ class _RelayControlScreenState extends ConsumerState<RelayControlScreen> {
             ],
           ),
           Text("Relay ${index + 1}",
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, color: Colors.white)),
         ],
       ),
     );

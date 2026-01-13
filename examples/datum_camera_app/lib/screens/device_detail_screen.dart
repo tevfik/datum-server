@@ -921,22 +921,22 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                           decoration: BoxDecoration(
                             border: Border(
                                 bottom:
-                                    BorderSide(color: Colors.grey.shade200)),
-                            color: Colors.white,
+                                    BorderSide(color: Colors.grey.shade800)),
+                            color: Colors.grey[900],
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(keyDisplay,
                                   style: TextStyle(
-                                      color: Colors.grey.shade600,
+                                      color: Colors.grey.shade400,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13)),
                               SelectableText(e.value.toString(),
                                   style: const TextStyle(
                                       fontWeight: FontWeight.w600,
                                       fontSize: 15,
-                                      color: Colors.black87)),
+                                      color: Colors.white70)),
                             ],
                           ),
                         );
