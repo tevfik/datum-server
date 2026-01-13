@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/device.dart';
 import '../providers/api_provider.dart';
+import 'sparkline_widget.dart';
 
 class DynamicWoTView extends ConsumerStatefulWidget {
   final Device device;
@@ -151,8 +152,12 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
 
         dynamic rawVal = _deviceData[key];
 
-        // 1. Time Series Widget (Graph Placeholder)
+        // 1. Time Series Widget (Real Chart)
         if (widgetType == 'timeseries') {
+          double? val =
+              rawVal != null ? double.tryParse(rawVal.toString()) : null;
+          bool isDemo = widget.device.type == 'demo'; // Or any other demo logic
+
           return Card(
             elevation: 4,
             color: Colors.grey[900],
@@ -163,10 +168,14 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
                 children: [
                   Text(prop['title']!,
                       style: const TextStyle(color: Colors.white70)),
-                  const Expanded(
-                    child: Center(
-                      child: Icon(Icons.show_chart,
-                          color: Colors.blueAccent, size: 40),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: SparklineWidget(
+                        value: val,
+                        demoMode: isDemo,
+                        color: Colors.blueAccent,
+                      ),
                     ),
                   ),
                   Text("${rawVal ?? '--'} ${prop['unit']}",
