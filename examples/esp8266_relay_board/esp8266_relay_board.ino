@@ -50,10 +50,6 @@ void loop() {
 
 // ... (omitted lines)
 
-connectMQTT();
-updatePublicIP();       // Get Public IP before first report
-sendThingDescription(); // Ensure TD is uploaded on every boot
-
 // ======== STORAGE CONFIG ========
 #define EEPROM_SIZE 2048
 #define CONFIG_MAGIC 0xD4701104 // Increment this when modifying struct
@@ -804,7 +800,6 @@ void setup() {
         Serial.println("Web Server Started (STA Mode)");
 
         connectMQTT();
-        updatePublicIP();       // Get Public IP before first report
         updatePublicIP();       // Get Public IP before first report
         sendThingDescription(); // Upload TD
         sendData(true, true);
