@@ -44,9 +44,15 @@ void loop() {
 #define ADC_BATTERY A0
 
 // ======== FIRMWARE CONFIG ========
-#define FIRMWARE_VER "1.2.2" // Bumped version for MQTT
+#define FIRMWARE_VER "1.2.3" // Bumped version for MQTT and TD fix
 #define DEVICE_TYPE_NAME "relay_board"
 #define DEVICE_FRIENDLY_NAME "ESP8266 Relay"
+
+// ... (omitted lines)
+
+connectMQTT();
+updatePublicIP();       // Get Public IP before first report
+sendThingDescription(); // Ensure TD is uploaded on every boot
 
 // ======== STORAGE CONFIG ========
 #define EEPROM_SIZE 2048
