@@ -202,6 +202,12 @@ func updateDeviceThingDescriptionHandler(c *gin.Context) {
 	authDeviceID := ""
 	if val, exists := c.Get("device_id"); exists {
 		authDeviceID = val.(string)
+	} else if val, exists := c.Get("api_key"); exists {
+		// If middleware set api_key, resolve device
+		apiKey := val.(string)
+		if dev, err := store.GetDeviceByAPIKey(apiKey); err == nil {
+			authDeviceID = dev.ID
+		}
 	}
 
 	device, err := store.GetDevice(deviceID)
