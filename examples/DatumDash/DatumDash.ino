@@ -35,7 +35,7 @@ PubSubClient mqttClient(espClient);
 
 // -- Config Structure (Aligned with Relay Board + Dash specifics) --
 #define CONFIG_MAGIC 0xD4701105 // Updated Magic
-#define FIRMWARE_VER "1.1.0"
+#define FIRMWARE_VER "1.1.1"
 #define DEVICE_TYPE_NAME "display"
 
 struct Config {
@@ -343,8 +343,10 @@ void sendThingDescription() {
   }
 
   HTTPClient http;
-  String url = String(config.server_url) + "/dev/" + config.device_id +
-               "/thing-description";
+  String srv = String(config.server_url);
+  if (srv.endsWith("/"))
+    srv.remove(srv.length() - 1);
+  String url = srv + "/dev/" + config.device_id + "/thing-description";
   http.begin(*client, url);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", "Bearer " + String(config.api_key));
@@ -404,6 +406,7 @@ void reportTelemetry() {
   doc["ip_address"] = WiFi.localIP().toString();
   doc["target_device_id"] = String(config.target_device_id);
   doc["poll_interval"] = config.poll_interval;
+  doc["fw_ver"] = FIRMWARE_VER;
 
   String payload;
   serializeJson(doc, payload);
