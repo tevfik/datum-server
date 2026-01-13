@@ -5,6 +5,8 @@ import 'about_screen.dart';
 import 'login_screen.dart';
 import 'api_keys_screen.dart';
 
+import 'widgets_demo_screen.dart';
+
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -133,6 +135,15 @@ class SettingsScreen extends ConsumerWidget {
                 context,
                 MaterialPageRoute(builder: (_) => const AboutScreen()),
               );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.widgets, color: Colors.purple),
+            title: const Text('WoT Widgets Demo'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const WidgetsDemoScreen()));
             },
           ),
           const Divider(),

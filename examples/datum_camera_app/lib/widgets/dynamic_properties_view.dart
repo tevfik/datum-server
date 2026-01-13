@@ -45,6 +45,7 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
           'type': (val['type'] ?? 'string').toString(),
           'unit': (val['unit'] ?? '').toString(),
           'readOnly': (val['readOnly'] ?? true).toString(),
+          'widget': (val['ui:widget'] ?? '').toString(),
         });
       }
     });
@@ -69,8 +70,6 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
         final deviceJson = await api.getDevice(widget.device.id);
         if (deviceJson.containsKey('thing_description') &&
             deviceJson['thing_description'] != null) {
-          // Hot-swap the TD into the widget's device model (hacky but works for now) because widget.device is final
-          // Better: Re-run parse logic with new TD
           final td = deviceJson['thing_description'];
           if (td != null) {
             _properties.clear();
@@ -83,6 +82,7 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
                   'type': (val['type'] ?? 'string').toString(),
                   'unit': (val['unit'] ?? '').toString(),
                   'readOnly': (val['readOnly'] ?? true).toString(),
+                  'widget': (val['ui:widget'] ?? '').toString(),
                 });
               }
             });
@@ -95,7 +95,6 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
       if (mounted) {
         setState(() {
           _deviceData = data;
-          // Merge shadow state if available
           if (data.containsKey('shadow_state')) {
             final shadow = data['shadow_state'] as Map<String, dynamic>;
             _deviceData.addAll(shadow);
@@ -108,14 +107,12 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
   }
 
   Future<void> _handlePropertyChange(String key, dynamic value) async {
-    // Optimistic Update
     setState(() {
       _deviceData[key] = value;
     });
 
     try {
       final api = await ref.read(authenticatedApiClientProvider.future);
-      // Generic "Set Property" Pattern
       await api.sendCommand(widget.device.id, "set_property",
           params: {"key": key, "value": value});
 
@@ -150,10 +147,72 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
       itemBuilder: (context, index) {
         final prop = _properties[index];
         final key = prop['key']!;
+        final widgetType = prop['widget'];
 
         dynamic rawVal = _deviceData[key];
 
-        // Logic for Writable Boolean (Switch)
+        // 1. Time Series Widget (Graph Placeholder)
+        if (widgetType == 'timeseries') {
+          return Card(
+            elevation: 4,
+            color: Colors.grey[900],
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(prop['title']!,
+                      style: const TextStyle(color: Colors.white70)),
+                  Expanded(
+                    child: Center(
+                      child: Icon(Icons.show_chart,
+                          color: Colors.blueAccent, size: 40),
+                    ),
+                  ),
+                  Text("${rawVal ?? '--'} ${prop['unit']}",
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // 2. Gauge Widget (Placeholder)
+        if (widgetType == 'gauge') {
+          return Card(
+            elevation: 4,
+            color: Colors.grey[900],
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(prop['title']!,
+                      style: const TextStyle(color: Colors.white70)),
+                  Expanded(
+                    child: Center(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Icon(Icons.speed,
+                              color: Colors.orangeAccent, size: 40),
+                          Positioned(
+                              bottom: 0,
+                              child: Text("${rawVal ?? '--'}",
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 10)))
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // 3. Boolean Switch
         bool isBool = prop['type'] == 'boolean';
         bool isReadOnly = prop['readOnly'] == 'true';
 
@@ -201,7 +260,7 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
                           ]))));
         }
 
-        // Read-Only Display
+        // 4. Default Read-Only Display
         String unit = prop['unit'] ?? '';
         String displayVal = rawVal?.toString() ?? '--';
 
