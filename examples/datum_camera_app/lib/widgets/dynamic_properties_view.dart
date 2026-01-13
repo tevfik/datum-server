@@ -35,14 +35,16 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
     final td = widget.device.thingDescription;
     if (td == null || !td.containsKey('properties')) return;
 
+    _properties.clear();
     final props = td['properties'] as Map<String, dynamic>;
     props.forEach((key, val) {
       if (val is Map<String, dynamic>) {
         _properties.add({
           'key': key,
-          'title': val['title'] ?? key,
-          'type': val['type'] ?? 'string',
-          'unit': val['unit'] ?? '',
+          'title': (val['title'] ?? key).toString(),
+          'type': (val['type'] ?? 'string').toString(),
+          'unit': (val['unit'] ?? '').toString(),
+          'readOnly': (val['readOnly'] ?? true).toString(),
         });
       }
     });
@@ -78,6 +80,31 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
     }
   }
 
+  Future<void> _handlePropertyChange(String key, dynamic value) async {
+    // Optimistic Update
+    setState(() {
+      _deviceData[key] = value;
+    });
+
+    try {
+      final api = await ref.read(authenticatedApiClientProvider.future);
+      // Generic "Set Property" Pattern
+      await api.sendCommand(widget.device.id, "set_property",
+          params: {"key": key, "value": value});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Command Sent"),
+            duration: Duration(milliseconds: 500)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_properties.isEmpty) {
@@ -96,9 +123,59 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
       itemBuilder: (context, index) {
         final prop = _properties[index];
         final key = prop['key']!;
-        final unit = prop['unit']!;
 
         dynamic rawVal = _deviceData[key];
+
+        // Logic for Writable Boolean (Switch)
+        bool isBool = prop['type'] == 'boolean';
+        bool isReadOnly = prop['readOnly'] == 'true';
+
+        if (isBool && !isReadOnly) {
+          bool switchVal = rawVal == true || rawVal == 'true' || rawVal == 1;
+          return Card(
+              elevation: 4,
+              color: switchVal ? Colors.blueGrey[800] : Colors.grey[900],
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: switchVal
+                      ? const BorderSide(color: Colors.blueAccent, width: 2)
+                      : BorderSide.none),
+              child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _handlePropertyChange(key, !switchVal),
+                  child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(prop['title']!,
+                                style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.bold)),
+                            Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(switchVal ? "ON" : "OFF",
+                                      style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: switchVal
+                                              ? Colors.greenAccent
+                                              : Colors.white38)),
+                                  Switch(
+                                    value: switchVal,
+                                    onChanged: (v) =>
+                                        _handlePropertyChange(key, v),
+                                    activeColor: Colors.greenAccent,
+                                  ),
+                                ])
+                          ]))));
+        }
+
+        // Read-Only Display
+        String unit = prop['unit'] ?? '';
         String displayVal = rawVal?.toString() ?? '--';
 
         return Card(

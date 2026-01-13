@@ -302,6 +302,22 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       ESP.restart();
       break;
     }
+  } else if (type == "set_property") {
+    // Generic Property Handler
+    JsonObject params = doc["params"];
+    String key = params["key"] | "";
+
+    if (key.startsWith("relay_")) {
+      int index = key.substring(6).toInt();
+      bool state = params["value"];
+      setRelay(index, state);
+      Serial.printf("Set Property: Relay %d -> %s\n", index,
+                    state ? "ON" : "OFF");
+      delay(50);
+      sendData(false, false);
+    } else {
+      Serial.println("Unknown Property Set: " + key);
+    }
   } else {
     Serial.println("Unknown command type: " + type);
   }
@@ -447,6 +463,69 @@ void handleThingDescription() {
   String response;
   serializeJson(doc, response);
   server.send(200, "application/td+json", response);
+}
+
+void sendThingDescription() {
+  if (strlen(config.device_id) == 0 || strlen(config.api_key) == 0)
+    return;
+
+  Serial.println("Sending Thing Description...");
+
+  WiFiClient *client = nullptr;
+  if (String(config.server_url).startsWith("https")) {
+    WiFiClientSecure *secureClient = new WiFiClientSecure();
+    secureClient->setInsecure();
+    client = secureClient;
+  } else {
+    client = new WiFiClient();
+  }
+
+  HTTPClient http;
+  String url = String(config.server_url) + "/dev/" + config.device_id +
+               "/thing-description";
+  http.begin(*client, url);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Authorization", "Bearer " + String(config.api_key));
+
+  DynamicJsonDocument doc(2048);
+  doc["@context"] = "https://www.w3.org/2019/wot/td/v1";
+  doc["id"] = "urn:dev:ops:" + String(config.device_id);
+  doc["title"] = DEVICE_FRIENDLY_NAME;
+  doc["description"] = "ESP8266 Relay Board";
+  doc["device_type"] = DEVICE_TYPE_NAME;
+
+  JsonObject props = doc.createNestedObject("properties");
+
+  // Relays
+  for (int i = 0; i < 4; i++) {
+    String key = "relay_" + String(i);
+    JsonObject r = props.createNestedObject(key);
+    r["title"] = "Relay " + String(i);
+    r["type"] = "boolean";
+    r["readOnly"] = false;
+  }
+
+  props["wifi_rssi"]["title"] = "WiFi Signal";
+  props["wifi_rssi"]["type"] = "integer";
+  props["wifi_rssi"]["readOnly"] = true;
+
+  props["uptime"]["title"] = "Uptime";
+  props["uptime"]["type"] = "integer";
+  props["uptime"]["unit"] = "s";
+  props["uptime"]["readOnly"] = true;
+
+  // Actions
+  JsonObject actions = doc.createNestedObject("actions");
+  actions["relay_control"]["title"] = "Control Relay";
+  actions["update_firmware"]["title"] = "Update Firmware";
+
+  String payload;
+  serializeJson(doc, payload);
+
+  int code = http.PUT(payload);
+  Serial.printf("[TD] Upload Code: %d\n", code);
+  http.end();
+  delete client;
 }
 
 void setupRoutes() {
@@ -595,6 +674,7 @@ void registerDevice() {
       saveConfig();
       Serial.println("Registration Success! Saved Credentials.");
       Serial.printf("ID: %s\n", config.device_id);
+      sendThingDescription(); // Upload TD
     } else {
       Serial.println("Registration Failed: Missing api_key or id in response");
     }
@@ -716,7 +796,9 @@ void setup() {
         Serial.println("Web Server Started (STA Mode)");
 
         connectMQTT();
-        updatePublicIP(); // Get Public IP before first report
+        updatePublicIP();       // Get Public IP before first report
+        updatePublicIP();       // Get Public IP before first report
+        sendThingDescription(); // Upload TD
         sendData(true, true);
       }
       // CRITICAL END

@@ -326,7 +326,91 @@ bool registerDeviceManual(String serverUrl, String userToken) {
   return false;
 }
 
-// -- WoT Logic (Keep Existing Display Logic) --
+// -- Thing Description Upload --
+void sendThingDescription() {
+  if (strlen(config.device_id) == 0 || strlen(config.api_key) == 0)
+    return;
+
+  Serial.println("Sending Thing Description...");
+
+  WiFiClient *client = nullptr;
+  if (String(config.server_url).startsWith("https")) {
+    WiFiClientSecure *secureClient = new WiFiClientSecure();
+    secureClient->setInsecure();
+    client = secureClient;
+  } else {
+    client = new WiFiClient();
+  }
+
+  HTTPClient http;
+  String url = String(config.server_url) + "/dev/" + config.device_id +
+               "/thing-description";
+  http.begin(*client, url);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Authorization", "Bearer " + String(config.api_key));
+
+  DynamicJsonDocument doc(2048);
+  doc["@context"] = "https://www.w3.org/2019/wot/td/v1";
+  doc["id"] = "urn:dev:datum:" + String(config.device_id);
+  doc["title"] = "DatumDash";
+  doc["description"] = "Smart IoT Display";
+
+  JsonObject props = doc.createNestedObject("properties");
+
+  props["target_device_id"]["title"] = "Target Device";
+  props["target_device_id"]["type"] = "string";
+  props["target_device_id"]["readOnly"] = false; // Writable via set_target
+
+  props["poll_interval"]["title"] = "Poll Interval";
+  props["poll_interval"]["type"] = "integer";
+  props["poll_interval"]["unit"] = "s";
+  props["poll_interval"]["readOnly"] = false;
+
+  props["ip_address"]["title"] = "IP Address";
+  props["ip_address"]["type"] = "string";
+  props["ip_address"]["readOnly"] = true;
+
+  props["wifi_ssid"]["title"] = "WiFi Network";
+  props["wifi_ssid"]["type"] = "string";
+  props["wifi_ssid"]["readOnly"] = true;
+
+  props["uptime"]["title"] = "Uptime";
+  props["uptime"]["type"] = "integer";
+  props["uptime"]["unit"] = "s";
+  props["uptime"]["readOnly"] = true;
+
+  JsonObject actions = doc.createNestedObject("actions");
+  actions["set_target"]["title"] = "Set Target Device";
+  actions["update_firmware"]["title"] = "Update Firmware";
+
+  String payload;
+  serializeJson(doc, payload);
+
+  int code = http.PUT(payload);
+  Serial.printf("[TD] Upload Code: %d\n", code);
+  http.end();
+  delete client;
+}
+
+unsigned long lastTelemetryTime = 0;
+
+void reportTelemetry() {
+  if (!mqttClient.connected())
+    return;
+
+  DynamicJsonDocument doc(512);
+  doc["uptime"] = millis() / 1000;
+  doc["wifi_ssid"] = String(config.ssid);
+  doc["ip_address"] = WiFi.localIP().toString();
+  doc["target_device_id"] = String(config.target_device_id);
+  doc["poll_interval"] = config.poll_interval;
+
+  String payload;
+  serializeJson(doc, payload);
+
+  String topic = "dev/" + String(config.device_id) + "/data";
+  mqttClient.publish(topic.c_str(), payload.c_str());
+}
 
 String getCachedValue(String key) {
   for (auto &v : valueCache) {
@@ -691,11 +775,15 @@ void setup() {
     tft.println("\nRegistering...");
     if (registerDeviceManual(config.server_url, config.user_token)) {
       tft.println("Success!");
+      sendThingDescription(); // Send TD immediately after registration
     } else {
       tft.println("Failed!");
       delay(2000);
       startSetupMode();
     }
+  } else {
+    // Also send on every boot to ensure server is in sync
+    sendThingDescription();
   }
 
   // Setup Server & OTA
@@ -732,10 +820,16 @@ void loop() {
       pollDevice();
     }
 
-    // Carousel Logic (Display Cycle)
+    // Display Cycle
     if (now - lastCarouselTime > 5000) {
       lastCarouselTime = now;
       updateDisplay();
+    }
+
+    // Telemetry Report
+    if (now - lastTelemetryTime > 60000) {
+      lastTelemetryTime = now;
+      reportTelemetry();
     }
   }
 }
