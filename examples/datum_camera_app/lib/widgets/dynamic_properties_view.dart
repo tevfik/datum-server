@@ -164,7 +164,7 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
                   Text(prop['title']!,
                       style: const TextStyle(color: Colors.white70)),
                   Expanded(
-                    child: Center(
+                    child: const Center(
                       child: Icon(Icons.show_chart,
                           color: Colors.blueAccent, size: 40),
                     ),
@@ -195,12 +195,12 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          Icon(Icons.speed,
+                          const Icon(Icons.speed,
                               color: Colors.orangeAccent, size: 40),
                           Positioned(
                               bottom: 0,
                               child: Text("${rawVal ?? '--'}",
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                       color: Colors.white, fontSize: 10)))
                         ],
                       ),
