@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"datum-go/internal/logger"
 	"datum-go/internal/storage"
@@ -88,12 +89,21 @@ func (h *AdminHandler) ListAllDevicesHandler(c *gin.Context) {
 			ownerEmail = owner.Email
 		}
 
+		// Calculate dynamic status (online/offline)
+		status := "offline"
+		if time.Since(d.LastSeen) < 5*time.Minute {
+			status = "online"
+		}
+
+		// Admin status (active/suspended) is stored in d.Status
+		adminStatus := d.Status
+
 		enrichedDevices = append(enrichedDevices, gin.H{
 			"id":           d.ID,
 			"name":         d.Name,
 			"type":         d.Type,
-			"status":       d.Status, // Admin status: active/suspended/banned
-			"admin_status": d.Status, // Explicit field for frontend clarity
+			"status":       status,      // Dynamic status for UI Badge
+			"admin_status": adminStatus, // DB status (active/suspended)
 			"owner_id":     d.UserID,
 			"owner_email":  ownerEmail,
 			"last_seen":    d.LastSeen,
