@@ -16,7 +16,7 @@ class DynamicWoTView extends ConsumerStatefulWidget {
 class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
   Timer? _timer;
   Map<String, dynamic> _deviceData = {};
-  List<Map<String, String>> _properties = [];
+  final List<Map<String, String>> _properties = [];
 
   @override
   void initState() {

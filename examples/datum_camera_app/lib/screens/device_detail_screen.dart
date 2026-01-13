@@ -567,9 +567,11 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
           actions: [
             PopupMenuButton<String>(
               onSelected: (value) {
-                if (value == 'delete')
+                if (value == 'delete') {
                   _confirmDelete();
-                else if (value == 'update') _showUpdateDialog();
+                } else if (value == 'update') {
+                  _showUpdateDialog();
+                }
               },
               itemBuilder: (context) => [
                 const PopupMenuItem(
