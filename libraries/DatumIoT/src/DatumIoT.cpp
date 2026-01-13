@@ -115,7 +115,7 @@ bool DatumIoT::registerDevice(String serverBaseUrl, String userToken,
   }
 
   HTTPClient http;
-  String url = _serverUrl + "/dev/register";
+  String url = _serverUrl + "/dev";
   DATUM_LOG("Registering at %s...", url.c_str());
 
 #ifdef ESP8266
@@ -131,9 +131,9 @@ bool DatumIoT::registerDevice(String serverBaseUrl, String userToken,
   http.addHeader("Authorization", "Bearer " + userToken);
 
   StaticJsonDocument<256> doc;
-  doc["device_uid"] = deviceUid;
-  doc["device_name"] = deviceName;
-  doc["device_type"] = deviceType;
+  doc["device_id"] = deviceUid; // Map deviceUid to device_id
+  doc["name"] = deviceName;     // Map device_name to name
+  doc["type"] = deviceType;     // Map device_type to type
 
   String payload;
   serializeJson(doc, payload);

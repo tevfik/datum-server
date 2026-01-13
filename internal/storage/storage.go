@@ -129,13 +129,14 @@ type Device struct {
 	FirmwareVersion string    `json:"firmware_version,omitempty"` // Current firmware version
 
 	// Token-based authentication (Hybrid SAS system)
-	MasterSecret   string    `json:"master_secret,omitempty"`    // Device's master secret for token generation
-	CurrentToken   string    `json:"current_token,omitempty"`    // Current active token
-	PreviousToken  string    `json:"previous_token,omitempty"`   // Previous token (valid during grace period)
-	TokenIssuedAt  time.Time `json:"token_issued_at,omitempty"`  // When current token was issued
-	TokenExpiresAt time.Time `json:"token_expires_at,omitempty"` // When current token expires
-	GracePeriodEnd time.Time `json:"grace_period_end,omitempty"` // When previous token becomes invalid
-	KeyRevokedAt   time.Time `json:"key_revoked_at,omitempty"`   // When keys were revoked (if revoked)
+	MasterSecret     string                 `json:"master_secret,omitempty"`     // Device's master secret for token generation
+	CurrentToken     string                 `json:"current_token,omitempty"`     // Current active token
+	PreviousToken    string                 `json:"previous_token,omitempty"`    // Previous token (valid during grace period)
+	TokenIssuedAt    time.Time              `json:"token_issued_at,omitempty"`   // When current token was issued
+	TokenExpiresAt   time.Time              `json:"token_expires_at,omitempty"`  // When current token expires
+	GracePeriodEnd   time.Time              `json:"grace_period_end,omitempty"`  // When previous token becomes invalid
+	KeyRevokedAt     time.Time              `json:"key_revoked_at,omitempty"`    // When keys were revoked (if revoked)
+	ThingDescription map[string]interface{} `json:"thing_description,omitempty"` // Thing Description (WoT)
 }
 
 func (s *Storage) CreateDevice(device *Device) error {
@@ -1002,6 +1003,30 @@ func (s *Storage) ListAllDevices() ([]Device, error) {
 		return nil
 	})
 	return devices, err
+}
+
+// UpdateDeviceThingDescription updates the Thing Description for a device
+func (s *Storage) UpdateDeviceThingDescription(deviceID string, td map[string]interface{}) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		deviceKey := fmt.Sprintf("device:%s", deviceID)
+		deviceData, err := tx.Get(deviceKey)
+		if err != nil {
+			return fmt.Errorf("device not found")
+		}
+
+		var device Device
+		if err := json.Unmarshal([]byte(deviceData), &device); err != nil {
+			return err
+		}
+
+		// Update TD
+		device.ThingDescription = td
+		device.UpdatedAt = time.Now()
+
+		newData, _ := json.Marshal(device)
+		_, _, err = tx.Set(deviceKey, string(newData), nil)
+		return err
+	})
 }
 
 // UpdateDevice updates device status (for ban/unban)

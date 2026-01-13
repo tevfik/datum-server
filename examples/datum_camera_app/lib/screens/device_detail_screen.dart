@@ -12,6 +12,7 @@ import '../providers/api_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/device.dart';
 import '../widgets/stream_recorder.dart';
+import '../widgets/dynamic_properties_view.dart'; // Import Generic View
 
 class DeviceDetailScreen extends ConsumerStatefulWidget {
   final Device device;
@@ -58,12 +59,16 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     });
 
     _pollData();
-    _startStream();
+    if (widget.device.type == 'camera') {
+      _startStream();
+    }
   }
 
   @override
   void dispose() {
-    _stopStream();
+    if (widget.device.type == 'camera') {
+      _stopStream();
+    }
     _streamController.dispose();
     super.dispose();
   }
@@ -237,7 +242,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                     DropdownButton<String>(
                       value: _vres,
                       isExpanded: true,
-                      items: ["QVGA", "VGA", "SVGA", "HD", "UXGA"]
+                      items: ["QQVGA", "QVGA", "VGA", "SVGA", "HD", "UXGA"]
                           .map((val) =>
                               DropdownMenuItem(value: val, child: Text(val)))
                           .toList(),
@@ -554,6 +559,42 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 1. Generic WoT View (DatumDash, Relays, etc.)
+    if (widget.device.type != 'camera') {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.device.name),
+          actions: [
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'delete')
+                  _confirmDelete();
+                else if (value == 'update') _showUpdateDialog();
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                    value: 'update',
+                    child: Row(children: [
+                      Icon(Icons.system_update),
+                      SizedBox(width: 8),
+                      Text('Update Firmware')
+                    ])),
+                const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(children: [
+                      Icon(Icons.delete, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Delete Device', style: TextStyle(color: Colors.red))
+                    ])),
+              ],
+            ),
+          ],
+        ),
+        body: DynamicWoTView(device: widget.device),
+      );
+    }
+
+    // 2. Existing Camera View (Legacy)
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.device.name),

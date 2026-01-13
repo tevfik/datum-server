@@ -341,6 +341,8 @@ bool extractJsonBool(String json, String key) {
 
 // Helper to get framesize from string
 framesize_t getFrameSizeFromName(String name) {
+  if (name == "QQVGA")
+    return FRAMESIZE_QQVGA;
   if (name == "QCIF")
     return FRAMESIZE_QCIF;
   if (name == "QVGA")
@@ -367,6 +369,8 @@ framesize_t getFrameSizeFromName(String name) {
 // Helper to get string name from framesize
 String getFrameSizeName(framesize_t size) {
   switch (size) {
+  case FRAMESIZE_QQVGA:
+    return "QQVGA";
   case FRAMESIZE_QCIF:
     return "QCIF";
   case FRAMESIZE_QVGA:

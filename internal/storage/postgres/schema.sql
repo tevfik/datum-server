@@ -35,7 +35,10 @@ CREATE TABLE IF NOT EXISTS devices (
     key_revoked_at TIMESTAMPTZ,
     
     -- Device Shadow (Latest State)
-    shadow_state JSONB
+    shadow_state JSONB,
+    
+    -- Thing Description (WoT)
+    thing_description JSONB
 );
 
 CREATE INDEX IF NOT EXISTS idx_devices_user_id ON devices(user_id);

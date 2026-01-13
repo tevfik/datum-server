@@ -320,6 +320,7 @@ func main() {
 		devGroup.POST("", createDeviceHandler)
 		devGroup.GET("", listDevicesHandler)
 		devGroup.GET("/:device_id", getDeviceHandler)
+		devGroup.PUT("/:device_id/thing-description", updateDeviceThingDescriptionHandler)
 		devGroup.DELETE("/:device_id", deleteDeviceHandler)
 
 		// Commands (User sends to device)

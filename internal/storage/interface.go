@@ -29,7 +29,8 @@ type Provider interface {
 	GetUserDevices(userID string) ([]Device, error)
 	GetAllDevices() ([]Device, error)
 	UpdateDevice(id string, status string) error
-	UpdateDeviceAPIKey(id string, newKey string) error // New method
+	UpdateDeviceThingDescription(id string, td map[string]interface{}) error // New method
+	UpdateDeviceAPIKey(id string, newKey string) error                       // New method
 	UpdateDeviceLastSeen(id string) error
 	DeleteDevice(deviceID, userID string) error
 	ForceDeleteDevice(id string) error

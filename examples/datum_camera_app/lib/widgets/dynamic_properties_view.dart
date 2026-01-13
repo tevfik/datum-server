@@ -1,140 +1,138 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import '../models/thing_description.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/device.dart';
+import '../providers/api_provider.dart';
 
-class DynamicPropertiesView extends StatelessWidget {
-  final ThingDescription td;
-  final Map<String, dynamic> data;
-  final Function(String key, dynamic value)? onValueChanged;
+class DynamicWoTView extends ConsumerStatefulWidget {
+  final Device device;
 
-  const DynamicPropertiesView({
-    super.key,
-    required this.td,
-    required this.data,
-    this.onValueChanged,
-  });
+  const DynamicWoTView({super.key, required this.device});
+
+  @override
+  ConsumerState<DynamicWoTView> createState() => _DynamicWoTViewState();
+}
+
+class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
+  Timer? _timer;
+  Map<String, dynamic> _deviceData = {};
+  List<Map<String, String>> _properties = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _parseThingDescription();
+    _startPolling();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _parseThingDescription() {
+    final td = widget.device.thingDescription;
+    if (td == null || !td.containsKey('properties')) return;
+
+    final props = td['properties'] as Map<String, dynamic>;
+    props.forEach((key, val) {
+      if (val is Map<String, dynamic>) {
+        _properties.add({
+          'key': key,
+          'title': val['title'] ?? key,
+          'type': val['type'] ?? 'string',
+          'unit': val['unit'] ?? '',
+        });
+      }
+    });
+
+    if (mounted) setState(() {});
+  }
+
+  void _startPolling() {
+    _pollData();
+    _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      _pollData();
+    });
+  }
+
+  Future<void> _pollData() async {
+    if (!mounted) return;
+    try {
+      final api = await ref.read(authenticatedApiClientProvider.future);
+      final data = await api.getDeviceData(widget.device.id);
+
+      if (mounted) {
+        setState(() {
+          _deviceData = data;
+          // Merge shadow state if available
+          if (data.containsKey('shadow_state')) {
+            final shadow = data['shadow_state'] as Map<String, dynamic>;
+            _deviceData.addAll(shadow);
+          }
+        });
+      }
+    } catch (e) {
+      // debugPrint("Poll Error: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Separate Booleans (Switches), Device Info (Strings/IP), and Sensors (Numbers)
-    final boolProps = td.properties.entries.where((e) => e.value.type == 'boolean').toList();
-    
-    final infoKeys = ['local_ip', 'public_ip', 'ssid', 'bssid', 'channel', 'fw_ver', 'uptime', 'status', 'reset_reason'];
-    final infoProps = td.properties.entries.where((e) => infoKeys.contains(e.key)).toList();
-    
-    final sensorProps = td.properties.entries
-        .where((e) => e.value.type != 'boolean' && !infoKeys.contains(e.key))
-        .toList();
+    if (_properties.isEmpty) {
+      return const Center(child: Text("No Properties Found in Description"));
+    }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 1. Controls (Switches)
-        if (boolProps.isNotEmpty) ...[
-          const Text("Controls", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          Card(
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 1.5,
+      ),
+      itemCount: _properties.length,
+      itemBuilder: (context, index) {
+        final prop = _properties[index];
+        final key = prop['key']!;
+        final unit = prop['unit']!;
+
+        dynamic rawVal = _deviceData[key];
+        String displayVal = rawVal?.toString() ?? '--';
+
+        return Card(
+          elevation: 4,
+          color: Colors.grey[900],
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
             child: Column(
-              children: boolProps.map((entry) {
-                final key = entry.key;
-                final prop = entry.value;
-                final bool value = data[key] == true;
-
-                return SwitchListTile(
-                  title: Text(prop.description.isNotEmpty ? prop.description : key),
-                  value: value,
-                  secondary: const Icon(Icons.power_settings_new),
-                  onChanged: onValueChanged != null 
-                    ? (val) => onValueChanged!(key, val) 
-                    : null,
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
-
-        // 2. Sensors (Grid)
-        if (sensorProps.isNotEmpty) ...[
-          const Text("Sensors", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 2.5,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-            ),
-            itemCount: sensorProps.length,
-            itemBuilder: (ctx, i) {
-              final entry = sensorProps[i];
-              final key = entry.key;
-              final prop = entry.value;
-              final val = data[key] ?? '-';
-              
-              IconData icon = Icons.sensors;
-              if (key.contains('rssi')) icon = Icons.wifi;
-              if (key.contains('battery')) icon = Icons.battery_std;
-
-              return Card(
-                elevation: 2,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    children: [
-                      Icon(icon, color: Colors.blueGrey),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(prop.description.isNotEmpty ? prop.description : key, 
-                                 style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                 maxLines: 1, overflow: TextOverflow.ellipsis),
-                            Text("$val${prop.unit != null ? " ${prop.unit}" : ""}", 
-                                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      )
-                    ],
-                  ),
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  prop['title']!,
+                  style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-        ],
-        
-        // 3. Device Info (List)
-        if (infoProps.isNotEmpty) ...[
-          const Text("Device Info", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          Card(
-            child: Column(
-              children: infoProps.map((entry) {
-                 final key = entry.key;
-                 final prop = entry.value;
-                 final val = data[key] ?? '-';
-                 IconData icon = Icons.info;
-                 if (key.contains('ip')) icon = Icons.lan;
-                 if (key == 'ssid') icon = Icons.wifi_password;
-                 if (key == 'bssid') icon = Icons.router;
-                 if (key == 'uptime') icon = Icons.timer;
-                 if (key == 'fw_ver') icon = Icons.system_update;
-
-                 return ListTile(
-                   leading: Icon(icon, color: Colors.grey),
-                   title: Text(prop.description),
-                   trailing: Text(val.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
-                   dense: true,
-                 );
-              }).toList(),
+                const Spacer(),
+                Text(
+                  displayVal,
+                  style:
+                      const TextStyle(color: Colors.blueAccent, fontSize: 24),
+                ),
+                if (unit.isNotEmpty)
+                  Text(unit,
+                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
             ),
           ),
-        ]
-      ],
+        );
+      },
     );
   }
 }

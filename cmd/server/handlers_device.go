@@ -19,15 +19,16 @@ type CreateDeviceRequest struct {
 }
 
 type DeviceResponse struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Type        string                 `json:"type"`
-	DeviceUID   string                 `json:"device_uid"` // Add DeviceUID
-	PublicIP    string                 `json:"public_ip"`  // Add PublicIP
-	LastSeen    time.Time              `json:"last_seen"`
-	CreatedAt   time.Time              `json:"created_at"`
-	Status      string                 `json:"status"`
-	ShadowState map[string]interface{} `json:"shadow_state"` // Added ShadowState
+	ID               string                 `json:"id"`
+	Name             string                 `json:"name"`
+	Type             string                 `json:"type"`
+	DeviceUID        string                 `json:"device_uid"` // Add DeviceUID
+	PublicIP         string                 `json:"public_ip"`  // Add PublicIP
+	LastSeen         time.Time              `json:"last_seen"`
+	CreatedAt        time.Time              `json:"created_at"`
+	Status           string                 `json:"status"`
+	ShadowState      map[string]interface{} `json:"shadow_state"`      // Added ShadowState
+	ThingDescription map[string]interface{} `json:"thing_description"` // Thing Description
 }
 
 // ============ Device Handlers ============
@@ -148,15 +149,16 @@ func getDeviceHandler(c *gin.Context) {
 	}
 
 	resp := DeviceResponse{
-		ID:          device.ID,
-		Name:        device.Name,
-		Type:        device.Type,
-		DeviceUID:   device.DeviceUID,
-		PublicIP:    device.PublicIP,
-		LastSeen:    device.LastSeen,
-		CreatedAt:   device.CreatedAt,
-		Status:      status,
-		ShadowState: shadowState,
+		ID:               device.ID,
+		Name:             device.Name,
+		Type:             device.Type,
+		DeviceUID:        device.DeviceUID,
+		PublicIP:         device.PublicIP,
+		LastSeen:         device.LastSeen,
+		CreatedAt:        device.CreatedAt,
+		Status:           status,
+		ShadowState:      shadowState,
+		ThingDescription: device.ThingDescription,
 	}
 
 	c.JSON(http.StatusOK, resp)
@@ -187,4 +189,37 @@ func deleteDeviceHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Device deleted"})
+}
+
+// updateDeviceThingDescriptionHandler updates the Thing Description of a device
+// PUT /dev/:device_id/thing-description
+func updateDeviceThingDescriptionHandler(c *gin.Context) {
+	userID, _ := auth.GetUserID(c)
+	role, _ := auth.GetUserRole(c)
+	deviceID := c.Param("device_id")
+
+	device, err := store.GetDevice(deviceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
+		return
+	}
+
+	// Authorization check
+	if role != "admin" && device.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var td map[string]interface{}
+	if err := c.ShouldBindJSON(&td); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := store.UpdateDeviceThingDescription(deviceID, td); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update TD"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "Thing Description updated", "thing_description": td})
 }
