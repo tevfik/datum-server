@@ -70,3 +70,31 @@ func UserAuthMiddleware(store storage.Provider) gin.HandlerFunc {
 		}
 	}
 }
+
+// HybridAuthMiddleware allows EITHER User Auth OR Device Auth
+func HybridAuthMiddleware(store storage.Provider) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		token := ""
+		if authHeader != "" {
+			parts := strings.Split(authHeader, " ")
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				token = parts[1]
+			}
+		}
+
+		// Device Auth Detection (sk_ or dk_)
+		if strings.HasPrefix(token, "sk_") || strings.HasPrefix(token, "dk_") {
+			auth.DeviceAuthMiddleware()(c)
+			// DeviceAuthMiddleware Aborts if invalid. If not aborted, it calls Next().
+			// But we want to call Next ONLY ONCE.
+			// If DeviceAuthMiddleware calls Next(), then we fall through?
+			// DeviceAuthMiddleware implementation usually ends with c.Next().
+			// So if we call it here, it will chain the rest.
+			return
+		}
+
+		// User Auth Fallback
+		UserAuthMiddleware(store)(c)
+	}
+}

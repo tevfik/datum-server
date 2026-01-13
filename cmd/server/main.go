@@ -320,7 +320,6 @@ func main() {
 		devGroup.POST("", createDeviceHandler)
 		devGroup.GET("", listDevicesHandler)
 		devGroup.GET("/:device_id", getDeviceHandler)
-		devGroup.PUT("/:device_id/thing-description", updateDeviceThingDescriptionHandler)
 		devGroup.DELETE("/:device_id", deleteDeviceHandler)
 
 		// Commands (User sends to device)
@@ -359,9 +358,11 @@ func main() {
 		// Video streaming upload (device uploads frames)
 		devAuthGroup.POST("/:device_id/stream/frame", uploadFrameHandler)
 
-		// Self-description (WoT)
-		devAuthGroup.PUT("/:device_id/thing-description", updateSelfThingDescriptionHandler)
 	}
+
+	// Specialized route for Thing Description (supports both User and Device Auth)
+	// Must be registered outside of Auth Groups to avoid conflict and allow hybrid auth
+	r.PUT("/dev/:device_id/thing-description", HybridAuthMiddleware(store), updateDeviceThingDescriptionHandler)
 
 	// Public routes (No Auth)
 	pubGroup := r.Group("/pub")

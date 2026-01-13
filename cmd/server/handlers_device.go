@@ -194,9 +194,15 @@ func deleteDeviceHandler(c *gin.Context) {
 // updateDeviceThingDescriptionHandler updates the Thing Description of a device
 // PUT /dev/:device_id/thing-description
 func updateDeviceThingDescriptionHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
 	userID, _ := auth.GetUserID(c)
 	role, _ := auth.GetUserRole(c)
-	deviceID := c.Param("device_id")
+
+	// Check for Device Authentication
+	authDeviceID := ""
+	if val, exists := c.Get("device_id"); exists {
+		authDeviceID = val.(string)
+	}
 
 	device, err := store.GetDevice(deviceID)
 	if err != nil {
@@ -204,39 +210,24 @@ func updateDeviceThingDescriptionHandler(c *gin.Context) {
 		return
 	}
 
-	// Authorization check
-	if role != "admin" && device.UserID != userID {
+	// Authorization Check (Dual Support)
+	isAuthorized := false
+
+	// 1. Admin
+	if role == "admin" {
+		isAuthorized = true
+	}
+	// 2. Device Owner (User)
+	if userID != "" && device.UserID == userID {
+		isAuthorized = true
+	}
+	// 3. The Device Itself
+	if authDeviceID != "" && authDeviceID == deviceID {
+		isAuthorized = true
+	}
+
+	if !isAuthorized {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	var td map[string]interface{}
-	if err := c.ShouldBindJSON(&td); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := store.UpdateDeviceThingDescription(deviceID, td); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update TD"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"status": "Thing Description updated", "thing_description": td})
-}
-
-// updateSelfThingDescriptionHandler updates the Thing Description of the authenticated device
-// PUT /dev/:device_id/thing-description (Device Auth)
-func updateSelfThingDescriptionHandler(c *gin.Context) {
-	deviceID := c.Param("device_id")
-	apiKey, exists := c.Get("api_key")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing device credentials"})
-		return
-	}
-
-	device, err := store.GetDeviceByAPIKey(apiKey.(string))
-	if err != nil || device.ID != deviceID {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid device credentials"})
 		return
 	}
 
