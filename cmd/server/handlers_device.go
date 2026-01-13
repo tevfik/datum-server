@@ -223,3 +223,33 @@ func updateDeviceThingDescriptionHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"status": "Thing Description updated", "thing_description": td})
 }
+
+// updateSelfThingDescriptionHandler updates the Thing Description of the authenticated device
+// PUT /dev/:device_id/thing-description (Device Auth)
+func updateSelfThingDescriptionHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
+	apiKey, exists := c.Get("api_key")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing device credentials"})
+		return
+	}
+
+	device, err := store.GetDeviceByAPIKey(apiKey.(string))
+	if err != nil || device.ID != deviceID {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid device credentials"})
+		return
+	}
+
+	var td map[string]interface{}
+	if err := c.ShouldBindJSON(&td); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := store.UpdateDeviceThingDescription(deviceID, td); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update TD"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "Thing Description updated", "thing_description": td})
+}

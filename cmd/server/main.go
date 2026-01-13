@@ -358,6 +358,9 @@ func main() {
 
 		// Video streaming upload (device uploads frames)
 		devAuthGroup.POST("/:device_id/stream/frame", uploadFrameHandler)
+
+		// Self-description (WoT)
+		devAuthGroup.PUT("/:device_id/thing-description", updateSelfThingDescriptionHandler)
 	}
 
 	// Public routes (No Auth)
