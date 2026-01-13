@@ -141,8 +141,24 @@ components:
       properties:
         device_id:
           type: string
+        name:
+          type: string
+        type:
+          type: string
         api_key:
           type: string
+        status:
+          type: string
+        last_seen:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        thing_description:
+          type: object
+          description: Web of Things (WoT) Thing Description
+          additionalProperties: true
 
     DataPayload:
       type: object
@@ -783,6 +799,26 @@ paths:
           description: Status check
 
   /dev/{device_id}:
+    get:
+      summary: Get device details
+      description: Returns device details, including Thing Description.
+      tags: [Devices]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Device details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
     delete:
       summary: Delete device
       tags: [Devices]
