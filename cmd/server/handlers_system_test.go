@@ -66,7 +66,7 @@ func TestExportDatabaseHandlerWithDevices(t *testing.T) {
 		store.CreateDevice(device)
 	}
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/database/export", h.ExportDatabaseHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/export", nil)
@@ -109,7 +109,7 @@ func TestExportDatabaseHandlerCompleteData(t *testing.T) {
 		store.CreateUser(user)
 	}
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/database/export", h.ExportDatabaseHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/export", nil)
@@ -136,7 +136,7 @@ func TestGetSystemConfigHandlerRateLimit(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/sys/config", h.GetSystemConfigHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/sys/config", nil)
@@ -197,7 +197,7 @@ func TestCreateUserHandlerDuplicateEmail(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users", h.CreateUserHandler)
 
 	requestBody := map[string]interface{}{
@@ -221,7 +221,7 @@ func TestCreateUserHandlerEmailValidation(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users", h.CreateUserHandler)
 
 	requestBody := map[string]interface{}{
@@ -336,7 +336,7 @@ func TestUpdateRetentionPolicyHandlerMinValue(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
 	requestBody := map[string]interface{}{
@@ -359,7 +359,7 @@ func TestUpdateRetentionPolicyHandlerMaxValue(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
 	requestBody := map[string]interface{}{
@@ -568,12 +568,12 @@ func TestGetLatestDataHandlerWithData(t *testing.T) {
 	}
 	store.StoreData(dataPoint)
 
-	router.GET("/data/:device_id/latest", func(c *gin.Context) {
+	router.GET("/data/:device_id", func(c *gin.Context) {
 		c.Set("user_id", "latest-u")
-		getLatestDataHandler(c)
+		getDataHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/data/latest-dev/latest", nil)
+	req := httptest.NewRequest(http.MethodGet, "/data/latest-dev", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -584,7 +584,7 @@ func TestGetLatestDataHandlerWithData(t *testing.T) {
 	assert.Contains(t, response, "device_id")
 }
 
-func TestGetLatestDataHandlerAccessDenied(t *testing.T) {
+func TestGetDataHandlerAccessDenied(t *testing.T) {
 	router, cleanup := setupMediumCoverageTestServer(t)
 	defer cleanup()
 
@@ -621,12 +621,12 @@ func TestGetLatestDataHandlerAccessDenied(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.GET("/data/:device_id/latest", func(c *gin.Context) {
+	router.GET("/data/:device_id", func(c *gin.Context) {
 		c.Set("user_id", "latest-u2") // Different user
-		getLatestDataHandler(c)
+		getDataHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/data/latest-dev-2/latest", nil)
+	req := httptest.NewRequest(http.MethodGet, "/data/latest-dev-2", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -639,7 +639,7 @@ func TestSetupSystemHandlerMinimalData(t *testing.T) {
 	router, cleanup := setupMediumCoverageTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{

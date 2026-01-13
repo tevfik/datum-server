@@ -132,9 +132,9 @@ func TestGetPublicDataHistoryHandler(t *testing.T) {
 	}
 	time.Sleep(200 * time.Millisecond) // Allow time for storage
 
-	router.GET("/pub/:device_id/history", getPublicDataHistoryHandler)
+	router.GET("/pub/:device_id", getPublicDataHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/pub/history-device/history", nil)
+	req := httptest.NewRequest(http.MethodGet, "/pub/history-device?limit=100", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -164,9 +164,9 @@ func TestGetPublicDataHistoryHandlerWithLimit(t *testing.T) {
 	}
 	time.Sleep(200 * time.Millisecond)
 
-	router.GET("/pub/:device_id/history", getPublicDataHistoryHandler)
+	router.GET("/pub/:device_id", getPublicDataHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/pub/limit-device/history?limit=3", nil)
+	req := httptest.NewRequest(http.MethodGet, "/pub/limit-device?limit=3", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

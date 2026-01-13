@@ -56,9 +56,11 @@ func postDataHandler(c *gin.Context) {
 	})
 }
 
-// getLatestDataHandler returns the latest data point for a device
+// getDataHandler returns data for a device
 // GET /data/:device_id
-func getLatestDataHandler(c *gin.Context) {
+// If no query parameters are provided, it returns the latest data point (single object).
+// If query parameters (limit, start, stop, range, etc.) are provided, it returns historical data (list).
+func getDataHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 	userID, _ := auth.GetUserID(c)
 
@@ -75,53 +77,39 @@ func getLatestDataHandler(c *gin.Context) {
 		}
 	}
 
-	point, err := store.GetLatestData(deviceID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No data found"})
-		return
-	}
-
-	// Sanitize Public IP (fix for Docker/Internal IP leak)
-	if data := point.Data; data != nil {
-		if ip, ok := data["public_ip"].(string); ok && strings.HasPrefix(ip, "172.") {
-			data["public_ip"] = ""
-		}
-	} else {
-		// Handle case where point.Data might not be map[string]interface{}
-		// But store.GetLatestData defines it as such in struct usually.
-		// Actually point.Data is map[string]interface{} in struct definition:
-		// type DataPoint struct { Data map[string]interface{} ... }
-		if ip, ok := point.Data["public_ip"].(string); ok && strings.HasPrefix(ip, "172.") {
-			point.Data["public_ip"] = ""
+	// Check if this is a history query
+	hasHistoryParams := false
+	for _, param := range []string{"limit", "start", "stop", "range", "start_rfc", "end_rfc", "int"} {
+		if c.Query(param) != "" {
+			hasHistoryParams = true
+			break
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"device_id": deviceID,
-		"timestamp": point.Timestamp.Format(time.RFC3339),
-		"data":      point.Data,
-	})
-}
-
-// getDataHistoryHandler returns historical data points for a device
-// GET /data/:device_id/history
-func getDataHistoryHandler(c *gin.Context) {
-	deviceID := c.Param("device_id")
-	userID, _ := auth.GetUserID(c)
-
-	device, err := store.GetDevice(deviceID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
-		return
-	}
-	if device.UserID != userID {
-		role, _ := auth.GetUserRole(c)
-		if role != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+	// === LATEST DATA MODE ===
+	if !hasHistoryParams {
+		point, err := store.GetLatestData(deviceID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "No data found"})
 			return
 		}
+
+		// Sanitize Public IP (fix for Docker/Internal IP leak)
+		if data := point.Data; data != nil {
+			if ip, ok := data["public_ip"].(string); ok && strings.HasPrefix(ip, "172.") {
+				data["public_ip"] = ""
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"device_id": deviceID,
+			"timestamp": point.Timestamp.Format(time.RFC3339),
+			"data":      point.Data,
+		})
+		return
 	}
 
+	// === HISTORY MODE ===
 	limit := 1000
 	if limitStr := c.Query("limit"); limitStr != "" {
 		fmt.Sscanf(limitStr, "%d", &limit)

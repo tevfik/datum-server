@@ -43,23 +43,33 @@ func postPublicDataHandler(c *gin.Context) {
 func getPublicDataHandler(c *gin.Context) {
 	deviceID := "public_" + c.Param("device_id")
 
-	point, err := store.GetLatestData(deviceID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No data found"})
+	// Check for history params
+	hasHistoryParams := false
+	for _, param := range []string{"limit"} { // Public data currently only supports limit (based on previous implementation)
+		if c.Query(param) != "" {
+			hasHistoryParams = true
+			break
+		}
+	}
+
+	// === LATEST DATA ===
+	if !hasHistoryParams {
+		point, err := store.GetLatestData(deviceID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "No data found"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"device_id": c.Param("device_id"),
+			"timestamp": point.Timestamp.Format(time.RFC3339),
+			"data":      point.Data,
+			"mode":      "public",
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"device_id": c.Param("device_id"),
-		"timestamp": point.Timestamp.Format(time.RFC3339),
-		"data":      point.Data,
-		"mode":      "public",
-	})
-}
-
-func getPublicDataHistoryHandler(c *gin.Context) {
-	deviceID := "public_" + c.Param("device_id")
-
+	// === HISTORY ===
 	limit := 100
 	if limitStr := c.Query("limit"); limitStr != "" {
 		fmt.Sscanf(limitStr, "%d", &limit)

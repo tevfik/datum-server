@@ -50,7 +50,7 @@ func TestDeleteUserHandlerExisting(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/delete-user-1", nil)
@@ -88,7 +88,7 @@ func TestDeleteUserHandlerWithDevices(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/user-with-dev", nil)
@@ -119,7 +119,7 @@ func TestExportDatabaseHandlerWithUsers(t *testing.T) {
 		store.CreateUser(user)
 	}
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/database/export", h.ExportDatabaseHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/export", nil)
@@ -141,7 +141,7 @@ func TestGetSystemConfigHandlerDefaults(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/sys/config", h.GetSystemConfigHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/sys/config", nil)
@@ -163,7 +163,7 @@ func TestGetSystemConfigHandlerCustom(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 14) // Custom retention
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/sys/config", h.GetSystemConfigHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/sys/config", nil)
@@ -186,7 +186,7 @@ func TestUpdateRetentionPolicyHandlerValid(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
 	requestBody := map[string]interface{}{
@@ -209,7 +209,7 @@ func TestUpdateRetentionPolicyHandlerInvalidJSON(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/sys/retention", bytes.NewBuffer([]byte("invalid")))
@@ -248,7 +248,7 @@ func TestListUsersHandlerWithFilters(t *testing.T) {
 	}
 	store.CreateUser(user2)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/users", h.ListUsersHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users?role=admin", nil)
@@ -265,7 +265,7 @@ func TestGetDatabaseStatsHandlerEmpty(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/database/stats", h.GetDatabaseStatsHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/stats", nil)
@@ -298,7 +298,7 @@ func TestResetPasswordHandlerNonEmpty(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users/:username/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{

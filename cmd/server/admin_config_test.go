@@ -42,7 +42,7 @@ func TestGetSystemConfigHandler(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/sys/config", h.GetSystemConfigHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/sys/config", nil)
@@ -62,7 +62,7 @@ func TestUpdateRetentionPolicyHandler(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
 	body := map[string]interface{}{
@@ -88,7 +88,7 @@ func TestUpdateRetentionPolicyHandlerInvalidDays(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
 	body := map[string]interface{}{
@@ -109,7 +109,7 @@ func TestUpdateRetentionPolicyHandlerInvalidInterval(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
 
 	body := map[string]interface{}{
@@ -130,7 +130,7 @@ func TestUpdateRateLimitHandler(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/sys/ratelimit", h.UpdateRateLimitHandler)
 
 	body := map[string]interface{}{
@@ -156,7 +156,7 @@ func TestUpdateRateLimitHandlerInvalidRequests(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/sys/ratelimit", h.UpdateRateLimitHandler)
 
 	body := map[string]interface{}{
@@ -177,7 +177,7 @@ func TestUpdateAlertConfigHandler(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/sys/alerts", h.UpdateAlertConfigHandler)
 
 	body := map[string]interface{}{
@@ -204,7 +204,7 @@ func TestUpdateAlertConfigHandlerInvalidThreshold(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/sys/alerts", h.UpdateAlertConfigHandler)
 
 	body := map[string]interface{}{
@@ -226,7 +226,7 @@ func TestGetLogsHandler(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/logs", h.GetLogsHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/logs", nil)
@@ -245,7 +245,7 @@ func TestGetLogsHandlerWithLines(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/logs", h.GetLogsHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/logs?lines=50", nil)
@@ -259,7 +259,7 @@ func TestClearLogsHandler(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/logs/clear", h.ClearLogsHandler)
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/logs/clear", nil)
@@ -280,7 +280,7 @@ func TestSetupSystemHandler(t *testing.T) {
 	// Reset system first
 	store.ResetSystem()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	body := map[string]interface{}{
@@ -310,7 +310,7 @@ func TestSetupSystemHandlerAlreadyInitialized(t *testing.T) {
 	defer cleanup()
 
 	// System is already initialized in setup
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	body := map[string]interface{}{
@@ -342,7 +342,7 @@ func TestResetPasswordHandler(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users/:username/password", h.ResetPasswordHandler)
 
 	body := map[string]interface{}{
@@ -362,7 +362,7 @@ func TestResetPasswordHandlerInvalidJSON(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users/:user_id/password", h.ResetPasswordHandler)
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/users/user-id/password", bytes.NewReader([]byte("{invalid")))
@@ -390,7 +390,7 @@ func TestProvisionDeviceHandler(t *testing.T) {
 
 	router.POST("/admin/provision", func(c *gin.Context) {
 		c.Set("user_id", "provision-user")
-		h := handlers.NewAdminHandler(store, nil)
+		h := handlers.NewAdminHandler(store, nil, time.Now())
 		h.ProvisionDeviceHandler(c)
 	})
 
@@ -429,7 +429,7 @@ func TestProvisionDeviceHandlerWithDeviceID(t *testing.T) {
 
 	router.POST("/admin/provision", func(c *gin.Context) {
 		c.Set("user_id", "provision-user")
-		h := handlers.NewAdminHandler(store, nil)
+		h := handlers.NewAdminHandler(store, nil, time.Now())
 		h.ProvisionDeviceHandler(c)
 	})
 
@@ -457,7 +457,7 @@ func TestGetSystemStatusHandler(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/api/sys/status", h.GetSystemStatusHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/sys/status", nil)
@@ -482,7 +482,7 @@ func TestGetSystemStatusHandlerNotInitialized(t *testing.T) {
 	defer store.Close()
 
 	router := gin.New()
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/api/sys/status", h.GetSystemStatusHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/sys/status", nil)
@@ -512,7 +512,7 @@ func TestGetDeviceAdminHandler(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/dev/:device_id", h.GetDeviceAdminHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/dev/admin-device-001", nil)
@@ -532,7 +532,7 @@ func TestGetDeviceAdminHandlerNotFound(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/dev/:device_id", h.GetDeviceAdminHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/dev/nonexistent", nil)
@@ -557,7 +557,7 @@ func TestUpdateDeviceHandlerInvalidStatus(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PATCH("/admin/dev/:device_id", h.UpdateDeviceHandler)
 
 	body := map[string]interface{}{
@@ -599,7 +599,7 @@ func TestGetDatabaseStatsHandler(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/database/stats", h.GetDatabaseStatsHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/stats", nil)
@@ -643,7 +643,7 @@ func TestListAllDevicesHandler(t *testing.T) {
 	}
 	store.CreateDevice(device2)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/dev", h.ListAllDevicesHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/dev", nil)

@@ -326,9 +326,9 @@ func main() {
 		devGroup.POST("/:device_id/cmd", sendCommandHandler)
 		devGroup.GET("/:device_id/cmd", listCommandsHandler) // History of commands sent
 
-		// Data Query (User gets data)
-		devGroup.GET("/:device_id/data", getLatestDataHandler)
-		devGroup.GET("/:device_id/rec", getDataHistoryHandler) // 'rec' for records/history
+		// Data Query (User gets data) - merged with history (polymorphic)
+		devGroup.GET("/:device_id/data", getDataHandler)
+		// devGroup.GET("/:device_id/rec", getDataHistoryHandler) // DEPRECATED: merged into /data
 
 		// Video streaming routes (require user auth)
 		devGroup.GET("/:device_id/stream/mjpeg", mjpegStreamHandler)       // MJPEG over HTTP
@@ -364,7 +364,7 @@ func main() {
 	{
 		pubGroup.POST("/:device_id", postPublicDataHandler)
 		pubGroup.GET("/:device_id", getPublicDataHandler)
-		pubGroup.GET("/:device_id/rec", getPublicDataHistoryHandler)
+		// pubGroup.GET("/:device_id/rec", getPublicDataHistoryHandler) // DEPRECATED: merged into /pub/:device_id
 	}
 
 	// Serve firmware updates (protected)

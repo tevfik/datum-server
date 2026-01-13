@@ -39,7 +39,7 @@ func TestSetupSystemHandlerDuplicateEmail(t *testing.T) {
 	router, cleanup := setupEdgeCaseTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	// First setup
@@ -65,7 +65,7 @@ func TestCreateUserHandlerAdminRole(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users", h.CreateUserHandler)
 
 	requestBody := map[string]interface{}{
@@ -101,7 +101,7 @@ func TestUpdateUserHandlerWithPassword(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/users/:user_id", h.UpdateUserHandler)
 
 	requestBody := map[string]interface{}{
@@ -124,7 +124,7 @@ func TestUpdateUserHandlerNotFound(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/users/:user_id", h.UpdateUserHandler)
 
 	requestBody := map[string]interface{}{
@@ -147,7 +147,7 @@ func TestDeleteUserHandlerNotFound(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/nonexistent", nil)
@@ -175,7 +175,7 @@ func TestResetPasswordHandlerEmptyPassword(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users/:username/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{
@@ -202,7 +202,7 @@ func TestResetPasswordHandlerUserNotFound(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users/:username/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{
@@ -276,7 +276,7 @@ func TestListUsersHandlerMultiple(t *testing.T) {
 		store.CreateUser(user)
 	}
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/users", h.ListUsersHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil)
@@ -308,7 +308,7 @@ func TestUpdateDeviceHandlerActive(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/dev/:device_id", h.UpdateDeviceHandler)
 
 	requestBody := map[string]interface{}{

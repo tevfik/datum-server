@@ -37,7 +37,7 @@ func TestSetupSystemHandlerDefaultRetention(t *testing.T) {
 	router, cleanup := setupAdditionalTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{
@@ -64,7 +64,7 @@ func TestCreateUserHandlerDefaultRole(t *testing.T) {
 	// Initialize system
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users", h.CreateUserHandler)
 
 	requestBody := map[string]interface{}{
@@ -101,7 +101,7 @@ func TestUpdateUserHandlerSuccess(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/users/:user_id", h.UpdateUserHandler)
 
 	requestBody := map[string]interface{}{
@@ -143,7 +143,7 @@ func TestDeleteUserHandlerSuccess(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/delete-user-1", nil)
@@ -177,7 +177,7 @@ func TestResetPasswordHandlerSuccess(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users/:username/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{
@@ -213,7 +213,7 @@ func TestResetPasswordHandlerShortPassword(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users/:username/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{
@@ -238,7 +238,7 @@ func TestGetSystemConfigHandlerSuccess(t *testing.T) {
 	// Initialize system
 	store.InitializeSystem("Test Platform", true, 14)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/config", h.GetSystemConfigHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/config", nil)
@@ -276,7 +276,7 @@ func TestUpdateDeviceHandlerSuspended(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/dev/:device_id", h.UpdateDeviceHandler)
 
 	requestBody := map[string]interface{}{
@@ -304,7 +304,7 @@ func TestUpdateDeviceHandlerNotFound(t *testing.T) {
 	// Initialize system
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/dev/:device_id", h.UpdateDeviceHandler)
 
 	requestBody := map[string]interface{}{
@@ -339,7 +339,7 @@ func TestForceDeleteDeviceHandlerWithData(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.DELETE("/admin/dev/:device_id", h.ForceDeleteDeviceHandler)
 
 	// Add some data using StoreData
@@ -387,7 +387,7 @@ func TestExportDatabaseHandlerWithData(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/database/export", h.ExportDatabaseHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/export", nil)

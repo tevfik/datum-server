@@ -60,7 +60,7 @@ func TestListUsersHandlerStatusFilter(t *testing.T) {
 		store.CreateUser(user)
 	}
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/users", h.ListUsersHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users?status=active", nil)
@@ -101,7 +101,7 @@ func TestGetDatabaseStatsHandlerDetailed(t *testing.T) {
 		store.CreateDevice(device)
 	}
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/database/stats", h.GetDatabaseStatsHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/stats", nil)
@@ -136,7 +136,7 @@ func TestResetPasswordHandlerValidUpdate(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users/:username/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{
@@ -174,7 +174,7 @@ func TestUpdateUserHandlerEmailUpdate(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/users/:user_id", h.UpdateUserHandler)
 
 	requestBody := map[string]interface{}{
@@ -197,7 +197,7 @@ func TestCreateUserHandlerValidInput(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users", h.CreateUserHandler)
 
 	requestBody := map[string]interface{}{
@@ -220,7 +220,7 @@ func TestSetupSystemHandlerValidSetup(t *testing.T) {
 	router, cleanup := setupFinalTestServer(t)
 	defer cleanup()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/sys/setup", h.SetupSystemHandler)
 
 	requestBody := map[string]interface{}{

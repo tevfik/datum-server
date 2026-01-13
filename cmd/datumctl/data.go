@@ -93,29 +93,29 @@ func runDataGet(cmd *cobra.Command, args []string) error {
 	client := NewAPIClient(serverURL, token, apiKey)
 
 	// Build query parameters
-	path := fmt.Sprintf("/dev/%s/rec", dataDevice)
+	path := fmt.Sprintf("/dev/%s/data", dataDevice)
 	queryParams := ""
 
 	if dataLast != "" {
-		duration, err := parseDuration(dataLast)
+		_, err := parseDuration(dataLast)
 		if err != nil {
 			return fmt.Errorf("invalid duration: %w", err)
 		}
-		from := time.Now().Add(-duration)
-		queryParams = fmt.Sprintf("?from=%s&limit=%d", from.Format(time.RFC3339), dataLimit)
+		// Use server's 'range' parameter for convenience
+		queryParams = fmt.Sprintf("?range=%s&limit=%d", dataLast, dataLimit)
 	} else if dataFrom != "" {
 		fromTime, err := parseTime(dataFrom)
 		if err != nil {
 			return fmt.Errorf("invalid from time: %w", err)
 		}
-		queryParams = fmt.Sprintf("?from=%s&limit=%d", fromTime.Format(time.RFC3339), dataLimit)
+		queryParams = fmt.Sprintf("?start_rfc=%s&limit=%d", fromTime.Format(time.RFC3339), dataLimit)
 
 		if dataTo != "" {
 			toTime, err := parseTime(dataTo)
 			if err != nil {
 				return fmt.Errorf("invalid to time: %w", err)
 			}
-			queryParams += fmt.Sprintf("&to=%s", toTime.Format(time.RFC3339))
+			queryParams += fmt.Sprintf("&end_rfc=%s", toTime.Format(time.RFC3339))
 		}
 	}
 

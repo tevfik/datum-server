@@ -75,15 +75,15 @@ func TestGetDataHistoryHandlerRFC3339Times(t *testing.T) {
 		store.StoreData(dataPoint)
 	}
 
-	router.GET("/data/:device_id/history", func(c *gin.Context) {
+	router.GET("/data/:device_id", func(c *gin.Context) {
 		c.Set("user_id", "hist-user-rfc")
-		getDataHistoryHandler(c)
+		getDataHandler(c)
 	})
 
 	startTime := time.Now().Add(-5 * time.Hour).Format(time.RFC3339)
 	endTime := time.Now().Add(1 * time.Hour).Format(time.RFC3339)
 
-	req := httptest.NewRequest(http.MethodGet, "/data/hist-dev-rfc/history?start_rfc="+startTime+"&end_rfc="+endTime, nil)
+	req := httptest.NewRequest(http.MethodGet, "/data/hist-dev-rfc?start_rfc="+startTime+"&end_rfc="+endTime, nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -135,12 +135,12 @@ func TestGetDataHistoryHandlerWithIntervalAggregation(t *testing.T) {
 		store.StoreData(dataPoint)
 	}
 
-	router.GET("/data/:device_id/history", func(c *gin.Context) {
+	router.GET("/data/:device_id", func(c *gin.Context) {
 		c.Set("user_id", "hist-user-int")
-		getDataHistoryHandler(c)
+		getDataHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/data/hist-dev-int/history?range=24h&int=1h", nil)
+	req := httptest.NewRequest(http.MethodGet, "/data/hist-dev-int?range=24h&int=1h", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -179,13 +179,13 @@ func TestGetDataHistoryHandlerStartStopDuration(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.GET("/data/:device_id/history", func(c *gin.Context) {
+	router.GET("/data/:device_id", func(c *gin.Context) {
 		c.Set("user_id", "hist-user-ss")
-		getDataHistoryHandler(c)
+		getDataHandler(c)
 	})
 
 	startMs := time.Now().Add(-2 * time.Hour).UnixMilli()
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/data/hist-dev-ss/history?start=%d&stop=1h", startMs), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/data/hist-dev-ss?start=%d&stop=1h", startMs), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -220,12 +220,12 @@ func TestGetDataHistoryHandlerRange7d(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.GET("/data/:device_id/history", func(c *gin.Context) {
+	router.GET("/data/:device_id", func(c *gin.Context) {
 		c.Set("user_id", "hist-user-7d")
-		getDataHistoryHandler(c)
+		getDataHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/data/hist-dev-7d/history?range=7d", nil)
+	req := httptest.NewRequest(http.MethodGet, "/data/hist-dev-7d?range=7d", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -266,12 +266,12 @@ func TestGetDataHistoryHandlerRange30d(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.GET("/data/:device_id/history", func(c *gin.Context) {
+	router.GET("/data/:device_id", func(c *gin.Context) {
 		c.Set("user_id", "hist-user-30d")
-		getDataHistoryHandler(c)
+		getDataHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/data/hist-dev-30d/history?range=30d", nil)
+	req := httptest.NewRequest(http.MethodGet, "/data/hist-dev-30d?range=30d", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -306,12 +306,12 @@ func TestGetDataHistoryHandlerCustomLimit(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.GET("/data/:device_id/history", func(c *gin.Context) {
+	router.GET("/data/:device_id", func(c *gin.Context) {
 		c.Set("user_id", "hist-user-lim")
-		getDataHistoryHandler(c)
+		getDataHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/data/hist-dev-lim/history?limit=50", nil)
+	req := httptest.NewRequest(http.MethodGet, "/data/hist-dev-lim?limit=50", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -358,12 +358,12 @@ func TestGetDataHistoryHandlerInterval1d(t *testing.T) {
 		store.StoreData(dataPoint)
 	}
 
-	router.GET("/data/:device_id/history", func(c *gin.Context) {
+	router.GET("/data/:device_id", func(c *gin.Context) {
 		c.Set("user_id", "hist-user-1d")
-		getDataHistoryHandler(c)
+		getDataHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/data/hist-dev-1d/history?range=7d&int=1d", nil)
+	req := httptest.NewRequest(http.MethodGet, "/data/hist-dev-1d?range=7d&int=1d", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -451,7 +451,7 @@ func TestDeleteUserHandlerWithMultipleDevices(t *testing.T) {
 		store.CreateDevice(device)
 	}
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/del-user-md", nil)
@@ -480,7 +480,7 @@ func TestDeleteUserHandlerSuccessNoDevices(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/del-user-nd", nil)
@@ -501,7 +501,7 @@ func TestDeleteUserHandlerNonExistentUser(t *testing.T) {
 
 	store.InitializeSystem("Test", true, 7)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/nonexistent-user-id", nil)
@@ -529,7 +529,7 @@ func TestDeleteUserHandlerSuspendedUser(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.DELETE("/admin/users/:user_id", h.DeleteUserHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/users/del-user-susp", nil)
@@ -559,7 +559,7 @@ func TestResetPasswordHandlerGenerateRandom(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/users/:username/reset-password", h.ResetPasswordHandler)
 
 	requestBody := map[string]interface{}{
@@ -619,7 +619,7 @@ func TestGetDatabaseStatsHandlerWithVariousData(t *testing.T) {
 		store.CreateDevice(device)
 	}
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/database/stats", h.GetDatabaseStatsHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/database/stats", nil)
@@ -656,7 +656,7 @@ func TestListUsersHandlerWithMultipleRoles(t *testing.T) {
 		store.CreateUser(user)
 	}
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/users", h.ListUsersHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil)
@@ -689,7 +689,7 @@ func TestUpdateUserHandlerMultipleFields(t *testing.T) {
 	}
 	store.CreateUser(user)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/users/:user_id", h.UpdateUserHandler)
 
 	requestBody := map[string]interface{}{

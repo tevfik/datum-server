@@ -51,7 +51,7 @@ func setupTestEnvironment(t *testing.T) (*gin.Engine, *storage.Storage, string) 
 	r := gin.New()
 
 	// Use new handlers
-	h := handlers.NewAdminHandler(testStore, nil)
+	h := handlers.NewAdminHandler(testStore, nil, time.Now())
 	h.RegisterRoutes(r)
 
 	// setupAdminRoutes(r, testStore) // Legacy
@@ -68,7 +68,7 @@ func TestSystemSetup(t *testing.T) {
 	r := gin.New()
 
 	// Use new handler
-	h := handlers.NewAdminHandler(testStore, nil)
+	h := handlers.NewAdminHandler(testStore, nil, time.Now())
 	r.POST("/sys/setup", h.SetupSystemHandler)
 
 	setupData := map[string]interface{}{

@@ -60,7 +60,7 @@ func TestGetUserHandler(t *testing.T) {
 	router := setupTestServerHandlers(t)
 	defer store.Close()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/users/:user_id", h.GetUserHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/regular-user-001", nil)
@@ -83,7 +83,7 @@ func TestGetUserHandlerNotFound(t *testing.T) {
 	router := setupTestServerHandlers(t)
 	defer store.Close()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/users/:user_id", h.GetUserHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/nonexistent", nil)
@@ -99,7 +99,7 @@ func TestUpdateUserHandlerRole(t *testing.T) {
 
 	router.PUT("/admin/users/:user_id", func(c *gin.Context) {
 		c.Set("user_id", "admin-user-001") // Simulate authenticated admin
-		h := handlers.NewAdminHandler(store, nil)
+		h := handlers.NewAdminHandler(store, nil, time.Now())
 		h.UpdateUserHandler(c)
 	})
 
@@ -126,7 +126,7 @@ func TestUpdateUserHandlerStatus(t *testing.T) {
 
 	router.PUT("/admin/users/:user_id", func(c *gin.Context) {
 		c.Set("user_id", "admin-user-001") // Simulate authenticated admin
-		h := handlers.NewAdminHandler(store, nil)
+		h := handlers.NewAdminHandler(store, nil, time.Now())
 		h.UpdateUserHandler(c)
 	})
 
@@ -153,7 +153,7 @@ func TestUpdateUserHandlerInvalidRole(t *testing.T) {
 
 	router.PUT("/admin/users/:user_id", func(c *gin.Context) {
 		c.Set("user_id", "admin-user-001")
-		h := handlers.NewAdminHandler(store, nil)
+		h := handlers.NewAdminHandler(store, nil, time.Now())
 		h.UpdateUserHandler(c)
 	})
 
@@ -177,7 +177,7 @@ func TestUpdateUserHandlerInvalidStatus(t *testing.T) {
 
 	router.PUT("/admin/users/:user_id", func(c *gin.Context) {
 		c.Set("user_id", "admin-user-001")
-		h := handlers.NewAdminHandler(store, nil)
+		h := handlers.NewAdminHandler(store, nil, time.Now())
 		h.UpdateUserHandler(c)
 	})
 
@@ -201,7 +201,7 @@ func TestUpdateUserHandlerCannotSuspendSelf(t *testing.T) {
 
 	router.PUT("/admin/users/:user_id", func(c *gin.Context) {
 		c.Set("user_id", "admin-user-001")
-		h := handlers.NewAdminHandler(store, nil)
+		h := handlers.NewAdminHandler(store, nil, time.Now())
 		h.UpdateUserHandler(c)
 	})
 
@@ -226,7 +226,7 @@ func TestUpdateUserHandlerCannotDemoteSelf(t *testing.T) {
 
 	router.PUT("/admin/users/:user_id", func(c *gin.Context) {
 		c.Set("user_id", "admin-user-001")
-		h := handlers.NewAdminHandler(store, nil)
+		h := handlers.NewAdminHandler(store, nil, time.Now())
 		h.UpdateUserHandler(c)
 	})
 
@@ -249,7 +249,7 @@ func TestExportDatabaseHandler(t *testing.T) {
 	router := setupTestServerHandlers(t)
 	defer store.Close()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.GET("/admin/export", h.ExportDatabaseHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/export", nil)
@@ -264,7 +264,7 @@ func TestForceCleanupHandler(t *testing.T) {
 	router := setupTestServerHandlers(t)
 	defer store.Close()
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.POST("/admin/cleanup", h.ForceCleanupHandler)
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/cleanup", nil)
@@ -381,7 +381,7 @@ func TestUpdateDeviceHandler(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.PUT("/admin/dev/:device_id", h.UpdateDeviceHandler)
 
 	body := map[string]interface{}{
@@ -417,7 +417,7 @@ func TestForceDeleteDeviceHandler(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	h := handlers.NewAdminHandler(store, nil)
+	h := handlers.NewAdminHandler(store, nil, time.Now())
 	router.DELETE("/admin/dev/:device_id/force", h.ForceDeleteDeviceHandler)
 
 	req := httptest.NewRequest(http.MethodDelete, "/admin/dev/delete-device-001/force", nil)

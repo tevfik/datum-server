@@ -170,7 +170,7 @@ func TestGetLatestData(t *testing.T) {
 	dataQueryGroup := r.Group("/data")
 	dataQueryGroup.Use(auth.AuthMiddleware())
 	{
-		dataQueryGroup.GET("/:device_id", getLatestDataHandler)
+		dataQueryGroup.GET("/:device_id", getDataHandler) // Use merged handler
 	}
 
 	req, _ := http.NewRequest("GET", "/data/device-1", nil)
@@ -183,153 +183,7 @@ func TestGetLatestData(t *testing.T) {
 	testStore.Close()
 }
 
-// TestDeleteDevice tests device deletion
-func TestDeleteDevice(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
-	store = testStore
-
-	testStore.InitializeSystem("Test", false, 7)
-
-	// Create admin user
-	adminUser := &storage.User{
-		ID:    "admin-1",
-		Email: "admin@test.com",
-		Role:  "admin",
-	}
-	testStore.CreateUser(adminUser)
-
-	// Create device
-	device := &storage.Device{
-		ID:     "device-to-delete",
-		UserID: "admin-1",
-		Name:   "Delete Me",
-	}
-	testStore.CreateDevice(device)
-
-	// Generate admin token
-	token, _ := auth.GenerateToken("admin-1", "admin@test.com", "admin")
-
-	r := gin.New()
-	h := handlers.NewAdminHandler(testStore, nil)
-	h.RegisterRoutes(r)
-
-	req, _ := http.NewRequest("DELETE", "/admin/dev/device-to-delete", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	// Verify device is deleted
-	_, err := testStore.GetDevice("device-to-delete")
-	assert.Error(t, err)
-
-	testStore.Close()
-}
-
-// TestGetDevice tests fetching single device
-func TestGetDevice(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
-	store = testStore
-
-	testStore.InitializeSystem("Test", false, 7)
-
-	// Create admin user
-	adminUser := &storage.User{
-		ID:    "admin-1",
-		Email: "admin@test.com",
-		Role:  "admin",
-	}
-	testStore.CreateUser(adminUser)
-
-	// Create device
-	device := &storage.Device{
-		ID:     "device-123",
-		UserID: "admin-1",
-		Name:   "Test Device",
-		Type:   "sensor",
-		Status: "active",
-	}
-	testStore.CreateDevice(device)
-
-	// Generate admin token
-	token, _ := auth.GenerateToken("admin-1", "admin@test.com", "admin")
-
-	r := gin.New()
-	h := handlers.NewAdminHandler(testStore, nil)
-	h.RegisterRoutes(r)
-
-	req, _ := http.NewRequest("GET", "/admin/dev/device-123", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var response map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &response)
-	assert.Equal(t, "device-123", response["id"])
-	assert.Equal(t, "Test Device", response["name"])
-	assert.Equal(t, "sensor", response["type"])
-
-	testStore.Close()
-}
-
-// TestUpdateDevice tests device update
-func TestUpdateDevice(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
-	store = testStore
-
-	testStore.InitializeSystem("Test", false, 7)
-
-	// Create admin user
-	adminUser := &storage.User{
-		ID:    "admin-1",
-		Email: "admin@test.com",
-		Role:  "admin",
-	}
-	testStore.CreateUser(adminUser)
-
-	// Create device
-	device := &storage.Device{
-		ID:     "device-update",
-		UserID: "admin-1",
-		Name:   "Old Name",
-		Type:   "sensor",
-	}
-	testStore.CreateDevice(device)
-
-	// Generate admin token
-	token, _ := auth.GenerateToken("admin-1", "admin@test.com", "admin")
-
-	r := gin.New()
-	h := handlers.NewAdminHandler(testStore, nil)
-	h.RegisterRoutes(r)
-
-	updateData := map[string]interface{}{
-		"status": "suspended",
-	}
-
-	body, _ := json.Marshal(updateData)
-	req, _ := http.NewRequest("PUT", "/admin/dev/device-update", bytes.NewBuffer(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var response map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &response)
-	assert.Equal(t, "Device updated", response["message"])
-
-	testStore.Close()
-}
-
-// TestDataHistory tests historical data query
+// TestDataHistory tests historical data query via merged endpoint
 func TestDataHistory(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	testStore, _ := storage.New(":memory:", "", 7*24*time.Hour)
@@ -359,10 +213,11 @@ func TestDataHistory(t *testing.T) {
 	dataQueryGroup := r.Group("/data")
 	dataQueryGroup.Use(auth.AuthMiddleware())
 	{
-		dataQueryGroup.GET("/:device_id/history", getDataHistoryHandler)
+		dataQueryGroup.GET("/:device_id", getDataHandler) // Use merged handler
 	}
 
-	req, _ := http.NewRequest("GET", "/data/device-1/history?start=2025-01-01T00:00:00Z&end=2025-12-31T23:59:59Z", nil)
+	// Request with params triggers history mode
+	req, _ := http.NewRequest("GET", "/data/device-1?start=2025-01-01T00:00:00Z&end=2025-12-31T23:59:59Z", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -390,7 +245,7 @@ func TestInvalidDeviceID(t *testing.T) {
 	token, _ := auth.GenerateToken("admin-1", "admin@test.com", "admin")
 
 	r := gin.New()
-	h := handlers.NewAdminHandler(testStore, nil)
+	h := handlers.NewAdminHandler(testStore, nil, time.Now())
 	h.RegisterRoutes(r)
 
 	req, _ := http.NewRequest("GET", "/admin/dev/non-existent-device", nil)

@@ -384,6 +384,21 @@ paths:
                     format: date-time
 
 
+  /sys/ip:
+    get:
+      summary: Get system IP
+      description: Returns the public IP address of the client as seen by the server.
+      tags: [System]
+      responses:
+        '200':
+          description: Client IP address
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "127.0.0.1"
+
+
   /sys/status:
     get:
       summary: Get system status
@@ -991,25 +1006,15 @@ paths:
         '200':
           description: Data received
     get:
-      summary: Get latest data
-      tags: [Data]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: device_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Latest data point
-
-  /dev/{device_id}/rec:
-    get:
-      summary: Get data history with time range filtering
+      summary: Get data (latest or history)
       description: |
-        Query historical time-series data with flexible time range options.
+        Get latest data point (default) or query historical time-series data using parameters.
+        
+        **Latest Data:**
+        Call without query parameters. Returns a single data object.
+        
+        **Historical Data:**
+        Call with `limit`, `start`, `stop`, `range`, or `int` parameters. Returns a list of data objects.
         
         **Time Range Options (mutually exclusive):**
         - `range`: Duration backwards from now (e.g., `1h`, `24h`, `7d`, `30d`)
@@ -1029,7 +1034,7 @@ paths:
             type: string
         - name: limit
           in: query
-          description: Maximum number of data points to return
+          description: Maximum number of data points to return (triggers history mode)
           schema:
             type: integer
             default: 100
@@ -1088,32 +1093,43 @@ paths:
               summary: Aggregate per day
       responses:
         '200':
-          description: Historical data points
+          description: Latest data point OR List of historical data points
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  device_id:
-                    type: string
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        timestamp:
-                          type: string
-                          format: date-time
-                        timestamp_ms:
-                          type: integer
-                          format: int64
-                        values:
+                oneOf:
+                  # Latest Data Response
+                  - type: object
+                    properties:
+                      device_id:
+                        type: string
+                      timestamp:
+                        type: string
+                      data:
+                        type: object
+                  # History Data Response
+                  - type: object
+                    properties:
+                      device_id:
+                        type: string
+                      data:
+                        type: array
+                        items:
                           type: object
-                          additionalProperties:
-                            type: number
-                        count:
-                          type: integer
-                          description: Number of aggregated points (when using int parameter)
+                          properties:
+                            timestamp:
+                              type: string
+                              format: date-time
+                            timestamp_ms:
+                              type: integer
+                              format: int64
+                            values:
+                              type: object
+                              additionalProperties:
+                                type: number
+                            count:
+                              type: integer
+                              description: Number of aggregated points (when using int parameter)
 
 
 
@@ -1141,24 +1157,15 @@ paths:
         '200':
           description: Data received
     get:
-      summary: Get public data (no auth)
-      tags: [Public]
-      parameters:
-        - name: device_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Latest data
-
-  /pub/{device_id}/rec:
-    get:
-      summary: Get public history with time range filtering (no auth)
+      summary: Get public data (latest or history)
       description: |
-        Query historical time-series data without authentication.
-        Same time range and aggregation options as authenticated endpoint.
+        Get public data without authentication.
+        
+        **Latest Data:**
+        Call without query parameters. Returns a single data object.
+        
+        **Historical Data:**
+        Call with `limit` parameter. Returns a list of data objects.
       tags: [Public]
       parameters:
         - name: device_id
@@ -1168,34 +1175,13 @@ paths:
             type: string
         - name: limit
           in: query
-          description: Maximum number of data points
+          description: Maximum number of data points to return (triggers history mode)
           schema:
             type: integer
             default: 100
-        - name: range
-          in: query
-          description: Duration backwards from now (e.g., 1h, 24h, 7d)
-          schema:
-            type: string
-        - name: start
-          in: query
-          description: Start time as Unix timestamp in milliseconds
-          schema:
-            type: integer
-            format: int64
-        - name: stop
-          in: query
-          description: Duration from start (e.g., 1h, 1d)
-          schema:
-            type: string
-        - name: int
-          in: query
-          description: Aggregation interval (e.g., 1m, 1h, 1d)
-          schema:
-            type: string
       responses:
         '200':
-          description: Historical data points
+          description: Latest data OR list of historical data
 
   /dev/{device_id}/cmd/stream:
     get:
@@ -1521,6 +1507,156 @@ paths:
 
 
 
+
+
+  /admin/db/collections:
+    get:
+      summary: List all collections (Admin)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of all collections across all users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  collections:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        user_id:
+                          type: string
+                        collection:
+                          type: string
+                        doc_count:
+                          type: integer
+
+  /admin/db/{user_id}/{collection}:
+    get:
+      summary: List user documents (Admin)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of documents in user's collection
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+
+    post:
+      summary: Create user document (Admin)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Document content
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Document created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+
+  /admin/db/{user_id}/{collection}/{doc_id}:
+    put:
+      summary: Update user document (Admin)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: doc_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Document content
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Document updated
+    delete:
+      summary: Delete user document (Admin)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: doc_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document deleted
 
   /admin/users/{username}/reset-password:
     post:
@@ -1865,154 +2001,6 @@ paths:
         '200':
           description: Document deleted
 
-  /sys/db/collections:
-    get:
-      summary: List all collections (Admin)
-      tags: [Admin, Database]
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: List of all collections across all users
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  collections:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        user_id:
-                          type: string
-                        collection:
-                          type: string
-                        doc_count:
-                          type: integer
-
-  /sys/db/{user_id}/{collection}:
-    get:
-      summary: List user documents (Admin)
-      tags: [Admin, Database]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: user_id
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: collection
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: List of documents in user's collection
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  additionalProperties: true
-
-    post:
-      summary: Create user document (Admin)
-      tags: [Admin, Database]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: user_id
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: collection
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        description: Document content
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        '201':
-          description: Document created
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id:
-                    type: string
-                  status:
-                    type: string
-
-  /sys/db/{user_id}/{collection}/{doc_id}:
-    put:
-      summary: Update user document (Admin)
-      tags: [Admin, Database]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: user_id
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: collection
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: doc_id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        description: Document content
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        '200':
-          description: Document updated
-    delete:
-      summary: Delete user document (Admin)
-      tags: [Admin, Database]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: user_id
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: collection
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: doc_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Document deleted
 
   /sys/info:
     get:

@@ -203,12 +203,12 @@ func TestGetLatestDataHandler(t *testing.T) {
 	store.StoreData(point)
 	time.Sleep(100 * time.Millisecond)
 
-	router.GET("/api/dev/:device_id/data/latest", func(c *gin.Context) {
+	router.GET("/api/dev/:device_id/data", func(c *gin.Context) {
 		c.Set("user_id", "latest-user")
-		getLatestDataHandler(c)
+		getDataHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/dev/latest-device/data/latest", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/dev/latest-device/data", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -230,12 +230,12 @@ func TestGetLatestDataHandlerNoData(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.GET("/api/dev/:device_id/data/latest", func(c *gin.Context) {
+	router.GET("/api/dev/:device_id/data", func(c *gin.Context) {
 		c.Set("user_id", "nodata-user")
-		getLatestDataHandler(c)
+		getDataHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/dev/nodata-device/data/latest", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/dev/nodata-device/data", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -270,12 +270,12 @@ func TestGetDataHistoryHandler(t *testing.T) {
 	}
 	time.Sleep(200 * time.Millisecond)
 
-	router.GET("/api/dev/:device_id/data/history", func(c *gin.Context) {
+	router.GET("/api/dev/:device_id/data", func(c *gin.Context) {
 		c.Set("user_id", "history-user")
-		getDataHistoryHandler(c)
+		getDataHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/dev/history-device/data/history", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/dev/history-device/data?limit=100", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -307,12 +307,12 @@ func TestGetDataHistoryHandlerWithLimit(t *testing.T) {
 	}
 	time.Sleep(200 * time.Millisecond)
 
-	router.GET("/api/dev/:device_id/data/history", func(c *gin.Context) {
+	router.GET("/api/dev/:device_id/data", func(c *gin.Context) {
 		c.Set("user_id", "limit-user")
-		getDataHistoryHandler(c)
+		getDataHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/dev/limit-history-device/data/history?limit=5", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/dev/limit-history-device/data?limit=5", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -347,12 +347,12 @@ func TestGetDataHistoryHandlerWithRange(t *testing.T) {
 	}
 	time.Sleep(200 * time.Millisecond)
 
-	router.GET("/api/dev/:device_id/data/history", func(c *gin.Context) {
+	router.GET("/api/dev/:device_id/data", func(c *gin.Context) {
 		c.Set("user_id", "range-user")
-		getDataHistoryHandler(c)
+		getDataHandler(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/dev/range-history-device/data/history?range=24h", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/dev/range-history-device/data?range=24h", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -376,14 +376,14 @@ func TestGetDataHistoryHandlerWithStartStop(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.GET("/api/dev/:device_id/data/history", func(c *gin.Context) {
+	router.GET("/api/dev/:device_id/data", func(c *gin.Context) {
 		c.Set("user_id", "startstop-user")
-		getDataHistoryHandler(c)
+		getDataHandler(c)
 	})
 
 	startMs := time.Now().Add(-2 * time.Hour).UnixMilli()
 	req := httptest.NewRequest(http.MethodGet,
-		"/api/dev/startstop-device/data/history?start="+string(rune(startMs))+"&stop=1h", nil)
+		"/api/dev/startstop-device/data?start="+string(rune(startMs))+"&stop=1h", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -407,13 +407,13 @@ func TestGetDataHistoryHandlerWithInterval(t *testing.T) {
 	}
 	store.CreateDevice(device)
 
-	router.GET("/api/dev/:device_id/data/history", func(c *gin.Context) {
+	router.GET("/api/dev/:device_id/data", func(c *gin.Context) {
 		c.Set("user_id", "interval-user")
-		getDataHistoryHandler(c)
+		getDataHandler(c)
 	})
 
 	req := httptest.NewRequest(http.MethodGet,
-		"/api/dev/interval-device/data/history?range=7d&interval=1h", nil)
+		"/api/dev/interval-device/data?range=7d&interval=1h", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
