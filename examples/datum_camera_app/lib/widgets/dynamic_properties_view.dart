@@ -163,8 +163,8 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
                 children: [
                   Text(prop['title']!,
                       style: const TextStyle(color: Colors.white70)),
-                  Expanded(
-                    child: const Center(
+                  const Expanded(
+                    child: Center(
                       child: Icon(Icons.show_chart,
                           color: Colors.blueAccent, size: 40),
                     ),
