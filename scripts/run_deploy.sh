@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Navigate to project root (one level up from scripts/)
+cd "$(dirname "$0")/.." || exit 1
+
 # Pull latest changes
 git pull
 

@@ -95,6 +95,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sys/ip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get system IP
+         * @description Returns the public IP address of the client as seen by the server.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Client IP address */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sys/status": {
         parameters: {
             query?: never;
@@ -1402,10 +1441,42 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get latest data */
+        /**
+         * Get data (latest or history)
+         * @description Get latest data point (default) or query historical time-series data using parameters.
+         *
+         *     **Latest Data:**
+         *     Call without query parameters. Returns a single data object.
+         *
+         *     **Historical Data:**
+         *     Call with `limit`, `start`, `stop`, `range`, or `int` parameters. Returns a list of data objects.
+         *
+         *     **Time Range Options (mutually exclusive):**
+         *     - `range`: Duration backwards from now (e.g., `1h`, `24h`, `7d`, `30d`)
+         *     - `start` + `stop`: Unix timestamp (ms) with duration
+         *     - `start_rfc` + `end_rfc`: RFC3339 formatted timestamps
+         *
+         *     **Aggregation:**
+         *     Use `int` parameter to aggregate data into buckets (e.g., `1m`, `1h`, `1d`)
+         */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Maximum number of data points to return (triggers history mode) */
+                    limit?: number;
+                    /** @description Duration backwards from now (e.g., 1h, 24h, 7d, 30d) */
+                    range?: string;
+                    /** @description Start time as Unix timestamp in milliseconds */
+                    start?: number;
+                    /** @description Duration from start (e.g., 1h, 1d, 1m, 1s) */
+                    stop?: string;
+                    /** @description Start time in RFC3339 format (e.g., 2024-01-01T00:00:00Z) */
+                    start_rfc?: string;
+                    /** @description End time in RFC3339 format (e.g., 2024-01-02T00:00:00Z) */
+                    end_rfc?: string;
+                    /** @description Aggregation interval for averaging data (e.g., 1m, 1h, 1d) */
+                    int?: string;
+                };
                 header?: never;
                 path: {
                     device_id: string;
@@ -1414,12 +1485,31 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Latest data point */
+                /** @description Latest data point OR List of historical data points */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": {
+                            device_id?: string;
+                            timestamp?: string;
+                            data?: Record<string, never>;
+                        } | {
+                            device_id?: string;
+                            data?: {
+                                /** Format: date-time */
+                                timestamp?: string;
+                                /** Format: int64 */
+                                timestamp_ms?: number;
+                                values?: {
+                                    [key: string]: number;
+                                };
+                                /** @description Number of aggregated points (when using int parameter) */
+                                count?: number;
+                            }[];
+                        };
+                    };
                 };
             };
         };
@@ -1455,83 +1545,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dev/{device_id}/rec": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get data history with time range filtering
-         * @description Query historical time-series data with flexible time range options.
-         *
-         *     **Time Range Options (mutually exclusive):**
-         *     - `range`: Duration backwards from now (e.g., `1h`, `24h`, `7d`, `30d`)
-         *     - `start` + `stop`: Unix timestamp (ms) with duration
-         *     - `start_rfc` + `end_rfc`: RFC3339 formatted timestamps
-         *
-         *     **Aggregation:**
-         *     Use `int` parameter to aggregate data into buckets (e.g., `1m`, `1h`, `1d`)
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Maximum number of data points to return */
-                    limit?: number;
-                    /** @description Duration backwards from now (e.g., 1h, 24h, 7d, 30d) */
-                    range?: string;
-                    /** @description Start time as Unix timestamp in milliseconds */
-                    start?: number;
-                    /** @description Duration from start (e.g., 1h, 1d, 1m, 1s) */
-                    stop?: string;
-                    /** @description Start time in RFC3339 format (e.g., 2024-01-01T00:00:00Z) */
-                    start_rfc?: string;
-                    /** @description End time in RFC3339 format (e.g., 2024-01-02T00:00:00Z) */
-                    end_rfc?: string;
-                    /** @description Aggregation interval for averaging data (e.g., 1m, 1h, 1d) */
-                    int?: string;
-                };
-                header?: never;
-                path: {
-                    device_id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Historical data points */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            device_id?: string;
-                            data?: {
-                                /** Format: date-time */
-                                timestamp?: string;
-                                /** Format: int64 */
-                                timestamp_ms?: number;
-                                values?: {
-                                    [key: string]: number;
-                                };
-                                /** @description Number of aggregated points (when using int parameter) */
-                                count?: number;
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/pub/{device_id}": {
         parameters: {
             query?: never;
@@ -1539,10 +1552,22 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get public data (no auth) */
+        /**
+         * Get public data (latest or history)
+         * @description Get public data without authentication.
+         *
+         *     **Latest Data:**
+         *     Call without query parameters. Returns a single data object.
+         *
+         *     **Historical Data:**
+         *     Call with `limit` parameter. Returns a list of data objects.
+         */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Maximum number of data points to return (triggers history mode) */
+                    limit?: number;
+                };
                 header?: never;
                 path: {
                     device_id: string;
@@ -1551,7 +1576,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Latest data */
+                /** @description Latest data OR list of historical data */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1586,57 +1611,6 @@ export interface paths {
                 };
             };
         };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pub/{device_id}/rec": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get public history with time range filtering (no auth)
-         * @description Query historical time-series data without authentication.
-         *     Same time range and aggregation options as authenticated endpoint.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Maximum number of data points */
-                    limit?: number;
-                    /** @description Duration backwards from now (e.g., 1h, 24h, 7d) */
-                    range?: string;
-                    /** @description Start time as Unix timestamp in milliseconds */
-                    start?: number;
-                    /** @description Duration from start (e.g., 1h, 1d) */
-                    stop?: string;
-                    /** @description Aggregation interval (e.g., 1m, 1h, 1d) */
-                    int?: string;
-                };
-                header?: never;
-                path: {
-                    device_id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Historical data points */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2237,6 +2211,189 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/db/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all collections (Admin) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of all collections across all users */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            collections?: {
+                                user_id?: string;
+                                collection?: string;
+                                doc_count?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/db/{user_id}/{collection}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List user documents (Admin) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    user_id: string;
+                    collection: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of documents in user's collection */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create user document (Admin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    user_id: string;
+                    collection: string;
+                };
+                cookie?: never;
+            };
+            /** @description Document content */
+            requestBody: {
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            responses: {
+                /** @description Document created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id?: string;
+                            status?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/db/{user_id}/{collection}/{doc_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update user document (Admin) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    user_id: string;
+                    collection: string;
+                    doc_id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Document content */
+            requestBody: {
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            responses: {
+                /** @description Document updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** Delete user document (Admin) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    user_id: string;
+                    collection: string;
+                    doc_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Document deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/users/{username}/reset-password": {
         parameters: {
             query?: never;
@@ -2804,189 +2961,6 @@ export interface paths {
                 path: {
                     collection: string;
                     id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Document deleted */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sys/db/collections": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all collections (Admin) */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description List of all collections across all users */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            collections?: {
-                                user_id?: string;
-                                collection?: string;
-                                doc_count?: number;
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sys/db/{user_id}/{collection}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List user documents (Admin) */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    user_id: string;
-                    collection: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description List of documents in user's collection */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        }[];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /** Create user document (Admin) */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    user_id: string;
-                    collection: string;
-                };
-                cookie?: never;
-            };
-            /** @description Document content */
-            requestBody: {
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            responses: {
-                /** @description Document created */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            id?: string;
-                            status?: string;
-                        };
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sys/db/{user_id}/{collection}/{doc_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Update user document (Admin) */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    user_id: string;
-                    collection: string;
-                    doc_id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Document content */
-            requestBody: {
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            responses: {
-                /** @description Document updated */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        post?: never;
-        /** Delete user document (Admin) */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    user_id: string;
-                    collection: string;
-                    doc_id: string;
                 };
                 cookie?: never;
             };
