@@ -751,11 +751,14 @@ void sendThingDescription() {
 
   JsonObject aSnap = actions.createNestedObject("snap");
   aSnap["title"] = "Take Snapshot";
-  // No input for snap (uses properties)
+  aSnap["description"] = "Captures a still image (uses configured resolution)";
 
+  // Stream action deprecated in favor of stream_enabled property,
+  // but kept for compatibility/explicit trigger if needed.
   JsonObject aStream = actions.createNestedObject("stream");
-  aStream["title"] = "Control Stream";
-  // No input for stream (uses properties)
+  aStream["title"] = "Start Stream";
+  aStream["description"] =
+      "Starts the video stream (uses configured resolution)";
 
   JsonObject aUpdate = actions.createNestedObject("update_firmware");
   aUpdate["title"] = "Update Firmware";
