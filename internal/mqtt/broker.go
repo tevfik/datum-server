@@ -185,7 +185,7 @@ func (h *AuthHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) boo
 	}
 
 	// 1. Admin/User Dashboard Authentication
-	if strings.HasPrefix(clientID, "admin_dashboard_") {
+	if strings.HasPrefix(clientID, "admin_dashboard_") || strings.HasPrefix(clientID, "datum_web_") {
 		// Expecting User API Key
 		if strings.HasPrefix(token, "ak_") {
 			user, err := h.store.GetUserByUserAPIKey(token)
