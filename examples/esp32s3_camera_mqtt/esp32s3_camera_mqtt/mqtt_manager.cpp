@@ -224,6 +224,8 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       // LED Power
       if (paramsBlock.indexOf("\"led\":") != -1) {
         torchState = extractJsonBool(paramsBlock, "led");
+      } else if (paramsBlock.indexOf("\"led_on\":") != -1) {
+        torchState = extractJsonBool(paramsBlock, "led_on");
       }
 
 // Apply LED
@@ -244,6 +246,11 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       // Motion
       if (paramsBlock.indexOf("\"mot\":") != -1) {
         motionEnabled = extractJsonBool(paramsBlock, "mot");
+        prefs.begin("datum", false);
+        prefs.putBool("pref_mot", motionEnabled);
+        prefs.end();
+      } else if (paramsBlock.indexOf("\"motion_enabled\":") != -1) {
+        motionEnabled = extractJsonBool(paramsBlock, "motion_enabled");
         prefs.begin("datum", false);
         prefs.putBool("pref_mot", motionEnabled);
         prefs.end();
@@ -684,4 +691,22 @@ void sendThingDescription() {
   int code = http.PUT(payload);
   Serial.printf("[TD] Upload Code: %d\n", code);
   http.end();
+}
+
+void publishMotionEvent() {
+  if (deviceID.length() == 0 || !mqttClient.connected())
+    return;
+
+  DynamicJsonDocument doc(512);
+  doc["type"] = "event";
+  doc["event"] = "motion";
+  doc["timestamp"] = time(NULL);
+  doc["description"] = "Motion detected!";
+
+  String payload;
+  serializeJson(doc, payload);
+
+  String topic = "dev/" + deviceID + "/data";
+  mqttClient.publish(topic.c_str(), payload.c_str());
+  Serial.println("[MQTT] Published Motion Event");
 }

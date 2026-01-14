@@ -1,8 +1,12 @@
 import { type Device } from "@/shared/types/device";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, Line, Tooltip, ResponsiveContainer } from "recharts";
-import { Activity, Zap, Gauge } from "lucide-react";
+import { Activity, Zap, Gauge, Loader2 } from "lucide-react";
+import { deviceService } from "@/features/devices/services/deviceService";
+import { useState } from "react";
 
 interface DynamicWoTPanelProps {
     device: Device;
@@ -36,6 +40,7 @@ export function DynamicWoTPanel({ device, shadowState }: DynamicWoTPanelProps) {
                         return (
                             <WoTPropertyCard
                                 key={key}
+                                deviceId={device.id}
                                 propKey={key}
                                 propDef={prop}
                                 value={value}
@@ -48,10 +53,26 @@ export function DynamicWoTPanel({ device, shadowState }: DynamicWoTPanelProps) {
     );
 }
 
-function WoTPropertyCard({ propKey, propDef, value }: { propKey: string, propDef: any, value: any }) {
+function WoTPropertyCard({ deviceId, propKey, propDef, value }: { deviceId: string, propKey: string, propDef: any, value: any }) {
     const unit = propDef.unit || "";
     const title = propDef.title || propKey;
     const widgetType = propDef["ui:widget"];
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleUpdate = async (newValue: any) => {
+        setIsLoading(true);
+        try {
+            await deviceService.sendCommand(deviceId, {
+                action: "update_settings",
+                params: { [propKey]: newValue }
+            });
+            // Ideally optimistic update or wait for shadow state
+        } catch (e) {
+            console.error("Failed to update property", e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     // Render TimeSeries Chart
     if (widgetType === "timeseries") {
@@ -116,28 +137,48 @@ function WoTPropertyCard({ propKey, propDef, value }: { propKey: string, propDef
         )
     }
 
-    // Default Card (Number/String)
+    // Default Card (Number/String/Boolean/Enum)
     return (
         <Card>
             <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
                     {title}
-                    {propDef.readOnly ? <Badge variant="outline" className="text-[10px]">Read-Only</Badge> : <Zap className="h-4 w-4 text-yellow-500" />}
+                    {propDef.readOnly ? (
+                        <Badge variant="outline" className="text-[10px]">Read-Only</Badge>
+                    ) : (
+                        isLoading ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Zap className="h-4 w-4 text-yellow-500" />
+                    )}
                 </CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="flex items-center justify-between">
                     <div className="text-2xl font-bold">
-                        {value !== undefined ? value : "--"} <span className="text-sm font-normal text-muted-foreground">{unit}</span>
+                        {propDef.enum && !propDef.readOnly ? (
+                            <Select
+                                value={String(value || "")}
+                                onValueChange={(val) => handleUpdate(val)}
+                                disabled={isLoading}
+                            >
+                                <SelectTrigger className="w-[140px] h-8">
+                                    <SelectValue placeholder="Select..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {propDef.enum.map((opt: string) => (
+                                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        ) : (
+                            <span>{value !== undefined ? value : "--"} <span className="text-sm font-normal text-muted-foreground">{unit}</span></span>
+                        )}
                     </div>
 
                     {!propDef.readOnly && propDef.type === "boolean" && (
                         <div className="flex items-center space-x-2">
-                            <input
-                                type="checkbox"
+                            <Switch
                                 checked={value === true}
-                                onChange={() => { }}
-                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                onCheckedChange={(chk: boolean) => handleUpdate(chk)}
+                                disabled={isLoading}
                             />
                         </div>
                     )}

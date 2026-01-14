@@ -5,6 +5,7 @@
 #include <Preferences.h>
 
 #include "camera_pins.h"
+#include "mqtt_manager.h"
 
 // External functions/vars from main
 extern void uploadFrame(camera_fb_t *fb);
@@ -528,6 +529,7 @@ void processCameraLoop() {
           if (isSDAvailable()) {
             // SAVE METADATA & RETURN FB BEFORE HIGH RES SNAPSHOT
             Serial.println("[MOTION] Triggered. Snapshot...");
+            publishMotionEvent();
 
             // Use handleSnap to take High-Res Snapshot (same as mobile app)
             // Arg1: "" -> Load resolution from preferences (High Res)

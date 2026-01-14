@@ -6,6 +6,7 @@
 extern void updateLED();
 extern void startSetupMode(); // If we need to fallback to AP
 extern bool initialBoot;      // in .ino
+extern String serverURL;      // in .ino
 
 unsigned long lastWiFiCheck = 0;
 bool wasConnected = false;
@@ -112,23 +113,50 @@ void updatePublicIP() {
       return; // Keep existing if valid
 
     Serial.println("[WiFi] Querying Public IP...");
-    WiFiClientSecure client;
-    client.setInsecure();
-    HTTPClient http;
-    http.setTimeout(8000);
+    // WiFiClientSecure client; // Not needed if serverURL handles protocol, but
+    // wait HTTPClient needs begin(url). If serverURL is https, we need
+    // ClientSecure or validation? HTTPClient handles https if given a url, but
+    // might need setInsecure if cert is self-signed? The previous code used
+    // api.ipify.org (https). Let's assume serverURL might be http or https.
 
-    if (http.begin(client, "https://api.ipify.org")) {
+    // We already have extern String serverURL; in wifi_manager.h? No, in
+    // mqtt_manager.h. wifi_manager.cpp doesn't include mqtt_manager.h but
+    // accesses globals? Wait, wifi_manager.cpp does not see serverURL extern!
+    // serverURL is defined in main.ino.
+    // I need to check if 'serverURL' is visible here.
+    // In wifi_manager.cpp lines 1-10, there is NO extern String serverURL.
+    // I MUST ADD extern String serverURL here first.
+
+    HTTPClient http;
+    http.setTimeout(5000);
+    // Use the serverURL global
+    String url = serverURL + "/sys/ip";
+
+    // Check if https
+    if (url.startsWith("https")) {
+      WiFiClientSecure client;
+      client.setInsecure();
+      http.begin(client, url);
       int httpCode = http.GET();
       if (httpCode > 0) {
         String payload = http.getString();
         payload.trim();
         if (payload.length() > 0) {
-          publicIP = payload; // Store in global
+          publicIP = payload;
           Serial.println("[WiFi] Public IP: " + publicIP);
         }
-      } else {
-        Serial.printf("[WiFi] Public IP check failed: %s\n",
-                      http.errorToString(httpCode).c_str());
+      }
+      http.end();
+    } else {
+      http.begin(url);
+      int httpCode = http.GET();
+      if (httpCode > 0) {
+        String payload = http.getString();
+        payload.trim();
+        if (payload.length() > 0) {
+          publicIP = payload;
+          Serial.println("[WiFi] Public IP: " + publicIP);
+        }
       }
       http.end();
     }

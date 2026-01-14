@@ -22,6 +22,7 @@ void startMQTTTask(); // If we were to use a task, but sticking to loop() for
 void processMqttLoop();
 
 void reportTelemetry(bool isBoot, bool isConnect);
+void publishMotionEvent();
 void ackCommand(String cmdId);
 void sendThingDescription();
 
