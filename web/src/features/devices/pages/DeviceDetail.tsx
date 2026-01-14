@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Trash2, Calendar, HardDrive, Globe, Activity, Terminal, Send } from 'lucide-react';
+import { ArrowLeft, Trash2, Calendar, HardDrive, Globe, Activity, Terminal, Send, Video, RefreshCw } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
 import { TelemetryChart } from '@/features/devices/components/TelemetryChart';
@@ -136,6 +136,7 @@ export default function DeviceDetail() {
                 {device.thing_description && (
                     <>
                         <DynamicWoTPanel device={device} shadowState={device.shadow_state} />
+                        <CameraStream deviceId={device.id} />
                         <DynamicActionPanel device={device} />
                         <DeviceEventLog device={device} />
                     </>
@@ -359,5 +360,65 @@ function FirmwareUpdate({ deviceId }: { deviceId: string }) {
                 {sendMutation.isPending ? 'Sending Command...' : 'Start OTA Update'}
             </Button>
         </div>
+    );
+}
+
+function CameraStream({ deviceId }: { deviceId: string }) {
+    const { token } = useAuth();
+    const [error, setError] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
+
+    const streamUrl = `/api/dev/${deviceId}/stream/mjpeg?token=${token}&t=${refreshKey}`;
+
+    return (
+        <Card className="col-span-2 md:col-span-2 lg:col-span-1 flex flex-col">
+            <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2">
+                    <Video className="h-5 w-5" />
+                    Camera Stream
+                </CardTitle>
+                <CardDescription>
+                    MJPEG Stream
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 flex items-center justify-center bg-black rounded-b-lg overflow-hidden min-h-[240px] relative group">
+                {error ? (
+                    <div className="text-destructive text-sm text-center p-4">
+                        <p>Stream unavailable</p>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-2"
+                            onClick={() => {
+                                setError(false);
+                                setRefreshKey(k => k + 1);
+                            }}
+                        >
+                            Retry
+                        </Button>
+                    </div>
+                ) : (
+                    <img
+                        src={streamUrl}
+                        alt="Camera Stream"
+                        className="w-full h-full object-contain"
+                        onError={() => setError(true)}
+                    />
+                )}
+
+                {/* Overlay Controls */}
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                        size="icon"
+                        variant="secondary"
+                        className="h-8 w-8 bg-black/50 hover:bg-black/70 text-white"
+                        onClick={() => setRefreshKey(k => k + 1)}
+                        title="Refresh Stream"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
     );
 }
