@@ -599,24 +599,33 @@ void pollDevice() {
 
   int httpCode = http.GET();
   if (httpCode == 200) {
-    // Optimization: Use stream to avoid loading entire string into RAM
-    DynamicJsonDocument doc(4096);
-    DeserializationError error = deserializeJson(doc, http.getStream());
+    // DEBUG: Print payload to see what we are receiving
+    String payload = http.getString();
+    Serial.printf("HTTP 200. Len: %d. Payload:\n", payload.length());
+    Serial.println(payload);
 
-    if (!error) {
-      isTargetOnline = (doc["status"] | "offline") == "online";
-      // Only parse TD if we don't have properties yet
-      if (doc.containsKey("thing_description") && properties.empty()) {
-        parseThingDescription(doc["thing_description"]);
-      }
-      if (doc.containsKey("shadow_state")) {
-        JsonObject shadow = doc["shadow_state"];
-        for (JsonPair p : shadow)
-          updateValueCache(p.key().c_str(), p.value().as<String>());
-      }
+    if (payload.length() == 0) {
+      Serial.println("Error: Empty Payload");
     } else {
-      Serial.print("JSON Parse Failed: ");
-      Serial.println(error.c_str());
+      DynamicJsonDocument doc(4096);
+      DeserializationError error =
+          deserializeJson(doc, payload); // Revert to string parse for debug
+
+      if (!error) {
+        isTargetOnline = (doc["status"] | "offline") == "online";
+        // Only parse TD if we don't have properties yet
+        if (doc.containsKey("thing_description") && properties.empty()) {
+          parseThingDescription(doc["thing_description"]);
+        }
+        if (doc.containsKey("shadow_state")) {
+          JsonObject shadow = doc["shadow_state"];
+          for (JsonPair p : shadow)
+            updateValueCache(p.key().c_str(), p.value().as<String>());
+        }
+      } else {
+        Serial.print("JSON Parse Failed: ");
+        Serial.println(error.c_str());
+      }
     }
   } else {
     Serial.printf("Poll Failed: %d\n", httpCode);
