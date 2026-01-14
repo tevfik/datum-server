@@ -182,14 +182,14 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
 
     if (action == "update_settings") {
       // Stream Enable/Disable
-      String streamEn = extractJsonVal(paramsBlock, "stream_enabled");
-      if (streamEn.length() > 0) {
-        if (streamEn == "true") {
+      if (paramsBlock.indexOf("\"stream_enabled\":") != -1) {
+        bool enabled = extractJsonBool(paramsBlock, "stream_enabled");
+        if (enabled) {
           // Stream enabled pref only
           prefs.begin("datum", false);
           prefs.putBool("pref_stream_en", true);
           prefs.end();
-          streaming = true; // Fix: ACTUALLY START STREAMING
+          streaming = true;
           Serial.println("Streaming STARTED via property update");
         } else {
           // Stream disabled
@@ -197,6 +197,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
           prefs.putBool("pref_stream_en", false);
           prefs.end();
           streaming = false; // Stop active stream loop if any
+          Serial.println("Streaming STOPPED via property update");
         }
       }
 
