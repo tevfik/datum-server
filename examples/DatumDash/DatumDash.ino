@@ -599,32 +599,37 @@ void pollDevice() {
 
   int httpCode = http.GET();
   if (httpCode == 200) {
-    // DEBUG: Print payload to see what we are receiving
-    String payload = http.getString();
-    Serial.printf("HTTP 200. Len: %d. Payload:\n", payload.length());
-    Serial.println(payload);
+    // Optimization: Filter JSON to only keep what we need
+    // This prevents "NoMemory" errors on large payloads (2KB+)
+    StaticJsonDocument<200> filter;
+    filter["status"] = true;
+    filter["thing_description"]["properties"] = true;
+    filter["shadow_state"] = true;
 
-    if (payload.length() == 0) {
-      Serial.println("Error: Empty Payload");
+    DynamicJsonDocument doc(4096);
+    DeserializationError error = deserializeJson(
+        doc, http.getStream(), DeserializationOption::Filter(filter));
+
+    if (!error) {
+      isTargetOnline = (doc["status"] | "offline") == "online";
+
+      // Only parse TD if we don't have properties yet
+      if (doc.containsKey("thing_description") && properties.empty()) {
+        parseThingDescription(doc["thing_description"]);
+      }
+
+      // Update values from Shadow State
+      if (doc.containsKey("shadow_state")) {
+        JsonObject shadow = doc["shadow_state"];
+        for (JsonPair p : shadow)
+          updateValueCache(p.key().c_str(), p.value().as<String>());
+      }
     } else {
-      DynamicJsonDocument doc(4096);
-      DeserializationError error =
-          deserializeJson(doc, payload); // Revert to string parse for debug
-
-      if (!error) {
-        isTargetOnline = (doc["status"] | "offline") == "online";
-        // Only parse TD if we don't have properties yet
-        if (doc.containsKey("thing_description") && properties.empty()) {
-          parseThingDescription(doc["thing_description"]);
-        }
-        if (doc.containsKey("shadow_state")) {
-          JsonObject shadow = doc["shadow_state"];
-          for (JsonPair p : shadow)
-            updateValueCache(p.key().c_str(), p.value().as<String>());
-        }
-      } else {
-        Serial.print("JSON Parse Failed: ");
-        Serial.println(error.c_str());
+      Serial.print("JSON Parse Failed: ");
+      Serial.println(error.c_str());
+      // On empty input (Empty Payload), just ignore
+      if (error == DeserializationError::EmptyInput) {
+        Serial.println("Warning: Server returned 200 OK but Empty Input");
       }
     }
   } else {
