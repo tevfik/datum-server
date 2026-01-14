@@ -319,22 +319,11 @@ func main() {
 		// Management
 		devGroup.POST("", createDeviceHandler)
 		devGroup.GET("", listDevicesHandler)
-		devGroup.GET("/:device_id", getDeviceHandler)
 		devGroup.DELETE("/:device_id", deleteDeviceHandler)
 
 		// Commands (User sends to device)
 		devGroup.POST("/:device_id/cmd", sendCommandHandler)
 		devGroup.GET("/:device_id/cmd", listCommandsHandler) // History of commands sent
-
-		// Data Query (User gets data) - merged with history (polymorphic)
-		devGroup.GET("/:device_id/data", getDataHandler)
-		// devGroup.GET("/:device_id/rec", getDataHistoryHandler) // DEPRECATED: merged into /data
-
-		// Video streaming routes (require user auth)
-		devGroup.GET("/:device_id/stream/mjpeg", mjpegStreamHandler)       // MJPEG over HTTP
-		devGroup.GET("/:device_id/stream/snapshot", streamSnapshotHandler) // Current frame snapshot
-		devGroup.GET("/:device_id/stream/ws", websocketStreamHandler)      // WebSocket binary stream
-		devGroup.GET("/:device_id/stream/info", streamInfoHandler)         // Stream metadata
 	}
 
 	// Device-side routes (Device Auth)
@@ -363,6 +352,20 @@ func main() {
 	// Specialized route for Thing Description (supports both User and Device Auth)
 	// Must be registered outside of Auth Groups to avoid conflict and allow hybrid auth
 	r.PUT("/dev/:device_id/thing-description", HybridAuthMiddleware(store), updateDeviceThingDescriptionHandler)
+
+	// Hybrid Auth Routes (User OR Device can access)
+	hybridGroup := r.Group("/dev")
+	hybridGroup.Use(HybridAuthMiddleware(store))
+	{
+		hybridGroup.GET("/:device_id", getDeviceHandler)
+		hybridGroup.GET("/:device_id/data", getDataHandler)
+
+		// Video streaming routes
+		hybridGroup.GET("/:device_id/stream/mjpeg", mjpegStreamHandler)       // MJPEG over HTTP
+		hybridGroup.GET("/:device_id/stream/snapshot", streamSnapshotHandler) // Current frame snapshot
+		hybridGroup.GET("/:device_id/stream/ws", websocketStreamHandler)      // WebSocket binary stream
+		hybridGroup.GET("/:device_id/stream/info", streamInfoHandler)         // Stream metadata
+	}
 
 	// Public routes (No Auth)
 	pubGroup := r.Group("/pub")
