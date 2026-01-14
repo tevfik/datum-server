@@ -368,7 +368,7 @@ function CameraStream({ deviceId }: { deviceId: string }) {
     const [error, setError] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
 
-    const streamUrl = `/api/dev/${deviceId}/stream/mjpeg?token=${token}&t=${refreshKey}`;
+    const streamUrl = `/dev/${deviceId}/stream/mjpeg?token=${token}&t=${refreshKey}`;
 
     return (
         <Card className="col-span-2 md:col-span-2 lg:col-span-1 flex flex-col">
