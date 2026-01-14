@@ -12,9 +12,10 @@ import { useState } from "react";
 interface DynamicWoTPanelProps {
     device: Device;
     shadowState?: Record<string, any>;
+    excludedKeys?: string[];
 }
 
-export function DynamicWoTPanel({ device, shadowState }: DynamicWoTPanelProps) {
+export function DynamicWoTPanel({ device, shadowState, excludedKeys = [] }: DynamicWoTPanelProps) {
     const td = device.thing_description;
 
     if (!td || !td.properties) {
@@ -36,18 +37,20 @@ export function DynamicWoTPanel({ device, shadowState }: DynamicWoTPanelProps) {
             </CardHeader>
             <CardContent>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {Object.entries(properties).map(([key, prop]) => {
-                        const value = shadowState ? shadowState[key] : undefined;
-                        return (
-                            <WoTPropertyCard
-                                key={key}
-                                deviceId={device.id}
-                                propKey={key}
-                                propDef={prop}
-                                value={value}
-                            />
-                        );
-                    })}
+                    {Object.entries(properties)
+                        .filter(([key]) => !excludedKeys.includes(key))
+                        .map(([key, prop]) => {
+                            const value = shadowState ? shadowState[key] : undefined;
+                            return (
+                                <WoTPropertyCard
+                                    key={key}
+                                    deviceId={device.id}
+                                    propKey={key}
+                                    propDef={prop}
+                                    value={value}
+                                />
+                            );
+                        })}
                 </div>
             </CardContent>
         </Card>

@@ -35,6 +35,7 @@ type SimState struct {
 	LedOn              bool   `json:"led_on"`
 	LedBrightness      int    `json:"led_brightness"`
 	LedColor           string `json:"led_color"`
+	StreamEnabled      bool   `json:"stream_enabled"`
 	MotionEnabled      bool   `json:"motion_enabled"`
 	MotionSensitivity  int    `json:"motion_sensitivity"`
 	HMirror            bool   `json:"hmirror"`
@@ -135,6 +136,12 @@ func sendThingDescription() {
 				"enum":     []string{"UXGA", "SXGA", "XGA", "SVGA", "VGA", "CIF", "QVGA", "HQVGA", "QQVGA"},
 				"readOnly": false,
 			},
+			"stream_enabled": map[string]interface{}{
+				"title":     "Stream Active",
+				"type":      "boolean",
+				"ui:widget": "switch",
+				"readOnly":  false,
+			},
 			"snapshot_resolution": map[string]interface{}{
 				"title":    "Snapshot Resolution",
 				"type":     "string",
@@ -193,27 +200,11 @@ func sendThingDescription() {
 		"actions": map[string]interface{}{
 			"snap": map[string]interface{}{
 				"title": "Take Snapshot",
-				"input": map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"resolution": map[string]interface{}{
-							"type": "string",
-							"enum": []string{"UXGA", "VGA"},
-						},
-					},
-				},
+				// No input parameters needed now (uses snapshot_resolution property)
 			},
 			"stream": map[string]interface{}{
 				"title": "Control Stream",
-				"input": map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"state": map[string]interface{}{
-							"type": "string",
-							"enum": []string{"on", "off"},
-						},
-					},
-				},
+				// No input - deprecated by stream_enabled property
 			},
 			"update_firmware": map[string]interface{}{
 				"title": "Update Firmware",
@@ -377,6 +368,14 @@ func handleCommand(cmd map[string]interface{}) {
 		if v, ok := params["stream_resolution"].(string); ok {
 			state.StreamResolution = v
 			log.Printf("   -> Set Stream Resolution: %s", v)
+		}
+		if v, ok := params["stream_enabled"].(bool); ok {
+			state.StreamEnabled = v
+			if v {
+				log.Println("   -> Stream STARTED")
+			} else {
+				log.Println("   -> Stream STOPPED")
+			}
 		}
 		if v, ok := params["snapshot_resolution"].(string); ok {
 			state.SnapshotResolution = v

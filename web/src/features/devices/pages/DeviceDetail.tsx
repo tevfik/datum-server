@@ -14,6 +14,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
 import { TelemetryChart } from '@/features/devices/components/TelemetryChart';
 import { DynamicWoTPanel } from '@/features/devices/components/DynamicWoTPanel';
+import { CameraSettingsPanel } from '@/features/devices/components/CameraSettingsPanel';
 import { DynamicActionPanel } from '@/features/devices/components/DynamicActionPanel';
 import { DeviceEventLog } from '@/features/devices/components/DeviceEventLog';
 
@@ -135,8 +136,15 @@ export default function DeviceDetail() {
                 {/* WoT Panels (Conditionally Rendered) */}
                 {device.thing_description && (
                     <>
-                        <DynamicWoTPanel device={device} shadowState={device.shadow_state} />
-                        <CameraStream deviceId={device.id} />
+                        <DynamicWoTPanel
+                            device={device}
+                            shadowState={device.shadow_state}
+                            excludedKeys={['stream_resolution', 'snapshot_resolution', 'vflip', 'hmirror', 'stream_enabled']}
+                        />
+                        <div className="col-span-1 md:col-span-2 lg:col-span-1 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-1">
+                            <CameraSettingsPanel device={device} shadowState={device.shadow_state} />
+                            <CameraStream deviceId={device.id} />
+                        </div>
                         <DynamicActionPanel device={device} />
                         <DeviceEventLog device={device} />
                     </>

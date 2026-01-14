@@ -182,6 +182,22 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
     ackCommand(pid);
 
     if (action == "update_settings") {
+      // Stream Enable/Disable
+      String streamEn = extractJsonVal(paramsBlock, "stream_enabled");
+      if (streamEn.length() > 0) {
+        if (streamEn == "true") {
+          startCameraServer();
+          prefs.begin("datum", false);
+          prefs.putBool("pref_stream_en", true);
+          prefs.end();
+        } else {
+          stopCameraServer();
+          prefs.begin("datum", false);
+          prefs.putBool("pref_stream_en", false);
+          prefs.end();
+        }
+      }
+
       // Stream Resolution
       String vres = extractJsonVal(paramsBlock, "vres");
       if (vres.length() == 0)
@@ -644,6 +660,12 @@ void sendThingDescription() {
   pRes["enum"].add("QQVGA");
   pRes["readOnly"] = false;
 
+  JsonObject pStream = props.createNestedObject("stream_enabled");
+  pStream["title"] = "Stream Active";
+  pStream["type"] = "boolean";
+  pStream["ui:widget"] = "switch";
+  pStream["readOnly"] = false;
+
   JsonObject pSnapRes = props.createNestedObject("snapshot_resolution");
   pSnapRes["title"] = "Snapshot Resolution";
   pSnapRes["type"] = "string";
@@ -727,22 +749,11 @@ void sendThingDescription() {
 
   JsonObject aSnap = actions.createNestedObject("snap");
   aSnap["title"] = "Take Snapshot";
-  JsonObject aSnapIn = aSnap.createNestedObject("input");
-  aSnapIn["type"] = "object";
-  JsonObject aSnapP = aSnapIn.createNestedObject("properties");
-  aSnapP["resolution"]["type"] = "string";
-  aSnapP["resolution"]["title"] = "Resolution";
-  aSnapP["resolution"]["enum"].add("UXGA");
-  aSnapP["resolution"]["enum"].add("VGA");
+  // No input for snap (uses properties)
 
   JsonObject aStream = actions.createNestedObject("stream");
   aStream["title"] = "Control Stream";
-  JsonObject aStreamIn = aStream.createNestedObject("input");
-  aStreamIn["type"] = "object";
-  JsonObject aStreamP = aStreamIn.createNestedObject("properties");
-  aStreamP["state"]["type"] = "string";
-  aStreamP["state"]["enum"].add("on");
-  aStreamP["state"]["enum"].add("off");
+  // No input for stream (uses properties)
 
   JsonObject aUpdate = actions.createNestedObject("update_firmware");
   aUpdate["title"] = "Update Firmware";
