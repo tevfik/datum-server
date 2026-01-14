@@ -131,7 +131,24 @@ func getDeviceHandler(c *gin.Context) {
 	}
 
 	// Authorization check
-	if role != "admin" && device.UserID != userID {
+	isAuthorized := false
+
+	if role == "admin" {
+		isAuthorized = true
+	} else if userID != "" && device.UserID == userID {
+		isAuthorized = true
+	} else if val, exists := c.Get("api_key"); exists {
+		// Device Auth: Check to see if requester belongs to same user
+		apiKey := val.(string)
+		if requesterDevice, err := store.GetDeviceByAPIKey(apiKey); err == nil {
+			// Allow if requester is the same device OR belongs to same user
+			if requesterDevice.ID == device.ID || requesterDevice.UserID == device.UserID {
+				isAuthorized = true
+			}
+		}
+	}
+
+	if !isAuthorized {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized"})
 		return
 	}

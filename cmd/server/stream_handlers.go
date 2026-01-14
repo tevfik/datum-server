@@ -298,6 +298,7 @@ func websocketStreamHandler(c *gin.Context) {
 func streamSnapshotHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 	userID, _ := auth.GetUserID(c)
+	role, _ := auth.GetUserRole(c)
 
 	// Verify device ownership
 	device, err := store.GetDevice(deviceID)
@@ -305,12 +306,26 @@ func streamSnapshotHandler(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
 		return
 	}
-	if device.UserID != userID {
-		role, _ := auth.GetUserRole(c)
-		if role != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-			return
+	// Verify device ownership
+	isAuthorized := false
+
+	if role == "admin" {
+		isAuthorized = true
+	} else if userID != "" && device.UserID == userID {
+		isAuthorized = true
+	} else if val, exists := c.Get("api_key"); exists {
+		// Device Auth: Check to see if requester belongs to same user
+		apiKey := val.(string)
+		if requesterDevice, err := store.GetDeviceByAPIKey(apiKey); err == nil {
+			if requesterDevice.ID == device.ID || requesterDevice.UserID == device.UserID {
+				isAuthorized = true
+			}
 		}
+	}
+
+	if !isAuthorized {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
 	}
 
 	frame := streamManager.GetLastFrame(deviceID)
