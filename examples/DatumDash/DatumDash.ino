@@ -327,18 +327,14 @@ void updateDisplay() {
   }
 
   // Carousel Logic
+  // User Request: Prioritize Camera Stream if available
+  if (hasCameraProp) {
+    drawCameraView();
+    return; // Skip property cards completely
+  }
+
   if (currentPropIndex >= properties.size()) {
-    if (hasCameraProp) {
-      drawCameraView();
-      currentPropIndex++;
-      // Show cam for 2 cycles
-      if (currentPropIndex > properties.size() + 2) {
-        currentPropIndex = 0;
-      }
-      return;
-    } else {
-      currentPropIndex = 0;
-    }
+    currentPropIndex = 0;
   }
 
   if (currentPropIndex < properties.size()) {
