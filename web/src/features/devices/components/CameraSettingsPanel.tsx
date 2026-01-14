@@ -18,19 +18,41 @@ export function CameraSettingsPanel({ device, shadowState }: CameraSettingsPanel
     const td = device.thing_description;
     if (!td || !td.properties) return null;
 
-    const getValue = (key: string) => shadowState ? shadowState[key] : undefined;
+    const [optimisticValues, setOptimisticValues] = useState<Record<string, any>>({});
+
+    const getValue = (key: string) => {
+        if (key in optimisticValues) return optimisticValues[key];
+        return shadowState ? shadowState[key] : undefined;
+    };
 
     const handleUpdate = async (key: string, value: any) => {
         setIsLoading(key);
+        setOptimisticValues(prev => ({ ...prev, [key]: value })); // Optimistic update
         try {
             await deviceService.sendCommand(device.id, {
                 action: "update_settings",
                 params: { [key]: value }
             });
+            // Wait a bit for shadow to update (mock lag compensation)
+            // In a real app, we'd wait for a shadow delta or just trust the eventual consistency
         } catch (e) {
             console.error(`Failed to update ${key}`, e);
+            // Revert on error
+            setOptimisticValues(prev => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+            });
         } finally {
             setIsLoading(null);
+            // Clear optimistic value after a short delay to let shadow sync take over
+            setTimeout(() => {
+                setOptimisticValues(prev => {
+                    const next = { ...prev };
+                    delete next[key];
+                    return next;
+                });
+            }, 2000);
         }
     };
 

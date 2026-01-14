@@ -143,7 +143,7 @@ export default function DeviceDetail() {
                         />
                         <div className="col-span-1 md:col-span-2 lg:col-span-1 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-1">
                             <CameraSettingsPanel device={device} shadowState={device.shadow_state} />
-                            <CameraStream deviceId={device.id} />
+                            <CameraStream deviceId={device.id} isEnabled={device.shadow_state?.stream_enabled} />
                         </div>
                         <DynamicActionPanel device={device} />
                         <DeviceEventLog device={device} />
@@ -371,12 +371,32 @@ function FirmwareUpdate({ deviceId }: { deviceId: string }) {
     );
 }
 
-function CameraStream({ deviceId }: { deviceId: string }) {
+function CameraStream({ deviceId, isEnabled }: { deviceId: string, isEnabled?: boolean }) {
     const { token } = useAuth();
     const [error, setError] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
 
     const streamUrl = `/dev/${deviceId}/stream/mjpeg?token=${token}&t=${refreshKey}`;
+
+    if (isEnabled === false) {
+        return (
+            <Card className="col-span-2 md:col-span-2 lg:col-span-1 flex flex-col">
+                <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-2">
+                        <Video className="h-5 w-5" />
+                        Camera Stream
+                    </CardTitle>
+                    <CardDescription>Stream is currently disabled</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 flex items-center justify-center bg-muted/20 rounded-b-lg min-h-[240px]">
+                    <div className="text-muted-foreground text-sm flex flex-col items-center gap-2">
+                        <Video className="h-8 w-8 opacity-20" />
+                        <span>Enable stream in settings to view</span>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <Card className="col-span-2 md:col-span-2 lg:col-span-1 flex flex-col">
