@@ -599,52 +599,50 @@ void pollDevice() {
 
   int httpCode = http.GET();
   if (httpCode == 200) {
-    // Optimization: Filter JSON to only keep what we need
-    // This prevents "NoMemory" errors on large payloads (2KB+)
-    StaticJsonDocument<200> filter;
-    filter["status"] = true;
-    filter["thing_description"] = true; // Allow full TD structure
-    filter["shadow_state"] = true;
+    // Optimization: Read string (safer than stream) then Filter
+    String payload = http.getString();
+    Serial.printf("Payload Len: %d\n", payload.length());
+    if (payload.length() > 0) {
+      Serial.println("Preview: " + payload.substring(0, 150));
+    }
 
-    DynamicJsonDocument doc(4096);
-    DeserializationError error = deserializeJson(
-        doc, http.getStream(), DeserializationOption::Filter(filter));
+    if (payload.length() == 0) {
+      Serial.println("Error: Empty Payload from Server");
+      isTargetOnline = false;
+    } else {
+      StaticJsonDocument<200> filter;
+      filter["status"] = true;
+      filter["thing_description"] = true;
+      filter["shadow_state"] = true;
 
-    if (!error) {
-      Serial.print("Filtered Doc: ");
-      serializeJson(doc, Serial);
-      Serial.println();
+      DynamicJsonDocument doc(4096);
+      DeserializationError error =
+          deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
-      isTargetOnline = (doc["status"] | "offline") == "online";
-      Serial.printf("Status: %s\n", isTargetOnline ? "Online" : "Offline");
+      if (!error) {
+        Serial.print("Filtered Doc: ");
+        serializeJson(doc, Serial);
+        Serial.println();
 
-      // Check if TD is present
-      if (doc.containsKey("thing_description")) {
-        Serial.println("TD found in JSON");
-        if (properties.empty()) {
-          Serial.println("Props empty, parsing TD...");
-          parseThingDescription(doc["thing_description"]);
-          Serial.printf("Props count after parse: %d\n", properties.size());
-        } else {
-          Serial.println("Props already loaded.");
+        isTargetOnline = (doc["status"] | "offline") == "online";
+        Serial.printf("Status: %s\n", isTargetOnline ? "Online" : "Offline");
+
+        if (doc.containsKey("thing_description")) {
+          // Serial.println("TD found");
+          if (properties.empty()) {
+            parseThingDescription(doc["thing_description"]);
+            Serial.printf("Props loaded: %d\n", properties.size());
+          }
+        }
+
+        if (doc.containsKey("shadow_state")) {
+          JsonObject shadow = doc["shadow_state"];
+          for (JsonPair p : shadow)
+            updateValueCache(p.key().c_str(), p.value().as<String>());
         }
       } else {
-        Serial.println("TD NOT found in JSON");
-      }
-
-      // Update values from Shadow State
-      if (doc.containsKey("shadow_state")) {
-        // Serial.println("Updating Shadow State...");
-        JsonObject shadow = doc["shadow_state"];
-        for (JsonPair p : shadow)
-          updateValueCache(p.key().c_str(), p.value().as<String>());
-      }
-    } else {
-      Serial.print("JSON Parse Failed: ");
-      Serial.println(error.c_str());
-      // On empty input (Empty Payload), just ignore
-      if (error == DeserializationError::EmptyInput) {
-        Serial.println("Warning: Server returned 200 OK but Empty Input");
+        Serial.print("JSON Parse Failed: ");
+        Serial.println(error.c_str());
       }
     }
   } else {
