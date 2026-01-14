@@ -18,10 +18,7 @@
 // -- Hardware Pin Definitions for GeekMagic TV (ESP8266) --
 #define TFT_MOSI 13 // D7
 #define TFT_SCLK 14 // D5
-#define TFT_CS -1
-#define TFT_DC 0  // D3
-#define TFT_RST 2 // D4
-#define TFT_BL 5  // D1
+#define TFT_CS 15   // D8
 
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 
