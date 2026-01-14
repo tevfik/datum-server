@@ -23,7 +23,8 @@
 #define TFT_RST 2 // D4
 #define TFT_BL 5  // D1
 
-Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
+Adafruit_ST7789 tft =
+    Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
 
 // -- Globals --
 ESP8266WebServer server(80);
