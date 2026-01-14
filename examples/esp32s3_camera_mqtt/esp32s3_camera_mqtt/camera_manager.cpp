@@ -714,7 +714,15 @@ void handleSnap(String resolution, bool saveToCard) {
   // I will add `initCamera()` at the end to restore normal operation,
   // as that seems safer and likely intended but missing.
   esp_camera_deinit(); // Cleanup high res
-  initCamera();        // Restore default/VGA
+  initCamera();        // Restore driver foundation
+
+  // RESTORE PREVIOUS STATE (Stream Resolution, etc.)
+  s = esp_camera_sensor_get();
+  if (s) {
+    s->set_framesize(s, savedSize);
+    s->set_hmirror(s, savedMirror);
+    s->set_vflip(s, savedFlip);
+  }
 
   // Resume Camera Task
   camPauseRequest = false;
