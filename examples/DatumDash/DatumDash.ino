@@ -382,8 +382,24 @@ void sendThingDescription() {
   props["uptime"]["readOnly"] = true;
 
   JsonObject actions = doc.createNestedObject("actions");
-  actions["set_target"]["title"] = "Set Target Device";
-  actions["update_firmware"]["title"] = "Update Firmware";
+  
+  JsonObject setTarget = actions.createNestedObject("set_target");
+  setTarget["title"] = "Set Target Device";
+  JsonObject stInput = setTarget.createNestedObject("input");
+  stInput["type"] = "object";
+  JsonObject stProps = stInput.createNestedObject("properties");
+  stProps["target_id"]["type"] = "string";
+  stProps["target_id"]["title"] = "Target Device ID";
+  stProps["poll_interval"]["type"] = "integer";
+  stProps["poll_interval"]["title"] = "Poll Interval (s)";
+
+  JsonObject updateFw = actions.createNestedObject("update_firmware");
+  updateFw["title"] = "Update Firmware";
+  JsonObject ufInput = updateFw.createNestedObject("input");
+  ufInput["type"] = "object";
+  JsonObject ufProps = ufInput.createNestedObject("properties");
+  ufProps["url"]["type"] = "string";
+  ufProps["url"]["title"] = "Firmware URL";
 
   String payload;
   serializeJson(doc, payload);

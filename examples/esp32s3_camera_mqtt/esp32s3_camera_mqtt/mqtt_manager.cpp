@@ -3,7 +3,8 @@
 #include "eif_motion.h"     // For motion settings
 #include "ota_manager.h"    // For updateFirmware
 #include "wifi_manager.h"   // For getPublicIP
-#include <HTTPClient.h>     // For ackCommand
+#include <ArduinoJson.h>
+#include <HTTPClient.h> // For ackCommand
 #include <Preferences.h>
 
 // Extern Globals from Main
@@ -435,6 +436,7 @@ bool reconnectMQTT() {
 
     // Telemetry on connect
     reportTelemetry(false, true);
+    sendThingDescription(); // Send WoT Description
     return true;
   } else {
     Serial.print("[MQTT] Failed, rc=");
@@ -560,4 +562,126 @@ void reportTelemetry(bool isBoot, bool isConnect) {
   } else {
     Serial.println("MQTT Not Connected! Telemetry skipped.");
   }
+}
+
+void sendThingDescription() {
+  if (deviceID.length() == 0 || apiKey.length() == 0)
+    return;
+
+  HTTPClient http;
+  http.begin(serverURL + "/dev/" + deviceID + "/thing-description");
+  http.addHeader("Authorization", "Bearer " + apiKey);
+  http.addHeader("Content-Type", "application/json");
+
+  DynamicJsonDocument doc(4096);
+  doc["@context"] = "https://www.w3.org/2019/wot/td/v1";
+  doc["id"] = "urn:dev:datum:" + deviceID;
+  doc["title"] = deviceName.length() > 0 ? deviceName : "ESP32-S3 Camera";
+  doc["description"] = "Smart AI-capable Camera with Motion Detection";
+
+  // -- Properties --
+  JsonObject props = doc.createNestedObject("properties");
+
+  // Read-Write Properties
+  JsonObject pRes = props.createNestedObject("resolution");
+  pRes["title"] = "Resolution";
+  pRes["type"] = "string";
+  pRes["enum"].add("UXGA");
+  pRes["enum"].add("SXGA");
+  pRes["enum"].add("XGA");
+  pRes["enum"].add("SVGA");
+  pRes["enum"].add("VGA");
+  pRes["enum"].add("CIF");
+  pRes["enum"].add("QVGA");
+  pRes["enum"].add("HQVGA");
+  pRes["enum"].add("QQVGA");
+  pRes["readOnly"] = false;
+
+  JsonObject pLed = props.createNestedObject("led_on");
+  pLed["title"] = "LED Flash";
+  pLed["type"] = "boolean";
+  pLed["ui:widget"] = "switch";
+  pLed["readOnly"] = false;
+
+  JsonObject pBri = props.createNestedObject("led_brightness");
+  pBri["title"] = "LED Brightness";
+  pBri["type"] = "integer";
+  pBri["minimum"] = 0;
+  pBri["maximum"] = 100;
+  pBri["unit"] = "%";
+  pBri["ui:widget"] = "slider";
+  pBri["readOnly"] = false;
+
+  JsonObject pMot = props.createNestedObject("motion_enabled");
+  pMot["title"] = "Motion Detection";
+  pMot["type"] = "boolean";
+  pMot["ui:widget"] = "switch";
+  pMot["readOnly"] = false;
+
+  JsonObject pHm = props.createNestedObject("hmirror");
+  pHm["title"] = "Horizontal Mirror";
+  pHm["type"] = "boolean";
+  pHm["readOnly"] = false;
+
+  JsonObject pVf = props.createNestedObject("vflip");
+  pVf["title"] = "Vertical Flip";
+  pVf["type"] = "boolean";
+  pVf["readOnly"] = false;
+
+  // Read-Only
+  JsonObject pRssi = props.createNestedObject("rssi");
+  pRssi["title"] = "WiFi Signal";
+  pRssi["type"] = "integer";
+  pRssi["unit"] = "dBm";
+  pRssi["readOnly"] = true;
+
+  JsonObject pUp = props.createNestedObject("uptime");
+  pUp["title"] = "Uptime";
+  pUp["type"] = "integer";
+  pUp["unit"] = "s";
+  pUp["readOnly"] = true;
+
+  JsonObject pIp = props.createNestedObject("public_ip");
+  pIp["title"] = "Public IP";
+  pIp["type"] = "string";
+  pIp["readOnly"] = true;
+
+  // -- Actions --
+  JsonObject actions = doc.createNestedObject("actions");
+
+  JsonObject aSnap = actions.createNestedObject("snap");
+  aSnap["title"] = "Take Snapshot";
+  JsonObject aSnapIn = aSnap.createNestedObject("input");
+  aSnapIn["type"] = "object";
+  JsonObject aSnapP = aSnapIn.createNestedObject("properties");
+  aSnapP["resolution"]["type"] = "string";
+  aSnapP["resolution"]["title"] = "Resolution";
+  aSnapP["resolution"]["enum"].add("UXGA");
+  aSnapP["resolution"]["enum"].add("VGA");
+
+  JsonObject aStream = actions.createNestedObject("stream");
+  aStream["title"] = "Control Stream";
+  JsonObject aStreamIn = aStream.createNestedObject("input");
+  aStreamIn["type"] = "object";
+  JsonObject aStreamP = aStreamIn.createNestedObject("properties");
+  aStreamP["state"]["type"] = "string";
+  aStreamP["state"]["enum"].add("on");
+  aStreamP["state"]["enum"].add("off");
+
+  JsonObject aUpdate = actions.createNestedObject("update_firmware");
+  aUpdate["title"] = "Update Firmware";
+  JsonObject aUpdateIn = aUpdate.createNestedObject("input");
+  aUpdateIn["type"] = "object";
+  aUpdateIn["properties"]["url"]["type"] = "string";
+  aUpdateIn["properties"]["url"]["title"] = "Firmware URL";
+
+  JsonObject aRestart = actions.createNestedObject("restart");
+  aRestart["title"] = "Restart Device";
+
+  String payload;
+  serializeJson(doc, payload);
+
+  int code = http.PUT(payload);
+  Serial.printf("[TD] Upload Code: %d\n", code);
+  http.end();
 }

@@ -46,10 +46,9 @@ export function TelemetryChart({ data, isLoading }: TelemetryChartProps) {
 
     const dataKeys = useMemo(() => {
         if (!data || data.length === 0) return [];
-        // Extract all unique keys from all data points (in case sparse)
         const keys = new Set<string>();
-        data.forEach(p => Object.keys(p.data).forEach(k => keys.add(k)));
-        // Filter only numeric values for LineChart
+        // Only check first 5 items to avoid performance hit on large datasets
+        data.slice(0, 5).forEach(p => Object.keys(p.data).forEach(k => keys.add(k)));
         return Array.from(keys).filter(key => {
             const val = data[0].data[key];
             return typeof val === 'number';

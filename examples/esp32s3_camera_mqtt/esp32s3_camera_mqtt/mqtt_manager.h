@@ -23,6 +23,7 @@ void processMqttLoop();
 
 void reportTelemetry(bool isBoot, bool isConnect);
 void ackCommand(String cmdId);
+void sendThingDescription();
 
 // JSON Helpers
 String extractJsonVal(String json, String key);

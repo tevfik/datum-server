@@ -34,7 +34,7 @@ export default function DeviceDetail() {
     const queryClient = useQueryClient();
     const { user } = useAuth();
 
-    const { data: device, isLoading, error } = useQuery({
+    const { data: device, isLoading } = useQuery({
         queryKey: ['device', id],
         queryFn: () => deviceService.getById(id!),
         enabled: !!id,
@@ -56,8 +56,8 @@ export default function DeviceDetail() {
         refetchInterval: 5000,
     });
 
-    if (isLoading) return <div className="p-8">Loading device details...</div>;
-    if (error || !device) return <div className="p-8 text-destructive">Device not found</div>;
+    if (isLoading && !device) return <div className="p-8">Loading device details...</div>;
+    if (!device) return <div className="p-8 text-destructive">Device not found</div>;
 
     return (
         <div className="space-y-6 p-6">

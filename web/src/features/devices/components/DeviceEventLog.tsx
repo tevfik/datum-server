@@ -75,7 +75,10 @@ export function DeviceEventLog({ device }: DeviceEventLogProps) {
                                 <span className="text-muted-foreground">[{format(log.time, 'HH:mm:ss')}]</span>{' '}
                                 <span className="text-blue-400">{log.topic}</span>
                                 <div className="text-green-300 mt-1 pl-4 whitespace-pre-wrap">
-                                    {typeof log.payload === 'object' ? JSON.stringify(log.payload, null, 2) : String(log.payload)}
+                                    {(() => {
+                                        const s = typeof log.payload === 'object' ? JSON.stringify(log.payload, null, 2) : String(log.payload);
+                                        return s.length > 300 ? s.substring(0, 300) + '... (truncated)' : s;
+                                    })()}
                                 </div>
                             </div>
                         ))
