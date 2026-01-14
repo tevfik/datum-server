@@ -747,25 +747,25 @@ void setup() {
   Serial.begin(115200);
 
   // Manual Reset for TFT
+  // Manual Reset works, keeping it.
   pinMode(TFT_RST, OUTPUT);
   digitalWrite(TFT_RST, HIGH);
-  delay(50);
+  delay(10);
   digitalWrite(TFT_RST, LOW);
-  delay(50);
+  delay(10);
   digitalWrite(TFT_RST, HIGH);
-  delay(150);
+  delay(10);
 
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, LOW); // Max Brightness (Active Low: 0=Bright)
 
-  tft.init(240, 240);
+  // Critical: SPI Mode 2 is often required for ST7789 on ESP8266 without CS
+  tft.init(240, 240, SPI_MODE2);
   tft.invertDisplay(true);
-  tft.setSPISpeed(20000000); // 20MHz (Reliable)
-  // Let's stick to 20MHz but ensure Mode 2 if possible.
-  // Adafruit defaults to Mode 0. ST7789 often works on Mode 2 or 3.
-  // Let's try to set SPI Mode 2 via SPI global before init? No.
-  // Adafruit_ST7789 doesn't confirm setSPIMode is public in all versions.
-  // Let's just try basic config + Invert + HIGH backlight.
+  tft.setRotation(2); // Try 180 degree rotation (GeekTV often mounted upside
+                      // down or needs this)
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setSPISpeed(40000000); // 40MHz for smooth updates
 
   // Splash Screen
   tft.setTextSize(3);
