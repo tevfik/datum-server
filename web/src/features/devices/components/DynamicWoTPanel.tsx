@@ -7,7 +7,7 @@ import { LineChart, Line, Tooltip, ResponsiveContainer } from "recharts";
 import { Slider } from "@/components/ui/slider";
 import { Activity, Zap, Gauge, Loader2 } from "lucide-react";
 import { deviceService } from "@/features/devices/services/deviceService";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface DynamicWoTPanelProps {
     device: Device;
@@ -157,12 +157,10 @@ function WoTPropertyCard({ deviceId, propKey, propDef, value }: { deviceId: stri
                             {value || "#000000"} <span className="text-sm font-normal text-muted-foreground">{unit}</span>
                         </div>
                         <div className="flex items-center space-x-2">
-                            <input
-                                type="color"
-                                value={value || "#000000"}
-                                onChange={(e) => handleUpdate(e.target.value)}
+                            <DebouncedColorInput
+                                value={value}
+                                onUpdate={handleUpdate}
                                 disabled={isLoading}
-                                className="h-8 w-12 cursor-pointer rounded border border-gray-300 p-0"
                             />
                         </div>
                     </div>
@@ -187,11 +185,11 @@ function WoTPropertyCard({ deviceId, propKey, propDef, value }: { deviceId: stri
                             {value} <span className="text-sm font-normal text-muted-foreground">{unit}</span>
                         </div>
                         <Slider
-                            value={[value]}
-                            min={propDef.minimum || 0}
+                            defaultValue={[value]}
                             max={propDef.maximum || 100}
+                            min={propDef.minimum || 0}
                             step={1}
-                            onValueChange={(vals: number[]) => handleUpdate(vals[0])}
+                            onValueCommit={(vals) => handleUpdate(vals[0])}
                             disabled={isLoading}
                         />
                     </div>
@@ -248,5 +246,34 @@ function WoTPropertyCard({ deviceId, propKey, propDef, value }: { deviceId: stri
                 </div>
             </CardContent>
         </Card>
+    );
+
+}
+
+function DebouncedColorInput({ value, onUpdate, disabled }: { value: string, onUpdate: (val: string) => void, disabled: boolean }) {
+    const [localValue, setLocalValue] = useState(value || "#000000");
+
+    // Sync from server
+    useEffect(() => {
+        if (value) setLocalValue(value);
+    }, [value]);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            if (localValue !== value) {
+                onUpdate(localValue);
+            }
+        }, 500); // 500ms debounce
+        return () => clearTimeout(handler);
+    }, [localValue, value, onUpdate]);
+
+    return (
+        <input
+            type="color"
+            value={localValue}
+            onChange={(e) => setLocalValue(e.target.value)}
+            disabled={disabled}
+            className="h-8 w-12 cursor-pointer rounded border border-gray-300 p-0"
+        />
     );
 }

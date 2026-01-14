@@ -186,15 +186,16 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       String streamEn = extractJsonVal(paramsBlock, "stream_enabled");
       if (streamEn.length() > 0) {
         if (streamEn == "true") {
-          startCameraServer();
+          // Stream enabled pref only
           prefs.begin("datum", false);
           prefs.putBool("pref_stream_en", true);
           prefs.end();
         } else {
-          stopCameraServer();
+          // Stream disabled
           prefs.begin("datum", false);
           prefs.putBool("pref_stream_en", false);
           prefs.end();
+          streaming = false; // Stop active stream loop if any
         }
       }
 
@@ -574,17 +575,16 @@ void reportTelemetry(bool isBoot, bool isConnect) {
 
   char hexColor[8];
   sprintf(hexColor, "#%02X%02X%02X", savedR, savedG, savedB);
-  json += "\"led_on\":" + String(status.led ? "true" : "false") + "," +
-          "\"led_brightness\":" + String(status.brightness) + "," +
-          "\"led_color\":\"" + String(status.color) + "\",";
+  json += "\"led_on\":" + String(torchState ? "true" : "false") + "," +
+          "\"led_brightness\":" + String(savedBrightness) + "," +
+          "\"led_color\":\"" + String(hexColor) + "\",";
 
   prefs.begin("datum", true);
   int sens = prefs.getInt("pref_motion_sens", 50); // Default 50?
   prefs.end();
 
-  json +=
-      "\"motion_enabled\":" + String(status.motion_enabled ? "true" : "false") +
-      "," + "\"motion_sensitivity\":" + String(sens) + ",";
+  json += "\"motion_enabled\":" + String(motionEnabled ? "true" : "false") +
+          "," + "\"motion_sensitivity\":" + String(sens) + ",";
 
   sensor_t *s = esp_camera_sensor_get();
   if (s) {

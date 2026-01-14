@@ -685,19 +685,51 @@ void checkCommands() {
 
 #include <WiFiClientSecure.h>
 
-WiFiClientSecure uploadClient;
+// Global Clients
+WiFiClientSecure sslClient;
+WiFiClient tcpClient;
+Client *msgClient = NULL; // Pointer to active client
 bool uploadClientConnected = false;
 
 void uploadFrame(camera_fb_t *fb) {
-  // 1. Ensure TCP/SSL Connection is Open
-  if (!uploadClient.connected()) {
-    Serial.println("[UPLOAD] Connecting to server...");
-    uploadClient.setInsecure(); // Skip cert check for speed/simplicity
-    // Parse host and port from serverURL (assuming https://datum.bezg.in)
-    // Hardcoded for now based on DEFAULT_SERVER_URL, ideally parse it.
-    // datum.bezg.in:443
-    if (!uploadClient.connect("datum.bezg.in", 443)) {
+  // 0. Parse Server URL
+  String protocol = "https";
+  String host = "datum.bezg.in";
+  int port = 443;
+
+  int protoEnd = serverURL.indexOf("://");
+  if (protoEnd != -1) {
+    protocol = serverURL.substring(0, protoEnd);
+    int portStart = serverURL.indexOf(":", protoEnd + 3);
+    int pathStart = serverURL.indexOf("/", protoEnd + 3);
+
+    if (pathStart == -1)
+      pathStart = serverURL.length();
+
+    if (portStart != -1 && portStart < pathStart) {
+      host = serverURL.substring(protoEnd + 3, portStart);
+      port = serverURL.substring(portStart + 1, pathStart).toInt();
+    } else {
+      host = serverURL.substring(protoEnd + 3, pathStart);
+      port = (protocol == "http") ? 80 : 443;
+    }
+  }
+
+  // 1. Select Client & Connect
+  bool isSecure = (protocol == "https");
+  if (isSecure) {
+    msgClient = &sslClient;
+    sslClient.setInsecure();
+  } else {
+    msgClient = &tcpClient;
+  }
+
+  if (!msgClient->connected()) {
+    Serial.printf("[UPLOAD] Connecting to %s:%d (%s)...\n", host.c_str(), port,
+                  protocol.c_str());
+    if (!msgClient->connect(host.c_str(), port)) {
       Serial.println("[UPLOAD] Connection failed!");
+      uploadClientConnected = false;
       return;
     }
     Serial.println("[UPLOAD] Connected!");
@@ -707,20 +739,16 @@ void uploadFrame(camera_fb_t *fb) {
   // 2. Send HTTP Headers (Keep-Alive!)
   String head = "";
   head += "POST /dev/" + deviceID + "/stream/frame HTTP/1.1\r\n";
-  head += "Host: datum.bezg.in\r\n";
+  head += "Host: " + host + "\r\n";
   head += "Authorization: Bearer " + apiKey + "\r\n";
   head += "Content-Type: image/jpeg\r\n";
   head += "Content-Length: " + String(fb->len) + "\r\n";
-  head += "Connection: keep-alive\r\n"; // Critical for persistence
+  head += "Connection: keep-alive\r\n";
   head += "\r\n";
 
-  uploadClient.print(head);
+  msgClient->print(head);
 
   // 3. Send Body (Image Data)
-  // Split into chunks if needed, but client.write handles it usually.
-  // For large buffers, write in chunks to avoid watchdog?
-  // ESP32 client.write can handle ~15KB fine usually.
-
   const uint8_t *data = fb->buf;
   size_t len = fb->len;
   size_t written = 0;
@@ -728,44 +756,36 @@ void uploadFrame(camera_fb_t *fb) {
 
   while (written < len) {
     size_t toWrite = (len - written) > chunkSize ? chunkSize : (len - written);
-    size_t r = uploadClient.write(data + written, toWrite);
+    size_t r = msgClient->write(data + written, toWrite);
     if (r == 0) {
       Serial.println("[UPLOAD] Write failed/timeout");
-      uploadClient.stop();
+      msgClient->stop();
       return;
     }
     written += r;
   }
 
-  // 4. Read Response (Non-blocking check or minimal wait)
-  // We don't want to wait for full body, just header to confirm 200 OK?
-  // Actually, for max speed, Fire-and-Forget style (pipelining) is risky but
-  // fast. Better: Read headers, disregard body.
-
-  // Simple read-until-end-of-headers loop with timeout
+  // 4. Read Response (Headers only)
   unsigned long timeout = millis();
-  while (uploadClient.connected()) {
-    if (uploadClient.available()) {
-      String line = uploadClient.readStringUntil('\n');
+  while (msgClient->connected()) {
+    if (msgClient->available()) {
+      String line = msgClient->readStringUntil('\n');
       if (line == "\r")
         break; // End of headers
       if (millis() - timeout > 2000) {
-        Serial.println("[UPLOAD] Timeout waiting for response");
-        uploadClient.stop();
+        msgClient->stop(); // Timeout
         return;
       }
     } else {
-      if (millis() - timeout > 500) { // Wait only 500ms max for first byte
-        // Maybe lost connection?
-        break;
-      }
+      if (millis() - timeout > 500)
+        break; // Short wait for Ack
       delay(1);
     }
   }
 
-  // Drain response body if any (usually short JSON)
-  while (uploadClient.available()) {
-    uploadClient.read();
+  // Drain body if small
+  while (msgClient->available()) {
+    msgClient->read();
   }
 }
 
