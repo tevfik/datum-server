@@ -69,10 +69,6 @@ std::vector<Property> properties;
 int currentPropIndex = 0;
 bool hasCameraProp = false; // Flag if target is a camera
 
-// FPS Measurement
-unsigned long fpsStartTime = 0;
-int frameCount = 0;
-
 struct ValueCache {
   String key;
   String value;
@@ -115,9 +111,7 @@ h2{text-align:center;color:#00bcd4}
 <hr style="border-color:#444;margin:20px 0">
 <label>Target Device ID (to Watch)</label><input type="text" name="target_id" placeholder="ID of device to display">
 <label>Poll Interval (Seconds)</label><input type="number" name="poll_int" value="5" min="1">
-<hr style="border-color:#444;margin:20px 0">
-<label>Server URL</label><input type="text" name="server_url" value="https://datum.bezg.in" placeholder="https://datum.bezg.in">
-<div class="note">Use http://ip:8000 for faster streaming (no TLS)</div>
+<input type="hidden" name="server_url" value="https://datum.bezg.in">
 <button type="submit">Save & Connect</button>
 </form>
 </div>
@@ -183,144 +177,78 @@ bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h,
   tft.drawRGBBitmap(x, y, bitmap, w, h);
   return 1;
 }
-// Persistent Camera Client for Connection Reuse (FPS Boost)
-WiFiClient *camClient = nullptr;
-bool camStreamConnected = false;
 
-void initCameraClient() {
-  if (camClient) {
-    camClient->stop();
-    delete camClient;
-    camClient = nullptr;
-  }
-
-  if (String(config.server_url).startsWith("https")) {
-    WiFiClientSecure *secureClient = new WiFiClientSecure();
-    secureClient->setInsecure();
-    secureClient->setBufferSizes(8192, 512); // Larger buffer for stream
-    camClient = secureClient;
-  } else {
-    camClient = new WiFiClient();
-  }
-  camStreamConnected = false;
-}
-
-// Parse MJPEG stream and draw frames
 void drawCameraView() {
   if (strlen(config.target_device_id) == 0)
     return;
 
-  // Initialize client if needed
-  if (!camClient) {
-    initCameraClient();
+  WiFiClient *client = nullptr;
+  if (String(config.server_url).startsWith("https")) {
+    WiFiClientSecure *secureClient = new WiFiClientSecure();
+    secureClient->setInsecure();
+    // Increase buffer for image download
+    secureClient->setBufferSizes(2048, 512);
+    client = secureClient;
+  } else {
+    client = new WiFiClient();
   }
 
-  // Connect to MJPEG stream if not connected
-  if (!camStreamConnected || !camClient->connected()) {
-    HTTPClient http;
-    String url = String(config.server_url) + "/dev/" + config.target_device_id +
-                 "/stream/mjpeg";
+  HTTPClient http;
+  String url = String(config.server_url) + "/dev/" + config.target_device_id +
+               "/stream/snapshot";
+  http.begin(*client, url);
+  http.addHeader("Authorization", "Bearer " + String(config.api_key));
 
-    http.setReuse(true);
-    http.begin(*camClient, url);
-    http.addHeader("Authorization", "Bearer " + String(config.api_key));
-    http.addHeader("Connection", "keep-alive");
+  int httpCode = http.GET();
+  if (httpCode == 200) {
+    int len = http.getSize();
+    Serial.printf("Cam Snapshot Size: %d bytes. Free Heap: %d\n", len,
+                  ESP.getFreeHeap());
 
-    int httpCode = http.GET();
-    if (httpCode != 200) {
-      showStatus("MJPEG Fail", ST77XX_RED);
-      http.end();
-      camStreamConnected = false;
-      return;
-    }
-    camStreamConnected = true;
-    Serial.println("MJPEG Stream Connected");
-    // Don't call http.end() - keep connection open
-  }
+    // Safety Limit: ESP8266 has limited RAM (~40KB usually free)
+    // Try to alloc up to 35KB if heap permits
+    if (len > 0 && len < 40000) {
+      if (ESP.getFreeHeap() > len + 2000) { // Ensure 2KB slack
+        uint8_t *valBuffer = (uint8_t *)malloc(len);
+        if (valBuffer) {
+          WiFiClient *stream = http.getStreamPtr();
+          int idx = 0;
+          while (http.connected() && (len > 0 || len == -1)) {
+            size_t size = stream->available();
+            if (size) {
+              int c = stream->readBytes(valBuffer + idx, size);
+              idx += c;
+              if (len > 0)
+                len -= c;
+            } else {
+              delay(1);
+            }
+            if (len == 0)
+              break;
+          }
 
-  // Read one frame from MJPEG stream
-  // Format: --frame\r\nContent-Type: image/jpeg\r\nContent-Length:
-  // NNN\r\n\r\n<DATA>
+          TJpgDec.drawJpg(-40, 0, valBuffer, idx);
+          free(valBuffer);
 
-  unsigned long startTime = millis();
-  const int MAX_WAIT_MS = 2000;
-
-  // Wait for data
-  while (!camClient->available() && millis() - startTime < MAX_WAIT_MS) {
-    mqttClient.loop();
-    delay(1);
-  }
-
-  if (!camClient->available()) {
-    return; // No data yet, try next loop
-  }
-
-  // Read until we find frame boundary
-  String line = "";
-  int contentLength = 0;
-  bool foundStart = false;
-
-  while (camClient->available() && millis() - startTime < MAX_WAIT_MS) {
-    char c = camClient->read();
-    line += c;
-
-    if (line.endsWith("\r\n")) {
-      if (line.startsWith("--frame")) {
-        foundStart = true;
-        line = "";
-      } else if (foundStart && line.startsWith("Content-Length:")) {
-        contentLength = line.substring(15).toInt();
-        line = "";
-      } else if (foundStart && line == "\r\n" && contentLength > 0) {
-        // Header complete, read image data
-        break;
-      } else {
-        line = "";
-      }
-    }
-  }
-
-  if (contentLength > 0 && contentLength < 40000 &&
-      ESP.getFreeHeap() > contentLength + 2000) {
-    uint8_t *frameBuffer = (uint8_t *)malloc(contentLength);
-    if (frameBuffer) {
-      int bytesRead = 0;
-      while (bytesRead < contentLength && millis() - startTime < MAX_WAIT_MS) {
-        mqttClient.loop();
-        if (camClient->available()) {
-          int toRead =
-              min((int)camClient->available(), contentLength - bytesRead);
-          int read = camClient->readBytes(frameBuffer + bytesRead, toRead);
-          bytesRead += read;
+          tft.setTextColor(ST77XX_GREEN);
+          tft.setCursor(5, 5);
+          tft.setTextSize(1);
+          tft.print("LIVE");
         } else {
-          delay(1);
+          showStatus("OOM: Malloc Fail", ST77XX_RED);
         }
+      } else {
+        showStatus("OOM: Low Heap", ST77XX_RED);
       }
-
-      if (bytesRead == contentLength) {
-        // Draw frame
-        TJpgDec.drawJpg(-40, 0, frameBuffer, bytesRead);
-
-        tft.setTextColor(ST77XX_GREEN);
-        tft.setCursor(5, 5);
-        tft.setTextSize(1);
-        tft.print("LIVE");
-
-        // FPS Measurement
-        frameCount++;
-        if (frameCount == 1) {
-          fpsStartTime = millis();
-        } else if (frameCount >= 10) {
-          float fps = 10000.0 / (millis() - fpsStartTime);
-          Serial.printf("FPS: %.1f\n", fps);
-          frameCount = 0;
-        }
-      }
-      free(frameBuffer);
+    } else {
+      showStatus("Img Too Large", ST77XX_RED);
     }
+  } else {
+    showStatus("Cam Offline", ST77XX_RED);
   }
+  http.end();
+  delete client;
 
-  // Draw status bar
   tft.drawLine(0, 210, 240, 210, ST77XX_WHITE);
   tft.setCursor(10, 220);
   tft.setTextSize(1);
@@ -873,11 +801,11 @@ void setup() {
   tft.invertDisplay(true);
   tft.setRotation(2);
   tft.fillScreen(ST77XX_BLACK);
-  tft.setSPISpeed(40000000);
+  tft.setSPISpeed(20000000);
 
   // TJpg Dec Init
   TJpgDec.setJpgScale(1);
-  TJpgDec.setSwapBytes(false); // Fix Color Corruption (RGB vs BGR)
+  TJpgDec.setSwapBytes(true);
   TJpgDec.setCallback(tft_output);
 
   // Splash
@@ -962,22 +890,12 @@ void loop() {
       mqttClient.loop();
     }
 
-    // Skip polling when MJPEG stream is active (saves TLS connections)
-    if (!camStreamConnected) {
-      if (now - lastPollTime > (unsigned long)config.poll_interval * 1000UL) {
-        lastPollTime = now;
-        pollDevice();
-      }
-    } else {
-      isTargetOnline = true; // Stream connected = device online
+    if (now - lastPollTime > (unsigned long)config.poll_interval * 1000UL) {
+      lastPollTime = now;
+      pollDevice();
     }
 
-    // Dynamic Display Update Interval
-    // If showing Camera: Update immediately (Limited by network download time)
-    // If showing Props: Update every 5 seconds (Carousel)
-    unsigned long interval = hasCameraProp ? 0 : 5000;
-
-    if (now - lastCarouselTime > interval) {
+    if (now - lastCarouselTime > 5000) {
       lastCarouselTime = now;
       updateDisplay();
     }
