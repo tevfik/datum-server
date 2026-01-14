@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
     LineChart,
     Line,
@@ -58,6 +58,22 @@ export function TelemetryChart({ data, isLoading }: TelemetryChartProps) {
     // Color palette
     const colors = ["#2563eb", "#16a34a", "#db2777", "#ea580c", "#7c3aed"];
 
+    // State for toggling lines via Legend
+    const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
+
+    const handleLegendClick = (e: any) => {
+        const { value } = e;
+        setHiddenKeys((prev: Set<string>) => {
+            const next = new Set(prev);
+            if (next.has(value)) {
+                next.delete(value);
+            } else {
+                next.add(value);
+            }
+            return next;
+        });
+    };
+
     if (isLoading) return <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading telemetry...</div>;
     if (chartData.length === 0) return (
         <Card>
@@ -83,7 +99,7 @@ export function TelemetryChart({ data, isLoading }: TelemetryChartProps) {
                     <Activity className="h-5 w-5" />
                     Telemetry
                 </CardTitle>
-                <CardDescription>Visualizing numeric data points</CardDescription>
+                <CardDescription>Visualizing numeric data points (Click legend items to toggle)</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="h-[300px] w-full">
@@ -106,7 +122,7 @@ export function TelemetryChart({ data, isLoading }: TelemetryChartProps) {
                             <Tooltip
                                 contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }}
                             />
-                            <Legend />
+                            <Legend onClick={handleLegendClick} wrapperStyle={{ cursor: 'pointer' }} />
                             {dataKeys.map((key, index) => (
                                 <Line
                                     key={key}
@@ -116,6 +132,7 @@ export function TelemetryChart({ data, isLoading }: TelemetryChartProps) {
                                     strokeWidth={2}
                                     activeDot={{ r: 4 }}
                                     dot={false}
+                                    hide={hiddenKeys.has(key)}
                                 />
                             ))}
                         </LineChart>

@@ -35,51 +35,18 @@ export function DynamicWoTPanel({ device, shadowState }: DynamicWoTPanelProps) {
             </CardHeader>
             <CardContent>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {/* Writable Properties (Top Priority) */}
-                        {Object.entries(properties)
-                            .filter(([_, prop]) => !prop.readOnly)
-                            .map(([key, prop]) => {
-                                const value = shadowState ? shadowState[key] : undefined;
-                                return (
-                                    <WoTPropertyCard
-                                        key={key}
-                                        deviceId={device.id}
-                                        propKey={key}
-                                        propDef={prop}
-                                        value={value}
-                                    />
-                                );
-                            })}
-                    </div>
-
-                    {/* Read-Only Telemetry (Collapsible) */}
-                    <div className="mt-6">
-                        <details className="group rounded-lg border bg-card text-card-foreground">
-                            <summary className="cursor-pointer px-4 py-3 font-medium hover:bg-muted/50 flex items-center justify-between select-none">
-                                <span>Telemetry & Device Info</span>
-                                <span className="transition-transform group-open:rotate-180">
-                                    ▼
-                                </span>
-                            </summary>
-                            <div className="p-4 pt-0 border-t grid gap-4 md:grid-cols-3 lg:grid-cols-4 mt-4">
-                                {Object.entries(properties)
-                                    .filter(([_, prop]) => prop.readOnly)
-                                    .map(([key, prop]) => {
-                                        const value = shadowState ? shadowState[key] : undefined;
-                                        return (
-                                            <WoTPropertyCard
-                                                key={key}
-                                                deviceId={device.id}
-                                                propKey={key}
-                                                propDef={prop}
-                                                value={value}
-                                            />
-                                        );
-                                    })}
-                            </div>
-                        </details>
-                    </div>
+                    {Object.entries(properties).map(([key, prop]) => {
+                        const value = shadowState ? shadowState[key] : undefined;
+                        return (
+                            <WoTPropertyCard
+                                key={key}
+                                deviceId={device.id}
+                                propKey={key}
+                                propDef={prop}
+                                value={value}
+                            />
+                        );
+                    })}
                 </div>
             </CardContent>
         </Card>
