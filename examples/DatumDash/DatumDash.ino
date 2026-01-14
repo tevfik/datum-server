@@ -603,7 +603,7 @@ void pollDevice() {
     // This prevents "NoMemory" errors on large payloads (2KB+)
     StaticJsonDocument<200> filter;
     filter["status"] = true;
-    filter["thing_description"]["properties"] = true;
+    filter["thing_description"] = true; // Allow full TD structure
     filter["shadow_state"] = true;
 
     DynamicJsonDocument doc(4096);
