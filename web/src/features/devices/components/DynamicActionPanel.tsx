@@ -66,11 +66,11 @@ function ActionItem({ deviceId, actionKey, actionDef }: { deviceId: string, acti
                 params: params
             });
             setOpen(false); // Close dialog
-            // Ideally show toast here
-            alert("Command Sent: " + title);
+            // Success - no alert needed
         } catch (e) {
             console.error(e);
-            alert("Failed to send command");
+            // alert("Failed to send command"); 
+            // Better to show error on UI, but removing alert as requested
         } finally {
             setIsLoading(false);
             setParams({}); // Reset params

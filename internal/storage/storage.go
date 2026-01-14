@@ -137,6 +137,7 @@ type Device struct {
 	GracePeriodEnd   time.Time              `json:"grace_period_end,omitempty"`  // When previous token becomes invalid
 	KeyRevokedAt     time.Time              `json:"key_revoked_at,omitempty"`    // When keys were revoked (if revoked)
 	ThingDescription map[string]interface{} `json:"thing_description,omitempty"` // Thing Description (WoT)
+	ShadowState      map[string]interface{} `json:"shadow_state,omitempty"`      // Current Device State (Shadow)
 }
 
 func (s *Storage) CreateDevice(device *Device) error {
@@ -189,7 +190,18 @@ func (s *Storage) GetDevice(deviceID string) (*Device, error) {
 		if err != nil {
 			return err
 		}
-		return json.Unmarshal([]byte(deviceData), &device)
+		if err := json.Unmarshal([]byte(deviceData), &device); err != nil {
+			return err
+		}
+		// Fetch Shadow
+		shadowKey := fmt.Sprintf("device:%s:shadow", deviceID)
+		if shadowJSON, err := tx.Get(shadowKey); err == nil {
+			var shadow map[string]interface{}
+			if err := json.Unmarshal([]byte(shadowJSON), &shadow); err == nil {
+				device.ShadowState = shadow
+			}
+		}
+		return nil
 	})
 	return &device, err
 }
@@ -208,7 +220,18 @@ func (s *Storage) GetDeviceByAPIKey(apiKey string) (*Device, error) {
 		if err != nil {
 			return err
 		}
-		return json.Unmarshal([]byte(deviceData), &device)
+		if err := json.Unmarshal([]byte(deviceData), &device); err != nil {
+			return err
+		}
+		// Fetch Shadow
+		shadowKey := fmt.Sprintf("device:%s:shadow", deviceID)
+		if shadowJSON, err := tx.Get(shadowKey); err == nil {
+			var shadow map[string]interface{}
+			if err := json.Unmarshal([]byte(shadowJSON), &shadow); err == nil {
+				device.ShadowState = shadow
+			}
+		}
+		return nil
 	})
 	return &device, err
 }
@@ -233,6 +256,14 @@ func (s *Storage) GetUserDevices(userID string) ([]Device, error) {
 			}
 			var device Device
 			json.Unmarshal([]byte(deviceData), &device)
+			// Fetch Shadow
+			shadowKey := fmt.Sprintf("device:%s:shadow", deviceID)
+			if shadowJSON, err := tx.Get(shadowKey); err == nil {
+				var shadow map[string]interface{}
+				if err := json.Unmarshal([]byte(shadowJSON), &shadow); err == nil {
+					device.ShadowState = shadow
+				}
+			}
 			devices = append(devices, device)
 		}
 		return nil

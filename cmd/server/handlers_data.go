@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -25,8 +26,6 @@ type DataResponse struct {
 
 // postDataHandler handles data ingestion from devices
 // POST /data/:device_id
-// postDataHandler handles data ingestion from devices
-// POST /data/:device_id
 func postDataHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 	apiKey, _ := c.Get("api_key")
@@ -47,6 +46,18 @@ func postDataHandler(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Bridge to MQTT for Live UI Updates
+	if mqttBroker != nil {
+		// Serialize data to JSON
+		if jsonBytes, err := json.Marshal(data); err == nil {
+			// Fire and forget - don't block HTTP response
+			go func() {
+				topic := fmt.Sprintf("dev/%s/data", deviceID)
+				mqttBroker.Publish(topic, jsonBytes, false)
+			}()
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

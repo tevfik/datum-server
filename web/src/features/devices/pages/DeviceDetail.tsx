@@ -188,13 +188,13 @@ function CommandSender({ deviceId }: { deviceId: string }) {
         mutationFn: (data: { action: string; params: any }) =>
             deviceService.sendCommand(deviceId, data),
         onSuccess: (data) => {
-            alert(`Command sent! ID: ${data.command_id}`);
+            // alert(`Command sent! ID: ${data.command_id}`);
             queryClient.invalidateQueries({ queryKey: ['commands', deviceId] });
             setParams('{}');
         },
         onError: (err) => {
-            alert('Failed to send command');
             console.error(err);
+            // alert('Failed to send command');
         }
     });
 
@@ -283,10 +283,11 @@ function FirmwareUpdate({ deviceId }: { deviceId: string }) {
         onSuccess: (data) => {
             setUrl(data.url);
             setFile(null); // Clear file after upload
-            alert(`Firmware uploaded! URL: ${data.url}`);
+            // alert(`Firmware uploaded! URL: ${data.url}`);
         },
         onError: (err: any) => {
-            alert(`Upload failed: ${err.response?.data?.error || err.message}`);
+            console.error(err);
+            // alert(`Upload failed: ${err.response?.data?.error || err.message}`);
         }
     });
 
@@ -295,11 +296,11 @@ function FirmwareUpdate({ deviceId }: { deviceId: string }) {
         mutationFn: (data: { action: string; params: any }) =>
             deviceService.sendCommand(deviceId, data),
         onSuccess: () => {
-            alert('OTA Update Command Sent!');
+            // alert('OTA Update Command Sent!');
         },
         onError: (err: any) => {
             console.error('OTA Command failed:', err);
-            alert(`Failed to send command: ${err.response?.data?.error || err.message}`);
+            // alert(`Failed to send command: ${err.response?.data?.error || err.message}`);
         }
     });
 
