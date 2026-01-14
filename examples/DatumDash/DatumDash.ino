@@ -804,7 +804,7 @@ void setup() {
   tft.invertDisplay(true);
   tft.setRotation(2);
   tft.fillScreen(ST77XX_BLACK);
-  tft.setSPISpeed(20000000);
+  tft.setSPISpeed(40000000);
 
   // TJpg Dec Init
   TJpgDec.setJpgScale(1);
@@ -898,7 +898,12 @@ void loop() {
       pollDevice();
     }
 
-    if (now - lastCarouselTime > 5000) {
+    // Dynamic Display Update Interval
+    // If showing Camera: Update immediately (Limited by network download time)
+    // If showing Props: Update every 5 seconds (Carousel)
+    unsigned long interval = hasCameraProp ? 0 : 5000;
+
+    if (now - lastCarouselTime > interval) {
       lastCarouselTime = now;
       updateDisplay();
     }
