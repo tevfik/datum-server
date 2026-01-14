@@ -747,11 +747,15 @@ void setup() {
   Serial.begin(115200);
 
   pinMode(TFT_BL, OUTPUT);
-  digitalWrite(TFT_BL, LOW); // Max Brightness (Active Low)
+  digitalWrite(TFT_BL, HIGH); // Max Brightness (Active High)
   tft.init(240, 240);
-  tft.setSPISpeed(20000000); // 20MHz to match reference
-  tft.setRotation(0);
-  tft.fillScreen(ST77XX_BLACK);
+  tft.invertDisplay(true);
+  tft.setSPISpeed(40000000); // Try 40MHz default or 20MHz? Reference 20MHz.
+  // Let's stick to 20MHz but ensure Mode 2 if possible.
+  // Adafruit defaults to Mode 0. ST7789 often works on Mode 2 or 3.
+  // Let's try to set SPI Mode 2 via SPI global before init? No.
+  // Adafruit_ST7789 doesn't confirm setSPIMode is public in all versions.
+  // Let's just try basic config + Invert + HIGH backlight.
 
   // Splash Screen
   tft.setTextSize(3);
