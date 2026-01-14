@@ -186,6 +186,8 @@ void drawCameraView() {
   if (String(config.server_url).startsWith("https")) {
     WiFiClientSecure *secureClient = new WiFiClientSecure();
     secureClient->setInsecure();
+    // Increase buffer for image download
+    secureClient->setBufferSizes(2048, 512);
     client = secureClient;
   } else {
     client = new WiFiClient();
@@ -200,41 +202,43 @@ void drawCameraView() {
   int httpCode = http.GET();
   if (httpCode == 200) {
     int len = http.getSize();
-    // Safety Limit: ESP8266 has limited RAM.
-    // QVGA is ~7-10KB JPG. Max buffer 20KB.
-    if (len > 0 && len < 25000) {
-      uint8_t *valBuffer = (uint8_t *)malloc(len);
-      if (valBuffer) {
-        WiFiClient *stream = http.getStreamPtr();
-        int idx = 0;
-        while (http.connected() && (len > 0 || len == -1)) {
-          size_t size = stream->available();
-          if (size) {
-            int c = stream->readBytes(valBuffer + idx, size);
-            idx += c;
-            if (len > 0)
-              len -= c;
-          } else {
-            delay(1);
+    Serial.printf("Cam Snapshot Size: %d bytes. Free Heap: %d\n", len,
+                  ESP.getFreeHeap());
+
+    // Safety Limit: ESP8266 has limited RAM (~40KB usually free)
+    // Try to alloc up to 35KB if heap permits
+    if (len > 0 && len < 40000) {
+      if (ESP.getFreeHeap() > len + 2000) { // Ensure 2KB slack
+        uint8_t *valBuffer = (uint8_t *)malloc(len);
+        if (valBuffer) {
+          WiFiClient *stream = http.getStreamPtr();
+          int idx = 0;
+          while (http.connected() && (len > 0 || len == -1)) {
+            size_t size = stream->available();
+            if (size) {
+              int c = stream->readBytes(valBuffer + idx, size);
+              idx += c;
+              if (len > 0)
+                len -= c;
+            } else {
+              delay(1);
+            }
+            if (len == 0)
+              break;
           }
-          if (len == 0)
-            break;
+
+          TJpgDec.drawJpg(-40, 0, valBuffer, idx);
+          free(valBuffer);
+
+          tft.setTextColor(ST77XX_GREEN);
+          tft.setCursor(5, 5);
+          tft.setTextSize(1);
+          tft.print("LIVE");
+        } else {
+          showStatus("OOM: Malloc Fail", ST77XX_RED);
         }
-
-        // tft.setSwapBytes(true); // NOT SUPPORTED in Adafruit_GFX, handled by
-        // TJpgDec.setSwapBytes(true) Draw centered-ish: -40, 0 usually works
-        // for 320x240 on 240x240
-        TJpgDec.drawJpg(-40, 0, valBuffer, idx);
-        // tft.setSwapBytes(false); // Restore
-
-        free(valBuffer);
-
-        tft.setTextColor(ST77XX_GREEN);
-        tft.setCursor(5, 5);
-        tft.setTextSize(1);
-        tft.print("LIVE");
       } else {
-        showStatus("OOM: Img Too Big", ST77XX_RED);
+        showStatus("OOM: Low Heap", ST77XX_RED);
       }
     } else {
       showStatus("Img Too Large", ST77XX_RED);
