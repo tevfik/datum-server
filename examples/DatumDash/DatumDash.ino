@@ -23,8 +23,7 @@
 #define TFT_RST 2 // D4
 #define TFT_BL 5  // D1
 
-Adafruit_ST7789 tft =
-    Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
+Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 
 // -- Globals --
 ESP8266WebServer server(80);
@@ -750,6 +749,7 @@ void setup() {
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, LOW); // Max Brightness (Active Low)
   tft.init(240, 240);
+  tft.setSPISpeed(20000000); // 20MHz to match reference
   tft.setRotation(0);
   tft.fillScreen(ST77XX_BLACK);
 
