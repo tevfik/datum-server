@@ -382,7 +382,7 @@ void sendThingDescription() {
   props["uptime"]["readOnly"] = true;
 
   JsonObject actions = doc.createNestedObject("actions");
-  
+
   JsonObject setTarget = actions.createNestedObject("set_target");
   setTarget["title"] = "Set Target Device";
   JsonObject stInput = setTarget.createNestedObject("input");
@@ -747,10 +747,21 @@ void setup() {
   Serial.begin(115200);
 
   pinMode(TFT_BL, OUTPUT);
-  analogWrite(TFT_BL, 128);
+  digitalWrite(TFT_BL, HIGH); // Max Brightness
   tft.init(240, 240);
   tft.setRotation(0);
   tft.fillScreen(ST77XX_BLACK);
+
+  // Splash Screen
+  tft.setTextSize(3);
+  int16_t x1, y1;
+  uint16_t w, h;
+  tft.getTextBounds("DatumDash", 0, 0, &x1, &y1, &w, &h);
+  tft.setCursor((240 - w) / 2, (240 - h) / 2);
+  tft.setTextColor(ST77XX_CYAN);
+  tft.print("DatumDash");
+
+  delay(2000); // Hold splash for 2 seconds
 
   loadConfig();
 
