@@ -759,13 +759,13 @@ void setup() {
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, LOW); // Max Brightness (Active Low: 0=Bright)
 
-  // Critical: SPI Mode 2 is often required for ST7789 on ESP8266 without CS
-  tft.init(240, 240, SPI_MODE2);
+  // Critical: SPI Mode 3 is often required for ST7789 without CS to sync
+  // correctly
+  tft.init(240, 240, SPI_MODE3);
   tft.invertDisplay(true);
-  tft.setRotation(2); // Try 180 degree rotation (GeekTV often mounted upside
-                      // down or needs this)
+  tft.setRotation(0); // Reference uses 0
   tft.fillScreen(ST77XX_BLACK);
-  tft.setSPISpeed(40000000); // 40MHz for smooth updates
+  tft.setSPISpeed(20000000); // 20MHz (Match reference EXACTLY)
 
   // Splash Screen
   tft.setTextSize(3);
