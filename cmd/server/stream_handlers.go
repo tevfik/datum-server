@@ -145,11 +145,12 @@ func uploadFrameHandler(c *gin.Context) {
 	})
 }
 
-// MJPEG stream endpoint for browsers (HTTP)
+// MJPEG stream endpoint for browsers (HTTP) and cross-device access
 // GET /dev/:device_id/stream/mjpeg
 func mjpegStreamHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 	userID, _ := auth.GetUserID(c)
+	role, _ := auth.GetUserRole(c)
 
 	// Verify device ownership
 	device, err := store.GetDevice(deviceID)
@@ -157,12 +158,26 @@ func mjpegStreamHandler(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
 		return
 	}
-	if device.UserID != userID {
-		role, _ := auth.GetUserRole(c)
-		if role != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-			return
+
+	// Authorization: Allow admin, owner, or same-user device
+	isAuthorized := false
+	if role == "admin" {
+		isAuthorized = true
+	} else if userID != "" && device.UserID == userID {
+		isAuthorized = true
+	} else if val, exists := c.Get("api_key"); exists {
+		// Device Auth: Check if requester belongs to same user
+		apiKey := val.(string)
+		if requesterDevice, err := store.GetDeviceByAPIKey(apiKey); err == nil {
+			if requesterDevice.ID == device.ID || requesterDevice.UserID == device.UserID {
+				isAuthorized = true
+			}
 		}
+	}
+
+	if !isAuthorized {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
 	}
 
 	// Set MJPEG headers

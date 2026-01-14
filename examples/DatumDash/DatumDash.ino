@@ -179,11 +179,11 @@ bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h,
 }
 // Persistent Camera Client for Connection Reuse (FPS Boost)
 WiFiClient *camClient = nullptr;
-HTTPClient camHttp;
-bool camClientInitialized = false;
+bool camStreamConnected = false;
 
 void initCameraClient() {
   if (camClient) {
+    camClient->stop();
     delete camClient;
     camClient = nullptr;
   }
@@ -191,84 +191,120 @@ void initCameraClient() {
   if (String(config.server_url).startsWith("https")) {
     WiFiClientSecure *secureClient = new WiFiClientSecure();
     secureClient->setInsecure();
-    secureClient->setBufferSizes(4096, 512);
+    secureClient->setBufferSizes(8192, 512); // Larger buffer for stream
     camClient = secureClient;
   } else {
     camClient = new WiFiClient();
   }
-  camClientInitialized = true;
+  camStreamConnected = false;
 }
 
+// Parse MJPEG stream and draw frames
 void drawCameraView() {
   if (strlen(config.target_device_id) == 0)
     return;
 
-  // Initialize or reconnect persistent client
-  if (!camClientInitialized || !camClient || !camClient->connected()) {
+  // Initialize client if needed
+  if (!camClient) {
     initCameraClient();
   }
 
-  String url = String(config.server_url) + "/dev/" + config.target_device_id +
-               "/stream/snapshot";
+  // Connect to MJPEG stream if not connected
+  if (!camStreamConnected || !camClient->connected()) {
+    HTTPClient http;
+    String url = String(config.server_url) + "/dev/" + config.target_device_id +
+                 "/stream/mjpeg";
 
-  // Reuse connection with Keep-Alive
-  camHttp.setReuse(true);
-  camHttp.begin(*camClient, url);
-  camHttp.addHeader("Authorization", "Bearer " + String(config.api_key));
-  camHttp.addHeader("Connection", "keep-alive");
+    http.setReuse(true);
+    http.begin(*camClient, url);
+    http.addHeader("Authorization", "Bearer " + String(config.api_key));
+    http.addHeader("Connection", "keep-alive");
 
-  int httpCode = camHttp.GET();
-  if (httpCode == 200) {
-    int len = camHttp.getSize();
-    // Serial.printf("Snap: %d bytes\n", len); // Reduce log spam for FPS
-
-    if (len > 0 && len < 40000) {
-      if (ESP.getFreeHeap() > len + 2000) {
-        uint8_t *valBuffer = (uint8_t *)malloc(len);
-        if (valBuffer) {
-          WiFiClient *stream = camHttp.getStreamPtr();
-          int idx = 0;
-          int originalLen = len;
-          while (camHttp.connected() && (len > 0 || len == -1)) {
-            mqttClient.loop();
-            size_t size = stream->available();
-            if (size) {
-              int c = stream->readBytes(valBuffer + idx, size);
-              idx += c;
-              if (len > 0)
-                len -= c;
-            } else {
-              delay(1);
-            }
-            if (len == 0)
-              break;
-          }
-
-          // Draw centered for QVGA (320x240) -> 240x240 screen
-          // Horizontal offset: (240-320)/2 = -40
-          TJpgDec.drawJpg(-40, 0, valBuffer, idx);
-          free(valBuffer);
-
-          tft.setTextColor(ST77XX_GREEN);
-          tft.setCursor(5, 5);
-          tft.setTextSize(1);
-          tft.print("LIVE");
-        } else {
-          showStatus("OOM: Malloc Fail", ST77XX_RED);
-        }
-      } else {
-        showStatus("OOM: Low Heap", ST77XX_RED);
-      }
-    } else {
-      showStatus("Img Too Large", ST77XX_RED);
+    int httpCode = http.GET();
+    if (httpCode != 200) {
+      showStatus("MJPEG Fail", ST77XX_RED);
+      http.end();
+      camStreamConnected = false;
+      return;
     }
-  } else {
-    showStatus("Cam Err", ST77XX_RED);
-    // Force reconnect on error
-    camClientInitialized = false;
+    camStreamConnected = true;
+    Serial.println("MJPEG Stream Connected");
+    // Don't call http.end() - keep connection open
   }
-  camHttp.end();
 
+  // Read one frame from MJPEG stream
+  // Format: --frame\r\nContent-Type: image/jpeg\r\nContent-Length:
+  // NNN\r\n\r\n<DATA>
+
+  unsigned long startTime = millis();
+  const int MAX_WAIT_MS = 2000;
+
+  // Wait for data
+  while (!camClient->available() && millis() - startTime < MAX_WAIT_MS) {
+    mqttClient.loop();
+    delay(1);
+  }
+
+  if (!camClient->available()) {
+    return; // No data yet, try next loop
+  }
+
+  // Read until we find frame boundary
+  String line = "";
+  int contentLength = 0;
+  bool foundStart = false;
+
+  while (camClient->available() && millis() - startTime < MAX_WAIT_MS) {
+    char c = camClient->read();
+    line += c;
+
+    if (line.endsWith("\r\n")) {
+      if (line.startsWith("--frame")) {
+        foundStart = true;
+        line = "";
+      } else if (foundStart && line.startsWith("Content-Length:")) {
+        contentLength = line.substring(15).toInt();
+        line = "";
+      } else if (foundStart && line == "\r\n" && contentLength > 0) {
+        // Header complete, read image data
+        break;
+      } else {
+        line = "";
+      }
+    }
+  }
+
+  if (contentLength > 0 && contentLength < 40000 &&
+      ESP.getFreeHeap() > contentLength + 2000) {
+    uint8_t *frameBuffer = (uint8_t *)malloc(contentLength);
+    if (frameBuffer) {
+      int bytesRead = 0;
+      while (bytesRead < contentLength && millis() - startTime < MAX_WAIT_MS) {
+        mqttClient.loop();
+        if (camClient->available()) {
+          int toRead =
+              min((int)camClient->available(), contentLength - bytesRead);
+          int read = camClient->readBytes(frameBuffer + bytesRead, toRead);
+          bytesRead += read;
+        } else {
+          delay(1);
+        }
+      }
+
+      if (bytesRead == contentLength) {
+        // Draw frame
+        TJpgDec.drawJpg(-40, 0, frameBuffer, bytesRead);
+
+        tft.setTextColor(ST77XX_GREEN);
+        tft.setCursor(5, 5);
+        tft.setTextSize(1);
+        tft.print("LIVE");
+      }
+      free(frameBuffer);
+    }
+  }
+
+  // Draw status bar
   tft.drawLine(0, 210, 240, 210, ST77XX_WHITE);
   tft.setCursor(10, 220);
   tft.setTextSize(1);
