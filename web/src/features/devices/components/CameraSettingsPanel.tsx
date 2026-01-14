@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Monitor, RefreshCw, FlipVertical, FlipHorizontal, Video } from "lucide-react";
+import { Monitor, FlipVertical, FlipHorizontal, Video } from "lucide-react";
 import { deviceService } from "@/features/devices/services/deviceService";
 import { useState } from "react";
 
