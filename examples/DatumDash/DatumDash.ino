@@ -747,7 +747,7 @@ void setup() {
   Serial.begin(115200);
 
   pinMode(TFT_BL, OUTPUT);
-  digitalWrite(TFT_BL, HIGH); // Max Brightness (Active High)
+  digitalWrite(TFT_BL, LOW); // Max Brightness (Active Low: 0=Bright)
   tft.init(240, 240);
   tft.invertDisplay(true);
   tft.setSPISpeed(40000000); // Try 40MHz default or 20MHz? Reference 20MHz.
