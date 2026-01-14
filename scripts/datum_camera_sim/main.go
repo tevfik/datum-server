@@ -391,8 +391,16 @@ func handleCommand(cmd map[string]interface{}) {
 
 func sendAck(cmdID string) {
 	url := fmt.Sprintf("%s/dev/%s/cmd/%s/ack", serverURL, simDeviceID, cmdID)
-	req, _ := http.NewRequest("POST", url, nil)
+
+	payload := map[string]interface{}{
+		"status": "executed",
+		"result": map[string]string{"msg": "Simulated execution success"},
+	}
+	jsonData, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	req.Header.Set("Authorization", "Bearer "+simApiKey)
+	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
