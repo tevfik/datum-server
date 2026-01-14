@@ -7,13 +7,30 @@ import {
     Menu,
     Settings as SettingsIcon
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
 export default function SidebarLayout() {
     const [isOpen, setIsOpen] = useState(false);
+    const [version, setVersion] = useState<string | null>(null);
     const { logout } = useAuth();
+
+    // Fetch version
+    useEffect(() => {
+        const fetchVersion = async () => {
+            try {
+                const res = await fetch('/health');
+                if (res.ok) {
+                    const data = await res.json();
+                    setVersion(data.version);
+                }
+            } catch (e) {
+                console.error('Failed to fetch version', e);
+            }
+        };
+        fetchVersion();
+    }, []);
 
     // Mock toggle for mobile
     const toggleSidebar = () => setIsOpen(!isOpen);
@@ -61,7 +78,7 @@ export default function SidebarLayout() {
                     ))}
                 </nav>
 
-                <div className="border-t p-4">
+                <div className="border-t p-4 space-y-2">
                     <button
                         onClick={() => logout()}
                         className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
@@ -69,6 +86,11 @@ export default function SidebarLayout() {
                         <LogOut className="h-5 w-5" />
                         Sign Out
                     </button>
+                    {version && (
+                        <div className="px-3 text-xs text-muted-foreground text-center">
+                            v{version}
+                        </div>
+                    )}
                 </div>
             </aside>
 

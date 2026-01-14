@@ -21,11 +21,17 @@ class MQTTService {
             const clientId = `datum_web_${user.role}_${user.id}_${random}`;
 
             // 3. Connect options
-            // Use WS protocol. Assume backend is on the same host but port 1884
-            const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-            const host = window.location.hostname;
-            const port = 1884;
-            const url = `${protocol}://${host}:${port}`;
+            // Development: Connect directly to 1884
+            // Production: Connect via Traefik /mqtt path (WSS on 443)
+            const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+            let url = '';
+            if (isDev) {
+                url = `ws://${window.location.hostname}:1884`;
+            } else {
+                const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+                url = `${protocol}://${window.location.host}/mqtt`;
+            }
 
             console.log(`Connecting to MQTT Broker: ${url} as ${clientId}`);
 

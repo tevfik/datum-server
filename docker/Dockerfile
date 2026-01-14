@@ -48,6 +48,6 @@ COPY --from=builder /app/datumctl /usr/local/bin/datumctl
 # Create data directory for database files
 RUN mkdir -p /root/data
 
-EXPOSE 8000
+EXPOSE 8000 1883 1884
 
 CMD ["./server"]
