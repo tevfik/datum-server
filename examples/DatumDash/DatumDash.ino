@@ -747,7 +747,7 @@ void setup() {
   Serial.begin(115200);
 
   pinMode(TFT_BL, OUTPUT);
-  digitalWrite(TFT_BL, HIGH); // Max Brightness
+  digitalWrite(TFT_BL, LOW); // Max Brightness (Active Low)
   tft.init(240, 240);
   tft.setRotation(0);
   tft.fillScreen(ST77XX_BLACK);
