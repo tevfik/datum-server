@@ -610,36 +610,36 @@ void pollDevice() {
       Serial.println("Error: Empty Payload from Server");
       isTargetOnline = false;
     } else {
+      // Filter: Only capture status and TD.
+      // Reduced DOC size to 2048 to fit in RAM alongside payload String
       StaticJsonDocument<200> filter;
       filter["status"] = true;
       filter["thing_description"] = true;
-      filter["shadow_state"] = true;
+      // filter["shadow_state"] = true; // Disabled to save RAM for now
 
-      DynamicJsonDocument doc(4096);
+      DynamicJsonDocument doc(2048);
       DeserializationError error =
           deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
       if (!error) {
-        Serial.print("Filtered Doc: ");
-        serializeJson(doc, Serial);
-        Serial.println();
+        // Serial.print("Filtered Doc: ");
+        // serializeJson(doc, Serial);
+        // Serial.println();
 
         isTargetOnline = (doc["status"] | "offline") == "online";
         Serial.printf("Status: %s\n", isTargetOnline ? "Online" : "Offline");
 
         if (doc.containsKey("thing_description")) {
-          // Serial.println("TD found");
+          Serial.println("TD found");
           if (properties.empty()) {
             parseThingDescription(doc["thing_description"]);
             Serial.printf("Props loaded: %d\n", properties.size());
           }
+        } else {
+          Serial.println("TD Missing in Doc");
         }
 
-        if (doc.containsKey("shadow_state")) {
-          JsonObject shadow = doc["shadow_state"];
-          for (JsonPair p : shadow)
-            updateValueCache(p.key().c_str(), p.value().as<String>());
-        }
+        // Shadow update temporarily disabled
       } else {
         Serial.print("JSON Parse Failed: ");
         Serial.println(error.c_str());
