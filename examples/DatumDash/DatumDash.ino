@@ -214,6 +214,9 @@ void drawCameraView() {
           WiFiClient *stream = http.getStreamPtr();
           int idx = 0;
           while (http.connected() && (len > 0 || len == -1)) {
+            // Critical: Keep MQTT alive during heavy download
+            mqttClient.loop();
+
             size_t size = stream->available();
             if (size) {
               int c = stream->readBytes(valBuffer + idx, size);
@@ -805,7 +808,7 @@ void setup() {
 
   // TJpg Dec Init
   TJpgDec.setJpgScale(1);
-  TJpgDec.setSwapBytes(true);
+  TJpgDec.setSwapBytes(false); // Fix Color Corruption (RGB vs BGR)
   TJpgDec.setCallback(tft_output);
 
   // Splash
