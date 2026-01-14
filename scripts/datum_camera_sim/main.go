@@ -326,9 +326,11 @@ func runCommandPollingLoop() {
 		}
 
 		if resp.StatusCode == 200 {
-			var cmds []map[string]interface{}
-			if err := json.NewDecoder(resp.Body).Decode(&cmds); err == nil && len(cmds) > 0 {
-				for _, c := range cmds {
+			var result struct {
+				Commands []map[string]interface{} `json:"commands"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&result); err == nil && len(result.Commands) > 0 {
+				for _, c := range result.Commands {
 					handleCommand(c)
 				}
 			}
@@ -392,7 +394,10 @@ func handleCommand(cmd map[string]interface{}) {
 	}
 
 	// Send Acknowledgement
-	if cmdID, ok := cmd["id"].(string); ok {
+	if cmdID, ok := cmd["command_id"].(string); ok {
+		sendAck(cmdID)
+	} else if cmdID, ok := cmd["id"].(string); ok {
+		// Fallback
 		sendAck(cmdID)
 	}
 }

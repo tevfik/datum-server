@@ -297,8 +297,8 @@ func (h *AuthHook) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
 		// For now, Devices only write to DATA.
 		return suffix == "data"
 	} else {
-		// Can only read from dev/{id}/cmd or dev/{id}/fw
-		return suffix == "cmd" || suffix == "fw"
+		// Can only read from dev/{id}/cmd, dev/{id}/fw, or dev/{id}/data (Live Logs)
+		return suffix == "cmd" || suffix == "fw" || suffix == "data"
 	}
 }
 
