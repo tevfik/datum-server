@@ -23,12 +23,12 @@ export const explorerService = {
         end?: Date; // Date object
         limit?: number;
     }): Promise<HistoryResponse> => {
-        // Use /dev/:id/rec endpoint
-        let url = `/dev/${deviceId}/rec`;
+        // Use unified /dev/:id/data endpoint
+        let url = `/dev/${deviceId}/data`;
         const queryParams = new URLSearchParams();
 
-        if (start) queryParams.append('from', start.toISOString());
-        if (end) queryParams.append('to', end.toISOString());
+        if (start) queryParams.append('start_rfc', start.toISOString()); // Map from -> start_rfc
+        if (end) queryParams.append('end_rfc', end.toISOString());     // Map to -> end_rfc
         if (limit) queryParams.append('limit', limit.toString());
 
         if (queryParams.toString()) {

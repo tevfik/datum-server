@@ -65,7 +65,7 @@ export const deviceService = {
 
     // Get telemetry history
     getHistory: async (deviceId: string): Promise<TelemetryPoint[]> => {
-        const { data } = await api.get<TelemetryHistoryResponse>(`/dev/${deviceId}/rec`);
+        const { data } = await api.get<TelemetryHistoryResponse>(`/dev/${deviceId}/data?limit=100`);
         return data.data || [];
     }
 };
