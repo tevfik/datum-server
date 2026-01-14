@@ -651,6 +651,7 @@ void sendThingDescription() {
   JsonObject pRes = props.createNestedObject("stream_resolution");
   pRes["title"] = "Stream Resolution";
   pRes["type"] = "string";
+  pRes["enum"].add("QXGA");
   pRes["enum"].add("UXGA");
   pRes["enum"].add("SXGA");
   pRes["enum"].add("XGA");
@@ -671,6 +672,7 @@ void sendThingDescription() {
   JsonObject pSnapRes = props.createNestedObject("snapshot_resolution");
   pSnapRes["title"] = "Snapshot Resolution";
   pSnapRes["type"] = "string";
+  pSnapRes["enum"].add("QXGA");
   pSnapRes["enum"].add("UXGA");
   pSnapRes["enum"].add("SXGA");
   pSnapRes["enum"].add("XGA");
