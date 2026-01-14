@@ -763,7 +763,7 @@ void setup() {
   // correctly
   tft.init(240, 240, SPI_MODE3);
   tft.invertDisplay(true);
-  tft.setRotation(0); // Reference uses 0
+  tft.setRotation(2); // Fix Vertical Flip (180 degree)
   tft.fillScreen(ST77XX_BLACK);
   tft.setSPISpeed(20000000); // 20MHz (Match reference EXACTLY)
 
@@ -779,11 +779,16 @@ void setup() {
   delay(2000); // Hold splash for 2 seconds
 
   loadConfig();
+  Serial.println("Config Loaded");
+
+  // Debug: Print boot failures count
+  Serial.printf("Boot Failures: %d\n", config.boot_failures);
 
   config.boot_failures++;
   saveConfig();
 
   if (config.boot_failures >= 5) {
+    Serial.println("Resetting due to failure threshold...");
     tft.fillScreen(ST77XX_RED);
     tft.setCursor(10, 100);
     tft.println("Boot Failures! Resetting...");
@@ -793,20 +798,28 @@ void setup() {
     delay(2000);
   }
 
-  if (strlen(config.ssid) == 0)
+  if (strlen(config.ssid) == 0) {
+    Serial.println("Start Setup Mode");
     startSetupMode();
+  }
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(config.ssid, config.password);
+  Serial.print("Connecting Wifi: ");
+  Serial.println(config.ssid);
 
   showStatus("Connecting...", ST77XX_YELLOW);
 
   int r = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    if (++r > 40)
+    Serial.print(".");
+    if (++r > 40) {
+      Serial.println("Timeout");
       ESP.restart();
+    }
   }
+  Serial.println("Connected!");
 
   config.boot_failures = 0;
   saveConfig();
