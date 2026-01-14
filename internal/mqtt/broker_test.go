@@ -88,7 +88,7 @@ func TestIngestionHook_OnPublish(t *testing.T) {
 	store, _ := storage.New(":memory:", "", 0)
 	store.InitializeSystem("Test", false, 7)
 	tp := processing.NewTelemetryProcessor(store)
-	hook := newIngestionHook(tp)
+	hook := newIngestionHook(tp, store)
 
 	// Create device so storage works
 	store.CreateDevice(&storage.Device{ID: "dev-1", Status: "active"})

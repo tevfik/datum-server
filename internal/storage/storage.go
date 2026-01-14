@@ -825,7 +825,22 @@ func (s *Storage) AcknowledgeCommand(cmdID string, result map[string]interface{}
 		pendingData, _ := json.Marshal(newPending)
 		tx.Set(pendingKey, string(pendingData), nil)
 		return nil
+
 	})
+}
+
+// GetCommand retrieves a command by ID
+func (s *Storage) GetCommand(cmdID string) (*Command, error) {
+	var cmd Command
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		cmdKey := fmt.Sprintf("command:%s", cmdID)
+		cmdData, err := tx.Get(cmdKey)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal([]byte(cmdData), &cmd)
+	})
+	return &cmd, err
 }
 
 func (s *Storage) GetPendingCommandCount(deviceID string) int {

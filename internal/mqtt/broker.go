@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"strings"
+	"time"
 
 	"datum-go/internal/processing"
 	"datum-go/internal/storage"
@@ -61,7 +62,7 @@ func (b *Broker) Start() error {
 	}
 
 	// Ingestion Hook (Data Processing)
-	if err := b.server.AddHook(newIngestionHook(b.processor), nil); err != nil {
+	if err := b.server.AddHook(newIngestionHook(b.processor, b.store), nil); err != nil {
 		return err
 	}
 
@@ -290,7 +291,10 @@ func (h *AuthHook) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
 	}
 
 	if write {
-		// Can only write to dev/{id}/data
+		// Can only write to dev/{id}/data (for device) or dev/{id}/cmd (for admin/user - already covered above)
+		// Since we are in "Device Access" section (cl.ID == deviceID), a device should NOT be writing to its own cmd topic usually.
+		// However, if we want to support device-to-device via broker later, maybe.
+		// For now, Devices only write to DATA.
 		return suffix == "data"
 	} else {
 		// Can only read from dev/{id}/cmd or dev/{id}/fw
@@ -305,10 +309,11 @@ func (h *AuthHook) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
 type IngestionHook struct {
 	mqtt.HookBase
 	processor *processing.TelemetryProcessor
+	store     storage.Provider
 }
 
-func newIngestionHook(processor *processing.TelemetryProcessor) *IngestionHook {
-	return &IngestionHook{processor: processor}
+func newIngestionHook(processor *processing.TelemetryProcessor, store storage.Provider) *IngestionHook {
+	return &IngestionHook{processor: processor, store: store}
 }
 
 func (h *IngestionHook) ID() string {
@@ -322,29 +327,57 @@ func (h *IngestionHook) Provides(b byte) bool {
 }
 
 func (h *IngestionHook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets.Packet, error) {
-	// Intercept "dev/+/data" messages
 	topic := pk.TopicName
-	// Check if it matches dev/{id}/data pattern
 	parts := strings.Split(topic, "/")
+
+	// 1. Intercept Telemetry: dev/+/data
 	if len(parts) == 3 && parts[0] == "dev" && parts[2] == "data" {
 		deviceID := parts[1]
-
-		// Parse JSON payload
 		var data map[string]interface{}
 		if err := json.Unmarshal(pk.Payload, &data); err == nil {
-			// Add public_ip if client connection is available
 			if cl.Net.Remote != "" {
 				host, _, _ := net.SplitHostPort(cl.Net.Remote)
 				data["public_ip"] = host
 			}
-
-			// Process data
-			// Send to processor (storage)
 			h.processor.Process(deviceID, data)
 		}
+		return pk, nil
 	}
 
-	// Allow the message to continue (e.g. to subscribers)
-	// Now subscribers get the enriched JSON with public_ip!
+	// 2. Intercept Commands: dev/+/cmd
+	if len(parts) == 3 && parts[0] == "dev" && parts[2] == "cmd" {
+		deviceID := parts[1]
+
+		var cmd storage.Command
+		if err := json.Unmarshal(pk.Payload, &cmd); err == nil {
+			// Deduplication: Check if command ID exists
+			if cmd.ID == "" {
+				// No ID provided, generate one? Or reject?
+				// Let's assume external clients might not provide unique IDs.
+				// But to be safe, we require an ID or we generate one.
+				// For now, let's treat it as a new command.
+				cmd.ID = fmt.Sprintf("cmd_%d", time.Now().UnixNano())
+			}
+
+			// Check if exists
+			existing, _ := h.store.GetCommand(cmd.ID)
+			if existing != nil && existing.ID == cmd.ID {
+				// Command already exists (likely sent by API -> MQTT), ignore DB write
+				return pk, nil
+			}
+
+			// New Command from External Source
+			cmd.DeviceID = deviceID
+			cmd.Status = "pending"
+			cmd.CreatedAt = time.Now()
+
+			// Save to DB so HTTP devices can poll it
+			if err := h.store.CreateCommand(&cmd); err != nil {
+				log.Printf("Error persisting MQTT command: %v", err)
+			}
+		}
+		return pk, nil
+	}
+
 	return pk, nil
 }

@@ -107,3 +107,42 @@ func (s *PostgresStore) AcknowledgeCommand(cmdID string, result map[string]inter
 	}
 	return nil
 }
+
+// GetCommand retrieves a command by ID
+func (s *PostgresStore) GetCommand(cmdID string) (*storage.Command, error) {
+	query := `
+		SELECT id, device_id, action, params, status, created_at, expires_at, acked_at, result
+		FROM commands
+		WHERE id = $1
+	`
+	var cmd storage.Command
+	var paramsJSON []byte
+	var resultJSON []byte
+	var expiresAt sql.NullTime
+	var ackedAt sql.NullTime
+
+	err := s.db.QueryRow(query, cmdID).Scan(
+		&cmd.ID, &cmd.DeviceID, &cmd.Action, &paramsJSON, &cmd.Status, &cmd.CreatedAt, &expiresAt, &ackedAt, &resultJSON,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("command not found")
+		}
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+
+	if len(paramsJSON) > 0 {
+		json.Unmarshal(paramsJSON, &cmd.Params)
+	}
+	if len(resultJSON) > 0 {
+		json.Unmarshal(resultJSON, &cmd.Result)
+	}
+	if expiresAt.Valid {
+		cmd.ExpiresAt = expiresAt.Time
+	}
+	if ackedAt.Valid {
+		cmd.AckedAt = ackedAt.Time
+	}
+
+	return &cmd, nil
+}

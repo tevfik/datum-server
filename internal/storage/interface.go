@@ -53,6 +53,7 @@ type Provider interface {
 
 	// Command Operations
 	CreateCommand(cmd *Command) error
+	GetCommand(cmdID string) (*Command, error)
 	GetPendingCommands(deviceID string) ([]Command, error)
 	AcknowledgeCommand(cmdID string, result map[string]interface{}) error
 	GetPendingCommandCount(deviceID string) int

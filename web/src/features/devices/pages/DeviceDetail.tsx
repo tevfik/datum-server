@@ -187,7 +187,7 @@ function CommandSender({ deviceId }: { deviceId: string }) {
     const sendMutation = useMutation({
         mutationFn: (data: { action: string; params: any }) =>
             deviceService.sendCommand(deviceId, data),
-        onSuccess: (data) => {
+        onSuccess: () => {
             // alert(`Command sent! ID: ${data.command_id}`);
             queryClient.invalidateQueries({ queryKey: ['commands', deviceId] });
             setParams('{}');
