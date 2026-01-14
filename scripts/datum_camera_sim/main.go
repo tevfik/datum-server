@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"golang.org/x/image/font"
@@ -26,6 +27,28 @@ var (
 	simApiKey   string
 	simFPS      int
 )
+
+// Simulator State
+type SimState struct {
+	Resolution    string `json:"resolution"`
+	LedOn         bool   `json:"led_on"`
+	LedBrightness int    `json:"led_brightness"`
+	LedColor      string `json:"led_color"`
+	MotionEnabled bool   `json:"motion_enabled"`
+	HMirror       bool   `json:"hmirror"`
+	VFlip         bool   `json:"vflip"`
+	mu            sync.Mutex
+}
+
+var state = SimState{
+	Resolution:    "VGA",
+	LedOn:         false,
+	LedBrightness: 50,
+	LedColor:      "#ff0000",
+	MotionEnabled: true,
+	HMirror:       false,
+	VFlip:         false,
+}
 
 func main() {
 	flag.StringVar(&serverURL, "server", "http://localhost:8000", "Datum server URL")
@@ -55,6 +78,10 @@ func main() {
 	// Send Thing Description
 	sendThingDescription()
 
+	// Initial State Sync
+	log.Printf("ℹ️ Initial State: Res=%s LED=%v Bri=%d%% Motion=%v Col=%s",
+		state.Resolution, state.LedOn, state.LedBrightness, state.MotionEnabled, state.LedColor)
+
 	// Start Telemetry Routine
 	go runTelemetryLoop()
 
@@ -77,6 +104,7 @@ func sendThingDescription() {
 		},
 		"security": []string{"bearer_sec"},
 		"properties": map[string]interface{}{
+			// Read-Only Telemetry
 			"temperature": map[string]interface{}{
 				"title":    "Temperature",
 				"type":     "number",
@@ -89,10 +117,40 @@ func sendThingDescription() {
 				"unit":     "%",
 				"readOnly": true,
 			},
-			"motion": map[string]interface{}{
-				"title":    "Motion Detection",
-				"type":     "boolean",
+			"rssi": map[string]interface{}{
+				"title":    "WiFi Signal",
+				"type":     "integer",
+				"unit":     "dBm",
 				"readOnly": true,
+			},
+
+			// Read-Write Settings
+			"resolution": map[string]interface{}{
+				"title":    "Resolution",
+				"type":     "string",
+				"enum":     []string{"UXGA", "SXGA", "XGA", "SVGA", "VGA", "CIF", "QVGA", "HQVGA", "QQVGA"},
+				"readOnly": false,
+			},
+			"led_on": map[string]interface{}{
+				"title":     "LED Flash",
+				"type":      "boolean",
+				"ui:widget": "switch",
+				"readOnly":  false,
+			},
+			"led_brightness": map[string]interface{}{
+				"title":     "LED Brightness",
+				"type":      "integer",
+				"minimum":   0,
+				"maximum":   100,
+				"unit":      "%",
+				"ui:widget": "slider",
+				"readOnly":  false,
+			},
+			"motion_enabled": map[string]interface{}{
+				"title":     "Motion Detection",
+				"type":      "boolean",
+				"ui:widget": "switch",
+				"readOnly":  false,
 			},
 			"led_color": map[string]interface{}{
 				"title":     "LED Color",
@@ -100,16 +158,58 @@ func sendThingDescription() {
 				"ui:widget": "color",
 				"readOnly":  false,
 			},
+			"hmirror": map[string]interface{}{
+				"title":     "Horizontal Mirror",
+				"type":      "boolean",
+				"ui:widget": "switch",
+				"readOnly":  false,
+			},
+			"vflip": map[string]interface{}{
+				"title":     "Vertical Flip",
+				"type":      "boolean",
+				"ui:widget": "switch",
+				"readOnly":  false,
+			},
 		},
 		"actions": map[string]interface{}{
-			"update_settings": map[string]interface{}{
-				"title": "Update Settings",
+			"snap": map[string]interface{}{
+				"title": "Take Snapshot",
 				"input": map[string]interface{}{
 					"type": "object",
 					"properties": map[string]interface{}{
-						"led_color": map[string]interface{}{"type": "string"},
+						"resolution": map[string]interface{}{
+							"type": "string",
+							"enum": []string{"UXGA", "VGA"},
+						},
 					},
 				},
+			},
+			"stream": map[string]interface{}{
+				"title": "Control Stream",
+				"input": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"state": map[string]interface{}{
+							"type": "string",
+							"enum": []string{"on", "off"},
+						},
+					},
+				},
+			},
+			"update_firmware": map[string]interface{}{
+				"title": "Update Firmware",
+				"input": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"url": map[string]interface{}{
+							"title": "Firmware URL",
+							"type":  "string",
+						},
+					},
+				},
+			},
+			"restart": map[string]interface{}{
+				"title": "Restart Device",
 			},
 		},
 	}
@@ -149,15 +249,26 @@ func runTelemetryLoop() {
 }
 
 func sendTelemetry() {
+	// Snapshot state for consistent logging
+	state.mu.Lock()
+	motionActive := state.MotionEnabled
+	state.mu.Unlock()
+
 	// Generate random data
 	temp := 20.0 + rand.Float64()*10.0
 	hum := 40.0 + rand.Float64()*20.0
-	motion := rand.Intn(10) > 8 // 10% chance of motion
+
+	// Only generate motion events if enabled
+	motion := false
+	if motionActive {
+		motion = rand.Intn(10) > 8 // 10% chance
+	}
 
 	payload := map[string]interface{}{
 		"temperature": temp,
 		"humidity":    hum,
 		"motion":      motion,
+		"rssi":        -50 - rand.Intn(20), // -50 to -70 dBm
 	}
 
 	if motion {
@@ -186,7 +297,8 @@ func sendData(payload map[string]interface{}) {
 	if resp.StatusCode != 200 {
 		log.Printf("⚠️ Telemetry Error: %s", resp.Status)
 	} else {
-		log.Printf("✅ Telemetry Sent: Temp=%.1f Hum=%.1f", payload["temperature"], payload["humidity"])
+		// Concise log
+		log.Printf("✅ Telemetry: Temp=%.1f Hum=%.1f", payload["temperature"], payload["humidity"])
 	}
 }
 
@@ -209,12 +321,91 @@ func runCommandPollingLoop() {
 			var cmds []map[string]interface{}
 			if err := json.NewDecoder(resp.Body).Decode(&cmds); err == nil && len(cmds) > 0 {
 				for _, c := range cmds {
-					log.Printf("🔔 Received Command: %v", c)
+					handleCommand(c)
 				}
 			}
 		}
 		resp.Body.Close()
 		time.Sleep(1 * time.Second) // Small backoff
+	}
+}
+
+func handleCommand(cmd map[string]interface{}) {
+	action, ok := cmd["action"].(string)
+	if !ok {
+		return
+	}
+
+	params, _ := cmd["params"].(map[string]interface{})
+	log.Printf("🔔 Received Command: %s Params: %v", action, params)
+
+	if action == "update_settings" && params != nil {
+		state.mu.Lock()
+		defer state.mu.Unlock()
+
+		if v, ok := params["resolution"].(string); ok {
+			state.Resolution = v
+			log.Printf("   -> Set Resolution: %s", v)
+		}
+		if v, ok := params["led_on"].(bool); ok {
+			state.LedOn = v
+			log.Printf("   -> Set LED: %v", v)
+		}
+		if v, ok := params["led_brightness"].(float64); ok {
+			state.LedBrightness = int(v) // JSON numbers are float64
+			log.Printf("   -> Set Brightness: %d%%", state.LedBrightness)
+		}
+		if v, ok := params["motion_enabled"].(bool); ok {
+			state.MotionEnabled = v
+			log.Printf("   -> Set Motion Enabled: %v", v)
+		}
+		if v, ok := params["led_color"].(string); ok {
+			state.LedColor = v
+			log.Printf("   -> Set Color: %s", v)
+		}
+		if v, ok := params["hmirror"].(bool); ok {
+			state.HMirror = v
+			log.Printf("   -> Set H-Mirror: %v", v)
+		}
+		if v, ok := params["vflip"].(bool); ok {
+			state.VFlip = v
+			log.Printf("   -> Set V-Flip: %v", v)
+		}
+	} else if action == "snap" {
+		log.Println("📸 Action: SNAPSHOT requested")
+	} else if action == "stream" {
+		log.Printf("🎥 Action: STREAM control: %v", params)
+	} else if action == "update_firmware" {
+		log.Printf("📦 Action: FIRMWARE UPDATE requested: %v", params)
+	} else if action == "restart" {
+		log.Println("♻️  Action: REBOOT requested")
+		time.Sleep(2 * time.Second)
+		log.Println("🚀 Restarted!")
+	}
+
+	// Send Acknowledgement
+	if cmdID, ok := cmd["id"].(string); ok {
+		sendAck(cmdID)
+	}
+}
+
+func sendAck(cmdID string) {
+	url := fmt.Sprintf("%s/dev/%s/cmd/%s/ack", serverURL, simDeviceID, cmdID)
+	req, _ := http.NewRequest("POST", url, nil)
+	req.Header.Set("Authorization", "Bearer "+simApiKey)
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("❌ Failed to ACK command %s: %v", cmdID, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 200 {
+		log.Printf("✅ ACK Sent for Command: %s", cmdID)
+	} else {
+		log.Printf("⚠️ Failed to ACK Command %s: %s", cmdID, resp.Status)
 	}
 }
 
@@ -232,24 +423,91 @@ func runStreamLoop() {
 }
 
 func generateFrame(id int) []byte {
+	// Frame size based on resolution (simplified)
 	width, height := 320, 240
+	if state.Resolution == "SVGA" {
+		width, height = 800, 600
+	} else if state.Resolution == "VGA" {
+		width, height = 640, 480
+	}
+
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 
-	// Background color cycles
-	r := uint8((id * 5) % 255)
-	g := uint8((id * 3) % 255)
-	b := uint8((id * 7) % 255)
-	col := color.RGBA{r, g, b, 255}
+	// Background color (Affected by LED Color if LED is ON!)
+	var col color.RGBA
+	if state.LedOn {
+		// Parse Hex Color
+		c, err := parseHexColor(state.LedColor)
+		if err == nil {
+			// Mix with time-based cycle
+			col = c
+		} else {
+			col = color.RGBA{255, 255, 255, 255}
+		}
+		// Apply brightness
+		col.R = uint8(float64(col.R) * (float64(state.LedBrightness) / 100.0))
+		col.G = uint8(float64(col.G) * (float64(state.LedBrightness) / 100.0))
+		col.B = uint8(float64(col.B) * (float64(state.LedBrightness) / 100.0))
+		col.A = 255
+	} else {
+		// Default Dark cycling background
+		r := uint8((id * 5) % 100)
+		g := uint8((id * 3) % 100)
+		b := uint8((id * 7) % 100)
+		col = color.RGBA{r, g, b, 255}
+	}
+
 	draw.Draw(img, img.Bounds(), &image.Uniform{col}, image.Point{}, draw.Src)
 
+	// Invert logic for Flip/Mirror would go here (complex for raw bytes)
+	// For simulation, we just toggle text position
+	x, y := 10, 20
+	if state.HMirror {
+		x = width - 150
+	}
+	if state.VFlip {
+		y = height - 40
+	}
+
 	// Add Labels
-	addLabel(img, 10, 20, fmt.Sprintf("SIM-CAM: %s", simDeviceID))
-	addLabel(img, 10, 40, fmt.Sprintf("Frame: %d", id))
-	addLabel(img, 10, 60, time.Now().Format("15:04:05"))
+	addLabel(img, x, y, fmt.Sprintf("SIM-CAM: %s", simDeviceID))
+	addLabel(img, x, y+20, fmt.Sprintf("Res: %s | FPS: %d", state.Resolution, simFPS))
+	addLabel(img, x, y+40, fmt.Sprintf("Motion: %v | LED: %v", state.MotionEnabled, state.LedOn))
 
 	var buf bytes.Buffer
 	jpeg.Encode(&buf, img, &jpeg.Options{Quality: 70})
 	return buf.Bytes()
+}
+
+func parseHexColor(s string) (c color.RGBA, err error) {
+	c.A = 0xff
+	if s[0] != '#' {
+		return c, fmt.Errorf("invalid format")
+	}
+	hexToByte := func(b byte) byte {
+		switch {
+		case b >= '0' && b <= '9':
+			return b - '0'
+		case b >= 'a' && b <= 'f':
+			return b - 'a' + 10
+		case b >= 'A' && b <= 'F':
+			return b - 'A' + 10
+		}
+		return 0
+	}
+	switch len(s) {
+	case 7:
+		c.R = hexToByte(s[1])<<4 + hexToByte(s[2])
+		c.G = hexToByte(s[3])<<4 + hexToByte(s[4])
+		c.B = hexToByte(s[5])<<4 + hexToByte(s[6])
+	case 4:
+		c.R = hexToByte(s[1]) * 17
+		c.G = hexToByte(s[2]) * 17
+		c.B = hexToByte(s[3]) * 17
+	default:
+		return c, fmt.Errorf("invalid length")
+	}
+	return
 }
 
 func addLabel(img *image.RGBA, x, y int, label string) {
@@ -273,7 +531,7 @@ func uploadFrame(data []byte) {
 	client := &http.Client{Timeout: 2 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		if rand.Intn(10) == 0 { // Log only occasionally
+		if rand.Intn(20) == 0 { // Log rarer
 			log.Printf("❌ Stream Upload Failed: %v", err)
 		}
 		return
