@@ -137,6 +137,36 @@ function WoTPropertyCard({ deviceId, propKey, propDef, value }: { deviceId: stri
         )
     }
 
+    // Render Color Picker (ui:widget: color)
+    if (widgetType === "color") {
+        return (
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+                        {title}
+                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Zap className="h-4 w-4 text-yellow-500" />}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex items-center justify-between">
+                        <div className="text-2xl font-bold">
+                            {value || "#000000"} <span className="text-sm font-normal text-muted-foreground">{unit}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <input
+                                type="color"
+                                value={value || "#000000"}
+                                onChange={(e) => handleUpdate(e.target.value)}
+                                disabled={isLoading}
+                                className="h-8 w-12 cursor-pointer rounded border border-gray-300 p-0"
+                            />
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
     // Default Card (Number/String/Boolean/Enum)
     return (
         <Card>

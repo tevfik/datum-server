@@ -625,6 +625,12 @@ void sendThingDescription() {
   pMot["ui:widget"] = "switch";
   pMot["readOnly"] = false;
 
+  JsonObject pCol = props.createNestedObject("led_color");
+  pCol["title"] = "LED Color";
+  pCol["type"] = "string";
+  pCol["ui:widget"] = "color";
+  pCol["readOnly"] = false;
+
   JsonObject pHm = props.createNestedObject("hmirror");
   pHm["title"] = "Horizontal Mirror";
   pHm["type"] = "boolean";
