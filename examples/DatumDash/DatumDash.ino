@@ -177,46 +177,60 @@ bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h,
   tft.drawRGBBitmap(x, y, bitmap, w, h);
   return 1;
 }
+// Persistent Camera Client for Connection Reuse (FPS Boost)
+WiFiClient *camClient = nullptr;
+HTTPClient camHttp;
+bool camClientInitialized = false;
+
+void initCameraClient() {
+  if (camClient) {
+    delete camClient;
+    camClient = nullptr;
+  }
+
+  if (String(config.server_url).startsWith("https")) {
+    WiFiClientSecure *secureClient = new WiFiClientSecure();
+    secureClient->setInsecure();
+    secureClient->setBufferSizes(4096, 512);
+    camClient = secureClient;
+  } else {
+    camClient = new WiFiClient();
+  }
+  camClientInitialized = true;
+}
 
 void drawCameraView() {
   if (strlen(config.target_device_id) == 0)
     return;
 
-  WiFiClient *client = nullptr;
-  if (String(config.server_url).startsWith("https")) {
-    WiFiClientSecure *secureClient = new WiFiClientSecure();
-    secureClient->setInsecure();
-    // Increase buffer for image download
-    secureClient->setBufferSizes(2048, 512);
-    client = secureClient;
-  } else {
-    client = new WiFiClient();
+  // Initialize or reconnect persistent client
+  if (!camClientInitialized || !camClient || !camClient->connected()) {
+    initCameraClient();
   }
 
-  HTTPClient http;
   String url = String(config.server_url) + "/dev/" + config.target_device_id +
                "/stream/snapshot";
-  http.begin(*client, url);
-  http.addHeader("Authorization", "Bearer " + String(config.api_key));
 
-  int httpCode = http.GET();
+  // Reuse connection with Keep-Alive
+  camHttp.setReuse(true);
+  camHttp.begin(*camClient, url);
+  camHttp.addHeader("Authorization", "Bearer " + String(config.api_key));
+  camHttp.addHeader("Connection", "keep-alive");
+
+  int httpCode = camHttp.GET();
   if (httpCode == 200) {
-    int len = http.getSize();
-    Serial.printf("Cam Snapshot Size: %d bytes. Free Heap: %d\n", len,
-                  ESP.getFreeHeap());
+    int len = camHttp.getSize();
+    // Serial.printf("Snap: %d bytes\n", len); // Reduce log spam for FPS
 
-    // Safety Limit: ESP8266 has limited RAM (~40KB usually free)
-    // Try to alloc up to 35KB if heap permits
     if (len > 0 && len < 40000) {
-      if (ESP.getFreeHeap() > len + 2000) { // Ensure 2KB slack
+      if (ESP.getFreeHeap() > len + 2000) {
         uint8_t *valBuffer = (uint8_t *)malloc(len);
         if (valBuffer) {
-          WiFiClient *stream = http.getStreamPtr();
+          WiFiClient *stream = camHttp.getStreamPtr();
           int idx = 0;
-          while (http.connected() && (len > 0 || len == -1)) {
-            // Critical: Keep MQTT alive during heavy download
+          int originalLen = len;
+          while (camHttp.connected() && (len > 0 || len == -1)) {
             mqttClient.loop();
-
             size_t size = stream->available();
             if (size) {
               int c = stream->readBytes(valBuffer + idx, size);
@@ -230,6 +244,8 @@ void drawCameraView() {
               break;
           }
 
+          // Draw centered for QVGA (320x240) -> 240x240 screen
+          // Horizontal offset: (240-320)/2 = -40
           TJpgDec.drawJpg(-40, 0, valBuffer, idx);
           free(valBuffer);
 
@@ -247,10 +263,11 @@ void drawCameraView() {
       showStatus("Img Too Large", ST77XX_RED);
     }
   } else {
-    showStatus("Cam Offline", ST77XX_RED);
+    showStatus("Cam Err", ST77XX_RED);
+    // Force reconnect on error
+    camClientInitialized = false;
   }
-  http.end();
-  delete client;
+  camHttp.end();
 
   tft.drawLine(0, 210, 240, 210, ST77XX_WHITE);
   tft.setCursor(10, 220);
