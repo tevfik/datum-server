@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, Line, Tooltip, ResponsiveContainer } from "recharts";
+import { Slider } from "@/components/ui/slider";
 import { Activity, Zap, Gauge, Loader2 } from "lucide-react";
 import { deviceService } from "@/features/devices/services/deviceService";
 import { useState } from "react";
@@ -161,6 +162,35 @@ function WoTPropertyCard({ deviceId, propKey, propDef, value }: { deviceId: stri
                                 className="h-8 w-12 cursor-pointer rounded border border-gray-300 p-0"
                             />
                         </div>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    // Render Slider (ui:widget: slider)
+    if (widgetType === "slider" && typeof value === 'number') {
+        return (
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+                        {title}
+                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Zap className="h-4 w-4 text-yellow-500" />}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        <div className="text-2xl font-bold">
+                            {value} <span className="text-sm font-normal text-muted-foreground">{unit}</span>
+                        </div>
+                        <Slider
+                            value={[value]}
+                            min={propDef.minimum || 0}
+                            max={propDef.maximum || 100}
+                            step={1}
+                            onValueChange={(vals: number[]) => handleUpdate(vals[0])}
+                            disabled={isLoading}
+                        />
                     </div>
                 </CardContent>
             </Card>

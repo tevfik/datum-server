@@ -203,6 +203,19 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       }
 
       // LED Color
+      String color = extractJsonVal(paramsBlock, "led_color");
+      if (color.length() > 0) {
+        // Assuming 'status' is an existing object or global variable
+        // status.color = color;
+        // setLEDColor(color); // Assuming setLEDColor is defined elsewhere
+      }
+
+      String motSens = extractJsonVal(paramsBlock, "motion_sensitivity");
+      if (motSens.length() > 0) {
+        prefs.begin("datum", false);
+        prefs.putInt("pref_motion_sens", motSens.toInt());
+        prefs.end();
+      }
       String lcol = extractJsonVal(paramsBlock, "lcol");
       if (lcol.length() == 0)
         lcol = extractJsonVal(paramsBlock, "led_color");
@@ -545,9 +558,17 @@ void reportTelemetry(bool isBoot, bool isConnect) {
 
   char hexColor[8];
   sprintf(hexColor, "#%02X%02X%02X", savedR, savedG, savedB);
-  json += "\"led_color\":\"" + String(hexColor) + "\",";
-  json += "\"led_brightness\":" + String(savedBrightness) + ",";
-  json += "\"led_on\":" + String(torchState ? "true" : "false") + ",";
+  json += "\"led_on\":" + String(status.led ? "true" : "false") + "," +
+          "\"led_brightness\":" + String(status.brightness) + "," +
+          "\"led_color\":\"" + String(status.color) + "\",";
+
+  prefs.begin("datum", true);
+  int sens = prefs.getInt("pref_motion_sens", 50); // Default 50?
+  prefs.end();
+
+  json +=
+      "\"motion_enabled\":" + String(status.motion_enabled ? "true" : "false") +
+      "," + "\"motion_sensitivity\":" + String(sens) + ",";
 
   sensor_t *s = esp_camera_sensor_get();
   if (s) {
@@ -657,6 +678,15 @@ void sendThingDescription() {
   pMot["type"] = "boolean";
   pMot["ui:widget"] = "switch";
   pMot["readOnly"] = false;
+
+  JsonObject pMotSen = props.createNestedObject("motion_sensitivity");
+  pMotSen["title"] = "Motion Sensitivity";
+  pMotSen["type"] = "integer";
+  pMotSen["minimum"] = 0;
+  pMotSen["maximum"] = 100;
+  pMotSen["unit"] = "%";
+  pMotSen["ui:widget"] = "slider";
+  pMotSen["readOnly"] = false;
 
   JsonObject pCol = props.createNestedObject("led_color");
   pCol["title"] = "LED Color";

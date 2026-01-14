@@ -36,6 +36,7 @@ type SimState struct {
 	LedBrightness      int    `json:"led_brightness"`
 	LedColor           string `json:"led_color"`
 	MotionEnabled      bool   `json:"motion_enabled"`
+	MotionSensitivity  int    `json:"motion_sensitivity"`
 	HMirror            bool   `json:"hmirror"`
 	VFlip              bool   `json:"vflip"`
 	mu                 sync.Mutex
@@ -48,6 +49,7 @@ var state = SimState{
 	LedBrightness:      50,
 	LedColor:           "#ff0000",
 	MotionEnabled:      true,
+	MotionSensitivity:  50,
 	HMirror:            false,
 	VFlip:              false,
 }
@@ -158,6 +160,15 @@ func sendThingDescription() {
 				"title":     "Motion Detection",
 				"type":      "boolean",
 				"ui:widget": "switch",
+				"readOnly":  false,
+			},
+			"motion_sensitivity": map[string]interface{}{
+				"title":     "Motion Sensitivity",
+				"type":      "integer",
+				"minimum":   0,
+				"maximum":   100,
+				"unit":      "%",
+				"ui:widget": "slider",
 				"readOnly":  false,
 			},
 			"led_color": map[string]interface{}{
@@ -284,6 +295,7 @@ func sendTelemetry() {
 		"led_brightness":      state.LedBrightness,
 		"led_color":           state.LedColor,
 		"motion_enabled":      state.MotionEnabled,
+		"motion_sensitivity":  state.MotionSensitivity,
 		"hmirror":             state.HMirror,
 		"vflip":               state.VFlip,
 	}
@@ -378,9 +390,13 @@ func handleCommand(cmd map[string]interface{}) {
 			state.LedBrightness = int(v) // JSON numbers are float64
 			log.Printf("   -> Set Brightness: %d%%", state.LedBrightness)
 		}
-		if v, ok := params["motion_enabled"].(bool); ok {
-			state.MotionEnabled = v
-			log.Printf("   -> Set Motion Enabled: %v", v)
+		if v, ok := params["motion_sensitive"].(float64); ok {
+			state.MotionSensitivity = int(v) // JSON numbers are floats
+			log.Printf("   -> Set Motion Sensitivity: %d", state.MotionSensitivity)
+		}
+		if v, ok := params["motion_sensitivity"].(float64); ok { // Handle consistent naming
+			state.MotionSensitivity = int(v)
+			log.Printf("   -> Set Motion Sensitivity: %d", state.MotionSensitivity)
 		}
 		if v, ok := params["led_color"].(string); ok {
 			state.LedColor = v
