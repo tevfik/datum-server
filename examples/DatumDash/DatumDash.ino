@@ -587,6 +587,9 @@ void pollDevice() {
   if (String(config.server_url).startsWith("https")) {
     WiFiClientSecure *sc = new WiFiClientSecure();
     sc->setInsecure();
+    // Critical: Increase RX buffer to handle larger TLS records and prevent
+    // truncation
+    sc->setBufferSizes(4096, 512);
     client = sc;
   } else {
     client = new WiFiClient();
@@ -596,42 +599,51 @@ void pollDevice() {
   String url = String(config.server_url) + "/dev/" + config.target_device_id;
   http.begin(*client, url);
   http.addHeader("Authorization", "Bearer " + String(config.api_key));
-  http.setTimeout(10000); // Increase timeout to 10s
+  http.setTimeout(10000);
 
   int httpCode = http.GET();
   if (httpCode == 200) {
-    // Optimization: Stream + Filter is the most memory efficient method
-    StaticJsonDocument<200> filter;
-    filter["status"] = true;
-    filter["thing_description"] = true;
-    // filter["shadow_state"] = true; // Keep disabled for safety
+    // Read payload into String (now reliable with larger buffer)
+    String payload = http.getString();
+    Serial.printf("Payload Len: %d\n", payload.length());
 
-    // 3KB buffer should be enough for filtered TD + status
-    DynamicJsonDocument doc(3072);
-    DeserializationError error = deserializeJson(
-        doc, http.getStream(), DeserializationOption::Filter(filter));
+    // Safety check for empty payload
+    if (payload.length() == 0) {
+      Serial.println("Error: Empty Payload");
+    } else {
+      // Optimization: Filter JSON to only keep what we need
+      StaticJsonDocument<200> filter;
+      filter["status"] = true;
+      filter["thing_description"] = true;
+      // filter["shadow_state"] = true; // Still disabled for RAM safety
 
-    if (!error) {
-      isTargetOnline = (doc["status"] | "offline") == "online";
-      Serial.printf("Status: %s\n", isTargetOnline ? "Online" : "Offline");
+      // 3KB buffer for the doc
+      DynamicJsonDocument doc(3072);
+      DeserializationError error =
+          deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
-      if (doc.containsKey("thing_description")) {
-        Serial.println("TD found");
-        if (properties.empty()) {
-          parseThingDescription(doc["thing_description"]);
-          Serial.printf("Props loaded: %d\n", properties.size());
+      if (!error) {
+        // Serial.print("Filtered Doc: ");
+        // serializeJson(doc, Serial);
+        // Serial.println();
+
+        isTargetOnline = (doc["status"] | "offline") == "online";
+        Serial.printf("Status: %s\n", isTargetOnline ? "Online" : "Offline");
+
+        if (doc.containsKey("thing_description")) {
+          // Serial.println("TD found");
+          if (properties.empty()) {
+            parseThingDescription(doc["thing_description"]);
+            Serial.printf("Props loaded: %d\n", properties.size());
+          }
         }
       } else {
-        Serial.println("TD Missing in Doc");
-        // Debug: Print minimal structure to see what we got
-        serializeJson(doc, Serial);
-        Serial.println();
+        Serial.print("JSON Parse Failed: ");
+        Serial.println(error.c_str());
+        // Debug: Print preview if parse fails
+        if (payload.length() > 100)
+          Serial.println("Prev: " + payload.substring(0, 100));
       }
-    } else {
-      Serial.print("JSON Parse Failed: ");
-      Serial.println(error.c_str());
-      Serial.printf("Doc Capacity: %d, Overflow: %d\n", doc.capacity(),
-                    doc.overflowed());
     }
   } else {
     Serial.printf("Poll Failed: %d\n", httpCode);
