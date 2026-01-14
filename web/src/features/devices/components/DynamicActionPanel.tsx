@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Terminal, Play, Loader2 } from "lucide-react";
 import { deviceService } from "@/features/devices/services/deviceService";
 
@@ -115,20 +116,43 @@ function ActionItem({ deviceId, actionKey, actionDef }: { deviceId: string, acti
                             <Label htmlFor={pKey} className="text-right">
                                 {pDef.title || pKey}
                             </Label>
-                            <Input
-                                id={pKey}
-                                type={pDef.type === "integer" || pDef.type === "number" ? "number" : "text"}
-                                className="col-span-3"
-                                placeholder={pDef.unit ? `(${pDef.unit})` : ""}
-                                value={params[pKey] || ""}
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    setParams(prev => ({
-                                        ...prev,
-                                        [pKey]: pDef.type === "integer" ? parseInt(val) : (pDef.type === "number" ? parseFloat(val) : val)
-                                    }));
-                                }}
-                            />
+                            {pDef.enum ? (
+                                <Select
+                                    onValueChange={(val) => {
+                                        setParams(prev => ({
+                                            ...prev,
+                                            [pKey]: val
+                                        }));
+                                    }}
+                                    value={params[pKey] ? String(params[pKey]) : ""}
+                                >
+                                    <SelectTrigger className="col-span-3">
+                                        <SelectValue placeholder={`Select ${pDef.title || pKey}`} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {pDef.enum.map((option: any) => (
+                                            <SelectItem key={String(option)} value={String(option)}>
+                                                {String(option)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <Input
+                                    id={pKey}
+                                    type={pDef.type === "integer" || pDef.type === "number" ? "number" : "text"}
+                                    className="col-span-3"
+                                    placeholder={pDef.unit ? `(${pDef.unit})` : ""}
+                                    value={params[pKey] || ""}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setParams(prev => ({
+                                            ...prev,
+                                            [pKey]: pDef.type === "integer" ? parseInt(val) : (pDef.type === "number" ? parseFloat(val) : val)
+                                        }));
+                                    }}
+                                />
+                            )}
                         </div>
                     ))}
                 </div>
