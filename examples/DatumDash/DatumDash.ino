@@ -611,6 +611,10 @@ void pollDevice() {
         doc, http.getStream(), DeserializationOption::Filter(filter));
 
     if (!error) {
+      Serial.print("Filtered Doc: ");
+      serializeJson(doc, Serial);
+      Serial.println();
+
       isTargetOnline = (doc["status"] | "offline") == "online";
       Serial.printf("Status: %s\n", isTargetOnline ? "Online" : "Offline");
 
