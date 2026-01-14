@@ -328,6 +328,7 @@ func streamSnapshotHandler(c *gin.Context) {
 		return
 	}
 
+	// Get the last frame
 	frame := streamManager.GetLastFrame(deviceID)
 	if frame == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "No stream active"})
@@ -338,7 +339,9 @@ func streamSnapshotHandler(c *gin.Context) {
 	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
 	c.Header("Pragma", "no-cache")
 	c.Header("Expires", "0")
-	c.Data(http.StatusOK, "image/jpeg", frame)
+	c.Header("Content-Type", "image/jpeg")
+	c.Header("Content-Length", fmt.Sprintf("%d", len(frame)))
+	c.Writer.Write(frame)
 }
 
 // Stream info endpoint
