@@ -281,6 +281,7 @@ func sendTelemetry() {
 		"motion":              motion,
 		"rssi":                -50 - rand.Intn(20),
 		"stream_resolution":   state.StreamResolution,
+		"stream_enabled":      state.StreamEnabled,
 		"snapshot_resolution": state.SnapshotResolution,
 		"led_on":              state.LedOn,
 		"led_brightness":      state.LedBrightness,
