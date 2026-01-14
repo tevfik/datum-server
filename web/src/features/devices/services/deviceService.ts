@@ -67,5 +67,13 @@ export const deviceService = {
     getHistory: async (deviceId: string): Promise<TelemetryPoint[]> => {
         const { data } = await api.get<TelemetryHistoryResponse>(`/dev/${deviceId}/data?limit=100`);
         return data.data || [];
+    },
+
+    // Get snapshot image
+    getSnapshot: async (deviceId: string): Promise<Blob> => {
+        const response = await api.get(`/dev/${deviceId}/stream/snapshot`, {
+            responseType: 'blob'
+        });
+        return response.data;
     }
 };

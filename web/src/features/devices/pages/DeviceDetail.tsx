@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Trash2, Calendar, HardDrive, Globe, Activity, Terminal, Send, Video, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Trash2, Calendar, HardDrive, Globe, Activity, Terminal, Send, Video, RefreshCw, Download } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
 import { TelemetryChart } from '@/features/devices/components/TelemetryChart';
@@ -375,8 +375,29 @@ function CameraStream({ deviceId, isEnabled }: { deviceId: string, isEnabled?: b
     const { token } = useAuth();
     const [error, setError] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [isDownloading, setIsDownloading] = useState(false);
 
     const streamUrl = `/dev/${deviceId}/stream/mjpeg?token=${token}&t=${refreshKey}`;
+
+    const handleDownload = async () => {
+        try {
+            setIsDownloading(true);
+            const blob = await deviceService.getSnapshot(deviceId);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `snapshot-${deviceId}-${new Date().toISOString()}.jpg`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (e) {
+            console.error('Download failed', e);
+            alert('Failed to download snapshot');
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
     if (isEnabled === false) {
         return (
@@ -388,11 +409,15 @@ function CameraStream({ deviceId, isEnabled }: { deviceId: string, isEnabled?: b
                     </CardTitle>
                     <CardDescription>Stream is currently disabled</CardDescription>
                 </CardHeader>
-                <CardContent className="flex-1 flex items-center justify-center bg-muted/20 rounded-b-lg min-h-[240px]">
+                <CardContent className="flex-1 flex flex-col items-center justify-center bg-muted/20 rounded-b-lg min-h-[240px] gap-4">
                     <div className="text-muted-foreground text-sm flex flex-col items-center gap-2">
                         <Video className="h-8 w-8 opacity-20" />
                         <span>Enable stream in settings to view</span>
                     </div>
+                    <Button variant="outline" size="sm" onClick={handleDownload} disabled={isDownloading}>
+                        <Download className="mr-2 h-4 w-4" />
+                        {isDownloading ? 'Downloading...' : 'Download Last Snapshot'}
+                    </Button>
                 </CardContent>
             </Card>
         );
@@ -435,7 +460,17 @@ function CameraStream({ deviceId, isEnabled }: { deviceId: string, isEnabled?: b
                 )}
 
                 {/* Overlay Controls */}
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                        size="icon"
+                        variant="secondary"
+                        className="h-8 w-8 bg-black/50 hover:bg-black/70 text-white"
+                        onClick={handleDownload}
+                        disabled={isDownloading}
+                        title="Download Snapshot"
+                    >
+                        <Download className="h-4 w-4" />
+                    </Button>
                     <Button
                         size="icon"
                         variant="secondary"
