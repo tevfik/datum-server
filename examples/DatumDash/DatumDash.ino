@@ -946,9 +946,14 @@ void loop() {
       mqttClient.loop();
     }
 
-    if (now - lastPollTime > (unsigned long)config.poll_interval * 1000UL) {
-      lastPollTime = now;
-      pollDevice();
+    // Skip polling when MJPEG stream is active (saves TLS connections)
+    if (!camStreamConnected) {
+      if (now - lastPollTime > (unsigned long)config.poll_interval * 1000UL) {
+        lastPollTime = now;
+        pollDevice();
+      }
+    } else {
+      isTargetOnline = true; // Stream connected = device online
     }
 
     // Dynamic Display Update Interval
