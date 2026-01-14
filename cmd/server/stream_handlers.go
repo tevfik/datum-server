@@ -158,8 +158,11 @@ func mjpegStreamHandler(c *gin.Context) {
 		return
 	}
 	if device.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-		return
+		role, _ := auth.GetUserRole(c)
+		if role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 	}
 
 	// Set MJPEG headers
@@ -221,8 +224,11 @@ func websocketStreamHandler(c *gin.Context) {
 		return
 	}
 	if device.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-		return
+		role, _ := auth.GetUserRole(c)
+		if role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 	}
 
 	// Upgrade to WebSocket
@@ -300,8 +306,11 @@ func streamSnapshotHandler(c *gin.Context) {
 		return
 	}
 	if device.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-		return
+		role, _ := auth.GetUserRole(c)
+		if role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 	}
 
 	frame := streamManager.GetLastFrame(deviceID)
@@ -330,8 +339,11 @@ func streamInfoHandler(c *gin.Context) {
 		return
 	}
 	if device.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-		return
+		role, _ := auth.GetUserRole(c)
+		if role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 	}
 
 	stream := streamManager.GetStream(deviceID)

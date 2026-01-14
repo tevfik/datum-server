@@ -23,8 +23,7 @@ extern const char
 // here! I should probably define it in a shared header or redeclare it. For
 // now, I'll use a hardcoded string or expect it to be passed? Better: create
 // `shared_config.h` or similar? Or just redeclare #define here?
-#define FIRMWARE_VERSION                                                       \
-  "2.1.0" // Duplication risk but okay for refactor step 1
+#define FIRMWARE_VERSION "2.1.1" // Bump version
 
 // LED Globals (Extern from Main)
 extern byte savedR;
@@ -190,6 +189,8 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
           prefs.begin("datum", false);
           prefs.putBool("pref_stream_en", true);
           prefs.end();
+          streaming = true; // Fix: ACTUALLY START STREAMING
+          Serial.println("Streaming STARTED via property update");
         } else {
           // Stream disabled
           prefs.begin("datum", false);
@@ -399,7 +400,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       String snapRes = extractJsonVal(paramsBlock, "resolution");
       if (snapRes.length() == 0) {
         prefs.begin("datum", true);
-        snapRes = prefs.getString("pref_snap_res", "UXGA");
+        snapRes = prefs.getString("pref_snap_res", "SVGA"); // safe default
         prefs.end();
       }
       handleSnap(snapRes);
@@ -591,13 +592,13 @@ void reportTelemetry(bool isBoot, bool isConnect) {
     json += "\"stream_resolution\":\"" + getFrameSizeName(s->status.framesize) +
             "\",";
     // Get Snap Res from Prefs (or default to Stream?)
-    String snapRes = prefs.getString("pref_snap_res", "UXGA");
+    String snapRes = prefs.getString("pref_snap_res", "SVGA");
     json += "\"snapshot_resolution\":\"" + snapRes + "\",";
 
     json += "\"hmirror\":" + String(s->status.hmirror ? "true" : "false") + ",";
     json += "\"vflip\":" + String(s->status.vflip ? "true" : "false");
   } else {
-    json += "\"stream_resolution\":\"VGA\",\"snapshot_resolution\":\"UXGA\","
+    json += "\"stream_resolution\":\"VGA\",\"snapshot_resolution\":\"SVGA\","
             "\"hmirror\":false,\"vflip\":false";
   }
 
