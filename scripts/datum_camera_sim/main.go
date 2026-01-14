@@ -199,12 +199,12 @@ func sendThingDescription() {
 		},
 		"actions": map[string]interface{}{
 			"snap": map[string]interface{}{
-				"title": "Take Snapshot",
-				// No input parameters needed now (uses snapshot_resolution property)
+				"title":       "Take Snapshot",
+				"description": "Captures a still image (uses configured resolution)",
 			},
 			"stream": map[string]interface{}{
-				"title": "Control Stream",
-				// No input - deprecated by stream_enabled property
+				"title":       "Start Stream",
+				"description": "Starts the video stream (uses configured resolution)",
 			},
 			"update_firmware": map[string]interface{}{
 				"title": "Update Firmware",
