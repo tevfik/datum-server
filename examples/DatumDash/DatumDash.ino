@@ -69,6 +69,10 @@ std::vector<Property> properties;
 int currentPropIndex = 0;
 bool hasCameraProp = false; // Flag if target is a camera
 
+// FPS Measurement
+unsigned long fpsStartTime = 0;
+int frameCount = 0;
+
 struct ValueCache {
   String key;
   String value;
@@ -299,6 +303,16 @@ void drawCameraView() {
         tft.setCursor(5, 5);
         tft.setTextSize(1);
         tft.print("LIVE");
+
+        // FPS Measurement
+        frameCount++;
+        if (frameCount == 1) {
+          fpsStartTime = millis();
+        } else if (frameCount >= 10) {
+          float fps = 10000.0 / (millis() - fpsStartTime);
+          Serial.printf("FPS: %.1f\n", fps);
+          frameCount = 0;
+        }
       }
       free(frameBuffer);
     }
