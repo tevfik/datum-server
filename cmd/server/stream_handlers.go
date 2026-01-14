@@ -66,6 +66,7 @@ func uploadFrameHandler(c *gin.Context) {
 	// Verify device auth
 	apiKey, exists := c.Get("api_key")
 	if !exists {
+		fmt.Printf("[STREAM_DEBUG] UploadFrame: Unauthorized (No API Key) IP=%s\n", c.ClientIP())
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
@@ -87,9 +88,12 @@ func uploadFrameHandler(c *gin.Context) {
 	}
 
 	if err != nil || device.ID != deviceID {
+		fmt.Printf("[STREAM_DEBUG] UploadFrame: Forbidden DeviceID=%s KeyDevice=%s\n", deviceID, device.ID)
 		c.JSON(http.StatusForbidden, gin.H{"error": "Device not found or unauthorized"})
 		return
 	}
+
+	// fmt.Printf("[STREAM_DEBUG] Frame received from %s\n", deviceID) // Verbose! uncomment if needed
 
 	// Read frame data
 	var frameData []byte
