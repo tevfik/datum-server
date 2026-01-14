@@ -182,10 +182,18 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
     ackCommand(pid);
 
     if (action == "update_settings") {
-      // Resolution
+      // Stream Resolution
       String vres = extractJsonVal(paramsBlock, "vres");
       if (vres.length() == 0)
-        vres = extractJsonVal(paramsBlock, "resolution");
+        vres = extractJsonVal(paramsBlock, "stream_resolution");
+
+      // Snapshot Resolution (Save only)
+      String snapRes = extractJsonVal(paramsBlock, "snapshot_resolution");
+      if (snapRes.length() > 0) {
+        prefs.begin("datum", false);
+        prefs.putString("pref_snap_res", snapRes);
+        prefs.end();
+      }
 
       String ires = extractJsonVal(paramsBlock, "ires");
       if (ires.length() > 0) {
@@ -359,6 +367,11 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
 
     } else if (action == "snap") {
       String snapRes = extractJsonVal(paramsBlock, "resolution");
+      if (snapRes.length() == 0) {
+        prefs.begin("datum", true);
+        snapRes = prefs.getString("pref_snap_res", "UXGA");
+        prefs.end();
+      }
       handleSnap(snapRes);
 
     } else if (action == "restart") {
@@ -538,11 +551,17 @@ void reportTelemetry(bool isBoot, bool isConnect) {
 
   sensor_t *s = esp_camera_sensor_get();
   if (s) {
-    json += "\"resolution\":\"" + getFrameSizeName(s->status.framesize) + "\",";
+    json += "\"stream_resolution\":\"" + getFrameSizeName(s->status.framesize) +
+            "\",";
+    // Get Snap Res from Prefs (or default to Stream?)
+    String snapRes = prefs.getString("pref_snap_res", "UXGA");
+    json += "\"snapshot_resolution\":\"" + snapRes + "\",";
+
     json += "\"hmirror\":" + String(s->status.hmirror ? "true" : "false") + ",";
     json += "\"vflip\":" + String(s->status.vflip ? "true" : "false");
   } else {
-    json += "\"resolution\":\"VGA\",\"hmirror\":false,\"vflip\":false";
+    json += "\"stream_resolution\":\"VGA\",\"snapshot_resolution\":\"UXGA\","
+            "\"hmirror\":false,\"vflip\":false";
   }
 
   String pubIP = getPublicIP();
@@ -590,8 +609,8 @@ void sendThingDescription() {
   JsonObject props = doc.createNestedObject("properties");
 
   // Read-Write Properties
-  JsonObject pRes = props.createNestedObject("resolution");
-  pRes["title"] = "Resolution";
+  JsonObject pRes = props.createNestedObject("stream_resolution");
+  pRes["title"] = "Stream Resolution";
   pRes["type"] = "string";
   pRes["enum"].add("UXGA");
   pRes["enum"].add("SXGA");
@@ -603,6 +622,20 @@ void sendThingDescription() {
   pRes["enum"].add("HQVGA");
   pRes["enum"].add("QQVGA");
   pRes["readOnly"] = false;
+
+  JsonObject pSnapRes = props.createNestedObject("snapshot_resolution");
+  pSnapRes["title"] = "Snapshot Resolution";
+  pSnapRes["type"] = "string";
+  pSnapRes["enum"].add("UXGA");
+  pSnapRes["enum"].add("SXGA");
+  pSnapRes["enum"].add("XGA");
+  pSnapRes["enum"].add("SVGA");
+  pSnapRes["enum"].add("VGA");
+  pSnapRes["enum"].add("CIF");
+  pSnapRes["enum"].add("QVGA");
+  pSnapRes["enum"].add("HQVGA");
+  pSnapRes["enum"].add("QQVGA");
+  pSnapRes["readOnly"] = false;
 
   JsonObject pLed = props.createNestedObject("led_on");
   pLed["title"] = "LED Flash";

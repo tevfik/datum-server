@@ -30,24 +30,26 @@ var (
 
 // Simulator State
 type SimState struct {
-	Resolution    string `json:"resolution"`
-	LedOn         bool   `json:"led_on"`
-	LedBrightness int    `json:"led_brightness"`
-	LedColor      string `json:"led_color"`
-	MotionEnabled bool   `json:"motion_enabled"`
-	HMirror       bool   `json:"hmirror"`
-	VFlip         bool   `json:"vflip"`
-	mu            sync.Mutex
+	StreamResolution   string `json:"stream_resolution"`
+	SnapshotResolution string `json:"snapshot_resolution"`
+	LedOn              bool   `json:"led_on"`
+	LedBrightness      int    `json:"led_brightness"`
+	LedColor           string `json:"led_color"`
+	MotionEnabled      bool   `json:"motion_enabled"`
+	HMirror            bool   `json:"hmirror"`
+	VFlip              bool   `json:"vflip"`
+	mu                 sync.Mutex
 }
 
 var state = SimState{
-	Resolution:    "VGA",
-	LedOn:         false,
-	LedBrightness: 50,
-	LedColor:      "#ff0000",
-	MotionEnabled: true,
-	HMirror:       false,
-	VFlip:         false,
+	StreamResolution:   "VGA",
+	SnapshotResolution: "UXGA",
+	LedOn:              false,
+	LedBrightness:      50,
+	LedColor:           "#ff0000",
+	MotionEnabled:      true,
+	HMirror:            false,
+	VFlip:              false,
 }
 
 func main() {
@@ -80,7 +82,7 @@ func main() {
 
 	// Initial State Sync
 	log.Printf("ℹ️ Initial State: Res=%s LED=%v Bri=%d%% Motion=%v Col=%s",
-		state.Resolution, state.LedOn, state.LedBrightness, state.MotionEnabled, state.LedColor)
+		state.StreamResolution, state.LedOn, state.LedBrightness, state.MotionEnabled, state.LedColor)
 
 	// Start Telemetry Routine
 	go runTelemetryLoop()
@@ -125,8 +127,14 @@ func sendThingDescription() {
 			},
 
 			// Read-Write Settings
-			"resolution": map[string]interface{}{
-				"title":    "Resolution",
+			"stream_resolution": map[string]interface{}{
+				"title":    "Stream Resolution",
+				"type":     "string",
+				"enum":     []string{"UXGA", "SXGA", "XGA", "SVGA", "VGA", "CIF", "QVGA", "HQVGA", "QQVGA"},
+				"readOnly": false,
+			},
+			"snapshot_resolution": map[string]interface{}{
+				"title":    "Snapshot Resolution",
 				"type":     "string",
 				"enum":     []string{"UXGA", "SXGA", "XGA", "SVGA", "VGA", "CIF", "QVGA", "HQVGA", "QQVGA"},
 				"readOnly": false,
@@ -266,17 +274,18 @@ func sendTelemetry() {
 
 	// Include all settings in telemetry (Shadow State)
 	payload := map[string]interface{}{
-		"temperature":    temp,
-		"humidity":       hum,
-		"motion":         motion,
-		"rssi":           -50 - rand.Intn(20),
-		"resolution":     state.Resolution,
-		"led_on":         state.LedOn,
-		"led_brightness": state.LedBrightness,
-		"led_color":      state.LedColor,
-		"motion_enabled": state.MotionEnabled,
-		"hmirror":        state.HMirror,
-		"vflip":          state.VFlip,
+		"temperature":         temp,
+		"humidity":            hum,
+		"motion":              motion,
+		"rssi":                -50 - rand.Intn(20),
+		"stream_resolution":   state.StreamResolution,
+		"snapshot_resolution": state.SnapshotResolution,
+		"led_on":              state.LedOn,
+		"led_brightness":      state.LedBrightness,
+		"led_color":           state.LedColor,
+		"motion_enabled":      state.MotionEnabled,
+		"hmirror":             state.HMirror,
+		"vflip":               state.VFlip,
 	}
 
 	if motion {
@@ -353,9 +362,13 @@ func handleCommand(cmd map[string]interface{}) {
 		state.mu.Lock()
 		defer state.mu.Unlock()
 
-		if v, ok := params["resolution"].(string); ok {
-			state.Resolution = v
-			log.Printf("   -> Set Resolution: %s", v)
+		if v, ok := params["stream_resolution"].(string); ok {
+			state.StreamResolution = v
+			log.Printf("   -> Set Stream Resolution: %s", v)
+		}
+		if v, ok := params["snapshot_resolution"].(string); ok {
+			state.SnapshotResolution = v
+			log.Printf("   -> Set Snapshot Resolution: %s", v)
 		}
 		if v, ok := params["led_on"].(bool); ok {
 			state.LedOn = v
@@ -446,9 +459,9 @@ func runStreamLoop() {
 func generateFrame(id int) []byte {
 	// Frame size based on resolution (simplified)
 	width, height := 320, 240
-	if state.Resolution == "SVGA" {
+	if state.StreamResolution == "SVGA" {
 		width, height = 800, 600
-	} else if state.Resolution == "VGA" {
+	} else if state.StreamResolution == "VGA" {
 		width, height = 640, 480
 	}
 
@@ -492,7 +505,7 @@ func generateFrame(id int) []byte {
 
 	// Add Labels
 	addLabel(img, x, y, fmt.Sprintf("SIM-CAM: %s", simDeviceID))
-	addLabel(img, x, y+20, fmt.Sprintf("Res: %s | FPS: %d", state.Resolution, simFPS))
+	addLabel(img, x, y+20, fmt.Sprintf("Res: %s | FPS: %d", state.StreamResolution, simFPS))
 	addLabel(img, x, y+40, fmt.Sprintf("Motion: %v | LED: %v", state.MotionEnabled, state.LedOn))
 
 	var buf bytes.Buffer
