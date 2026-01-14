@@ -596,54 +596,42 @@ void pollDevice() {
   String url = String(config.server_url) + "/dev/" + config.target_device_id;
   http.begin(*client, url);
   http.addHeader("Authorization", "Bearer " + String(config.api_key));
+  http.setTimeout(10000); // Increase timeout to 10s
 
   int httpCode = http.GET();
   if (httpCode == 200) {
-    // Optimization: Read string (safer than stream) then Filter
-    String payload = http.getString();
-    Serial.printf("Payload Len: %d\n", payload.length());
-    if (payload.length() > 0) {
-      Serial.println("Preview: " + payload.substring(0, 150));
-    }
+    // Optimization: Stream + Filter is the most memory efficient method
+    StaticJsonDocument<200> filter;
+    filter["status"] = true;
+    filter["thing_description"] = true;
+    // filter["shadow_state"] = true; // Keep disabled for safety
 
-    if (payload.length() == 0) {
-      Serial.println("Error: Empty Payload from Server");
-      isTargetOnline = false;
-    } else {
-      // Filter: Only capture status and TD.
-      // Reduced DOC size to 2048 to fit in RAM alongside payload String
-      StaticJsonDocument<200> filter;
-      filter["status"] = true;
-      filter["thing_description"] = true;
-      // filter["shadow_state"] = true; // Disabled to save RAM for now
+    // 3KB buffer should be enough for filtered TD + status
+    DynamicJsonDocument doc(3072);
+    DeserializationError error = deserializeJson(
+        doc, http.getStream(), DeserializationOption::Filter(filter));
 
-      DynamicJsonDocument doc(2048);
-      DeserializationError error =
-          deserializeJson(doc, payload, DeserializationOption::Filter(filter));
+    if (!error) {
+      isTargetOnline = (doc["status"] | "offline") == "online";
+      Serial.printf("Status: %s\n", isTargetOnline ? "Online" : "Offline");
 
-      if (!error) {
-        // Serial.print("Filtered Doc: ");
-        // serializeJson(doc, Serial);
-        // Serial.println();
-
-        isTargetOnline = (doc["status"] | "offline") == "online";
-        Serial.printf("Status: %s\n", isTargetOnline ? "Online" : "Offline");
-
-        if (doc.containsKey("thing_description")) {
-          Serial.println("TD found");
-          if (properties.empty()) {
-            parseThingDescription(doc["thing_description"]);
-            Serial.printf("Props loaded: %d\n", properties.size());
-          }
-        } else {
-          Serial.println("TD Missing in Doc");
+      if (doc.containsKey("thing_description")) {
+        Serial.println("TD found");
+        if (properties.empty()) {
+          parseThingDescription(doc["thing_description"]);
+          Serial.printf("Props loaded: %d\n", properties.size());
         }
-
-        // Shadow update temporarily disabled
       } else {
-        Serial.print("JSON Parse Failed: ");
-        Serial.println(error.c_str());
+        Serial.println("TD Missing in Doc");
+        // Debug: Print minimal structure to see what we got
+        serializeJson(doc, Serial);
+        Serial.println();
       }
+    } else {
+      Serial.print("JSON Parse Failed: ");
+      Serial.println(error.c_str());
+      Serial.printf("Doc Capacity: %d, Overflow: %d\n", doc.capacity(),
+                    doc.overflowed());
     }
   } else {
     Serial.printf("Poll Failed: %d\n", httpCode);
