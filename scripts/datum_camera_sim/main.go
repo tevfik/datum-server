@@ -264,11 +264,19 @@ func sendTelemetry() {
 		motion = rand.Intn(10) > 8 // 10% chance
 	}
 
+	// Include all settings in telemetry (Shadow State)
 	payload := map[string]interface{}{
-		"temperature": temp,
-		"humidity":    hum,
-		"motion":      motion,
-		"rssi":        -50 - rand.Intn(20), // -50 to -70 dBm
+		"temperature":    temp,
+		"humidity":       hum,
+		"motion":         motion,
+		"rssi":           -50 - rand.Intn(20),
+		"resolution":     state.Resolution,
+		"led_on":         state.LedOn,
+		"led_brightness": state.LedBrightness,
+		"led_color":      state.LedColor,
+		"motion_enabled": state.MotionEnabled,
+		"hmirror":        state.HMirror,
+		"vflip":          state.VFlip,
 	}
 
 	if motion {

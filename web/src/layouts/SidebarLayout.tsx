@@ -88,7 +88,7 @@ export default function SidebarLayout() {
                     </button>
                     {version && (
                         <div className="px-3 text-xs text-muted-foreground text-center">
-                            v{version}
+                            {version}
                         </div>
                     )}
                 </div>
