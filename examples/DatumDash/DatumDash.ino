@@ -18,7 +18,10 @@
 // -- Hardware Pin Definitions for GeekMagic TV (ESP8266) --
 #define TFT_MOSI 13 // D7
 #define TFT_SCLK 14 // D5
-#define TFT_CS 15   // D8
+#define TFT_CS -1   // Not connected
+#define TFT_DC 0    // D3
+#define TFT_RST 2   // D4
+#define TFT_BL 5    // D1
 
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 
@@ -743,11 +746,21 @@ void startSetupMode() {
 void setup() {
   Serial.begin(115200);
 
+  // Manual Reset for TFT
+  pinMode(TFT_RST, OUTPUT);
+  digitalWrite(TFT_RST, HIGH);
+  delay(50);
+  digitalWrite(TFT_RST, LOW);
+  delay(50);
+  digitalWrite(TFT_RST, HIGH);
+  delay(150);
+
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, LOW); // Max Brightness (Active Low: 0=Bright)
+
   tft.init(240, 240);
   tft.invertDisplay(true);
-  tft.setSPISpeed(40000000); // Try 40MHz default or 20MHz? Reference 20MHz.
+  tft.setSPISpeed(20000000); // 20MHz (Reliable)
   // Let's stick to 20MHz but ensure Mode 2 if possible.
   // Adafruit defaults to Mode 0. ST7789 often works on Mode 2 or 3.
   // Let's try to set SPI Mode 2 via SPI global before init? No.
