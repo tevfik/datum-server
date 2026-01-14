@@ -612,14 +612,25 @@ void pollDevice() {
 
     if (!error) {
       isTargetOnline = (doc["status"] | "offline") == "online";
+      Serial.printf("Status: %s\n", isTargetOnline ? "Online" : "Offline");
 
-      // Only parse TD if we don't have properties yet
-      if (doc.containsKey("thing_description") && properties.empty()) {
-        parseThingDescription(doc["thing_description"]);
+      // Check if TD is present
+      if (doc.containsKey("thing_description")) {
+        Serial.println("TD found in JSON");
+        if (properties.empty()) {
+          Serial.println("Props empty, parsing TD...");
+          parseThingDescription(doc["thing_description"]);
+          Serial.printf("Props count after parse: %d\n", properties.size());
+        } else {
+          Serial.println("Props already loaded.");
+        }
+      } else {
+        Serial.println("TD NOT found in JSON");
       }
 
       // Update values from Shadow State
       if (doc.containsKey("shadow_state")) {
+        // Serial.println("Updating Shadow State...");
         JsonObject shadow = doc["shadow_state"];
         for (JsonPair p : shadow)
           updateValueCache(p.key().c_str(), p.value().as<String>());
