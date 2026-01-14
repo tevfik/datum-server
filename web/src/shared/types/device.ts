@@ -9,6 +9,7 @@ export interface Device {
     status: 'online' | 'offline';  // Connection status
     admin_status?: 'active' | 'suspended' | 'banned';  // Administrative status
     shadow_state?: Record<string, any>;
+    thing_description?: Record<string, any>;
 }
 
 export interface DeviceListResponse {

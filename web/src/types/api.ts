@@ -1060,7 +1060,32 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get device details
+         * @description Returns device details, including Thing Description.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    device_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Device details */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeviceResponse"];
+                    };
+                };
+            };
+        };
         put?: never;
         post?: never;
         /** Delete device */
@@ -3067,7 +3092,18 @@ export interface components {
         };
         DeviceResponse: {
             device_id?: string;
+            name?: string;
+            type?: string;
             api_key?: string;
+            status?: string;
+            /** Format: date-time */
+            last_seen?: string;
+            /** Format: date-time */
+            created_at?: string;
+            /** @description Web of Things (WoT) Thing Description */
+            thing_description?: {
+                [key: string]: unknown;
+            };
         };
         /**
          * @example {

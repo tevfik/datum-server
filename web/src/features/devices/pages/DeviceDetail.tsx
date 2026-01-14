@@ -13,6 +13,9 @@ import { ArrowLeft, Trash2, Calendar, HardDrive, Globe, Activity, Terminal, Send
 import { format, formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
 import { TelemetryChart } from '@/features/devices/components/TelemetryChart';
+import { DynamicWoTPanel } from '@/features/devices/components/DynamicWoTPanel';
+import { DynamicActionPanel } from '@/features/devices/components/DynamicActionPanel';
+import { DeviceEventLog } from '@/features/devices/components/DeviceEventLog';
 
 const safeFormat = (dateStr: string | undefined | null, fmtStr: string) => {
     if (!dateStr) return 'N/A';
@@ -128,6 +131,15 @@ export default function DeviceDetail() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* WoT Panels (Conditionally Rendered) */}
+                {device.thing_description && (
+                    <>
+                        <DynamicWoTPanel device={device} shadowState={device.shadow_state} />
+                        <DynamicActionPanel device={device} />
+                        <DeviceEventLog device={device} />
+                    </>
+                )}
 
                 {/* Command Center */}
                 <Card className="flex flex-col">
