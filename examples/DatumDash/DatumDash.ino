@@ -59,6 +59,7 @@ unsigned long lastCarouselTime = 0;
 bool isTargetOnline = false;
 unsigned long lastReconnectAttempt = 0;
 unsigned long lastTelemetryTime = 0;
+String lastScanError = ""; // Diagnosis helper
 
 struct Property {
   String key;
@@ -323,7 +324,11 @@ void updateDisplay() {
     return;
   }
   if (properties.empty()) {
-    showStatus("Scanning...", ST77XX_BLUE);
+    if (lastScanError.length() > 0) {
+      showStatus(lastScanError, ST77XX_RED);
+    } else {
+      showStatus("Scanning...", ST77XX_BLUE);
+    }
     return;
   }
 
@@ -604,6 +609,7 @@ void pollDevice() {
 
   int httpCode = http.GET();
   if (httpCode == 200) {
+    lastScanError = ""; // Clear error on success
     // Read payload into String (now reliable with larger buffer)
     String payload = http.getString();
     Serial.printf("Payload Len: %d\n", payload.length());
@@ -649,6 +655,9 @@ void pollDevice() {
   } else {
     Serial.printf("Poll Failed: %d\n", httpCode);
     isTargetOnline = false;
+  }
+  if (httpCode != 200) {
+    lastScanError = "Err: " + String(httpCode);
   }
   http.end();
   delete client;
