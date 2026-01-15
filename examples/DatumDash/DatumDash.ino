@@ -139,10 +139,16 @@ void loadConfig() {
   if (config.magic != CONFIG_MAGIC) {
     Serial.println("Invalid/Old Config. Resetting defaults.");
     memset(&config, 0, sizeof(Config));
+    Serial.println("Config Cleared.");
     config.magic = CONFIG_MAGIC;
     strcpy(config.server_url, "https://datum.bezg.in");
     config.poll_interval = 5;
     saveConfig();
+  } else {
+    Serial.print("Loaded Config. Magic: 0x");
+    Serial.println(config.magic, HEX);
+    Serial.print("User Token Len: ");
+    Serial.println(strlen(config.user_token));
   }
 }
 
@@ -771,8 +777,11 @@ void startSetupMode() {
       strncpy(config.ssid, ssid.c_str(), sizeof(config.ssid));
     if (pass.length() > 0)
       strncpy(config.password, pass.c_str(), sizeof(config.password));
-    if (token.length() > 0)
+    if (token.length() > 0) {
       strncpy(config.user_token, token.c_str(), sizeof(config.user_token));
+      Serial.print("Saving User Token: ");
+      Serial.println(config.user_token);
+    }
 
     config.device_id[0] = 0;
     config.api_key[0] = 0;
