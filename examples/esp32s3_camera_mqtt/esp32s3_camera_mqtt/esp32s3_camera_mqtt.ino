@@ -800,7 +800,7 @@ void networkTask(void *pvParameters) {
     // 1. Connection State Machine
     if (WiFi.status() == WL_CONNECTED) {
       processMqttLoop();
-      checkCommands();
+      // checkCommands(); // Removed
     }
 
     // Handle WiFi Reconnection
