@@ -602,7 +602,13 @@ void pollDevice() {
   }
 
   HTTPClient http;
-  String url = String(config.server_url) + "/dev/" + config.target_device_id;
+  String url = String(config.server_url) + "/dev/" + config.target_device_id +
+               "?token=" + String(config.api_key);
+  Serial.print("Polling URL: ");
+  Serial.println(url);
+  Serial.print("API Key: ");
+  Serial.println(config.api_key);
+
   http.begin(*client, url);
   http.addHeader("Authorization", "Bearer " + String(config.api_key));
   http.setTimeout(3000); // Reduce timeout to prevent WDT hang
