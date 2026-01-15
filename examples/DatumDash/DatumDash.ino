@@ -411,6 +411,20 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       // WDT Disable explicitly for blocking update
       ESP.wdtDisable();
 
+      // Register Progress Callback
+      ESPhttpUpdate.onProgress([](int cur, int total) {
+        static int lastP = 0;
+        int p = (cur * 100) / total;
+        if (p != lastP && p % 10 == 0) { // Update every 10%
+          lastP = p;
+          Serial.printf("OTA Progress: %d%%\n", p);
+          tft.setCursor(10, 140);
+          tft.setTextColor(ST77XX_WHITE, ST77XX_BLUE);
+          tft.setTextSize(2);
+          tft.printf("DL: %d%%", p);
+        }
+      });
+
       t_httpUpdate_return ret;
       if (fwUrl.startsWith("https")) {
         WiFiClientSecure client;
