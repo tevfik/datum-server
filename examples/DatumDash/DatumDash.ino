@@ -415,6 +415,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
 
       // Register Progress Callback
       ESPhttpUpdate.onProgress([](int cur, int total) {
+        ESP.wdtFeed(); // Feed the dog during download!
         static int lastP = 0;
         int p = (cur * 100) / total;
         if (p != lastP && p % 10 == 0) { // Update every 10%
@@ -431,13 +432,15 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       if (fwUrl.startsWith("https")) {
         WiFiClientSecure client;
         client.setInsecure();
-        // Optimizing Buffer for Low Heap (BearSSL defaults are HUGE)
-        client.setBufferSizes(2048, 1024);
-        client.setTimeout(15000);
+        // Balanced Buffer: Enough for Handshake, small enough for Heap
+        client.setBufferSizes(4096, 1024);
+        client.setTimeout(5000); // Fail before WDT (6s) bites!
+        ESP.wdtFeed();           // Feed right before blocking call
         ret = ESPhttpUpdate.update(client, fwUrl);
       } else {
         WiFiClient client;
-        client.setTimeout(15000);
+        client.setTimeout(5000); // Fail before WDT
+        ESP.wdtFeed();
         ret = ESPhttpUpdate.update(client, fwUrl);
       }
 
