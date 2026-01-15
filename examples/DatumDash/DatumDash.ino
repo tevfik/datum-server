@@ -435,8 +435,11 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
         Serial.println("Downgrading OTA to HTTP for reliability");
       }
 
+      Serial.print("Final OTA URL: ");
+      Serial.println(fwUrl);
+
       WiFiClient client;
-      client.setTimeout(10000);
+      client.setTimeout(20000);
       ESP.wdtFeed();
       ret = ESPhttpUpdate.update(client, fwUrl);
 
@@ -447,6 +450,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
         ESP.restart();
       } else {
         Serial.printf("OTA Error: %d\n", ESPhttpUpdate.getLastError());
+        Serial.println("Error String: " + ESPhttpUpdate.getLastErrorString());
         sendLog("OTA Failed: " + String(ESPhttpUpdate.getLastError()));
       }
     }
