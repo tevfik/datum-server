@@ -58,6 +58,11 @@ unsigned long lastPollTime = 0;
 unsigned long lastCarouselTime = 0;
 bool isTargetOnline = false;
 unsigned long lastReconnectAttempt = 0;
+// -- FPS Globals --
+unsigned long lastFrameTime = 0;
+int frameCount = 0;
+float fps = 0.0;
+unsigned long lastFpsTime = 0;
 unsigned long lastTelemetryTime = 0;
 String lastScanError = ""; // Diagnosis helper
 
