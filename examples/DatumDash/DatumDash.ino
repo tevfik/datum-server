@@ -568,7 +568,11 @@ void sendThingDescription() {
 
   String payload;
   serializeJson(doc, payload);
-  http.PUT(payload);
+  int httpCode = http.PUT(payload);
+  Serial.print("TD Update Code: ");
+  Serial.println(httpCode);
+  if (httpCode > 0)
+    Serial.println(http.getString());
   http.end();
   delete client;
 }
