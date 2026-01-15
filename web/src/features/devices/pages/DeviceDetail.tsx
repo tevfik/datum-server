@@ -142,8 +142,10 @@ export default function DeviceDetail() {
                             shadowState={device.shadow_state}
                         />
                         <div className="col-span-1 md:col-span-2 lg:col-span-1 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-1">
-                            {/* Camera Settings handled by DynamicWoTPanel now */}
-                            <CameraStream deviceId={device.id} isEnabled={device.shadow_state?.stream_enabled} />
+                            {/* Only show Camera Stream if device has stream capability */}
+                            {device.thing_description?.properties?.stream_enabled && (
+                                <CameraStream deviceId={device.id} isEnabled={device.shadow_state?.stream_enabled} />
+                            )}
                         </div>
                         <DynamicActionPanel device={device} />
                         <DeviceEventLog device={device} />
