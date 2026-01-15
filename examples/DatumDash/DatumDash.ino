@@ -435,7 +435,7 @@ boolean connectMQTT() {
   String host = getHostFromUrl(config.server_url);
   mqttClient.setServer(host.c_str(), 1883);
   mqttClient.setCallback(mqttCallback);
-  mqttClient.setBufferSize(2048);
+  mqttClient.setBufferSize(4096); // Increase buffer for large payloads check
   mqttClient.setKeepAlive(60);
 
   if (strlen(config.api_key) == 0)
@@ -569,10 +569,8 @@ void sendThingDescription() {
   String payload;
   serializeJson(doc, payload);
   int httpCode = http.PUT(payload);
-  Serial.print("TD Update Code: ");
-  Serial.println(httpCode);
-  if (httpCode > 0)
-    Serial.println(http.getString());
+  // Serial.print("TD Update Code: "); Serial.println(httpCode); // Clean logs
+  // if (httpCode > 0) Serial.println(http.getString());
   http.end();
   delete client;
 }
@@ -632,8 +630,19 @@ void pollDevice() {
   http.setTimeout(3000); // Reduce timeout to prevent WDT hang
 
   int httpCode = http.GET();
+  // Serial.print("Poll Code: "); Serial.println(httpCode); // Clean logs
   if (httpCode == 200) {
     lastScanError = ""; // Clear error on success
+
+    // FPS Calculation
+    frameCount++;
+    unsigned long now = millis();
+    if (now - lastFpsTime >= 1000) {
+      fps = frameCount * 1000.0 / (now - lastFpsTime);
+      frameCount = 0;
+      lastFpsTime = now;
+      // Serial.printf("FPS: %.2f\n", fps);
+    }
     // Read payload into String (now reliable with larger buffer)
     String payload = http.getString();
     Serial.printf("Payload Len: %d\n", payload.length());
@@ -877,7 +886,7 @@ void setup() {
 
   // TJpg Dec Init
   TJpgDec.setJpgScale(1);
-  TJpgDec.setSwapBytes(true);
+  TJpgDec.setSwapBytes(false); // Fix Color Mismatch (RGB vs BGR)
   TJpgDec.setCallback(tft_output);
 
   // Splash
@@ -909,14 +918,20 @@ void setup() {
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(config.ssid, config.password);
+  Serial.print("Connecting to WiFi: ");
+  Serial.println(config.ssid);
 
   showStatus("Connecting...", ST77XX_YELLOW);
   int r = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    if (++r > 40)
+    Serial.print(".");
+    if (++r > 40) {
+      Serial.println("\nWiFi Timeout! Restarting...");
       ESP.restart();
+    }
   }
+  Serial.println("\nWiFi Connected!");
 
   config.boot_failures = 0;
   saveConfig();
@@ -924,11 +939,15 @@ void setup() {
   showStatus("Online!", ST77XX_GREEN);
   tft.print("IP: ");
   tft.println(WiFi.localIP());
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
 
   if (strlen(config.device_id) == 0 && strlen(config.user_token) > 0) {
     tft.println("\nRegistering...");
+    Serial.println("Registering Device...");
     if (registerDeviceManual(config.server_url, config.user_token)) {
       tft.println("Success!");
+      Serial.println("Registration Success!");
       sendThingDescription();
     } else {
       tft.println("Failed!");
@@ -962,10 +981,17 @@ void loop() {
       mqttClient.loop();
     }
 
-    if (now - lastPollTime > (unsigned long)config.poll_interval * 1000UL) {
+    if (now - lastPollTime > (unsigned long)config.poll_interval * 1000UL ||
+        config.poll_interval == 0) {
       lastPollTime = now;
       pollDevice();
     }
+
+    // FPS Display
+    tft.setCursor(0, 0);
+    tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
+    tft.print("FPS:");
+    tft.print(int(fps));
 
     if (now - lastCarouselTime > 5000) {
       lastCarouselTime = now;
