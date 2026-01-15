@@ -35,7 +35,7 @@ WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 
 // -- Config Structure --
-#define CONFIG_MAGIC 0xDD02
+#define CONFIG_MAGIC 0xDD03
 #define FIRMWARE_VER "1.1.2" // Bumped version
 #define DEVICE_TYPE_NAME "display"
 
