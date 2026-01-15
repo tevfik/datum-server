@@ -1038,7 +1038,12 @@ void loop() {
     tft.print("FPS:");
     tft.print(int(fps));
 
-    if (now - lastCarouselTime > 5000) {
+    // Dynamic Display Update Frequency
+    // If showing Camera, update as fast as possible (0 delay).
+    // If showing Status Cards, rotate every 5000ms.
+    unsigned long displayInterval = hasCameraProp ? 0 : 5000;
+
+    if (now - lastCarouselTime > displayInterval) {
       lastCarouselTime = now;
       updateDisplay();
     }
