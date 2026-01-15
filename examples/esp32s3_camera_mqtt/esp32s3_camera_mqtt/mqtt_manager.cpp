@@ -41,18 +41,9 @@ extern void updateLED(); // Main usually updates LED, but callback sets state?
 // in `board_config.h`. But user wants quick refactor. I'll duplicate board
 // macros here for safety. Note: This is technical debt.
 
-#define CAMERA_MODEL_FREENOVE_S3
+#include "camera_pins.h"
 
-#if defined(CAMERA_MODEL_FREENOVE_S3)
-#define LED_GPIO_NUM 48
-#elif defined(CAMERA_MODEL_AI_THINKER)
-#define LED_GPIO_NUM 4
-#else
-#define LED_GPIO_NUM 21 // Fallback
-#endif
-
-// Forward declare neopixelWrite (Main has the implementation usually or
-// standard?)
+// Extern Globals from Main
 extern void neopixelWrite(uint8_t pin, uint8_t red, uint8_t green,
                           uint8_t blue);
 
