@@ -262,10 +262,22 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       }
 
       // LED Power
+      bool ledChanged = false;
       if (paramsBlock.indexOf("\"led\":") != -1) {
         torchState = extractJsonBool(paramsBlock, "led");
+        ledChanged = true;
       } else if (paramsBlock.indexOf("\"led_on\":") != -1) {
         torchState = extractJsonBool(paramsBlock, "led_on");
+        ledChanged = true;
+      }
+
+      // Persist LED state to survive reboots
+      if (ledChanged) {
+        prefs.begin("datum", false);
+        prefs.putBool("pref_led_on", torchState);
+        prefs.end();
+        Serial.printf("[MQTT] LED State saved: %s\n",
+                      torchState ? "ON" : "OFF");
       }
 
 // Apply LED

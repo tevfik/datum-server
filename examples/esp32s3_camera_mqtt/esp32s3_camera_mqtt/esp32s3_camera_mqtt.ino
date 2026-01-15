@@ -819,6 +819,16 @@ void loadStartupSettings() {
     savedB = number & 0xFF;
   }
   savedBrightness = prefs.getInt("pref_lbri", 100);
+  torchState = prefs.getBool("pref_led_on", false); // Default OFF for safety
+
+  // Apply LED State at Boot
+  int r = 0, g = 0, b = 0;
+  if (torchState) {
+    r = (savedR * savedBrightness) / 100;
+    g = (savedG * savedBrightness) / 100;
+    b = (savedB * savedBrightness) / 100;
+  }
+  neopixelWrite(48, r, g, b); // LED_GPIO_NUM for Freenove S3
 
   // 3. Orientation
   bool mir = prefs.getBool("pref_imir", true);   // Default Mirror on
@@ -835,7 +845,8 @@ void loadStartupSettings() {
   Serial.printf("Motion: %s, Sens: %d, Area: >%.1f%%, Period: %d ms\n",
                 motionEnabled ? "ON" : "OFF", sens, motionMinAreaPct,
                 motionPeriodMs);
-  Serial.printf("LED: %s, Bri: %d\n", color.c_str(), savedBrightness);
+  Serial.printf("LED: %s, Bri: %d, Power: %s\n", color.c_str(), savedBrightness,
+                torchState ? "ON" : "OFF");
   Serial.printf("Orientation: Mirror %s, Flip %s\n", mir ? "ON" : "OFF",
                 flip ? "ON" : "OFF");
 
