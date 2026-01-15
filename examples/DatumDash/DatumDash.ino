@@ -105,10 +105,8 @@ h2{text-align:center;color:#00bcd4}
 <input type="text" name="custom_ssid" placeholder="Enter SSID if not listed">
 <label>WiFi Password</label><input type="password" name="password">
 <hr style="border-color:#444;margin:20px 0">
-<label>Datum User Token</label><input type="text" name="token" placeholder="Paste Token from Console">
-<div style="text-align:center;margin:10px">- OR -</div>
-<label>Datum Account Email</label><input type="email" name="email">
-<label>Password</label><input type="password" name="user_pass">
+<label>Datum User Token (REQUIRED)</label><input type="text" name="token" placeholder="Paste Token from Web Console (Settings -> Keys)">
+<div class="note"><b>Note:</b> Login via Email/Pass is removed. Please generate a token from the Web Console and paste it here.</div>
 <hr style="border-color:#444;margin:20px 0">
 <label>Target Device ID (to Watch)</label><input type="text" name="target_id" placeholder="ID of device to display">
 <label>Poll Interval (Seconds)</label><input type="number" name="poll_int" value="5" min="1">
