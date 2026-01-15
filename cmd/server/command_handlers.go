@@ -73,14 +73,16 @@ func sendCommandHandler(c *gin.Context) {
 	status := "pending"
 	message := "Command queued for device (offline)"
 
+	// SMART ROUTING: Optimistic Push
+	// Try to publish command via MQTT even if we think device is offline.
+	// This covers cases where connection state tracking is slightly out of sync.
+	
 	isConnected := false
 	if mqttBroker != nil {
 		isConnected = mqttBroker.IsDeviceConnected(deviceID)
 		// Debug log
-		logger.GetLogger().Info().Str("device_id", deviceID).Bool("connected", isConnected).Msg("Checking MQTT connection for command delivery")
-	}
+		logger.GetLogger().Info().Str("device_id", deviceID).Bool("connected", isConnected).Msg("MQTT Connection State Check")
 
-	if isConnected {
 		// Construct payload
 		payload := map[string]interface{}{
 			"command_id": cmdID,
@@ -91,10 +93,13 @@ func sendCommandHandler(c *gin.Context) {
 
 		// Marshal JSON
 		if jsonBytes, err := json.Marshal(payload); err == nil {
+			// Always attempt publish
 			if err := mqttBroker.PublishCommand(deviceID, jsonBytes); err == nil {
+				// We updated status to 'sent' if we successfully handed it to the broker
+				// The broker will deliver it if device is actually online
 				status = "sent"
-				message = "Command sent to device via MQTT"
-				logger.GetLogger().Info().Str("command_id", cmdID).Msg("Command successfully published to MQTT")
+				message = "Command sent to MQTT broker"
+				logger.GetLogger().Info().Str("command_id", cmdID).Msg("Command published to MQTT (Optimistic)")
 			} else {
 				logger.GetLogger().Error().Err(err).Str("command_id", cmdID).Msg("Failed to publish command to MQTT")
 			}
