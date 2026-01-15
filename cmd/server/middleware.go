@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"datum-go/internal/auth"
+	"datum-go/internal/logger"
 	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -83,18 +84,23 @@ func HybridAuthMiddleware(store storage.Provider) gin.HandlerFunc {
 			}
 		}
 
+		// Debug Log
+		logger.GetLogger().Info().Str("token_prefix", func() string {
+			if len(token) > 4 {
+				return token[:4]
+			}
+			return "short"
+		}()).Msg("HybridAuthMiddleware Check")
+
 		// Device Auth Detection (sk_ or dk_)
 		if strings.HasPrefix(token, "sk_") || strings.HasPrefix(token, "dk_") {
+			logger.GetLogger().Info().Msg("Routing to DeviceAuthMiddleware")
 			auth.DeviceAuthMiddleware()(c)
-			// DeviceAuthMiddleware Aborts if invalid. If not aborted, it calls Next().
-			// But we want to call Next ONLY ONCE.
-			// If DeviceAuthMiddleware calls Next(), then we fall through?
-			// DeviceAuthMiddleware implementation usually ends with c.Next().
-			// So if we call it here, it will chain the rest.
 			return
 		}
 
 		// User Auth Fallback
+		logger.GetLogger().Info().Msg("Routing to UserAuthMiddleware")
 		UserAuthMiddleware(store)(c)
 	}
 }
