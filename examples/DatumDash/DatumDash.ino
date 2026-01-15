@@ -406,23 +406,32 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       else
         fwUrl += "&token=" + String(config.api_key);
 
-      sendLog("OTA Starting");
       showStatus("FW UPDATING...", ST77XX_BLUE);
+
+      // WDT Disable explicitly for blocking update
+      ESP.wdtDisable();
 
       t_httpUpdate_return ret;
       if (fwUrl.startsWith("https")) {
         WiFiClientSecure client;
         client.setInsecure();
-        client.setTimeout(10000);
+        client.setTimeout(15000); // Bump timeout for slow networks
         ret = ESPhttpUpdate.update(client, fwUrl);
       } else {
         WiFiClient client;
-        client.setTimeout(10000);
+        client.setTimeout(15000);
         ret = ESPhttpUpdate.update(client, fwUrl);
       }
 
-      if (ret == HTTP_UPDATE_OK)
+      // Re-enable WDT if update failed/returned
+      ESP.wdtEnable(1000);
+
+      if (ret == HTTP_UPDATE_OK) {
         ESP.restart();
+      } else {
+        Serial.printf("OTA Error: %d\n", ESPhttpUpdate.getLastError());
+        sendLog("OTA Failed: " + String(ESPhttpUpdate.getLastError()));
+      }
     }
   } else if (action == "set_target") {
     String newTarget = doc["params"]["target_id"] | "";
@@ -653,7 +662,7 @@ void pollDevice() {
       fps = frameCount * 1000.0 / (now - lastFpsTime);
       frameCount = 0;
       lastFpsTime = now;
-      // Serial.printf("FPS: %.2f\n", fps);
+      Serial.printf("FPS: %.2f\n", fps);
     }
     // Read payload into String (now reliable with larger buffer)
     String payload = http.getString();
