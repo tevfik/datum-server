@@ -111,7 +111,8 @@ h2{text-align:center;color:#00bcd4}
 <hr style="border-color:#444;margin:20px 0">
 <label>Target Device ID (to Watch)</label><input type="text" name="target_id" placeholder="ID of device to display">
 <label>Poll Interval (Seconds)</label><input type="number" name="poll_int" value="5" min="1">
-<input type="hidden" name="server_url" value="https://datum.bezg.in">
+<label>Server URL (Default: https://datum.bezg.in)</label>
+<input type="text" name="server_url" value="https://datum.bezg.in" placeholder="http://ip:8000">
 <button type="submit">Save & Connect</button>
 </form>
 </div>
