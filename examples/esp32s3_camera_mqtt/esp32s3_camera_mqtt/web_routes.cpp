@@ -96,8 +96,8 @@ void handleOnboardingRoot(WebServer &server) {
   server.send(200, "text/html", DASHBOARD_HTML);
 }
 
-extern void processMqttLoop();  // Ensure it's available
-extern void checkCommands();    // Defined in main
+extern void processMqttLoop(); // Ensure it's available
+// extern void checkCommands(); // Removed
 extern volatile bool streaming; // Defined in camera_manager.h
 extern void copySharedFrame(uint8_t **destBuf, size_t *destLen,
                             size_t *destCapacity); // New API
@@ -129,7 +129,7 @@ void handleStream(WebServer &server) {
     loopCount++;
     // Keep Network & MQTT Alive
     processMqttLoop();
-    checkCommands(); // Process incoming commands
+    // checkCommands(); // Removed
 
     // Use Zero-Copy Logic (Reuses frameBuf if capacity fits)
     copySharedFrame(&frameBuf, &frameLen, &frameCapacity);
