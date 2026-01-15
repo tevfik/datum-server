@@ -411,6 +411,8 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       // WDT Disable explicitly for blocking update
       ESP.wdtDisable();
 
+      Serial.printf("Pre-OTA Free Heap: %d\n", ESP.getFreeHeap());
+
       // Register Progress Callback
       ESPhttpUpdate.onProgress([](int cur, int total) {
         static int lastP = 0;
@@ -429,7 +431,9 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       if (fwUrl.startsWith("https")) {
         WiFiClientSecure client;
         client.setInsecure();
-        client.setTimeout(15000); // Bump timeout for slow networks
+        // Optimizing Buffer for Low Heap (BearSSL defaults are HUGE)
+        client.setBufferSizes(2048, 1024);
+        client.setTimeout(15000);
         ret = ESPhttpUpdate.update(client, fwUrl);
       } else {
         WiFiClient client;
