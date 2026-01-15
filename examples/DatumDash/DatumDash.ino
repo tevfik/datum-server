@@ -546,7 +546,18 @@ void sendThingDescription() {
 
   JsonObject actions = doc.createNestedObject("actions");
   actions["set_target"]["title"] = "Set Target Device";
+  JsonObject inputST = actions["set_target"].createNestedObject("input");
+  inputST["type"] = "object";
+  JsonObject propsST = inputST.createNestedObject("properties");
+  propsST["target_id"]["type"] = "string";
+  propsST["target_id"]["title"] = "Target Camera ID";
+
   actions["update_firmware"]["title"] = "Update Firmware";
+  JsonObject inputUF = actions["update_firmware"].createNestedObject("input");
+  inputUF["type"] = "object";
+  JsonObject propsUF = inputUF.createNestedObject("properties");
+  propsUF["url"]["type"] = "string";
+  propsUF["url"]["title"] = "Firmware URL";
 
   String payload;
   serializeJson(doc, payload);
