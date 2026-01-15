@@ -605,7 +605,7 @@ void pollDevice() {
   String url = String(config.server_url) + "/dev/" + config.target_device_id;
   http.begin(*client, url);
   http.addHeader("Authorization", "Bearer " + String(config.api_key));
-  http.setTimeout(10000);
+  http.setTimeout(3000); // Reduce timeout to prevent WDT hang
 
   int httpCode = http.GET();
   if (httpCode == 200) {
