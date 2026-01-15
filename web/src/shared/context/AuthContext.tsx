@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User, AuthState } from '@/types/auth';
 
 interface AuthContextType extends AuthState {
-    login: (token: string, refreshToken: string | undefined, user: User, expiresAt: string) => void;
+    login: (token: string, refreshToken: string | undefined, user: User, expiresAt: string, remember?: boolean) => void;
     logout: () => void;
 }
 
@@ -17,25 +17,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     useEffect(() => {
-        // Check for stored token on mount
-        const token = localStorage.getItem('datum_token');
-        const userStr = localStorage.getItem('datum_user');
-        const expiry = localStorage.getItem('datum_token_expiry');
-        // We generally don't check refresh token existence here, 
-        // as long as access token appears valid or we use it.
-        // If access token is expired, the interceptor will try refresh.
-        // Actually, if access token is expired here, we might want to try refresh immediately?
-        // For now, let's stick to existing logic: if expired, logout.
-        // Use interceptor for API calls.
+        // Check for stored token on mount (Local OR Session)
+        const getToken = (key: string) => localStorage.getItem(key) || sessionStorage.getItem(key);
+
+        const token = getToken('datum_token');
+        const userStr = getToken('datum_user');
+        const expiry = getToken('datum_token_expiry');
 
         if (token && userStr && expiry) {
-            // Check implicit expiry (optional, since server validates)
-            // Allow expired token if we have refresh token?
-            // No, for UI state we might want to show "Authenticated" but 
-            // api calls will fail and refresh. If we set isAuthenticated=false,
-            // the UI might redirect to login immediately.
-            // So, we should be lenient here if we have a refresh token?
-            const refreshToken = localStorage.getItem('datum_refresh_token');
+            const refreshToken = getToken('datum_refresh_token');
             const isExpired = new Date(expiry) <= new Date();
 
             if (!isExpired || (isExpired && refreshToken)) {
@@ -58,13 +48,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    const login = (token: string, refreshToken: string | undefined, user: User, expiresAt: string) => {
-        localStorage.setItem('datum_token', token);
+    const login = (token: string, refreshToken: string | undefined, user: User, expiresAt: string, remember: boolean = true) => {
+        const storage = remember ? localStorage : sessionStorage;
+
+        // Clear other storage to avoid duplicates
+        const other = remember ? sessionStorage : localStorage;
+        other.removeItem('datum_token');
+        other.removeItem('datum_refresh_token');
+        other.removeItem('datum_user');
+        other.removeItem('datum_token_expiry');
+
+        storage.setItem('datum_token', token);
         if (refreshToken) {
-            localStorage.setItem('datum_refresh_token', refreshToken);
+            storage.setItem('datum_refresh_token', refreshToken);
         }
-        localStorage.setItem('datum_user', JSON.stringify(user));
-        localStorage.setItem('datum_token_expiry', expiresAt);
+        storage.setItem('datum_user', JSON.stringify(user));
+        storage.setItem('datum_token_expiry', expiresAt);
 
         setState({
             user,
@@ -75,10 +74,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const logout = () => {
-        localStorage.removeItem('datum_token');
-        localStorage.removeItem('datum_refresh_token');
-        localStorage.removeItem('datum_user');
-        localStorage.removeItem('datum_token_expiry');
+        ['datum_token', 'datum_refresh_token', 'datum_user', 'datum_token_expiry'].forEach(key => {
+            localStorage.removeItem(key);
+            sessionStorage.removeItem(key);
+        });
 
         setState({
             user: null,

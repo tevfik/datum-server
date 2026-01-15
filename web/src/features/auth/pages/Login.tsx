@@ -11,6 +11,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 export default function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(true);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const { login } = useAuth();
@@ -30,7 +31,7 @@ export default function Login() {
                 id: response.user_id,
                 email: response.email,
                 role: response.role
-            }, response.expires_at);
+            }, response.expires_at, rememberMe);
             navigate(from, { replace: true });
         } catch (err: any) {
             setError(err.response?.data?.error || 'Failed to login. Please check your credentials.');
@@ -81,6 +82,18 @@ export default function Login() {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                             />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                id="remember"
+                                className="h-4 w-4 rounded border-border bg-background text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                checked={rememberMe}
+                                onChange={(e) => setRememberMe(e.target.checked)}
+                            />
+                            <Label htmlFor="remember" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                Remember me
+                            </Label>
                         </div>
                     </CardContent>
                     <CardFooter>
