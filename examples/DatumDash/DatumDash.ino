@@ -409,10 +409,18 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       sendLog("OTA Starting");
       showStatus("FW UPDATING...", ST77XX_BLUE);
 
-      WiFiClientSecure client;
-      client.setInsecure();
-      client.setTimeout(10000);
-      t_httpUpdate_return ret = ESPhttpUpdate.update(client, fwUrl);
+      t_httpUpdate_return ret;
+      if (fwUrl.startsWith("https")) {
+        WiFiClientSecure client;
+        client.setInsecure();
+        client.setTimeout(10000);
+        ret = ESPhttpUpdate.update(client, fwUrl);
+      } else {
+        WiFiClient client;
+        client.setTimeout(10000);
+        ret = ESPhttpUpdate.update(client, fwUrl);
+      }
+
       if (ret == HTTP_UPDATE_OK)
         ESP.restart();
     }
@@ -627,8 +635,7 @@ void pollDevice() {
   HTTPClient http;
   String url = String(config.server_url) + "/dev/" + config.target_device_id +
                "?token=" + String(config.user_token);
-  Serial.print("Polling URL: ");
-  Serial.println(url);
+  // Serial.print("Polling URL: "); Serial.println(url); // Clean logs
 
   http.begin(*client, url);
   http.addHeader("Authorization", "Bearer " + String(config.user_token));
@@ -650,7 +657,7 @@ void pollDevice() {
     }
     // Read payload into String (now reliable with larger buffer)
     String payload = http.getString();
-    Serial.printf("Payload Len: %d\n", payload.length());
+    // Serial.printf("Payload Len: %d\n", payload.length()); // Clean logs
 
     // Safety check for empty payload
     if (payload.length() == 0) {
@@ -673,13 +680,15 @@ void pollDevice() {
         // Serial.println();
 
         isTargetOnline = (doc["status"] | "offline") == "online";
-        Serial.printf("Status: %s\n", isTargetOnline ? "Online" : "Offline");
+        // Serial.printf("Status: %s\n", isTargetOnline ? "Online" : "Offline");
+        // // Clean logs
 
         if (doc.containsKey("thing_description")) {
           // Serial.println("TD found");
           if (properties.empty()) {
             parseThingDescription(doc["thing_description"]);
-            Serial.printf("Props loaded: %d\n", properties.size());
+            // Serial.printf("Props loaded: %d\n", properties.size()); // Clean
+            // logs
           }
         }
       } else {
@@ -691,7 +700,8 @@ void pollDevice() {
       }
     }
   } else {
-    Serial.printf("Poll Failed: %d\n", httpCode);
+    if (httpCode != 200 && httpCode != -1) // Only log real errors
+      Serial.printf("Poll Failed: %d\n", httpCode);
     isTargetOnline = false;
   }
   if (httpCode != 200) {
