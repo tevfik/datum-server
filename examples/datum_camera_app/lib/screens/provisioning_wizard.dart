@@ -234,7 +234,7 @@ class _ProvisioningWizardState extends ConsumerState<ProvisioningWizard> {
           "device_name": _nameController.text.isNotEmpty
               ? _nameController.text
               : defaultName,
-          "server_url": "https://datum.bezg.in",
+          "server_url": "http://datum.bezg.in:8000",
           "user_token": token,
         }),
       );

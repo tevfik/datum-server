@@ -110,8 +110,8 @@ h2{text-align:center;color:#00bcd4}
 <hr style="border-color:#444;margin:20px 0">
 <label>Target Device ID (to Watch)</label><input type="text" name="target_id" placeholder="ID of device to display">
 <label>Poll Interval (Seconds)</label><input type="number" name="poll_int" value="5" min="1">
-<label>Server URL (Default: https://datum.bezg.in)</label>
-<input type="text" name="server_url" value="https://datum.bezg.in" placeholder="http://ip:8000">
+<label>Server URL (Default: http://datum.bezg.in:8000)</label>
+<input type="text" name="server_url" value="http://datum.bezg.in:8000" placeholder="http://ip:8000">
 <button type="submit">Save & Connect</button>
 </form>
 </div>
@@ -140,7 +140,7 @@ void loadConfig() {
     Serial.println("Invalid/Old Config. Resetting defaults.");
     memset(&config, 0, sizeof(Config));
     config.magic = CONFIG_MAGIC;
-    strcpy(config.server_url, "https://datum.bezg.in");
+    strcpy(config.server_url, "http://datum.bezg.in:8000");
     config.poll_interval = 5;
     saveConfig();
   }
