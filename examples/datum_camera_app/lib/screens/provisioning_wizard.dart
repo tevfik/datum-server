@@ -18,6 +18,8 @@ class _ProvisioningWizardState extends ConsumerState<ProvisioningWizard> {
   final _ssidController = TextEditingController();
   final _passController = TextEditingController();
   final _nameController = TextEditingController();
+  final _serverUrlController =
+      TextEditingController(text: "https://datum.bezg.in");
 
   String? _selectedSSID;
   List<dynamic> _networks = [];
@@ -37,6 +39,7 @@ class _ProvisioningWizardState extends ConsumerState<ProvisioningWizard> {
     _ssidController.dispose();
     _passController.dispose();
     _nameController.dispose();
+    _serverUrlController.dispose();
     super.dispose();
   }
 
@@ -234,7 +237,7 @@ class _ProvisioningWizardState extends ConsumerState<ProvisioningWizard> {
           "device_name": _nameController.text.isNotEmpty
               ? _nameController.text
               : defaultName,
-          "server_url": "http://datum.bezg.in:8000",
+          "server_url": _serverUrlController.text,
           "user_token": token,
         }),
       );
@@ -422,6 +425,14 @@ class _ProvisioningWizardState extends ConsumerState<ProvisioningWizard> {
                       hintText: ThingDescriptionRegistry.get(_deviceType ?? '')
                           .title, // Dynamic Hint
                       border: const OutlineInputBorder()),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _serverUrlController,
+                  decoration: const InputDecoration(
+                      labelText: 'Server URL',
+                      hintText: 'https://datum.bezg.in',
+                      border: OutlineInputBorder()),
                 ),
                 const SizedBox(height: 10),
                 const Text(
