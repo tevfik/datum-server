@@ -738,6 +738,41 @@ void startSetupMode() {
     server.send(200, "application/json", json);
   });
 
+  // -- Mobile App Endpoints --
+  server.on("/info", []() {
+    String json = "{\"device_uid\":\"" + String(ESP.getChipId()) +
+                  "\",\"firmware_version\":\"" + FIRMWARE_VER +
+                  "\",\"device_type\":\"" + DEVICE_TYPE_NAME + "\"}";
+    server.send(200, "application/json", json);
+  });
+
+  server.on("/configure", HTTP_POST, []() {
+    String ssid = server.arg("wifi_ssid");
+    String pass = server.arg("wifi_pass");
+    String token = server.arg("user_token"); // Mobile app sends 'user_token'
+    String url = server.arg("server_url");
+    String devName =
+        server.arg("device_name"); // Not used yet, but good to know
+
+    if (url.length() > 0)
+      strncpy(config.server_url, url.c_str(), sizeof(config.server_url));
+
+    if (ssid.length() > 0)
+      strncpy(config.ssid, ssid.c_str(), sizeof(config.ssid));
+    if (pass.length() > 0)
+      strncpy(config.password, pass.c_str(), sizeof(config.password));
+    if (token.length() > 0)
+      strncpy(config.user_token, token.c_str(), sizeof(config.user_token));
+
+    config.device_id[0] = 0;
+    config.api_key[0] = 0;
+    saveConfig();
+
+    server.send(200, "application/json", "{\"status\":\"success\"}");
+    delay(1000);
+    ESP.restart();
+  });
+
   server.on("/save", HTTP_POST, []() {
     String ssid = server.arg("custom_ssid");
     if (ssid.length() == 0)
