@@ -429,20 +429,16 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       });
 
       t_httpUpdate_return ret;
-      if (fwUrl.startsWith("https")) {
-        WiFiClientSecure client;
-        client.setInsecure();
-        // Balanced Buffer: Enough for Handshake, small enough for Heap
-        client.setBufferSizes(4096, 1024);
-        client.setTimeout(5000); // Fail before WDT (6s) bites!
-        ESP.wdtFeed();           // Feed right before blocking call
-        ret = ESPhttpUpdate.update(client, fwUrl);
-      } else {
-        WiFiClient client;
-        client.setTimeout(5000); // Fail before WDT
-        ESP.wdtFeed();
-        ret = ESPhttpUpdate.update(client, fwUrl);
+      // Force HTTP for OTA to avoid TLS/OOM issues on ESP8266
+      if (fwUrl.startsWith("https://")) {
+        fwUrl.replace("https://", "http://");
+        Serial.println("Downgrading OTA to HTTP for reliability");
       }
+
+      WiFiClient client;
+      client.setTimeout(10000);
+      ESP.wdtFeed();
+      ret = ESPhttpUpdate.update(client, fwUrl);
 
       // Re-enable WDT if update failed/returned
       ESP.wdtEnable(1000);
