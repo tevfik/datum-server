@@ -805,7 +805,7 @@ void setup() {
   delay(10);
 
   pinMode(TFT_BL, OUTPUT);
-  digitalWrite(TFT_BL, HIGH); // Max Brightness (Active HIGH)
+  digitalWrite(TFT_BL, LOW); // Max Brightness
 
   tft.init(240, 240, SPI_MODE3);
   tft.invertDisplay(true);
