@@ -482,7 +482,8 @@ bool registerDeviceManual(String serverUrl, String userToken) {
     if (did.length() > 0 && key.length() > 0) {
       strncpy(config.device_id, did.c_str(), sizeof(config.device_id));
       strncpy(config.api_key, key.c_str(), sizeof(config.api_key));
-      memset(config.user_token, 0, sizeof(config.user_token));
+      // memset(config.user_token, 0, sizeof(config.user_token)); // Keep User
+      // Token for Polling!
       saveConfig();
       return true;
     }
@@ -612,14 +613,12 @@ void pollDevice() {
 
   HTTPClient http;
   String url = String(config.server_url) + "/dev/" + config.target_device_id +
-               "?token=" + String(config.api_key);
+               "?token=" + String(config.user_token);
   Serial.print("Polling URL: ");
   Serial.println(url);
-  Serial.print("API Key: ");
-  Serial.println(config.api_key);
 
   http.begin(*client, url);
-  http.addHeader("Authorization", "Bearer " + String(config.api_key));
+  http.addHeader("Authorization", "Bearer " + String(config.user_token));
   http.setTimeout(3000); // Reduce timeout to prevent WDT hang
 
   int httpCode = http.GET();
