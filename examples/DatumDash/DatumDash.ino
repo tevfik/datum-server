@@ -279,6 +279,7 @@ void drawCameraView() {
             // Calculate index based on time
             // Use LOCAL static timer, independent of global display loop
             static unsigned long lastSlideTime = 0;
+            static int carouselIndex = 0;
             if (now - lastSlideTime > interval) {
               carouselIndex = (carouselIndex + 1) % filtered.size();
               lastSlideTime = now;
