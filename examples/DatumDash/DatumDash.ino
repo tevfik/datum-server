@@ -324,17 +324,17 @@ void drawCameraView() {
           if (valBuffer) {
             unsigned long tDL = millis();
             int bytesRead = streamClient->readBytes(valBuffer, len);
-            unsigned long tDownload = millis() - tDL;
-
+            unsigned long tDownload = millis();
             if (bytesRead == len) {
-              unsigned long tDec = millis();
+              // unsigned long tDec = millis();
               TJpgDec.drawJpg(40, 0, valBuffer, len);
-              unsigned long tDecode = millis() - tDec;
+              // unsigned long tDecode = millis() - tDec;
 
-              unsigned long tTotal = millis() - tStart;
-              Serial.printf("Frame: %d bytes | DL: %lums | Dec: %lums | Tot: "
-                            "%lums | FPS: %.1f\n",
-                            len, tDownload, tDecode, tTotal, 1000.0 / tTotal);
+              // unsigned long tTotal = millis() - tStart;
+              static int logFrame = 0;
+              if (logFrame++ % 30 == 0) {
+                Serial.printf("Stream Active: %d bytes\n", len);
+              }
             } else {
               Serial.printf("Incomplete Frame: %d/%d\n", bytesRead, len);
             }
@@ -433,7 +433,7 @@ void drawCameraView() {
   }
 
   tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
-  tft.setCursor(5, 5);
+  tft.setCursor(210, 5); // Moved to top-right
   tft.setTextSize(1);
   tft.print("LIVE");
 }
