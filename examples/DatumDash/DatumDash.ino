@@ -244,34 +244,43 @@ void drawCameraView() {
               break;
           }
 
-          TJpgDec.drawJpg(-40, 0, valBuffer, idx);
+          // 1. Draw Camera (Top-Left 160x120)
+          TJpgDec.drawJpg(0, 0, valBuffer, idx);
           free(valBuffer);
 
-          // OVERLAY: Draw sensor values on top of video
-          int yPos = 180;
+          // 2. Clear surrounding areas to prevent artifacts
+          // Right Side (80px wide)
+          tft.fillRect(160, 0, 80, 120, ST77XX_BLACK);
+          // Bottom Side (120px high)
+          tft.fillRect(0, 120, 240, 120, ST77XX_BLACK);
+
+          // 3. Draw Data in Bottom Area
+          int yPos = 130;
           int count = 0;
+
+          tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+          tft.setTextSize(2);
+
           for (auto &v : valueCache) {
-            if (count >= 2)
-              break; // limit to 2 lines overlay
-            // Use Configured Filter
+            if (count >= 5)
+              break; // Limit to fit bottom area (120px / 20px ~= 6 lines)
+
+            // Filter
             if (config.overlay_filter[0] != 0 &&
                 strstr(config.overlay_filter, v.key.c_str()) == NULL) {
               continue;
             }
-            // Draw valid item
-            tft.setCursor(5, yPos);
-            tft.setTextColor(ST77XX_WHITE,
-                             ST77XX_BLACK); // Black BG for readability
-            tft.setTextSize(2);
+
+            tft.setCursor(10, yPos);
+            // Print Key: Value
+            tft.print(v.key);
+            tft.print(": ");
+            tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
             tft.print(v.value);
-            // Find unit
-            // For now just print value, unit is in properties vector not
-            // cache. Simplified overlay.
+            tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK); // Reset for next key
+
             yPos += 20;
             count++;
-            yPos += 20;
-            count++;
-            // } -> removed block bracket from previous hardcoded if
           }
 
           tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
