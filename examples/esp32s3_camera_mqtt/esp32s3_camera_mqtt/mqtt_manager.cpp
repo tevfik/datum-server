@@ -600,7 +600,8 @@ void reportTelemetry(bool isBoot, bool isConnect) {
     json += "\"snapshot_resolution\":\"" + snapRes + "\",";
 
     json += "\"hmirror\":" + String(s->status.hmirror ? "true" : "false") + ",";
-    json += "\"vflip\":" + String(s->status.vflip ? "true" : "false");
+    json += "\"vflip\":" + String(s->status.vflip ? "true" : "false") + ",";
+    json += "\"stream_enabled\":" + String(streaming ? "true" : "false");
   } else {
     json += "\"stream_resolution\":\"VGA\",\"snapshot_resolution\":\"SVGA\","
             "\"hmirror\":false,\"vflip\":false";

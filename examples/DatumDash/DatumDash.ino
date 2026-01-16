@@ -275,7 +275,9 @@ void drawCameraView() {
           if (!filtered.empty()) {
             unsigned long now = millis();
             int interval =
-                config.slide_interval > 0 ? config.slide_interval : 500;
+                config.slide_interval > 0 ? config.slide_interval : 3000;
+            if (interval < 100)
+              interval = 500; // Safeguard
 
             // Calculate index based on time
             static int carouselIndex = 0;
