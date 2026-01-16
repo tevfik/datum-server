@@ -798,7 +798,11 @@ p{font-size:18px}
 <form action="/save-settings" method="POST">
 <h3>⚙️ Settings</h3>
 <input type="text" name="target_id" placeholder="Target Device ID" value="%TID%">
-<input type="text" name="overlay" placeholder="Overlay (e.g. temp,volt)" value="%OVL%">
+<p style="text-align:left;font-size:14px;color:#aaa">Select Overlay Data:</p>
+<div style="text-align:left;padding:0 20px;">
+%CHECKBOXES%
+</div>
+<br>
 <button type="submit" class="btn">Save Settings</button>
 </form>
 <hr style="border-color:#444">
@@ -809,7 +813,26 @@ p{font-size:18px}
 )rawliteral";
   html.replace("%DID%", String(config.device_id));
   html.replace("%TID%", String(config.target_device_id));
-  html.replace("%OVL%", String(config.overlay_filter));
+  html.replace("%DID%", String(config.device_id));
+  html.replace("%TID%", String(config.target_device_id));
+
+  // Generate Checkboxes
+  String checkboxes = "";
+  if (properties.empty()) {
+    checkboxes = "<i>No properties found. Connect to target first.</i>";
+  } else {
+    for (auto &p : properties) {
+      // Only show relevant props (numbers mostly)
+      checkboxes +=
+          "<label><input type='checkbox' name='overlay' value='" + p.key + "'";
+      if (strstr(config.overlay_filter, p.key.c_str())) {
+        checkboxes += " checked";
+      }
+      checkboxes += "> " + p.title + " (" + p.key + ")</label><br>";
+    }
+  }
+  html.replace("%CHECKBOXES%", checkboxes);
+
   server.send(200, "text/html", html);
 }
 
@@ -825,13 +848,23 @@ void handleWebReset() {
 
 void handleSaveSettings() {
   String t = server.arg("target_id");
-  String o = server.arg("overlay");
-
   if (t.length() > 0)
     strncpy(config.target_device_id, t.c_str(),
             sizeof(config.target_device_id));
-  if (o.length() >= 0)
-    strncpy(config.overlay_filter, o.c_str(), sizeof(config.overlay_filter));
+
+  // Parse multiple overlay checkboxes
+  String newOverlay = "";
+  for (int i = 0; i < server.args(); i++) {
+    if (server.argName(i) == "overlay") {
+      if (newOverlay.length() > 0)
+        newOverlay += ",";
+      newOverlay += server.arg(i);
+    }
+  }
+
+  // Always update filter (empty if none selected)
+  strncpy(config.overlay_filter, newOverlay.c_str(),
+          sizeof(config.overlay_filter));
 
   saveConfig();
   server.sendHeader("Location", "/");
