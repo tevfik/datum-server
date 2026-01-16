@@ -222,40 +222,65 @@ void drawCameraView() {
     return;
 
   // Persistent Client State
-  static WiFiClientSecure *streamClient = nullptr;
-  static HTTPClient
-      http; // Keep HTTPClient instance to manage the connection wrapper
-  static bool isConnected = false;
+  static WiFiClient *streamClient = nullptr; // Polymorphic base
+  static bool isSecure = false;
+  static bool equalsNull = true; // Track if we need to re-alloc
+
+  if (streamClient != nullptr)
+    equalsNull = false;
 
   // 1. Connection Management
-  if (!isConnected || streamClient == nullptr || !streamClient->connected()) {
-    // Cleanup if needed
+  if (streamClient == nullptr || !streamClient->connected()) {
+    // Cleanup
     if (streamClient) {
       delete streamClient;
       streamClient = nullptr;
     }
-    isConnected = false;
 
-    // Allocate new client
-    streamClient = new WiFiClientSecure();
-    streamClient->setInsecure();
-    streamClient->setBufferSizes(4096, 512); // Optimized buffer
+    // Parse URL
+    String url = String(config.server_url);
+    String protocol = "http";
+    String host = "";
+    int port = 80;
 
-    String url = String(config.server_url) + "/dev/" + config.target_device_id +
-                 "/stream/mjpeg";
+    int idx = url.indexOf("://");
+    if (idx != -1) {
+      protocol = url.substring(0, idx);
+      String rest = url.substring(idx + 3);
 
-    // Manual HTTP Request for Stream
-    // We can't use HTTPClient easily for continuous stream processing with
-    // manual parsing flexibility needed here So we connect manually using the
-    // Secure Client
+      int pIdx = rest.indexOf(":");
+      int sIdx = rest.indexOf("/");
 
-    String host = getHostFromUrl(config.server_url);
-    int port = 443;
-    if (config.server_url[4] != 's')
-      port = 80; // Simple http check
+      if (pIdx != -1 && (sIdx == -1 || pIdx < sIdx)) {
+        host = rest.substring(0, pIdx);
+        if (sIdx != -1)
+          port = rest.substring(pIdx + 1, sIdx).toInt();
+        else
+          port = rest.substring(pIdx + 1).toInt();
+      } else if (sIdx != -1) {
+        host = rest.substring(0, sIdx);
+      } else {
+        host = rest;
+      }
+    }
+
+    if (protocol == "https") {
+      if (port == 80)
+        port = 443; // Default SSL
+      WiFiClientSecure *s = new WiFiClientSecure();
+      s->setInsecure();
+      s->setBufferSizes(4096, 512);
+      streamClient = s;
+      isSecure = true;
+    } else {
+      streamClient = new WiFiClient();
+      isSecure = false;
+    }
 
     Serial.print("Connecting to stream: ");
-    Serial.println(url);
+    Serial.print(host);
+    Serial.print(":");
+    Serial.println(port);
 
     if (streamClient->connect(host.c_str(), port)) {
       // Send HTTP Request
@@ -266,11 +291,9 @@ void drawCameraView() {
                           "\r\n");
       streamClient->print("User-Agent: DatumDash\r\n");
       streamClient->print("Connection: keep-alive\r\n\r\n");
-
-      isConnected = true;
     } else {
       Serial.println("Stream Connection Failed");
-      delay(100); // Backoff
+      delay(100);
       return;
     }
   }
@@ -320,8 +343,7 @@ void drawCameraView() {
     }
   } else {
     // Keep-Alive check?
-    if (!streamClient->connected())
-      isConnected = false;
+    // streamClient->connected() is checked at start of function
   }
 
   // 3. Draw Data in Bottom Area (Carousel) with Smart Redraw
