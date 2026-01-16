@@ -186,6 +186,7 @@ func mjpegStreamHandler(c *gin.Context) {
 	c.Header("Pragma", "no-cache")
 	c.Header("Expires", "0")
 	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no") // Disable Nginx Buffering
 
 	// Register client
 	clientChan := streamManager.RegisterClient(deviceID)
