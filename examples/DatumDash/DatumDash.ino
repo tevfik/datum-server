@@ -330,10 +330,20 @@ void drawCameraView() {
               TJpgDec.drawJpg(40, 0, valBuffer, len);
               // unsigned long tDecode = millis() - tDec;
 
+              // Update Global FPS
+              frameCount++;
+              unsigned long now = millis();
+              if (now - lastFpsTime >= 1000) {
+                fps = frameCount * 1000.0 / (now - lastFpsTime);
+                frameCount = 0;
+                lastFpsTime = now;
+              }
+
               // unsigned long tTotal = millis() - tStart;
               static int logFrame = 0;
               if (logFrame++ % 30 == 0) {
-                Serial.printf("Stream Active: %d bytes\n", len);
+                Serial.printf("Stream Active: %d bytes | FPS: %.1f\n", len,
+                              fps);
               }
             } else {
               Serial.printf("Incomplete Frame: %d/%d\n", bytesRead, len);
