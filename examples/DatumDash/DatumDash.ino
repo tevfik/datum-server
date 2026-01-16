@@ -431,7 +431,7 @@ void updateDisplay() {
 
   // Carousel Logic
   // User Request: Prioritize Camera Stream if available
-  if (hasCameraProp) {
+  if (hasCameraProp && getCachedValue("stream_enabled") == "true") {
     drawCameraView();
     return; // Skip property cards completely
   }
@@ -790,7 +790,7 @@ void pollDevice() {
       StaticJsonDocument<200> filter;
       filter["status"] = true;
       filter["thing_description"] = true;
-      // filter["shadow_state"] = true; // Still disabled for RAM safety
+      filter["shadow_state"] = true;
 
       // 3KB buffer for the doc
       DynamicJsonDocument doc(3072);
@@ -812,6 +812,19 @@ void pollDevice() {
             parseThingDescription(doc["thing_description"]);
             // Serial.printf("Props loaded: %d\n", properties.size()); // Clean
             // logs
+          }
+        }
+
+        if (doc.containsKey("shadow_state")) {
+          JsonObject shadow = doc["shadow_state"];
+          for (JsonPair p : shadow) {
+            String valStr;
+            if (p.value().is<bool>()) {
+              valStr = p.value().as<bool>() ? "true" : "false";
+            } else {
+              valStr = p.value().as<String>();
+            }
+            updateValueCache(p.key().c_str(), valStr);
           }
         }
       } else {
