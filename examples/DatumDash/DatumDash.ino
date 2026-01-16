@@ -25,6 +25,9 @@
 #define TFT_RST 2   // D4
 #define TFT_BL 5    // D1
 
+#define ST77XX_GREY 0x8410
+#define ST77XX_DARKGREY 0x4208
+
 // -- Globals --
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 ESP8266WebServer server(80);
