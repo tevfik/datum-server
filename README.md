@@ -506,6 +506,12 @@ docker-compose logs -f datumpy-server
 
 # Stop
 docker-compose down
+
+### Nginx Configuration Impact
+If serving behind Nginx, you must allow the backend to disable buffering for MJPEG streams. The server sends `X-Accel-Buffering: no` automatically, but ensure your Nginx config respects this or includes:
+```nginx
+proxy_buffering off; # Enforce global disable if header is ignored
+```
 ```
 
 ### Systemd Service
