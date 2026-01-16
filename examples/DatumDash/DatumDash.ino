@@ -867,8 +867,15 @@ void handleSaveSettings() {
           sizeof(config.overlay_filter));
 
   saveConfig();
-  server.sendHeader("Location", "/");
-  server.send(303);
+
+  server.send(200, "text/html",
+              "<html><head><meta name='viewport' "
+              "content='width=device-width'><style>body{background:#1b1b1b;"
+              "color:white;font-family:sans-serif;text-align:center;padding:"
+              "50px;}</style></head><body><h1>✅ "
+              "Saved!</h1><p>Redirecting...</"
+              "p><script>setTimeout(function(){window.location.href='/';}, "
+              "1500);</script></body></html>");
 
   // Reset state to force refresh
   properties.clear();
