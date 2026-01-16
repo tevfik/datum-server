@@ -1248,9 +1248,20 @@ void loop() {
     // Dynamic Display Update Frequency
     // If showing Camera, update as fast as possible (0 delay).
     // If showing Status Cards, rotate every 5000ms.
-    unsigned long displayInterval =
-        (hasCameraProp && getCachedValue("stream_enabled") == "true") ? 0
-                                                                      : 5000;
+    // Dynamic Display Update Frequency
+    // If showing Camera, update as fast as possible (0 delay).
+    // If showing Status Cards, rotate every 5000ms.
+    bool streamActive =
+        (hasCameraProp && getCachedValue("stream_enabled") == "true");
+
+    // Check for mode switch to clear screen
+    static bool lastStreamActive = false;
+    if (streamActive != lastStreamActive) {
+      tft.fillScreen(ST77XX_BLACK);
+      lastStreamActive = streamActive;
+    }
+
+    unsigned long displayInterval = streamActive ? 0 : 5000;
 
     // Use a separate timer for display refresh to not conflict with carousel
     static unsigned long lastDisplayTime = 0;
