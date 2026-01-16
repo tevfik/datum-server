@@ -383,8 +383,8 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
                         enumList.map((e) => e.toString()).contains(currentVal)
                             ? currentVal
                             : null,
-                    hint:
-                        Text(currentVal, style: TextStyle(color: Colors.white)),
+                    hint: Text(currentVal,
+                        style: const TextStyle(color: Colors.white)),
                     dropdownColor: Colors.grey[850],
                     style: const TextStyle(color: Colors.white),
                     isExpanded: true,
