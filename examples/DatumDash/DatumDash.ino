@@ -1308,8 +1308,9 @@ void loop() {
     // Dynamic Display Update Frequency
     // If showing Camera, update as fast as possible (0 delay).
     // If showing Status Cards, rotate every 5000ms.
-    bool streamActive =
-        (hasCameraProp && getCachedValue("stream_enabled") == "true");
+    String sEnabled = getCachedValue("stream_enabled");
+    sEnabled.trim();
+    bool streamActive = (hasCameraProp && sEnabled == "true");
 
     // Check for mode switch to clear screen
     static bool lastStreamActive = false;
