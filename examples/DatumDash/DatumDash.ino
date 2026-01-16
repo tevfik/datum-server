@@ -495,12 +495,6 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
       config.poll_interval =
           doc["params"]["poll_interval"] | config.poll_interval;
 
-      String newOverlay = doc["params"]["overlay"] | "";
-      if (newOverlay.length() > 0) {
-        strncpy(config.overlay_filter, newOverlay.c_str(),
-                sizeof(config.overlay_filter));
-      }
-
       saveConfig();
       sendLog("Target Set: " + newTarget);
       showStatus("Target Updated!", ST77XX_GREEN);
@@ -801,12 +795,21 @@ p{font-size:18px}
 <p><b>Device ID:</b> %DID%</p>
 <p><b>Target:</b> %TID%</p>
 <hr style="border-color:#444">
+<form action="/save-settings" method="POST">
+<h3>⚙️ Settings</h3>
+<input type="text" name="target_id" placeholder="Target Device ID" value="%TID%">
+<input type="text" name="overlay" placeholder="Overlay (e.g. temp,volt)" value="%OVL%">
+<button type="submit" class="btn">Save Settings</button>
+</form>
+<hr style="border-color:#444">
 <a href="/update" class="btn">☁️ Firmware Update</a>
 <a href="/reset" class="btn btn-red" onclick="return confirm('Reset?')">⚠️ Factory Reset</a>
 </div></body></html>
+
 )rawliteral";
   html.replace("%DID%", String(config.device_id));
   html.replace("%TID%", String(config.target_device_id));
+  html.replace("%OVL%", String(config.overlay_filter));
   server.send(200, "text/html", html);
 }
 
@@ -817,6 +820,26 @@ void handleWebReset() {
   server.send(200, "text/html", "Resetting...");
   delay(1000);
   ESP.restart();
+  ESP.restart();
+}
+
+void handleSaveSettings() {
+  String t = server.arg("target_id");
+  String o = server.arg("overlay");
+
+  if (t.length() > 0)
+    strncpy(config.target_device_id, t.c_str(),
+            sizeof(config.target_device_id));
+  if (o.length() >= 0)
+    strncpy(config.overlay_filter, o.c_str(), sizeof(config.overlay_filter));
+
+  saveConfig();
+  server.sendHeader("Location", "/");
+  server.send(303);
+
+  // Reset state to force refresh
+  properties.clear();
+  lastPollTime = 0;
 }
 
 void startSetupMode() {
@@ -1047,6 +1070,7 @@ void setup() {
 
   httpUpdater.setup(&server);
   server.on("/", handleRoot);
+  server.on("/save-settings", HTTP_POST, handleSaveSettings);
   server.on("/reset", handleWebReset);
   server.begin();
 
