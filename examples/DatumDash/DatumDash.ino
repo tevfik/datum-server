@@ -213,8 +213,8 @@ void drawCameraView() {
   int httpCode = http.GET();
   if (httpCode == 200) {
     int len = http.getSize();
-    Serial.printf("Cam Snapshot Size: %d bytes. Free Heap: %d\n", len,
-                  ESP.getFreeHeap());
+    // Serial.printf("Cam Snapshot Size: %d bytes. Free Heap: %d\n", len,
+    // ESP.getFreeHeap()); // Clean Log
 
     // Safety Limit: ESP8266 has limited RAM (~40KB usually free)
     // Try to alloc up to 35KB if heap permits
@@ -241,7 +241,29 @@ void drawCameraView() {
           TJpgDec.drawJpg(-40, 0, valBuffer, idx);
           free(valBuffer);
 
-          tft.setTextColor(ST77XX_GREEN);
+          // OVERLAY: Draw sensor values on top of video
+          int yPos = 180;
+          int count = 0;
+          for (auto &v : valueCache) {
+            if (count >= 2)
+              break; // limit to 2 lines overlay
+            // Filter for common telemetry
+            if (v.key.indexOf("temp") != -1 || v.key.indexOf("volt") != -1 ||
+                v.key.indexOf("curr") != -1 || v.key.indexOf("pow") != -1) {
+              tft.setCursor(5, yPos);
+              tft.setTextColor(ST77XX_WHITE,
+                               ST77XX_BLACK); // Black BG for readability
+              tft.setTextSize(2);
+              tft.print(v.value);
+              // Find unit
+              // For now just print value, unit is in properties vector not
+              // cache. Simplified overlay.
+              yPos += 20;
+              count++;
+            }
+          }
+
+          tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
           tft.setCursor(5, 5);
           tft.setTextSize(1);
           tft.print("LIVE");
@@ -550,6 +572,8 @@ void reportTelemetry() {
   doc["target_device_id"] = String(config.target_device_id);
   doc["poll_interval"] = config.poll_interval;
   doc["fw_ver"] = FIRMWARE_VER;
+  doc["free_heap"] = ESP.getFreeHeap();
+  doc["fps"] = int(fps);
   String payload;
   serializeJson(doc, payload);
   mqttClient.publish(("dev/" + String(config.device_id) + "/data").c_str(),
@@ -1048,7 +1072,7 @@ void loop() {
       updateDisplay();
     }
 
-    if (now - lastTelemetryTime > 60000) {
+    if (now - lastTelemetryTime > 10000) { // 10s Telemetry Report
       lastTelemetryTime = now;
       reportTelemetry();
     }
