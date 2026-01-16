@@ -175,6 +175,22 @@ void saveConfig() {
   EEPROM.commit();
 }
 
+String getHostFromUrl(String url) {
+  int index = url.indexOf("://");
+  if (index != -1) {
+    url = url.substring(index + 3);
+  }
+  index = url.indexOf("/");
+  if (index != -1) {
+    url = url.substring(0, index);
+  }
+  index = url.indexOf(":");
+  if (index != -1) {
+    url = url.substring(0, index);
+  }
+  return url;
+}
+
 // -- Display Functions --
 
 void showStatus(String msg, uint16_t color) {
