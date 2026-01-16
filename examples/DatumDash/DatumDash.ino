@@ -414,7 +414,6 @@ void drawCameraView() {
   tft.print("LIVE");
 }
 // End of drawCameraView
-}
 
 String getCachedValue(String key) {
   for (auto &v : valueCache) {
@@ -511,18 +510,7 @@ void updateDisplay() {
 
 // -- MQTT & Network Functions --
 
-String getHostFromUrl(String url) {
-  int index = url.indexOf("://");
-  if (index != -1)
-    url = url.substring(index + 3);
-  int slash = url.indexOf("/");
-  if (slash != -1)
-    url = url.substring(0, slash);
-  int port = url.indexOf(":");
-  if (port != -1)
-    url = url.substring(0, port);
-  return url;
-}
+// -- MQTT & Network Functions --
 
 void sendLog(String msg) {
   if (mqttClient.connected()) {
