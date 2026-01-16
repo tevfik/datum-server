@@ -205,170 +205,199 @@ void drawCameraView() {
   if (strlen(config.target_device_id) == 0)
     return;
 
-  WiFiClient *client = nullptr;
-  if (String(config.server_url).startsWith("https")) {
-    WiFiClientSecure *secureClient = new WiFiClientSecure();
-    secureClient->setInsecure();
-    // Increase buffer for image download
-    secureClient->setBufferSizes(2048, 512);
-    client = secureClient;
-  } else {
-    client = new WiFiClient();
+  // Persistent Client State
+  static WiFiClientSecure *streamClient = nullptr;
+  static HTTPClient
+      http; // Keep HTTPClient instance to manage the connection wrapper
+  static bool isConnected = false;
+
+  // 1. Connection Management
+  if (!isConnected || streamClient == nullptr || !streamClient->connected()) {
+    // Cleanup if needed
+    if (streamClient) {
+      delete streamClient;
+      streamClient = nullptr;
+    }
+    isConnected = false;
+
+    // Allocate new client
+    streamClient = new WiFiClientSecure();
+    streamClient->setInsecure();
+    streamClient->setBufferSizes(4096, 512); // Optimized buffer
+
+    String url = String(config.server_url) + "/dev/" + config.target_device_id +
+                 "/stream/mjpeg";
+
+    // Manual HTTP Request for Stream
+    // We can't use HTTPClient easily for continuous stream processing with
+    // manual parsing flexibility needed here So we connect manually using the
+    // Secure Client
+
+    String host = getHostFromUrl(config.server_url);
+    int port = 443;
+    if (config.server_url[4] != 's')
+      port = 80; // Simple http check
+
+    Serial.print("Connecting to stream: ");
+    Serial.println(url);
+
+    if (streamClient->connect(host.c_str(), port)) {
+      // Send HTTP Request
+      streamClient->print("GET /dev/" + String(config.target_device_id) +
+                          "/stream/mjpeg HTTP/1.1\r\n");
+      streamClient->print("Host: " + host + "\r\n");
+      streamClient->print("Authorization: Bearer " + String(config.api_key) +
+                          "\r\n");
+      streamClient->print("User-Agent: DatumDash\r\n");
+      streamClient->print("Connection: keep-alive\r\n\r\n");
+
+      isConnected = true;
+    } else {
+      Serial.println("Stream Connection Failed");
+      delay(100); // Backoff
+      return;
+    }
   }
 
-  HTTPClient http;
-  String url = String(config.server_url) + "/dev/" + config.target_device_id +
-               "/stream/snapshot";
-  http.begin(*client, url);
-  http.addHeader("Authorization", "Bearer " + String(config.api_key));
+  // 2. Stream Parsing (Multipart)
+  // Logic: Read line by line looking for Content-Length
+  // This is a blocking read for the header, then block read for body
+  // To keep loop responsive, we depend on valid stream data arriving
 
-  int httpCode = http.GET();
-  if (httpCode == 200) {
-    int len = http.getSize();
-    // Serial.printf("Cam Snapshot Size: %d bytes. Free Heap: %d\n", len,
-    // ESP.getFreeHeap()); // Clean Log
+  if (streamClient->available()) {
+    static int violence_counter = 0; // Prevent infinite loops
 
-    // Safety Limit: ESP8266 has limited RAM (~40KB usually free)
-    // Try to alloc up to 35KB if heap permits
-    if (len > 0 && len < 40000) {
-      if (ESP.getFreeHeap() > len + 2000) { // Ensure 2KB slack
-        uint8_t *valBuffer = (uint8_t *)malloc(len);
-        if (valBuffer) {
-          WiFiClient *stream = http.getStreamPtr();
-          int idx = 0;
-          while (http.connected() && (len > 0 || len == -1)) {
-            size_t size = stream->available();
-            if (size) {
-              int c = stream->readBytes(valBuffer + idx, size);
-              idx += c;
-              if (len > 0)
-                len -= c;
-            } else {
-              delay(1);
+    String line = streamClient->readStringUntil('\n');
+    line.trim();
+
+    // Simple Parse Logic for "Content-Length: <size>"
+    if (line.startsWith("Content-Length:")) {
+      int len = line.substring(15).toInt();
+      if (len > 0 && len < 40000) {
+        // Skip empty line after headers
+        streamClient->readStringUntil('\n');
+
+        // Read Image Data
+        if (ESP.getFreeHeap() > len + 2000) {
+          uint8_t *valBuffer = (uint8_t *)malloc(len);
+          if (valBuffer) {
+            int bytesRead = 0;
+            while (bytesRead < len && streamClient->connected()) {
+              int c =
+                  streamClient->read(valBuffer + bytesRead, len - bytesRead);
+              if (c > 0)
+                bytesRead += c;
+              else
+                delay(1);
             }
-            if (len == 0)
-              break;
+
+            if (bytesRead == len) {
+              // Draw!
+              TJpgDec.drawJpg(40, 0, valBuffer, len);
+
+              // Clear surrounding areas logic moved to Mode Switch
+            }
+            free(valBuffer);
           }
-
-          // 1. Draw Camera (Centered 160x120 on 240 width) -> X Offset = 40
-          TJpgDec.drawJpg(40, 0, valBuffer, idx);
-          free(valBuffer);
-
-          // 2. Clear surrounding areas to prevent artifacts
-          // (Disabled for performance - screen should be cleared on mode switch
-          // logic later if needed)
-
-          // 3. Draw Data in Bottom Area (Carousel) with Smart Redraw
-          // Filter first
-          std::vector<ValueCache> filtered;
-          for (auto &v : valueCache) {
-            if (config.overlay_filter[0] == 0 ||
-                strstr(config.overlay_filter, v.key.c_str()) != NULL) {
-              filtered.push_back(v);
-            }
-          }
-
-          if (!filtered.empty()) {
-            unsigned long now = millis();
-            int interval =
-                config.slide_interval > 0 ? config.slide_interval : 3000;
-            if (interval < 100)
-              interval = 500;
-
-            // Calculate index based on time
-            // Calculate index based on time
-            // Use LOCAL static timer, independent of global display loop
-            static unsigned long lastSlideTime = 0;
-            static int carouselIndex = 0;
-            if (now - lastSlideTime > interval) {
-              carouselIndex = (carouselIndex + 1) % filtered.size();
-              lastSlideTime = now;
-            }
-            // Handle resize
-            if (carouselIndex >= filtered.size())
-              carouselIndex = 0;
-
-            ValueCache &v = filtered[carouselIndex];
-
-            // Smart Redraw: Only draw if changed
-            static int lastDrawnIndex = -1;
-            static String lastDrawnVal = "";
-
-            if (carouselIndex != lastDrawnIndex || v.value != lastDrawnVal) {
-              // Clear Bottom
-              tft.fillRect(0, 120, 240, 120, ST77XX_BLACK);
-
-              // Draw Key
-              tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
-              tft.setTextSize(2);
-              int16_t x1, y1;
-              uint16_t w, h;
-              String keyStr = v.key;
-              keyStr.toUpperCase();
-              tft.getTextBounds(keyStr, 0, 0, &x1, &y1, &w, &h);
-              tft.setCursor((240 - w) / 2, 140);
-              tft.print(keyStr);
-
-              // Draw Value
-              tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-              tft.setTextSize(3);
-              tft.getTextBounds(v.value, 0, 0, &x1, &y1, &w, &h);
-              if (w > 220)
-                tft.setTextSize(2); // Auto-scale
-              tft.getTextBounds(v.value, 0, 0, &x1, &y1, &w, &h);
-              tft.setCursor((240 - w) / 2, 180);
-              tft.print(v.value);
-
-              // Pagination
-              tft.setTextSize(1);
-              tft.setTextColor(ST77XX_DARKGREY, ST77XX_BLACK);
-              String pag =
-                  String(carouselIndex + 1) + "/" + String(filtered.size());
-              tft.getTextBounds(pag, 0, 0, &x1, &y1, &w, &h);
-              tft.setCursor((240 - w) / 2, 220);
-              tft.print(pag);
-
-              lastDrawnIndex = carouselIndex;
-              lastDrawnVal = v.value;
-            }
-          } else {
-            // No Data case
-            static bool noDataDrawn = false;
-            if (!noDataDrawn) {
-              tft.fillRect(0, 120, 240, 120, ST77XX_BLACK);
-              tft.setTextColor(ST77XX_GREY, ST77XX_BLACK);
-              tft.setCursor(60, 170);
-              tft.setTextSize(2);
-              tft.print("No Data");
-              noDataDrawn = true;
-            }
-          }
-
-          tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
-          tft.setCursor(5, 5);
-          tft.setTextSize(1);
-          tft.print("LIVE");
-        } else {
-          showStatus("OOM: Malloc Fail", ST77XX_RED);
         }
-      } else {
-        showStatus("OOM: Low Heap", ST77XX_RED);
       }
-    } else {
-      showStatus("Img Too Large", ST77XX_RED);
     }
   } else {
-    showStatus("Cam Offline", ST77XX_RED);
+    // Keep-Alive check?
+    if (!streamClient->connected())
+      isConnected = false;
   }
-  http.end();
-  delete client;
 
-  tft.drawLine(0, 210, 240, 210, ST77XX_WHITE);
-  tft.setCursor(10, 220);
+  // 3. Draw Data in Bottom Area (Carousel) with Smart Redraw
+  // Filter first
+  std::vector<ValueCache> filtered;
+  for (auto &v : valueCache) {
+    if (config.overlay_filter[0] == 0 ||
+        strstr(config.overlay_filter, v.key.c_str()) != NULL) {
+      filtered.push_back(v);
+    }
+  }
+
+  if (!filtered.empty()) {
+    unsigned long now = millis();
+    int interval = config.slide_interval > 0 ? config.slide_interval : 3000;
+    if (interval < 100)
+      interval = 500;
+
+    // Calculate index based on time
+    // Calculate index based on time
+    // Use LOCAL static timer, independent of global display loop
+    static unsigned long lastSlideTime = 0;
+    static int carouselIndex = 0;
+    if (now - lastSlideTime > interval) {
+      carouselIndex = (carouselIndex + 1) % filtered.size();
+      lastSlideTime = now;
+    }
+    // Handle resize
+    if (carouselIndex >= filtered.size())
+      carouselIndex = 0;
+
+    ValueCache &v = filtered[carouselIndex];
+
+    // Smart Redraw: Only draw if changed
+    static int lastDrawnIndex = -1;
+    static String lastDrawnVal = "";
+
+    if (carouselIndex != lastDrawnIndex || v.value != lastDrawnVal) {
+      // Clear Bottom
+      tft.fillRect(0, 120, 240, 120, ST77XX_BLACK);
+
+      // Draw Key
+      tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+      tft.setTextSize(2);
+      int16_t x1, y1;
+      uint16_t w, h;
+      String keyStr = v.key;
+      keyStr.toUpperCase();
+      tft.getTextBounds(keyStr, 0, 0, &x1, &y1, &w, &h);
+      tft.setCursor((240 - w) / 2, 140);
+      tft.print(keyStr);
+
+      // Draw Value
+      tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+      tft.setTextSize(3);
+      tft.getTextBounds(v.value, 0, 0, &x1, &y1, &w, &h);
+      if (w > 220)
+        tft.setTextSize(2); // Auto-scale
+      tft.getTextBounds(v.value, 0, 0, &x1, &y1, &w, &h);
+      tft.setCursor((240 - w) / 2, 180);
+      tft.print(v.value);
+
+      // Pagination
+      tft.setTextSize(1);
+      tft.setTextColor(ST77XX_DARKGREY, ST77XX_BLACK);
+      String pag = String(carouselIndex + 1) + "/" + String(filtered.size());
+      tft.getTextBounds(pag, 0, 0, &x1, &y1, &w, &h);
+      tft.setCursor((240 - w) / 2, 220);
+      tft.print(pag);
+
+      lastDrawnIndex = carouselIndex;
+      lastDrawnVal = v.value;
+    }
+  } else {
+    // No Data case
+    static bool noDataDrawn = false;
+    if (!noDataDrawn) {
+      tft.fillRect(0, 120, 240, 120, ST77XX_BLACK);
+      tft.setTextColor(ST77XX_GREY, ST77XX_BLACK);
+      tft.setCursor(60, 170);
+      tft.setTextSize(2);
+      tft.print("No Data");
+      noDataDrawn = true;
+    }
+  }
+
+  tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
+  tft.setCursor(5, 5);
   tft.setTextSize(1);
-  tft.setTextColor(ST77XX_WHITE);
-  tft.print("Target: ");
-  tft.print(config.target_device_id);
+  tft.print("LIVE");
+}
+// End of drawCameraView
 }
 
 String getCachedValue(String key) {
