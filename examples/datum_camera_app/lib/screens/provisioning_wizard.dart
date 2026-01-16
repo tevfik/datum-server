@@ -33,6 +33,7 @@ class _ProvisioningWizardState extends ConsumerState<ProvisioningWizard> {
   int _step = 0;
   bool _isLoading = false;
   String? _statusMessage;
+  bool _obscureWifiPass = true;
 
   @override
   void dispose() {
@@ -394,8 +395,20 @@ class _ProvisioningWizardState extends ConsumerState<ProvisioningWizard> {
                 ),
                 TextField(
                   controller: _passController,
-                  decoration: const InputDecoration(labelText: 'WiFi Password'),
-                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'WiFi Password',
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureWifiPass
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () {
+                        setState(() {
+                          _obscureWifiPass = !_obscureWifiPass;
+                        });
+                      },
+                    ),
+                  ),
+                  obscureText: _obscureWifiPass,
                 ),
               ],
             ),
