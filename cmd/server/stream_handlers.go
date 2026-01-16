@@ -447,7 +447,7 @@ func (sm *StreamManager) RegisterClient(deviceID string) chan []byte {
 	defer stream.mu.Unlock()
 
 	clientID := fmt.Sprintf("client_%d", time.Now().UnixNano())
-	clientChan := make(chan []byte, 30) // Buffer 30 frames
+	clientChan := make(chan []byte, 2) // Buffer 2 frames (Low Latency)
 
 	stream.Clients[clientID] = &StreamClient{
 		ID:   clientID,
