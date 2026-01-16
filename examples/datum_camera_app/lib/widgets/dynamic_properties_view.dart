@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../models/device.dart';
 import '../providers/api_provider.dart';
 import 'sparkline_widget.dart';
@@ -17,7 +18,7 @@ class DynamicWoTView extends ConsumerStatefulWidget {
 class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
   Timer? _timer;
   Map<String, dynamic> _deviceData = {};
-  final List<Map<String, String>> _properties = [];
+  final List<Map<String, dynamic>> _properties = [];
 
   @override
   void initState() {
@@ -35,9 +36,12 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
   void _parseThingDescription() {
     final td = widget.device.thingDescription;
     if (td == null || !td.containsKey('properties')) return;
+    _extractProperties(td['properties'] as Map<String, dynamic>);
+    if (mounted) setState(() {});
+  }
 
+  void _extractProperties(Map<String, dynamic> props) {
     _properties.clear();
-    final props = td['properties'] as Map<String, dynamic>;
     props.forEach((key, val) {
       if (val is Map<String, dynamic>) {
         _properties.add({
@@ -45,13 +49,23 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
           'title': (val['title'] ?? key).toString(),
           'type': (val['type'] ?? 'string').toString(),
           'unit': (val['unit'] ?? '').toString(),
-          'readOnly': (val['readOnly'] ?? true).toString(),
+          // Store as actual boolean
+          'readOnly': val['readOnly'] == true ||
+              val['readOnly'] ==
+                  'true', // Default false if missing? No, usually default is false (writeable) or true?
+          // Original code: (val['readOnly'] ?? true).toString() -> defaulted to true (read-only)
+          // So if missing, it's ReadOnly.
+          // Let's stick to that:
+          'isReadOnly': val['readOnly'] == true ||
+              val['readOnly'] == 'true' ||
+              val['readOnly'] == null,
           'widget': (val['ui:widget'] ?? '').toString(),
+          'enum': val['enum'], // List
+          'minimum': val['minimum'], // num
+          'maximum': val['maximum'], // num
         });
       }
     });
-
-    if (mounted) setState(() {});
   }
 
   void _startPolling() {
@@ -73,20 +87,8 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
             deviceJson['thing_description'] != null) {
           final td = deviceJson['thing_description'];
           if (td != null) {
-            _properties.clear();
             final props = td['properties'] as Map<String, dynamic>;
-            props.forEach((key, val) {
-              if (val is Map<String, dynamic>) {
-                _properties.add({
-                  'key': key,
-                  'title': (val['title'] ?? key).toString(),
-                  'type': (val['type'] ?? 'string').toString(),
-                  'unit': (val['unit'] ?? '').toString(),
-                  'readOnly': (val['readOnly'] ?? true).toString(),
-                  'widget': (val['ui:widget'] ?? '').toString(),
-                });
-              }
-            });
+            _extractProperties(props);
           }
         }
       }
@@ -130,6 +132,53 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
     }
   }
 
+  Color _parseColor(String? hexString) {
+    if (hexString == null || hexString.isEmpty) return Colors.white;
+    try {
+      var hex = hexString.replaceAll('#', '');
+      if (hex.length == 6) hex = 'FF$hex';
+      return Color(int.parse(hex, radix: 16));
+    } catch (e) {
+      return Colors.white;
+    }
+  }
+
+  String _colorToHex(Color color) {
+    // ignore: deprecated_member_use
+    return '#${color.value.toRadixString(16).substring(2).toUpperCase()}';
+  }
+
+  void _showColorPicker(String key, String currentValue) {
+    Color pickerColor = _parseColor(currentValue);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pick a color'),
+        content: SingleChildScrollView(
+          child: ColorPicker(
+            pickerColor: pickerColor,
+            onColorChanged: (color) {
+              pickerColor = color;
+            },
+            // Use block picker or material picker if preferred, but standard is fine
+            enableAlpha: false,
+            displayThumbColor: true,
+            paletteType: PaletteType.hsvWithHue,
+          ),
+        ),
+        actions: <Widget>[
+          ElevatedButton(
+            child: const Text('Got it'),
+            onPressed: () {
+              Navigator.of(context).pop();
+              _handlePropertyChange(key, _colorToHex(pickerColor));
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_properties.isEmpty) {
@@ -147,8 +196,11 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
       itemCount: _properties.length,
       itemBuilder: (context, index) {
         final prop = _properties[index];
-        final key = prop['key']!;
-        final widgetType = prop['widget'];
+        final key = prop['key'] as String;
+        final title = prop['title'] as String;
+        final widgetType = prop['widget'] as String;
+        final unit = prop['unit'] as String;
+        final isReadOnly = prop['isReadOnly'] as bool;
 
         dynamic rawVal = _deviceData[key];
 
@@ -156,7 +208,7 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
         if (widgetType == 'timeseries') {
           double? val =
               rawVal != null ? double.tryParse(rawVal.toString()) : null;
-          bool isDemo = widget.device.type == 'demo'; // Or any other demo logic
+          bool isDemo = widget.device.type == 'demo';
 
           return Card(
             elevation: 4,
@@ -166,8 +218,7 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(prop['title']!,
-                      style: const TextStyle(color: Colors.white70)),
+                  Text(title, style: const TextStyle(color: Colors.white70)),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -178,7 +229,7 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
                       ),
                     ),
                   ),
-                  Text("${rawVal ?? '--'} ${prop['unit']}",
+                  Text("${rawVal ?? '--'} $unit",
                       style: const TextStyle(
                           color: Colors.white, fontWeight: FontWeight.bold)),
                 ],
@@ -187,7 +238,7 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
           );
         }
 
-        // 2. Gauge Widget (Placeholder)
+        // 2. Gauge Widget
         if (widgetType == 'gauge') {
           return Card(
             elevation: 4,
@@ -197,8 +248,7 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(prop['title']!,
-                      style: const TextStyle(color: Colors.white70)),
+                  Text(title, style: const TextStyle(color: Colors.white70)),
                   Expanded(
                     child: Center(
                       child: Stack(
@@ -221,9 +271,142 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
           );
         }
 
-        // 3. Boolean Switch
+        // 3. Color Picker
+        if (widgetType == 'color') {
+          Color currentColor = _parseColor(rawVal?.toString());
+          return Card(
+            elevation: 4,
+            color: Colors.grey[900],
+            child: InkWell(
+              onTap: isReadOnly
+                  ? null
+                  : () =>
+                      _showColorPicker(key, rawVal?.toString() ?? '#FFFFFF'),
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(title, style: const TextStyle(color: Colors.white70)),
+                    const SizedBox(height: 10),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: currentColor,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white30, width: 2),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(rawVal?.toString() ?? '--',
+                        style: const TextStyle(
+                            color: Colors.white54, fontSize: 10)),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        // 4. Slider (Range)
+        var min = prop['minimum'];
+        var max = prop['maximum'];
+        if (!isReadOnly &&
+            (widgetType == 'slider' || (min != null && max != null))) {
+          double minVal = (min ?? 0).toDouble();
+          double maxVal = (max ?? 100).toDouble();
+          double currentVal =
+              double.tryParse(rawVal?.toString() ?? '0') ?? minVal;
+          // Clamp
+          if (currentVal < minVal) currentVal = minVal;
+          if (currentVal > maxVal) currentVal = maxVal;
+
+          return Card(
+            elevation: 4,
+            color: Colors.grey[900],
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white70)),
+                  Expanded(
+                    child: Slider(
+                      value: currentVal,
+                      min: minVal,
+                      max: maxVal,
+                      activeColor: Colors.blueAccent,
+                      onChanged: (v) {
+                        // Local update only for smooth sliding
+                        setState(() {
+                          _deviceData[key] = v;
+                        });
+                      },
+                      onChangeEnd: (v) {
+                        // Commit change
+                        _handlePropertyChange(key, v);
+                      },
+                    ),
+                  ),
+                  Text("${currentVal.toStringAsFixed(1)} $unit",
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // 5. Select (Enum)
+        var enumList = prop['enum'];
+        if (!isReadOnly && enumList is List && enumList.isNotEmpty) {
+          String currentVal = rawVal?.toString() ?? (enumList.first.toString());
+          if (!enumList.contains(currentVal)) {
+            // Handle case where current value is not in enum list
+            // Try to match ignoring case or just add it temporarily?
+            // Or just show first?
+          }
+
+          return Card(
+            elevation: 4,
+            color: Colors.grey[900],
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white70)),
+                  const SizedBox(height: 5),
+                  DropdownButton<String>(
+                    value:
+                        enumList.map((e) => e.toString()).contains(currentVal)
+                            ? currentVal
+                            : null,
+                    hint:
+                        Text(currentVal, style: TextStyle(color: Colors.white)),
+                    dropdownColor: Colors.grey[850],
+                    style: const TextStyle(color: Colors.white),
+                    isExpanded: true,
+                    underline: Container(height: 1, color: Colors.blueAccent),
+                    items: enumList.map((e) {
+                      return DropdownMenuItem<String>(
+                        value: e.toString(),
+                        child: Text(e.toString()),
+                      );
+                    }).toList(),
+                    onChanged: (v) {
+                      if (v != null) _handlePropertyChange(key, v);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // 6. Boolean Switch
         bool isBool = prop['type'] == 'boolean';
-        bool isReadOnly = prop['readOnly'] == 'true';
 
         if (isBool && !isReadOnly) {
           bool switchVal = rawVal == true || rawVal == 'true' || rawVal == 1;
@@ -244,7 +427,7 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(prop['title']!,
+                            Text(title,
                                 style: const TextStyle(
                                     color: Colors.white70,
                                     fontWeight: FontWeight.bold)),
@@ -263,14 +446,14 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
                                     value: switchVal,
                                     onChanged: (v) =>
                                         _handlePropertyChange(key, v),
+                                    // ignore: deprecated_member_use
                                     activeColor: Colors.greenAccent,
                                   ),
                                 ])
                           ]))));
         }
 
-        // 4. Default Read-Only Display
-        String unit = prop['unit'] ?? '';
+        // 7. Default Read-Only Display
         String displayVal = rawVal?.toString() ?? '--';
 
         return Card(
@@ -283,7 +466,7 @@ class _DynamicWoTViewState extends ConsumerState<DynamicWoTView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  prop['title']!,
+                  title,
                   style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 14,

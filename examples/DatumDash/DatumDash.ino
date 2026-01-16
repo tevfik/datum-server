@@ -51,6 +51,7 @@ struct Config {
   int poll_interval;
   int boot_failures;
   char overlay_filter[64];
+  int slide_interval;
 };
 Config config;
 
@@ -116,6 +117,7 @@ h2{text-align:center;color:#00bcd4}
 <hr style="border-color:#444;margin:20px 0">
 <label>Target Device ID (to Watch)</label><input type="text" name="target_id" placeholder="ID of device to display">
 <label>Poll Interval (Seconds)</label><input type="number" name="poll_int" value="5" min="1">
+<label>Slide Interval (ms, 0=Fast)</label><input type="number" name="slide_int" value="3000" min="0">
 <label>Server URL (Default: https://datum.bezg.in)</label>
 <input type="text" name="server_url" value="https://datum.bezg.in" placeholder="http://ip:8000">
 <button type="submit">Save & Connect</button>
@@ -151,6 +153,7 @@ void loadConfig() {
     // Default Overlay
     strncpy(config.overlay_filter, "temp,volt,curr,pow",
             sizeof(config.overlay_filter));
+    config.slide_interval = 3000;
     config.boot_failures = 0;
     strcpy(config.server_url, "https://datum.bezg.in");
     config.poll_interval = 5;
@@ -244,43 +247,83 @@ void drawCameraView() {
               break;
           }
 
-          // 1. Draw Camera (Top-Left 160x120)
-          TJpgDec.drawJpg(0, 0, valBuffer, idx);
+          // 1. Draw Camera (Centered 160x120 on 240 width) -> X Offset = 40
+          TJpgDec.drawJpg(40, 0, valBuffer, idx);
           free(valBuffer);
 
           // 2. Clear surrounding areas to prevent artifacts
-          // Right Side (80px wide)
-          tft.fillRect(160, 0, 80, 120, ST77XX_BLACK);
+          // Left Side (40px)
+          tft.fillRect(0, 0, 40, 120, ST77XX_BLACK);
+          // Right Side (40px)
+          tft.fillRect(200, 0, 40, 120, ST77XX_BLACK);
           // Bottom Side (120px high)
           tft.fillRect(0, 120, 240, 120, ST77XX_BLACK);
 
-          // 3. Draw Data in Bottom Area
-          int yPos = 130;
-          int count = 0;
-
-          tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
-          tft.setTextSize(2);
-
+          // 3. Draw Data in Bottom Area (Carousel)
+          // Filter first
+          std::vector<ValueCache> filtered;
           for (auto &v : valueCache) {
-            if (count >= 5)
-              break; // Limit to fit bottom area (120px / 20px ~= 6 lines)
-
-            // Filter
-            if (config.overlay_filter[0] != 0 &&
-                strstr(config.overlay_filter, v.key.c_str()) == NULL) {
-              continue;
+            if (config.overlay_filter[0] == 0 ||
+                strstr(config.overlay_filter, v.key.c_str()) != NULL) {
+              filtered.push_back(v);
             }
+          }
 
-            tft.setCursor(10, yPos);
-            // Print Key: Value
-            tft.print(v.key);
-            tft.print(": ");
+          if (!filtered.empty()) {
+            unsigned long now = millis();
+            int interval =
+                config.slide_interval > 0 ? config.slide_interval : 500;
+
+            // Calculate index based on time
+            static int carouselIndex = 0;
+            if (now - lastCarouselTime > interval) {
+              carouselIndex = (carouselIndex + 1) % filtered.size();
+              lastCarouselTime = now;
+            }
+            if (carouselIndex >= filtered.size())
+              carouselIndex = 0;
+
+            ValueCache &v = filtered[carouselIndex];
+
+            // Draw Centered Huge Text
+            tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+            tft.setTextSize(2);
+            int16_t x1, y1;
+            uint16_t w, h;
+
+            // Key
+            String keyStr = v.key;
+            keyStr.toUpperCase();
+            tft.getTextBounds(keyStr, 0, 0, &x1, &y1, &w, &h);
+            tft.setCursor((240 - w) / 2, 140);
+            tft.print(keyStr);
+
+            // Value
             tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-            tft.print(v.value);
-            tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK); // Reset for next key
+            tft.setTextSize(3);
+            tft.getTextBounds(v.value, 0, 0, &x1, &y1, &w, &h);
+            // Verify if it fits
+            if (w > 220)
+              tft.setTextSize(2);
 
-            yPos += 20;
-            count++;
+            tft.getTextBounds(v.value, 0, 0, &x1, &y1, &w, &h); // Recalc
+            tft.setCursor((240 - w) / 2, 180);
+            tft.print(v.value);
+
+            // Pagination Dots (Optional, maybe later)
+            // Draw indicator like (1/5)
+            tft.setTextSize(1);
+            tft.setTextColor(ST77XX_DARKGREY, ST77XX_BLACK);
+            String pag =
+                String(carouselIndex + 1) + "/" + String(filtered.size());
+            tft.getTextBounds(pag, 0, 0, &x1, &y1, &w, &h);
+            tft.setCursor((240 - w) / 2, 220);
+            tft.print(pag);
+          } else {
+            tft.setTextColor(ST77XX_GREY, ST77XX_BLACK);
+            tft.setCursor(60, 170);
+            tft.setTextSize(2);
+            tft.print("No Data");
           }
 
           tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
@@ -503,6 +546,8 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
               sizeof(config.target_device_id));
       config.poll_interval =
           doc["params"]["poll_interval"] | config.poll_interval;
+      config.slide_interval =
+          doc["params"]["slide_interval"] | config.slide_interval;
 
       saveConfig();
       sendLog("Target Set: " + newTarget);
@@ -811,7 +856,10 @@ p{font-size:18px}
 <div style="text-align:left;padding:0 20px;">
 %CHECKBOXES%
 </div>
-<br>
+<h3>Carousel Speed</h3>
+<label>Slide Interval (ms): </label>
+<input type="number" name="slide_interval" value="%SLIDE_VAL%" min="0" style="width:80px">
+<br><br>
 <button type="submit" class="btn">Save Settings</button>
 </form>
 <hr style="border-color:#444">
@@ -824,6 +872,7 @@ p{font-size:18px}
   html.replace("%TID%", String(config.target_device_id));
   html.replace("%DID%", String(config.device_id));
   html.replace("%TID%", String(config.target_device_id));
+  html.replace("%SLIDE_VAL%", String(config.slide_interval));
 
   // Generate Checkboxes
   String checkboxes = "";
@@ -874,6 +923,10 @@ void handleSaveSettings() {
   // Always update filter (empty if none selected)
   strncpy(config.overlay_filter, newOverlay.c_str(),
           sizeof(config.overlay_filter));
+
+  if (server.hasArg("slide_interval")) {
+    config.slide_interval = server.arg("slide_interval").toInt();
+  }
 
   saveConfig();
 
@@ -982,6 +1035,8 @@ void startSetupMode() {
               sizeof(config.target_device_id));
     if (server.arg("poll_int").length() > 0)
       config.poll_interval = server.arg("poll_int").toInt();
+    if (server.arg("slide_int").length() > 0)
+      config.slide_interval = server.arg("slide_int").toInt();
 
     if (token.length() == 0 && email.length() > 0) {
       HTTPClient http;

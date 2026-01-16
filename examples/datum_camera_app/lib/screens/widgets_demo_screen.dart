@@ -23,6 +23,26 @@ class WidgetsDemoScreen extends StatelessWidget {
             "ui:widget": "timeseries",
             "readOnly": true
           },
+          "start_color": {
+            "title": "Start Color",
+            "type": "string",
+            "ui:widget": "color",
+            "readOnly": false
+          },
+          "dimming": {
+            "title": "Brightness",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "unit": "%",
+            "readOnly": false
+          },
+          "mode": {
+            "title": "Operation Mode",
+            "type": "string",
+            "enum": ["Auto", "Manual", "Eco", "Boost"],
+            "readOnly": false
+          },
           "speed": {
             "title": "Engine Speed",
             "type": "number",
