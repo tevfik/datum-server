@@ -270,10 +270,15 @@ void drawCameraView() {
       WiFiClientSecure *s = new WiFiClientSecure();
       s->setInsecure();
       s->setBufferSizes(4096, 512);
+      s->setNoDelay(true); // Disable Nagle
+      s->setTimeout(2000);
       streamClient = s;
       isSecure = true;
     } else {
-      streamClient = new WiFiClient();
+      WiFiClient *c = new WiFiClient();
+      c->setNoDelay(true); // Disable Nagle
+      c->setTimeout(2000);
+      streamClient = c;
       isSecure = false;
     }
 
@@ -281,8 +286,10 @@ void drawCameraView() {
     Serial.print(host);
     Serial.print(":");
     Serial.println(port);
+    unsigned long startConnect = millis();
 
     if (streamClient->connect(host.c_str(), port)) {
+      Serial.printf("Connected in %lums\n", millis() - startConnect);
       // Send HTTP Request
       streamClient->print("GET /dev/" + String(config.target_device_id) +
                           "/stream/mjpeg HTTP/1.1\r\n");
@@ -299,42 +306,37 @@ void drawCameraView() {
   }
 
   // 2. Stream Parsing (Multipart)
-  // Logic: Read line by line looking for Content-Length
-  // This is a blocking read for the header, then block read for body
-  // To keep loop responsive, we depend on valid stream data arriving
-
   if (streamClient->available()) {
-    static int violence_counter = 0; // Prevent infinite loops
-
+    unsigned long tStart = millis();
     String line = streamClient->readStringUntil('\n');
     line.trim();
 
-    // Simple Parse Logic for "Content-Length: <size>"
+    // Debug Header
+    // if (line.length() > 0) Serial.println("HDR: " + line);
+
     if (line.startsWith("Content-Length:")) {
       int len = line.substring(15).toInt();
       if (len > 0 && len < 40000) {
-        // Skip empty line after headers
-        streamClient->readStringUntil('\n');
+        streamClient->readStringUntil('\n'); // Skip empty line
 
-        // Read Image Data
         if (ESP.getFreeHeap() > len + 2000) {
           uint8_t *valBuffer = (uint8_t *)malloc(len);
           if (valBuffer) {
-            int bytesRead = 0;
-            while (bytesRead < len && streamClient->connected()) {
-              int c =
-                  streamClient->read(valBuffer + bytesRead, len - bytesRead);
-              if (c > 0)
-                bytesRead += c;
-              else
-                delay(1);
-            }
+            unsigned long tDL = millis();
+            int bytesRead = streamClient->readBytes(valBuffer, len);
+            unsigned long tDownload = millis() - tDL;
 
             if (bytesRead == len) {
-              // Draw!
+              unsigned long tDec = millis();
               TJpgDec.drawJpg(40, 0, valBuffer, len);
+              unsigned long tDecode = millis() - tDec;
 
-              // Clear surrounding areas logic moved to Mode Switch
+              unsigned long tTotal = millis() - tStart;
+              Serial.printf("Frame: %d bytes | DL: %lums | Dec: %lums | Tot: "
+                            "%lums | FPS: %.1f\n",
+                            len, tDownload, tDecode, tTotal, 1000.0 / tTotal);
+            } else {
+              Serial.printf("Incomplete Frame: %d/%d\n", bytesRead, len);
             }
             free(valBuffer);
           }
