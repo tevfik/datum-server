@@ -276,11 +276,14 @@ void drawCameraView() {
               interval = 500;
 
             // Calculate index based on time
-            static int carouselIndex = 0;
-            if (now - lastCarouselTime > interval) {
+            // Calculate index based on time
+            // Use LOCAL static timer, independent of global display loop
+            static unsigned long lastSlideTime = 0;
+            if (now - lastSlideTime > interval) {
               carouselIndex = (carouselIndex + 1) % filtered.size();
-              lastCarouselTime = now;
+              lastSlideTime = now;
             }
+            // Handle resize
             if (carouselIndex >= filtered.size())
               carouselIndex = 0;
 
@@ -1223,8 +1226,14 @@ void loop() {
       mqttClient.loop();
     }
 
-    if (now - lastPollTime > (unsigned long)config.poll_interval * 1000UL ||
-        config.poll_interval == 0) {
+    // Poll Device Logic
+    // If poll_interval is 0, default to 5 seconds to prevent network
+    // flooding/FPS drop
+    unsigned long pInt = config.poll_interval > 0
+                             ? (unsigned long)config.poll_interval * 1000UL
+                             : 5000UL;
+
+    if (now - lastPollTime > pInt) {
       lastPollTime = now;
       pollDevice();
     }
@@ -1238,10 +1247,14 @@ void loop() {
     // Dynamic Display Update Frequency
     // If showing Camera, update as fast as possible (0 delay).
     // If showing Status Cards, rotate every 5000ms.
-    unsigned long displayInterval = hasCameraProp ? 0 : 5000;
+    unsigned long displayInterval =
+        (hasCameraProp && getCachedValue("stream_enabled") == "true") ? 0
+                                                                      : 5000;
 
-    if (now - lastCarouselTime > displayInterval) {
-      lastCarouselTime = now;
+    // Use a separate timer for display refresh to not conflict with carousel
+    static unsigned long lastDisplayTime = 0;
+    if (now - lastDisplayTime > displayInterval) {
+      lastDisplayTime = now;
       updateDisplay();
     }
 
