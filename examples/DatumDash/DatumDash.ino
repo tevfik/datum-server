@@ -35,7 +35,7 @@ WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 
 // -- Config Structure --
-#define CONFIG_MAGIC 0xDD03
+#define CONFIG_MAGIC 0xDD04
 #define FIRMWARE_VER "1.1.2" // Bumped version
 #define DEVICE_TYPE_NAME "display"
 
@@ -50,6 +50,7 @@ struct Config {
   char target_device_id[37];
   int poll_interval;
   int boot_failures;
+  char overlay_filter[64];
 };
 Config config;
 
@@ -146,6 +147,11 @@ void loadConfig() {
     memset(&config, 0, sizeof(Config));
     Serial.println("Config Cleared.");
     config.magic = CONFIG_MAGIC;
+    strncpy(config.device_id, "", sizeof(config.device_id));
+    // Default Overlay
+    strncpy(config.overlay_filter, "temp,volt,curr,pow",
+            sizeof(config.overlay_filter));
+    config.boot_failures = 0;
     strcpy(config.server_url, "https://datum.bezg.in");
     config.poll_interval = 5;
     saveConfig();
@@ -247,20 +253,25 @@ void drawCameraView() {
           for (auto &v : valueCache) {
             if (count >= 2)
               break; // limit to 2 lines overlay
-            // Filter for common telemetry
-            if (v.key.indexOf("temp") != -1 || v.key.indexOf("volt") != -1 ||
-                v.key.indexOf("curr") != -1 || v.key.indexOf("pow") != -1) {
-              tft.setCursor(5, yPos);
-              tft.setTextColor(ST77XX_WHITE,
-                               ST77XX_BLACK); // Black BG for readability
-              tft.setTextSize(2);
-              tft.print(v.value);
-              // Find unit
-              // For now just print value, unit is in properties vector not
-              // cache. Simplified overlay.
-              yPos += 20;
-              count++;
+            // Use Configured Filter
+            if (config.overlay_filter[0] != 0 &&
+                strstr(config.overlay_filter, v.key.c_str()) == NULL) {
+              continue;
             }
+            // Draw valid item
+            tft.setCursor(5, yPos);
+            tft.setTextColor(ST77XX_WHITE,
+                             ST77XX_BLACK); // Black BG for readability
+            tft.setTextSize(2);
+            tft.print(v.value);
+            // Find unit
+            // For now just print value, unit is in properties vector not
+            // cache. Simplified overlay.
+            yPos += 20;
+            count++;
+            yPos += 20;
+            count++;
+            // } -> removed block bracket from previous hardcoded if
           }
 
           tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
@@ -483,6 +494,13 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
               sizeof(config.target_device_id));
       config.poll_interval =
           doc["params"]["poll_interval"] | config.poll_interval;
+
+      String newOverlay = doc["params"]["overlay"] | "";
+      if (newOverlay.length() > 0) {
+        strncpy(config.overlay_filter, newOverlay.c_str(),
+                sizeof(config.overlay_filter));
+      }
+
       saveConfig();
       sendLog("Target Set: " + newTarget);
       showStatus("Target Updated!", ST77XX_GREEN);
