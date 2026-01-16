@@ -255,14 +255,10 @@ void drawCameraView() {
           free(valBuffer);
 
           // 2. Clear surrounding areas to prevent artifacts
-          // Left Side (40px)
-          tft.fillRect(0, 0, 40, 120, ST77XX_BLACK);
-          // Right Side (40px)
-          tft.fillRect(200, 0, 40, 120, ST77XX_BLACK);
-          // Bottom Side (120px high)
-          tft.fillRect(0, 120, 240, 120, ST77XX_BLACK);
+          // (Disabled for performance - screen should be cleared on mode switch
+          // logic later if needed)
 
-          // 3. Draw Data in Bottom Area (Carousel)
+          // 3. Draw Data in Bottom Area (Carousel) with Smart Redraw
           // Filter first
           std::vector<ValueCache> filtered;
           for (auto &v : valueCache) {
@@ -277,7 +273,7 @@ void drawCameraView() {
             int interval =
                 config.slide_interval > 0 ? config.slide_interval : 3000;
             if (interval < 100)
-              interval = 500; // Safeguard
+              interval = 500;
 
             // Calculate index based on time
             static int carouselIndex = 0;
@@ -290,45 +286,58 @@ void drawCameraView() {
 
             ValueCache &v = filtered[carouselIndex];
 
-            // Draw Centered Huge Text
-            tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
-            tft.setTextSize(2);
-            int16_t x1, y1;
-            uint16_t w, h;
+            // Smart Redraw: Only draw if changed
+            static int lastDrawnIndex = -1;
+            static String lastDrawnVal = "";
 
-            // Key
-            String keyStr = v.key;
-            keyStr.toUpperCase();
-            tft.getTextBounds(keyStr, 0, 0, &x1, &y1, &w, &h);
-            tft.setCursor((240 - w) / 2, 140);
-            tft.print(keyStr);
+            if (carouselIndex != lastDrawnIndex || v.value != lastDrawnVal) {
+              // Clear Bottom
+              tft.fillRect(0, 120, 240, 120, ST77XX_BLACK);
 
-            // Value
-            tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-            tft.setTextSize(3);
-            tft.getTextBounds(v.value, 0, 0, &x1, &y1, &w, &h);
-            // Verify if it fits
-            if (w > 220)
+              // Draw Key
+              tft.setTextColor(ST77XX_CYAN, ST77XX_BLACK);
               tft.setTextSize(2);
+              int16_t x1, y1;
+              uint16_t w, h;
+              String keyStr = v.key;
+              keyStr.toUpperCase();
+              tft.getTextBounds(keyStr, 0, 0, &x1, &y1, &w, &h);
+              tft.setCursor((240 - w) / 2, 140);
+              tft.print(keyStr);
 
-            tft.getTextBounds(v.value, 0, 0, &x1, &y1, &w, &h); // Recalc
-            tft.setCursor((240 - w) / 2, 180);
-            tft.print(v.value);
+              // Draw Value
+              tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+              tft.setTextSize(3);
+              tft.getTextBounds(v.value, 0, 0, &x1, &y1, &w, &h);
+              if (w > 220)
+                tft.setTextSize(2); // Auto-scale
+              tft.getTextBounds(v.value, 0, 0, &x1, &y1, &w, &h);
+              tft.setCursor((240 - w) / 2, 180);
+              tft.print(v.value);
 
-            // Pagination Dots (Optional, maybe later)
-            // Draw indicator like (1/5)
-            tft.setTextSize(1);
-            tft.setTextColor(ST77XX_DARKGREY, ST77XX_BLACK);
-            String pag =
-                String(carouselIndex + 1) + "/" + String(filtered.size());
-            tft.getTextBounds(pag, 0, 0, &x1, &y1, &w, &h);
-            tft.setCursor((240 - w) / 2, 220);
-            tft.print(pag);
+              // Pagination
+              tft.setTextSize(1);
+              tft.setTextColor(ST77XX_DARKGREY, ST77XX_BLACK);
+              String pag =
+                  String(carouselIndex + 1) + "/" + String(filtered.size());
+              tft.getTextBounds(pag, 0, 0, &x1, &y1, &w, &h);
+              tft.setCursor((240 - w) / 2, 220);
+              tft.print(pag);
+
+              lastDrawnIndex = carouselIndex;
+              lastDrawnVal = v.value;
+            }
           } else {
-            tft.setTextColor(ST77XX_GREY, ST77XX_BLACK);
-            tft.setCursor(60, 170);
-            tft.setTextSize(2);
-            tft.print("No Data");
+            // No Data case
+            static bool noDataDrawn = false;
+            if (!noDataDrawn) {
+              tft.fillRect(0, 120, 240, 120, ST77XX_BLACK);
+              tft.setTextColor(ST77XX_GREY, ST77XX_BLACK);
+              tft.setCursor(60, 170);
+              tft.setTextSize(2);
+              tft.print("No Data");
+              noDataDrawn = true;
+            }
           }
 
           tft.setTextColor(ST77XX_GREEN, ST77XX_BLACK);
@@ -1111,10 +1120,10 @@ void setup() {
   digitalWrite(TFT_BL, LOW); // Max Brightness
 
   tft.init(240, 240, SPI_MODE3);
+  tft.setSPISpeed(40000000); // Boost to 40MHz
   tft.invertDisplay(true);
   tft.setRotation(2);
   tft.fillScreen(ST77XX_BLACK);
-  tft.setSPISpeed(20000000);
 
   // TJpg Dec Init
   TJpgDec.setJpgScale(1);
