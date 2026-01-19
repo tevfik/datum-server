@@ -103,6 +103,7 @@ func (h *AdminHandler) GetSystemConfigHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"retention": gin.H{
 			"days":                 config.DataRetention,
+			"public_days":          config.PublicDataRetention,
 			"check_interval_hours": 6,
 		},
 		"rate_limit": gin.H{
