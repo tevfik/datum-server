@@ -15,6 +15,7 @@ export interface SystemStats {
     total_devices: number;
     platform_name: string;
     data_retention_days: number;
+    public_data_retention_days?: number;
     allow_register?: boolean;
     // New fields
     server_time?: string;
@@ -55,6 +56,7 @@ export interface PublishRequest {
 export interface SystemConfig {
     retention: {
         days: number;
+        public_days?: number;
         check_interval_hours: number;
     };
     rate_limit: {
@@ -80,6 +82,7 @@ export interface LogsResponse {
 
 export interface UpdateRetentionRequest {
     days: number;
+    public_days: number;
     check_interval_hours: number;
 }
 

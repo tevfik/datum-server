@@ -37,16 +37,16 @@ export const adminService = {
 
     // System Config & Logs
     getSystemConfig: async (): Promise<SystemConfig> => {
-        const { data } = await api.get<SystemConfig>('/admin/config');
+        const { data } = await api.get<SystemConfig>('/admin/sys/config');
         return data;
     },
 
     updateRetention: async (req: UpdateRetentionRequest): Promise<void> => {
-        await api.put('/admin/config/retention', req);
+        await api.put('/admin/sys/retention', req);
     },
 
     updateRegistration: async (req: UpdateRegistrationRequest): Promise<void> => {
-        await api.put('/admin/config/registration', req);
+        await api.put('/admin/sys/registration', req);
     },
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -55,12 +55,12 @@ export const adminService = {
         // Actually admin.go doesn't support limit param in readLastLines call directly in handler (hardcoded 500)
         // But handler accepts query? No, handler calls readLastLines(path, 500).
         // It accepts `type`, `level`, `search`.
-        const { data } = await api.get<LogsResponse>(`/admin/logs`);
-        return data;
+        const { data } = await api.get<LogsResponse>(`/admin/sys/logs`);
+        return data; // was /admin/logs and /admin/config/retention in TS but admin.go is /admin/sys/...
     },
 
     clearLogs: async (): Promise<void> => {
-        await api.delete('/admin/logs');
+        await api.delete('/admin/sys/logs');
     },
 
     uploadFirmware: async (file: File): Promise<{ url: string; filename: string }> => {

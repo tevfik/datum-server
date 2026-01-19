@@ -12,6 +12,7 @@ export function SystemTab() {
 
     // Config State
     const [retentionDays, setRetentionDays] = useState(7);
+    const [publicRetentionDays, setPublicRetentionDays] = useState(1);
     const [allowRegister, setAllowRegister] = useState(false);
     const [configError, setConfigError] = useState("");
 
@@ -25,6 +26,7 @@ export function SystemTab() {
     useEffect(() => {
         if (config) {
             setRetentionDays(config.retention.days);
+            setPublicRetentionDays(config.retention.public_days || 1);
             // allow_register is not in SystemConfig, handled via systemStats below
         }
     }, [config]);
@@ -80,7 +82,7 @@ export function SystemTab() {
     });
 
     const handleSaveRetention = () => {
-        retentionMutation.mutate({ days: retentionDays, check_interval_hours: 6 });
+        retentionMutation.mutate({ days: retentionDays, public_days: publicRetentionDays, check_interval_hours: 6 });
     };
 
     const handleToggleRegister = () => {
@@ -141,7 +143,7 @@ export function SystemTab() {
                         )}
 
                         <div className="space-y-2">
-                            <Label>Data Retention (Days)</Label>
+                            <Label>Data Retention (Global - Days)</Label>
                             <div className="flex gap-2">
                                 <Input
                                     type="number"
@@ -155,7 +157,26 @@ export function SystemTab() {
                                 </Button>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                Data older than this will be automatically deleted.
+                                Data older than this will be automatically deleted from disk.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Public Data Retention (Days)</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    type="number"
+                                    value={publicRetentionDays}
+                                    onChange={(e) => setPublicRetentionDays(parseInt(e.target.value) || 0)}
+                                    min={1}
+                                    max={365}
+                                />
+                                <Button onClick={handleSaveRetention} disabled={retentionMutation.isPending}>
+                                    <Save className="h-4 w-4 mr-2" /> Save
+                                </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Data published to public APIs will be hidden after this many days.
                             </p>
                         </div>
 
