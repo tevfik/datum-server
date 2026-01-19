@@ -84,11 +84,6 @@ func HybridAuthMiddleware(store storage.Provider) gin.HandlerFunc {
 			}
 		}
 
-		// Fallback to query param if header is missing
-		if token == "" {
-			token = c.Query("token")
-		}
-
 		// Debug Log
 		logger.GetLogger().Info().Str("token_prefix", func() string {
 			if len(token) > 4 {
