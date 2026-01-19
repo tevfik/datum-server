@@ -84,6 +84,33 @@ func TestUpdateRetentionPolicyHandler(t *testing.T) {
 	assert.Equal(t, "Retention policy updated", response["message"])
 }
 
+func TestUpdateRetentionPolicyHandlerWithPublic(t *testing.T) {
+	router, cleanup := setupAdminConfigTestServer(t)
+	defer cleanup()
+
+	h := handlers.NewAdminHandler(store, nil, time.Now())
+	router.PUT("/admin/sys/retention", h.UpdateRetentionPolicyHandler)
+
+	body := map[string]interface{}{
+		"days":                 30,
+		"public_days":          3,
+		"check_interval_hours": 12,
+	}
+	bodyBytes, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/admin/sys/retention", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	retention := response["retention"].(map[string]interface{})
+	assert.Equal(t, float64(3), retention["public_days"])
+}
+
 func TestUpdateRetentionPolicyHandlerInvalidDays(t *testing.T) {
 	router, cleanup := setupAdminConfigTestServer(t)
 	defer cleanup()

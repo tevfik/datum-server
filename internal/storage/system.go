@@ -9,11 +9,12 @@ import (
 
 // SystemConfig stores platform-wide configuration
 type SystemConfig struct {
-	Initialized   bool      `json:"initialized"`
-	SetupAt       time.Time `json:"setup_at,omitempty"`
-	PlatformName  string    `json:"platform_name"`
-	AllowRegister bool      `json:"allow_register"` // Public registration toggle
-	DataRetention int       `json:"data_retention"` // Days to keep data
+	Initialized         bool      `json:"initialized"`
+	SetupAt             time.Time `json:"setup_at,omitempty"`
+	PlatformName        string    `json:"platform_name"`
+	AllowRegister       bool      `json:"allow_register"`        // Public registration toggle
+	DataRetention       int       `json:"data_retention"`        // Days to keep data
+	PublicDataRetention int       `json:"public_data_retention"` // Days to keep public data
 }
 
 const systemConfigKey = "system:config"
@@ -29,6 +30,14 @@ func (s *Storage) GetSystemConfig() (*SystemConfig, error) {
 		}
 		return json.Unmarshal([]byte(data), &config)
 	})
+
+	// Ensure defaults for new fields if not present in DB
+	if err == nil {
+		if config.PublicDataRetention == 0 {
+			config.PublicDataRetention = 1 // Default to 1 day if not set
+		}
+	}
+
 	return &config, err
 }
 
@@ -55,12 +64,18 @@ func (s *Storage) IsSystemInitialized() bool {
 
 // InitializeSystem marks the system as initialized with the given settings
 func (s *Storage) InitializeSystem(platformName string, allowRegister bool, retention int) error {
+	defaultPublicRetention := 1
+	if env := GetRetentionConfigFromEnv(); env.PublicMaxAge > 0 {
+		defaultPublicRetention = int(env.PublicMaxAge.Hours() / 24)
+	}
+
 	config := &SystemConfig{
-		Initialized:   true,
-		SetupAt:       time.Now(),
-		PlatformName:  platformName,
-		AllowRegister: allowRegister,
-		DataRetention: retention,
+		Initialized:         true,
+		SetupAt:             time.Now(),
+		PlatformName:        platformName,
+		AllowRegister:       allowRegister,
+		DataRetention:       retention,
+		PublicDataRetention: defaultPublicRetention,
 	}
 	return s.SaveSystemConfig(config)
 }
@@ -110,7 +125,17 @@ func (s *Storage) UpdateDataRetention(days int) error {
 	return s.SaveSystemConfig(config)
 }
 
-// UpdateRegistrationConfig updates the public registration setting
+// UpdatePublicDataRetention updates the public data retention policy
+func (s *Storage) UpdatePublicDataRetention(days int) error {
+	config, err := s.GetSystemConfig()
+	if err != nil {
+		return err
+	}
+	config.PublicDataRetention = days
+	return s.SaveSystemConfig(config)
+}
+
+// UpdateRegistrationConfig updates the registration policy
 func (s *Storage) UpdateRegistrationConfig(allow bool) error {
 	config, err := s.GetSystemConfig()
 	if err != nil {

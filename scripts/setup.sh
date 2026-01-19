@@ -33,7 +33,7 @@ echo ""
 # Check if .env exists
 if [ ! -f .env ]; then
     echo -e "${YELLOW}📝 Creating .env file from template...${NC}"
-    cp .env.example .env
+    cp docker/.env.example .env
     
     # Generate random JWT secret
     JWT_SECRET=$(openssl rand -base64 32 2>/dev/null || cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)

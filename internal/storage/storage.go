@@ -2191,3 +2191,13 @@ func (s *Storage) ListAllCollections() ([]CollectionInfo, error) {
 
 	return result, nil
 }
+
+// CleanupPublicData currently acts as a placeholder or soft-limit enforcer.
+// Since tstorage does not support selective deletion by prefix efficiently,
+// we rely on the global retention for physical deletion.
+// However, specific filtering logic is applied at read time in the API layer.
+func (s *Storage) CleanupPublicData(maxAge time.Duration) (int, error) {
+	// Future optimization: If tstorage adds delete support, implement here.
+	// For now, no physical cleanup beyond global retention.
+	return 0, nil
+}

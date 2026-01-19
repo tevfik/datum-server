@@ -74,6 +74,7 @@ type Provider interface {
 	DeleteDeviceUIDIndex(deviceUID string) error
 	CleanupExpiredProvisioningRequests() (int, error)
 	PurgeProvisioningRequests(maxAge time.Duration) (int, error)
+	CleanupPublicData(maxAge time.Duration) (int, error)
 
 	// User API Key Operations
 	CreateUserAPIKey(key *APIKey) error
@@ -89,6 +90,7 @@ type Provider interface {
 	ResetSystem() error
 	ExportDatabase() (map[string]interface{}, error)
 	UpdateDataRetention(days int) error
+	UpdatePublicDataRetention(days int) error
 	UpdateRegistrationConfig(allow bool) error
 
 	// Generic Document Store (Collections)

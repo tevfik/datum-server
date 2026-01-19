@@ -141,6 +141,7 @@ func (h *AdminHandler) UpdateRegistrationConfigHandler(c *gin.Context) {
 
 type UpdateRetentionRequest struct {
 	Days               int `json:"days" binding:"required,min=1,max=365"`
+	PublicDays         int `json:"public_days"` // Optional, default to 0 (no change) or explicit value
 	CheckIntervalHours int `json:"check_interval_hours" binding:"required,min=1,max=24"`
 }
 
@@ -156,10 +157,18 @@ func (h *AdminHandler) UpdateRetentionPolicyHandler(c *gin.Context) {
 		return
 	}
 
+	if req.PublicDays > 0 {
+		if err := h.Store.UpdatePublicDataRetention(req.PublicDays); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Retention policy updated",
 		"retention": gin.H{
 			"days":                 req.Days,
+			"public_days":          req.PublicDays,
 			"check_interval_hours": req.CheckIntervalHours,
 		},
 	})
@@ -222,6 +231,7 @@ func (h *AdminHandler) GetDatabaseStatsHandler(c *gin.Context) {
 	stats["platform_name"] = config.PlatformName
 	stats["allow_register"] = config.AllowRegister
 	stats["data_retention_days"] = config.DataRetention
+	stats["public_data_retention_days"] = config.PublicDataRetention
 
 	// Add Server Time and Uptime
 	stats["server_time"] = time.Now().Format(time.RFC3339)

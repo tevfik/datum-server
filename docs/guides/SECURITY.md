@@ -29,8 +29,8 @@ We will respond within 48 hours and work with you to understand and resolve the 
 
 1. **Change Default Secrets**
    ```bash
-   # Copy .env.example to .env and update all secrets
-   cp .env.example .env
+   # Copy docker/.env.example to .env and update all secrets
+   cp docker/.env.example .env
    # Generate strong JWT secret (min 32 characters)
    openssl rand -base64 32
    ```

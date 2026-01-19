@@ -43,6 +43,14 @@ func postPublicDataHandler(c *gin.Context) {
 func getPublicDataHandler(c *gin.Context) {
 	deviceID := "public_" + c.Param("device_id")
 
+	// Get system config for public retention
+	config, err := store.GetSystemConfig()
+	retentionDays := 1 // Default
+	if err == nil && config != nil && config.PublicDataRetention > 0 {
+		retentionDays = config.PublicDataRetention
+	}
+	cutoffTime := time.Now().Add(-time.Duration(retentionDays) * 24 * time.Hour)
+
 	// Check for history params
 	hasHistoryParams := false
 	for _, param := range []string{"limit"} { // Public data currently only supports limit (based on previous implementation)
@@ -57,6 +65,12 @@ func getPublicDataHandler(c *gin.Context) {
 		point, err := store.GetLatestData(deviceID)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "No data found"})
+			return
+		}
+
+		// Enforce Soft Retention
+		if point.Timestamp.Before(cutoffTime) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "No data found (expired)"})
 			return
 		}
 
@@ -88,10 +102,13 @@ func getPublicDataHandler(c *gin.Context) {
 
 	var response []DataResponse
 	for _, p := range points {
-		response = append(response, DataResponse{
-			Timestamp: p.Timestamp.Format(time.RFC3339),
-			Data:      p.Data,
-		})
+		// Enforce Soft Retention
+		if p.Timestamp.After(cutoffTime) {
+			response = append(response, DataResponse{
+				Timestamp: p.Timestamp.Format(time.RFC3339),
+				Data:      p.Data,
+			})
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

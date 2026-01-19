@@ -170,6 +170,7 @@ func main() {
 			Str("timeseries", "tstorage").
 			Str("data_dir", dataDirPath).
 			Dur("retention", retentionConfig.MaxAge).
+			Dur("public_retention", retentionConfig.PublicMaxAge).
 			Msg("Storage initialized")
 	}
 
@@ -557,6 +558,14 @@ func startPeriodicCleanup() {
 			// Purge old provisioning requests (Hard Delete > 7 days old)
 			if count, err := store.PurgeProvisioningRequests(7 * 24 * time.Hour); err == nil && count > 0 {
 				log.Info().Int("count", count).Msg("Periodic cleanup: purged old provisioning requests")
+			}
+
+			// Cleanup Public Data (Soft/Hard check)
+			config, _ := store.GetSystemConfig()
+			if config != nil && config.PublicDataRetention > 0 {
+				if count, err := store.CleanupPublicData(time.Duration(config.PublicDataRetention) * 24 * time.Hour); err == nil && count > 0 {
+					log.Info().Int("count", count).Msg("Periodic cleanup: public data")
+				}
 			}
 		}
 	}()

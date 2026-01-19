@@ -59,12 +59,18 @@ func (s *PostgresStore) IsSystemInitialized() bool {
 
 // InitializeSystem marks the system as initialized
 func (s *PostgresStore) InitializeSystem(platformName string, allowRegister bool, retention int) error {
+	defaultPublicRetention := 1
+	if env := storage.GetRetentionConfigFromEnv(); env.PublicMaxAge > 0 {
+		defaultPublicRetention = int(env.PublicMaxAge.Hours() / 24)
+	}
+
 	config := &storage.SystemConfig{
-		Initialized:   true,
-		SetupAt:       time.Now(),
-		PlatformName:  platformName,
-		AllowRegister: allowRegister,
-		DataRetention: retention,
+		Initialized:         true,
+		SetupAt:             time.Now(),
+		PlatformName:        platformName,
+		AllowRegister:       allowRegister,
+		DataRetention:       retention,
+		PublicDataRetention: defaultPublicRetention,
 	}
 	return s.SaveSystemConfig(config)
 }
@@ -129,4 +135,30 @@ func (s *PostgresStore) UpdateRegistrationConfig(allow bool) error {
 	}
 	config.AllowRegister = allow
 	return s.SaveSystemConfig(config)
+}
+
+// UpdatePublicDataRetention updates public data retention policy
+func (s *PostgresStore) UpdatePublicDataRetention(days int) error {
+	config, err := s.GetSystemConfig()
+	if err != nil {
+		return err
+	}
+	if config == nil {
+		return fmt.Errorf("system not initialized")
+	}
+	config.PublicDataRetention = days
+	return s.SaveSystemConfig(config)
+}
+
+// CleanupPublicData deletes public data older than maxAge
+func (s *PostgresStore) CleanupPublicData(maxAge time.Duration) (int, error) {
+	cutoff := time.Now().Add(-maxAge)
+	// Assuming device_id for public data starts with 'public_'
+	query := `DELETE FROM data_points WHERE device_id LIKE 'public_%' AND timestamp < $1`
+	result, err := s.db.Exec(query, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	rows, _ := result.RowsAffected()
+	return int(rows), nil
 }
