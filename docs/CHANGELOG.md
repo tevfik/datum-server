@@ -5,14 +5,19 @@ All notable changes to Datum IoT Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.5.0] - 2026-01-20
 
 ### Added
+- **Application Keys**: Implemented `ak_` prefixed persistent API keys for server-to-server or CLI auth.
+- **Datumctl**: Added `datumctl login --api-key` support with validation.
+- **Roadmap**: Added future steps documentation for Mobile, Firmware, and CI/CD.
+- **Mobile**: Fixed Flutter widget tests and build issues.
 - Comprehensive test suite with 400+ tests achieving 68.6% coverage
 - Test file reorganization following Go naming conventions
 - Documentation improvements (CONTRIBUTING.md, TESTING.md, DEPLOYMENT.md)
 
 ### Changed
+- **Refactor**: Centralized authentication middleware in `internal/auth` and removed `cmd/server/middleware.go`.
 - Renamed test files to follow Go standards:
   - `critical_handlers_boost_test.go` → `handlers_data_test.go`
   - `medium_coverage_boost_test.go` → `handlers_system_test.go`
