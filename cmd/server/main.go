@@ -299,7 +299,7 @@ func main() {
 
 	// Authenticated user routes (password change, self-deletion)
 	authProtectedGroup := r.Group("/auth")
-	authProtectedGroup.Use(UserAuthMiddleware(store))
+	authProtectedGroup.Use(auth.UserAuthMiddleware(store))
 	{
 		authProtectedGroup.PUT("/password", changePasswordHandler)
 		authProtectedGroup.DELETE("/user", deleteSelfHandler)
@@ -315,7 +315,7 @@ func main() {
 
 	// Device management routes (require user auth)
 	devGroup := r.Group("/dev")
-	devGroup.Use(UserAuthMiddleware(store))
+	devGroup.Use(auth.UserAuthMiddleware(store))
 	{
 		// Management
 		devGroup.POST("", createDeviceHandler)
@@ -352,11 +352,11 @@ func main() {
 
 	// Specialized route for Thing Description (supports both User and Device Auth)
 	// Must be registered outside of Auth Groups to avoid conflict and allow hybrid auth
-	r.PUT("/dev/:device_id/thing-description", HybridAuthMiddleware(store), updateDeviceThingDescriptionHandler)
+	r.PUT("/dev/:device_id/thing-description", auth.HybridAuthMiddleware(store), updateDeviceThingDescriptionHandler)
 
 	// Hybrid Auth Routes (User OR Device can access)
 	hybridGroup := r.Group("/dev")
-	hybridGroup.Use(HybridAuthMiddleware(store))
+	hybridGroup.Use(auth.HybridAuthMiddleware(store))
 	{
 		hybridGroup.GET("/:device_id", getDeviceHandler)
 		hybridGroup.GET("/:device_id/data", getDataHandler)
@@ -423,7 +423,7 @@ func main() {
 	// setupKeyRoutes(r, store) // Assuming this is a new call, but not explicitly in the original file.
 
 	// Provisioning routes (Mobile App & Device Activation)
-	RegisterProvisioningRoutes(r, UserAuthMiddleware(store))
+	RegisterProvisioningRoutes(r, auth.UserAuthMiddleware(store))
 
 	// Swagger UI documentation
 	setupSwagger(r)

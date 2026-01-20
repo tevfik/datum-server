@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -46,8 +47,26 @@ func init() {
 }
 
 func runLogin(cmd *cobra.Command, args []string) error {
-	// If API key is provided, just save it
+	// If API key is provided, verify and save it
 	if loginAPIKey != "" {
+		fmt.Printf("Verifying API Key with %s...\n", serverURL)
+		client := NewAPIClient(serverURL, "", loginAPIKey)
+
+		// Check against an authenticated endpoint (listing keys requires auth)
+		resp, err := client.Get("/auth/keys")
+		if err != nil {
+			return fmt.Errorf("failed to connect to server: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusUnauthorized {
+			return fmt.Errorf("invalid API key (401 Unauthorized)")
+		}
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("server verify failed with status: %d", resp.StatusCode)
+		}
+
+		fmt.Println("✅ API Key verified successfully!")
 		return saveAPIKey(loginAPIKey)
 	}
 

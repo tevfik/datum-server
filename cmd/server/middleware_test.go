@@ -36,7 +36,7 @@ func TestUserAuthMiddleware_Success_JWT(t *testing.T) {
 	defer cleanup()
 
 	// Setup protected route
-	router.GET("/protected", UserAuthMiddleware(store), func(c *gin.Context) {
+	router.GET("/protected", auth.UserAuthMiddleware(store), func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"user_id": c.GetString("user_id"),
 			"role":    c.GetString("role"),
@@ -75,7 +75,7 @@ func TestUserAuthMiddleware_Success_APIKey(t *testing.T) {
 	store.CreateUserAPIKey(apiKey)
 
 	// Setup protected route
-	router.GET("/protected-key", UserAuthMiddleware(store), func(c *gin.Context) {
+	router.GET("/protected-key", auth.UserAuthMiddleware(store), func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"user_id":     c.GetString("user_id"),
 			"auth_method": c.GetString("auth_method"),
@@ -96,7 +96,7 @@ func TestUserAuthMiddleware_MissingToken(t *testing.T) {
 	router, _, cleanup := setupMiddlewareTestServer(t)
 	defer cleanup()
 
-	router.GET("/protected", UserAuthMiddleware(store), func(c *gin.Context) {})
+	router.GET("/protected", auth.UserAuthMiddleware(store), func(c *gin.Context) {})
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 	w := httptest.NewRecorder()
@@ -109,7 +109,7 @@ func TestUserAuthMiddleware_InvalidJWT(t *testing.T) {
 	router, _, cleanup := setupMiddlewareTestServer(t)
 	defer cleanup()
 
-	router.GET("/protected", UserAuthMiddleware(store), func(c *gin.Context) {})
+	router.GET("/protected", auth.UserAuthMiddleware(store), func(c *gin.Context) {})
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 	req.Header.Set("Authorization", "Bearer invalid.jwt.token")
@@ -123,7 +123,7 @@ func TestUserAuthMiddleware_InvalidAPIKey(t *testing.T) {
 	router, _, cleanup := setupMiddlewareTestServer(t)
 	defer cleanup()
 
-	router.GET("/protected", UserAuthMiddleware(store), func(c *gin.Context) {})
+	router.GET("/protected", auth.UserAuthMiddleware(store), func(c *gin.Context) {})
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 	req.Header.Set("Authorization", "Bearer ak_invalid_key")

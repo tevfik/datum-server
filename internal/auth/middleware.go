@@ -5,10 +5,106 @@ import (
 	"net/http"
 	"strings"
 
+	"datum-go/internal/logger"
+	"datum-go/internal/storage"
+
 	"github.com/gin-gonic/gin"
 )
 
-// AuthMiddleware validates JWT tokens
+// UserAuthMiddleware handles authentication for Users via JWT or Persistent API Key (ak_)
+func UserAuthMiddleware(store storage.Provider) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		var token string
+
+		// 1. Extract token/key
+		if authHeader != "" {
+			parts := strings.Split(authHeader, " ")
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				token = parts[1]
+			}
+		}
+
+		// Fallback to query param (common for streaming/OTA)
+		if token == "" {
+			token = c.Query("token")
+		}
+
+		if token == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization required"})
+			c.Abort()
+			return
+		}
+
+		// 2. Identify Token Type
+		if strings.HasPrefix(token, "ak_") {
+			// === Persistent User API Key ===
+			user, err := store.GetUserByUserAPIKey(token)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid API Key"})
+				c.Abort()
+				return
+			}
+
+			// Valid Key -> Set Context
+			c.Set("user_id", user.ID)
+			c.Set("email", user.Email)
+			c.Set("role", user.Role)
+			c.Set("auth_method", "api_key")
+			c.Next()
+
+		} else {
+			// === JWT Token ===
+			claims, err := ValidateToken(token)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+				c.Abort()
+				return
+			}
+
+			// Valid JWT -> Set Context
+			c.Set("user_id", claims.UserID)
+			c.Set("email", claims.Email)
+			c.Set("role", claims.Role)
+			c.Set("auth_method", "jwt")
+			c.Next()
+		}
+	}
+}
+
+// HybridAuthMiddleware allows EITHER User Auth OR Device Auth
+func HybridAuthMiddleware(store storage.Provider) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		token := ""
+		if authHeader != "" {
+			parts := strings.Split(authHeader, " ")
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				token = parts[1]
+			}
+		}
+
+		// Debug Log
+		logger.GetLogger().Info().Str("token_prefix", func() string {
+			if len(token) > 4 {
+				return token[:4]
+			}
+			return "short"
+		}()).Msg("HybridAuthMiddleware Check")
+
+		// Device Auth Detection (sk_ or dk_)
+		if strings.HasPrefix(token, "sk_") || strings.HasPrefix(token, "dk_") {
+			logger.GetLogger().Info().Msg("Routing to DeviceAuthMiddleware")
+			DeviceAuthMiddleware()(c)
+			return
+		}
+
+		// User Auth Fallback (JWT or ak_)
+		UserAuthMiddleware(store)(c)
+	}
+}
+
+// AuthMiddleware validates JWT tokens (Legacy/Simple)
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
