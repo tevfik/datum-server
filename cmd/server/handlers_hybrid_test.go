@@ -35,7 +35,7 @@ func TestHybridAuthThingDescriptionUpload(t *testing.T) {
 	defer store.Close()
 
 	// Register the Hybrid route
-	r.PUT("/dev/:device_id/thing-description", HybridAuthMiddleware(store), updateDeviceThingDescriptionHandler)
+	r.PUT("/dev/:device_id/thing-description", auth.HybridAuthMiddleware(store), updateDeviceThingDescriptionHandler)
 
 	// Create Data
 	userID := "user_123"

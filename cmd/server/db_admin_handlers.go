@@ -23,7 +23,7 @@ func NewDBAdminHandler(store storage.Provider) *DBAdminHandler {
 // RegisterRoutes registers admin DB routes
 func (h *DBAdminHandler) RegisterRoutes(r *gin.Engine) {
 	adminGroup := r.Group("/admin/db")
-	adminGroup.Use(UserAuthMiddleware(h.store))
+	adminGroup.Use(auth.UserAuthMiddleware(h.store))
 	adminGroup.Use(auth.AdminMiddleware(h.store))
 	{
 		adminGroup.GET("/collections", h.listAllCollections)
