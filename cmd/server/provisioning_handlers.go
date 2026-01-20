@@ -508,7 +508,7 @@ func generateProvisioningID(prefix string) string {
 func generateProvisioningAPIKey() string {
 	bytes := make([]byte, 16)
 	rand.Read(bytes)
-	return "dk_" + hex.EncodeToString(bytes)
+	return "sk_" + hex.EncodeToString(bytes)
 }
 
 // ============ Route Registration ============
