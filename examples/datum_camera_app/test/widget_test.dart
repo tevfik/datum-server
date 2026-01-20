@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:datum_camera_app/main.dart';
@@ -9,6 +10,14 @@ void main() {
   testWidgets('App starts at Login Screen', (WidgetTester tester) async {
     // Mock SharedPreferences
     SharedPreferences.setMockInitialValues({});
+    
+    // Mock FlutterSecureStorage
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'),
+            (MethodCall methodCall) async {
+      return null;
+    });
 
     // Build our app and trigger a frame.
     await tester.pumpWidget(
