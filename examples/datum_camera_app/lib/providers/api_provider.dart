@@ -12,14 +12,10 @@ ApiClient apiClient(Ref ref) {
 
 @riverpod
 Future<ApiClient> authenticatedApiClient(Ref ref) async {
-  final token = await ref.watch(authProvider.future);
-  final client = ApiClient();
-  client.onUnauthorized = () {
-    ref.read(authProvider.notifier).logout();
-  };
-
-  if (token != null) {
-    client.setToken(token);
-  }
+  // Ensure auth is ready
+  await ref.watch(authProvider.future);
+  
+  final client = ref.read(apiClientProvider);
+  
   return client;
 }

@@ -80,19 +80,18 @@ class _DatumAppState extends State<DatumApp> {
           final authState = ref.watch(authProvider);
 
           // Listen for auth changes to reset navigation stack on logout
-          ref.listen<AsyncValue<String?>>(authProvider, (previous, next) {
-            next.whenData((token) {
-              if (token == null) {
+          ref.listen<AsyncValue<bool>>(authProvider, (previous, next) {
+            next.whenData((isAuthenticated) {
+              if (!isAuthenticated) {
                 // User logged out - clear entire stack and go to login
                 _navigatorKey.currentState?.popUntil((route) => route.isFirst);
-                // Ensure we are at root which will be LoginScreen due to home param
               }
             });
           });
 
           return authState.when(
-            data: (token) =>
-                token != null ? const HomeScreen() : const LoginScreen(),
+            data: (isAuthenticated) =>
+                isAuthenticated ? const HomeScreen() : const LoginScreen(),
             loading: () => const Scaffold(
               backgroundColor: Color(0xFF1B1B1B),
               body:

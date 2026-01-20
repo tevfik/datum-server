@@ -10,8 +10,8 @@ part 'device_provider.g.dart';
 class Devices extends _$Devices {
   @override
   Future<List<Device>> build() async {
-    final token = await ref.watch(authProvider.future);
-    if (token == null) return [];
+    final isAuthenticated = await ref.watch(authProvider.future);
+    if (!isAuthenticated) return [];
 
     final api = await ref.watch(authenticatedApiClientProvider.future);
     try {
