@@ -16,7 +16,12 @@ jobs:
       
       - name: Build Cross-Platform Binaries
         run: |
-          make build-release VERSION=${{ github.ref_name }}
+          if [[ $GITHUB_REF_TYPE == "tag" ]]; then
+            VER=${{ github.ref_name }}
+          else
+            VER="0.0.0-dev.${{ github.run_number }}"
+          fi
+          make build-release VERSION=$VER
 
       - name: Upload Backend Artifacts
         uses: actions/upload-artifact@v3
@@ -47,8 +52,12 @@ jobs:
       - name: Build APK (Inject Version)
         working-directory: examples/datum_camera_app
         run: |
-          # Strip 'v' prefix from tag (v1.0.0 -> 1.0.0)
+          # Determine version
+          if [[ $GITHUB_REF_TYPE == "tag" ]]; then
             VERSION=${GITHUB_REF_NAME#v}
+          else
+            VERSION="0.0.0-dev.${{ github.run_number }}"
+          fi
           echo "Building version: $VERSION"
           
           flutter pub get
@@ -82,6 +91,7 @@ jobs:
           ls -R assets/
 
       - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
           files: assets/*
@@ -90,6 +100,7 @@ jobs:
           generate_release_notes: true
 
       - name: Upload to Package Registry
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           echo "Uploading assets to Gitea Generic Package Registry..."
           for file in assets/*; do
