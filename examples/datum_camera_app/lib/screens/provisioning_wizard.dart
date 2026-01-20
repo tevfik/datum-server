@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:wifi_iot/wifi_iot.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../providers/auth_provider.dart';
+import '../utils/token_storage.dart';
 
 import '../utils/thing_description_registry.dart'; // Import Registry
 
@@ -214,11 +215,9 @@ class _ProvisioningWizardState extends ConsumerState<ProvisioningWizard> {
     // Based on previous file read, _token is private but there is `get isAuthenticated`.
     // I need to update AuthProvider to expose token or hack it via reflection?
     // Wait, the file read of `auth_provider.dart` showed `String? _token;` and NO public getter for token string, only `isAuthenticated`.
-    // I MUST ADD A GETTER TO AuthProvider FIRST.
-    // Assuming I will do that in next step or assuming I can modify it now.
-    // I will use `Provider.of<AuthProvider>(context, listen: false).token` and fix AuthProvider immediately after this tool call.
-
-    final token = ref.read(authProvider).value;
+    // I will use `TokenStorage`.
+    
+    final token = await TokenStorage.getAccessToken();
 
     if (token == null) {
       setState(() {

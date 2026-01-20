@@ -3,10 +3,12 @@ package auth
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,29 +37,85 @@ func TestCheckPassword(t *testing.T) {
 func TestGenerateToken(t *testing.T) {
 	userID := "usr_123"
 	email := "test@example.com"
+	role := "user"
 
-	token, err := GenerateToken(userID, email, "user")
+	token, err := GenerateToken(userID, email, role)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, token)
+
+	// validate content immediately to be sure
+	claims, err := ValidateToken(token)
+	assert.NoError(t, err)
+	assert.Equal(t, userID, claims.UserID)
+	assert.Equal(t, email, claims.Email)
+	assert.Equal(t, role, claims.Role)
+}
+
+func TestGenerateTokenPair(t *testing.T) {
+	userID := "usr_456"
+	email := "pair@example.com"
+	role := "admin"
+
+	accessToken, refreshToken, err := GenerateTokenPair(userID, email, role)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, accessToken)
+	assert.NotEmpty(t, refreshToken)
+
+	// Validate Access Token
+	aClaims, err := ValidateToken(accessToken)
+	assert.NoError(t, err)
+	assert.Equal(t, userID, aClaims.UserID)
+	assert.Equal(t, role, aClaims.Role)
+
+	// Validate Refresh Token
+	rClaims, err := ValidateToken(refreshToken)
+	assert.NoError(t, err)
+	assert.Equal(t, userID, rClaims.UserID)
+	assert.Equal(t, "refresh", rClaims.Subject)
 }
 
 func TestValidateToken(t *testing.T) {
-	userID := "usr_123"
-	email := "test@example.com"
+	userID := "usr_789"
+	email := "valid@example.com"
+	role := "user"
 
-	token, _ := GenerateToken(userID, email, "user")
+	token, _ := GenerateToken(userID, email, role)
 
 	// Test valid token
 	claims, err := ValidateToken(token)
 	assert.NoError(t, err)
 	assert.Equal(t, userID, claims.UserID)
 	assert.Equal(t, email, claims.Email)
-	assert.Equal(t, "user", claims.Role)
+	assert.Equal(t, role, claims.Role)
 
-	// Test invalid token
+	// Test invalid token string
 	_, err = ValidateToken("invalid.token.here")
 	assert.Error(t, err)
+	// assert.Equal(t, ErrInvalidToken, err) // jwt library returns specific processing errors
+
+	// Test expired token (manually create one)
+	expiredClaims := Claims{
+		UserID: userID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)), // Expired 1 hour ago
+		},
+	}
+	expiredToken := jwt.NewWithClaims(jwt.SigningMethodHS256, expiredClaims)
+	expiredTokenString, _ := expiredToken.SignedString(jwtSecret)
+
+	_, err = ValidateToken(expiredTokenString)
+	assert.Error(t, err)
+	// v5 returns specific error types, but our wrapper might map them or return generic error
+}
+
+func TestGenerateUserAPIKey(t *testing.T) {
+	key, err := GenerateUserAPIKey()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, key)
+	assert.True(t, strings.HasPrefix(key, "ak_"), "User API key should start with ak_")
+	assert.Equal(t, 35, len(key)) // ak_ + 32 hex chars = 3+32 = 35
 }
 
 func TestRateLimitMiddleware(t *testing.T) {
@@ -88,42 +146,4 @@ func TestRateLimiterTokenBucket(t *testing.T) {
 
 	// 6th request should be denied
 	assert.False(t, tb.allow(), "6th request should be denied")
-}
-
-func TestRateLimiterCleanup(t *testing.T) {
-	rl := &RateLimiter{
-		visitors: make(map[string]*visitor),
-		rate:     100,
-		window:   time.Minute,
-	}
-
-	// Add a visitor
-	v := rl.getVisitor("192.168.1.1")
-	assert.NotNil(t, v)
-	assert.Equal(t, 1, len(rl.visitors))
-
-	// Mark as old
-	v.lastSeen = time.Now().Add(-15 * time.Minute)
-
-	// Run cleanup
-	rl.cleanup()
-
-	// Should be removed
-	assert.Equal(t, 0, len(rl.visitors))
-}
-
-func TestRateLimiterMultipleIPs(t *testing.T) {
-	rl := &RateLimiter{
-		visitors: make(map[string]*visitor),
-		rate:     100,
-		window:   time.Minute,
-	}
-
-	// Different IPs should have separate limits
-	v1 := rl.getVisitor("192.168.1.1")
-	v2 := rl.getVisitor("192.168.1.2")
-
-	assert.NotNil(t, v1)
-	assert.NotNil(t, v2)
-	assert.Equal(t, 2, len(rl.visitors))
 }

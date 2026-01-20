@@ -1,5 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/token_storage.dart';
 import 'api_provider.dart';
 
 part 'auth_provider.g.dart';
@@ -7,37 +7,30 @@ part 'auth_provider.g.dart';
 @Riverpod(keepAlive: true)
 class Auth extends _$Auth {
   @override
-  Future<String?> build() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-
-    if (token != null) {
-      ref.read(apiClientProvider).setToken(token);
-    } else {
-      ref.read(apiClientProvider).clearToken();
+  Future<bool> build() async {
+    final hasToken = await TokenStorage.hasToken();
+    if (hasToken) {
+      // Setup interceptor callback to logout when token expires and refresh fails
+      ref.read(apiClientProvider).onUnauthorized = () {
+        state = const AsyncValue.data(false);
+      };
     }
-
-    return token;
+    return hasToken;
   }
 
-  bool get isAuthenticated => state.value != null;
+  bool get isAuthenticated => state.value ?? false;
 
-  Future<bool> login(String email, String password,
-      {bool rememberMe = false}) async {
+  Future<bool> login(String email, String password) async {
     final api = ref.read(apiClientProvider);
     state = const AsyncValue.loading();
     try {
-      final token = await api.login(email, password);
-      api.setToken(token);
-
-      final prefs = await SharedPreferences.getInstance();
-      if (rememberMe) {
-        await prefs.setString('auth_token', token);
-      } else {
-        await prefs.remove('auth_token'); // Don't persist if not asked
-      }
-
-      state = AsyncValue.data(token);
+      await api.login(email, password);
+      // Setup logout callback
+      api.onUnauthorized = () {
+        state = const AsyncValue.data(false);
+      };
+      
+      state = const AsyncValue.data(true);
       return true;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -57,10 +50,8 @@ class Auth extends _$Auth {
 
   Future<void> logout() async {
     final api = ref.read(apiClientProvider);
-    api.clearToken();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
-    state = const AsyncValue.data(null);
+    await api.logout();
+    state = const AsyncValue.data(false);
   }
 
   Future<void> changePassword(String oldPassword, String newPassword) async {

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'utils/token_storage.dart';
 
 class DebugLogger {
   static final DebugLogger _instance = DebugLogger._internal();
@@ -10,6 +11,7 @@ class DebugLogger {
   final ValueNotifier<int> logCount = ValueNotifier(0);
 
   void log(String message) {
+    if (kReleaseMode) return;
     final timestamp =
         DateTime.now().toIso8601String().split('T').last.substring(0, 8);
     logs.add('[$timestamp] $message');
@@ -27,6 +29,7 @@ class DebugLogger {
 class ApiClient {
   final Dio _dio = Dio();
   final DebugLogger _logger = DebugLogger();
+  bool _isRefreshing = false;
 
   VoidCallback? onUnauthorized;
 
@@ -35,22 +38,60 @@ class ApiClient {
     _dio.options.connectTimeout = const Duration(seconds: 10);
     _dio.options.receiveTimeout = const Duration(seconds: 10);
 
-    _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) {
+    _dio.interceptors.add(QueuedInterceptorsWrapper(
+      onRequest: (options, handler) async {
         _logger.log('REQ: ${options.method} ${options.path}');
         if (options.data != null) _logger.log('DATA: ${options.data}');
+
+        // Attach Access Token if available
+        final token = await TokenStorage.getAccessToken();
+        if (token != null) {
+          options.headers['Authorization'] = 'Bearer $token';
+        }
+
         return handler.next(options);
       },
       onResponse: (response, handler) {
         _logger.log('RES: ${response.statusCode} ${response.statusMessage}');
         return handler.next(response);
       },
-      onError: (DioException e, handler) {
+      onError: (DioException e, handler) async {
         _logger.log('ERR: ${e.response?.statusCode} ${e.message}');
         if (e.response != null) _logger.log('RES DATA: ${e.response?.data}');
 
-        if (e.response?.statusCode == 401 && onUnauthorized != null) {
-          onUnauthorized!();
+        // Handle 401 Unauthorized (Token Expiry)
+        if (e.response?.statusCode == 401) {
+          if (!_isRefreshing) {
+            _isRefreshing = true;
+            try {
+              final refreshed = await _refreshToken();
+              _isRefreshing = false;
+              if (refreshed) {
+                // Retry the original request
+                final opts = Options(
+                  method: e.requestOptions.method,
+                  headers: e.requestOptions.headers,
+                );
+                // Update header with new token
+                final newToken = await TokenStorage.getAccessToken();
+                opts.headers?['Authorization'] = 'Bearer $newToken';
+
+                final cloneReq = await _dio.request(
+                  e.requestOptions.path,
+                  options: opts,
+                  data: e.requestOptions.data,
+                  queryParameters: e.requestOptions.queryParameters,
+                );
+                return handler.resolve(cloneReq);
+              }
+            } catch (refreshErr) {
+              _isRefreshing = false;
+              _logger.log('Token Refresh Failed: $refreshErr');
+            }
+          }
+          // If refresh failed or not possible, trigger logout
+          await TokenStorage.clearTokens();
+          onUnauthorized?.call();
         }
 
         return handler.next(e);
@@ -58,19 +99,36 @@ class ApiClient {
     ));
   }
 
+  Future<bool> _refreshToken() async {
+    final refreshToken = await TokenStorage.getRefreshToken();
+    if (refreshToken == null) return false;
+
+    try {
+      // Create a separate Dio instance to avoid interceptor loop
+      final tokenDio = Dio(BaseOptions(baseUrl: _dio.options.baseUrl));
+      final response = await tokenDio.post('/auth/refresh', data: {
+        'refresh_token': refreshToken,
+      });
+
+      if (response.statusCode == 200) {
+        final newAccessToken = response.data['token'] ?? response.data['access_token'];
+        // Refresh token might be rotated or stay same depending on server policy
+        final newRefreshToken =
+            response.data['refresh_token'] ?? refreshToken;
+
+        await TokenStorage.saveTokens(newAccessToken, newRefreshToken);
+        _logger.log('Token Refreshed Successfully');
+        return true;
+      }
+    } catch (e) {
+      _logger.log('Error refreshing token: $e');
+    }
+    return false;
+  }
+
   void setBaseUrl(String url) {
     _dio.options.baseUrl = url;
     _logger.log('Base URL set to: $url');
-  }
-
-  void setToken(String token) {
-    _dio.options.headers['Authorization'] = 'Bearer $token';
-    _logger.log('Auth Token set');
-  }
-
-  void clearToken() {
-    _dio.options.headers.remove('Authorization');
-    _logger.log('Auth Token cleared');
   }
 
   Future<String> login(String email, String password) async {
@@ -79,13 +137,24 @@ class ApiClient {
         'email': email,
         'password': password,
       });
-      return response.data['token'];
+      // Accept both single token (legacy) and pair
+      final accessToken = response.data['token'] ?? response.data['access_token'];
+      final refreshToken = response.data['refresh_token'] ?? '';
+      
+      if (accessToken != null) {
+        await TokenStorage.saveTokens(accessToken, refreshToken);
+      }
+      return accessToken;
     } catch (e) {
       if (e is DioException && e.response != null) {
         throw Exception('Login failed: ${e.response?.data}');
       }
       throw Exception('Login failed: $e');
     }
+  }
+
+  Future<void> logout() async {
+      await TokenStorage.clearTokens();
   }
 
   Future<Map<String, dynamic>> register(String email, String password) async {
@@ -117,9 +186,6 @@ class ApiClient {
     final response = await _dio.get('/dev/$id/data');
     final Map<String, dynamic> raw = response.data;
 
-    // Server returns { "data": {...}, "timestamp": "...", "device_id": "..." }
-    // We want to flatten it for the UI: { ...data, "timestamp": "..." }
-
     final Map<String, dynamic> flattened =
         Map<String, dynamic>.from(raw['data'] ?? {});
     if (raw.containsKey('timestamp')) {
@@ -128,15 +194,33 @@ class ApiClient {
     return flattened;
   }
 
-  Future<Map<String, dynamic>> createProvisioningRequest(
-      String uid, String name, String ssid, String pass) async {
-    final response = await _dio.post('/dev/register', data: {
+  // Updated to support new Auth Mode and Return API Key
+  Future<Map<String, dynamic>> registerDeviceOnServer({
+    required String uid,
+    required String name,
+    required String type,
+    String authMode = 'static',
+    String? wifiSSID,
+    String? wifiPass,
+  }) async {
+    final data = {
       'device_uid': uid,
       'device_name': name,
-      'wifi_ssid': ssid,
-      'wifi_pass': pass,
-    });
-    return response.data;
+      'device_type': type,
+      'auth_mode': authMode,
+    };
+    if (wifiSSID != null) data['wifi_ssid'] = wifiSSID;
+    if (wifiPass != null) data['wifi_pass'] = wifiPass;
+
+    final response = await _dio.post('/dev/register', data: data);
+    return response.data; // Should return { "api_key": "...", "device_id": "..." }
+  }
+
+  // Legacy support
+  Future<Map<String, dynamic>> createProvisioningRequest(
+      String uid, String name, String ssid, String pass) async {
+    return registerDeviceOnServer(
+        uid: uid, name: name, type: 'unknown', wifiSSID: ssid, wifiPass: pass);
   }
 
   Future<void> sendCommand(String deviceId, String action,
@@ -191,7 +275,6 @@ class ApiClient {
       await _dio.post('/auth/forgot-password', data: {'email': email});
       _logger.log('Forgot password request sent for: $email');
     } catch (e) {
-      // 200 OK is returned even if email not found (security), so this catches actual errors
       if (e is DioException && e.response != null) {
         throw Exception('Request failed: ${e.response?.data}');
       }

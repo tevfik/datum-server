@@ -140,7 +140,7 @@ func registerDeviceHandler(c *gin.Context) {
 	// Generate IDs and keys
 	requestID := generateProvisioningID("prov")
 	deviceID := generateProvisioningID("dev")
-	
+
 	var apiKey string
 	var masterSecret string
 	var err error
@@ -156,7 +156,7 @@ func registerDeviceHandler(c *gin.Context) {
 		}
 		// In rotating mode, we store the Master Secret as the API Key in DB
 		// The device will derive dynamic keys (dk_) from this secret.
-		apiKey = masterSecret 
+		apiKey = masterSecret
 	} else {
 		// Default: Static Auth (sk_)
 		req.AuthMode = "static" // normalize
