@@ -38,21 +38,23 @@ type RegisterDeviceRequest struct {
 	DeviceUID  string `json:"device_uid" binding:"required"`  // Hardware UID from device
 	DeviceName string `json:"device_name" binding:"required"` // User-provided name
 	DeviceType string `json:"device_type"`                    // Optional device type
+	AuthMode   string `json:"auth_mode"`                      // Optional: "static" (default) or "rotating"
 	WiFiSSID   string `json:"wifi_ssid"`                      // Optional WiFi SSID
 	WiFiPass   string `json:"wifi_pass"`                      // Optional WiFi password
 }
 
 type RegisterDeviceResponse struct {
-	RequestID   string    `json:"request_id"`
-	DeviceUID   string    `json:"device_uid"`
-	DeviceID    string    `json:"device_id"`
-	APIKey      string    `json:"api_key"`
-	ServerURL   string    `json:"server_url"`
-	WiFiSSID    string    `json:"wifi_ssid,omitempty"`
-	WiFiPass    string    `json:"wifi_pass,omitempty"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	Status      string    `json:"status"`
-	ActivateURL string    `json:"activate_url"` // URL for device to call
+	RequestID    string    `json:"request_id"`
+	DeviceUID    string    `json:"device_uid"`
+	DeviceID     string    `json:"device_id"`
+	APIKey       string    `json:"api_key,omitempty"`       // For static auth
+	MasterSecret string    `json:"master_secret,omitempty"` // For rotating auth
+	ServerURL    string    `json:"server_url"`
+	WiFiSSID     string    `json:"wifi_ssid,omitempty"`
+	WiFiPass     string    `json:"wifi_pass,omitempty"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	Status       string    `json:"status"`
+	ActivateURL  string    `json:"activate_url"` // URL for device to call
 }
 
 type CheckUIDRequest struct {
@@ -136,10 +138,30 @@ func registerDeviceHandler(c *gin.Context) {
 	}
 
 	// Generate IDs and keys
-	// Generate IDs and keys
 	requestID := generateProvisioningID("prov")
 	deviceID := generateProvisioningID("dev")
-	apiKey := generateProvisioningAPIKey()
+	
+	var apiKey string
+	var masterSecret string
+	var err error
+
+	// Determine Auth Mode
+	if req.AuthMode == "rotating" {
+		// Generate Master Secret for Rotating Auth
+		masterSecret, err = auth.GenerateMasterSecret()
+		if err != nil {
+			logger.GetLogger().Error().Err(err).Msg("Failed to generate master secret")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate security credentials"})
+			return
+		}
+		// In rotating mode, we store the Master Secret as the API Key in DB
+		// The device will derive dynamic keys (dk_) from this secret.
+		apiKey = masterSecret 
+	} else {
+		// Default: Static Auth (sk_)
+		req.AuthMode = "static" // normalize
+		apiKey = generateProvisioningAPIKey()
+	}
 
 	// 1. Create Provisioning Request (Pending)
 	provReq := &storage.ProvisioningRequest{
@@ -188,18 +210,27 @@ func registerDeviceHandler(c *gin.Context) {
 		Time("expires_at", provReq.ExpiresAt).
 		Msg("Device registered and activated")
 
-	c.JSON(http.StatusCreated, RegisterDeviceResponse{
+	// Prepare Response
+	resp := RegisterDeviceResponse{
 		RequestID:   requestID,
 		DeviceUID:   deviceUID,
 		DeviceID:    deviceID,
-		APIKey:      apiKey,
 		ServerURL:   provisioningConfig.ServerURL,
 		WiFiSSID:    req.WiFiSSID,
 		WiFiPass:    req.WiFiPass,
 		ExpiresAt:   provReq.ExpiresAt,
 		Status:      provReq.Status, // Will be "active"
 		ActivateURL: "",             // No activation needed
-	})
+	}
+
+	// Populate Credentials based on Auth Mode
+	if req.AuthMode == "rotating" {
+		resp.MasterSecret = apiKey // Used as API Key in DB
+	} else {
+		resp.APIKey = apiKey
+	}
+
+	c.JSON(http.StatusCreated, resp)
 }
 
 // checkDeviceUIDHandler checks if a device UID is already registered
