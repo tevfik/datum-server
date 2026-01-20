@@ -197,6 +197,11 @@ components:
           type: string
         device_type:
           type: string
+        auth_mode:
+          type: string
+          enum: [static, rotating]
+          default: static
+          description: Authentication security mode
         wifi_ssid:
           type: string
         wifi_pass:
@@ -211,8 +216,15 @@ components:
           type: string
         device_id:
           type: string
+        api_key:
+          type: string
+          description: Returned only for static auth mode
+        master_secret:
+          type: string
+          description: Returned only for rotating auth mode
         status:
           type: string
+
         activate_url:
           type: string
         expires_at:
