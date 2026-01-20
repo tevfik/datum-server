@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:wifi_iot/wifi_iot.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../providers/auth_provider.dart';
 import '../utils/token_storage.dart';
 
 import '../utils/thing_description_registry.dart'; // Import Registry
