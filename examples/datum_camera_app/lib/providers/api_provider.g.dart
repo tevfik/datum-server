@@ -23,7 +23,7 @@ final apiClientProvider = AutoDisposeProvider<ApiClient>.internal(
 // ignore: unused_element
 typedef ApiClientRef = AutoDisposeProviderRef<ApiClient>;
 String _$authenticatedApiClientHash() =>
-    r'1b702b12e0b4d1e928fc0660de85c04bfb5eed30';
+    r'97cc0919949366e4393a7186ce7babd5fae0a553';
 
 /// See also [authenticatedApiClient].
 @ProviderFor(authenticatedApiClient)
