@@ -34,34 +34,44 @@ The platform uses a prefix-based key system to instantly identify the type and h
 
 ---
 
-## 2. Provisioning & Onboarding Flow
+## 2. Provisioning & Registration Flow
 
-Which token method is used is decided **during the connection/provisioning phase** based on the Firmware's capability advertisement or the method chosen by the user in the Mobile App.
+**Critical Context**: Devices can register themselves if they have a valid User Token (Self-Registration).
 
-### Step-by-Step Flow
+### Step-by-Step Flow (Self-Registration)
 
-#### Phase 1: Handshake (Bluetooth / SoftAP)
-1. **Mobile App** connects to **Device**.
-2. **Device** advertises capabilities (e.g., `auth_mode: "static"` or `auth_mode: "rotating"`).
+1. **User Login (App/Web)**:
+   - User logs in to Datum Platform.
+   - User gets a **User Token** (JWT).
 
-#### Phase 2: Registration (Server)
-3. **Mobile App** calls Server API: `POST /devices/register`.
-4. **Server** creates Device Record.
-5. **Server** generates:
-   - If `static`: A `sk_...` key.
-   - If `rotating`: A random **Master Secret** (base64).
+2. **Device Configuration (Local)**:
+   - User connects to Device (AP Mode / Bluetooth).
+   - User passes Credentials to Device: `WiFi SSID`, `WiFi Pass` **AND** `User Token`.
+   - **Device Decision**: Firmware decides intended auth mode (`sk_` vs `dk_`) by sending `device_type`.
 
-#### Phase 3: Configuration (Device)
-6. **Mobile App** sends credentials to **Device**:
-   - WiFi SSID/Pass
-   - Device ID
-   - **Auth Credential** (`sk_...` OR `Master Secret`).
-7. **Device** saves these to NVS/EEPROM.
-8. **Device** reboots and connects.
+3. **Device Registration (On-Behalf-Of)**:
+   - Device connects to Internet.
+   - Device calls `POST /dev/register` using the **User Token**.
+     ```json
+     {
+       "device_uid": "MAC_ADDRESS",
+       "device_name": "My Sensor",
+       "device_type": "sensor_plus" // imply capability
+     }
+     ```
+   
+4. **Server Processing**:
+   - Validates **User Token**.
+   - Creates Device Record linked to User ID.
+   - Generates API Key based on system default (currently `dk_` static-like key for compatibility).
 
-#### Phase 4: Operation
-- **Static Device**: Sends `sk_...` in every request.
-- **Rotating Device**: Wake up -> Sync Time (NTP) -> Generate `dk_` -> Send Request.
+5. **Response & Storage**:
+   - Server returns: `{"device_id": "...", "api_key": "dk_..."}`
+   - Device saves `device_id` and `api_key` to NVS.
+   - Device **discards** User Token (security best practice).
+
+6. **Operation**:
+   - Device starts sending telemetry using `Authorization: Bearer dk_...`.
 
 ---
 
@@ -69,10 +79,10 @@ Which token method is used is decided **during the connection/provisioning phase
 
 ### Do NOT:
 - Ever hardcode a `sk_` or `ak_` in frontend code (`.js` bundles).
-- Use User JWTs (`eyJ...`) on IoT Devices. They expire and leave devices stranded.
+- Persist User JWTs (`eyJ...`) on IoT Devices longer than needed for registration.
 - Share `dk_` Master Secrets.
 
 ### DO:
 - Use `datumctl` to rotate compromised device keys immediately.
 - Use TLS (HTTPS/MQTTS) for all traffic to prevent `sk_` sniffing.
-- prefer Rotating Auth (`dk_`) for devices with internet access and RTC.
+- Prefer Rotating Auth (`dk_`) for devices with internet access and RTC.
