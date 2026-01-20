@@ -230,9 +230,6 @@ components:
         expires_at:
           type: string
           format: date-time
-        api_key:
-          type: string
-          description: Temporary provisioning key
 
     DeviceActivateRequest:
       type: object
