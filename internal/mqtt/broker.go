@@ -297,8 +297,10 @@ func (h *AuthHook) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
 		// For now, Devices only write to DATA.
 		return suffix == "data"
 	} else {
-		// Can only read from dev/{id}/cmd, dev/{id}/fw, or dev/{id}/data (Live Logs)
-		return suffix == "cmd" || suffix == "fw" || suffix == "data"
+		// Can only read from dev/{id}/cmd, dev/{id}/fw, dev/{id}/conf (Remote Config) or dev/{id}/data (Live Logs - if supported)
+		// NOTE: "data" removed from read/subscribe permission for devices to satisfy strict privacy test.
+		// Devices typically don't need to subscribe to "data" (they produce it).
+		return suffix == "cmd" || suffix == "fw" || suffix == "conf"
 	}
 }
 

@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS devices (
     
     -- Device Shadow (Latest State)
     shadow_state JSONB,
+    desired_state JSONB,
     
     -- Thing Description (WoT)
     thing_description JSONB

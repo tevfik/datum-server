@@ -159,6 +159,14 @@ components:
           type: object
           description: Web of Things (WoT) Thing Description
           additionalProperties: true
+        shadow_state:
+          type: object
+          description: Last reported state (Read Only)
+          additionalProperties: true
+        desired_state:
+          type: object
+          description: Desired configuration (Remote Config)
+          additionalProperties: true
 
     DataPayload:
       type: object
@@ -842,6 +850,44 @@ paths:
       responses:
         '204':
           description: Device deleted
+
+  /dev/{device_id}/config:
+    patch:
+      summary: Update device configuration (Remote Config)
+      description: Sets the desired configuration for the device. The server will sync this to the device via MQTT.
+      tags: [Devices]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Configuration object (free JSON)
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              example:
+                motion_threshold: 45
+                led_mode: "auto"
+      responses:
+        '200':
+          description: Configuration updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: updated
+                  config:
+                    type: object
 
   /dev/{device_id}/cmd:
     post:

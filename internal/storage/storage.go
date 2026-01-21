@@ -137,7 +137,8 @@ type Device struct {
 	GracePeriodEnd   time.Time              `json:"grace_period_end,omitempty"`  // When previous token becomes invalid
 	KeyRevokedAt     time.Time              `json:"key_revoked_at,omitempty"`    // When keys were revoked (if revoked)
 	ThingDescription map[string]interface{} `json:"thing_description,omitempty"` // Thing Description (WoT)
-	ShadowState      map[string]interface{} `json:"shadow_state,omitempty"`      // Current Device State (Shadow)
+	ShadowState      map[string]interface{} `json:"shadow_state,omitempty"`      // Current Device State (Reported)
+	DesiredState     map[string]interface{} `json:"desired_state,omitempty"`     // Desired Device State (Configuration)
 }
 
 func (s *Storage) CreateDevice(device *Device) error {
@@ -1067,6 +1068,30 @@ func (s *Storage) UpdateDeviceThingDescription(deviceID string, td map[string]in
 
 		// Update TD
 		device.ThingDescription = td
+		device.UpdatedAt = time.Now()
+
+		newData, _ := json.Marshal(device)
+		_, _, err = tx.Set(deviceKey, string(newData), nil)
+		return err
+	})
+}
+
+// UpdateDeviceConfig updates the Desired Configuration for a device (Remote Config)
+func (s *Storage) UpdateDeviceConfig(deviceID string, config map[string]interface{}) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		deviceKey := fmt.Sprintf("device:%s", deviceID)
+		deviceData, err := tx.Get(deviceKey)
+		if err != nil {
+			return fmt.Errorf("device not found")
+		}
+
+		var device Device
+		if err := json.Unmarshal([]byte(deviceData), &device); err != nil {
+			return err
+		}
+
+		// Update Desired State
+		device.DesiredState = config
 		device.UpdatedAt = time.Now()
 
 		newData, _ := json.Marshal(device)

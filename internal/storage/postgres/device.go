@@ -17,22 +17,25 @@ func (s *PostgresStore) CreateDevice(device *storage.Device) error {
 			created_at, updated_at, firmware_version,
 			master_secret, current_token, previous_token, 
 			token_issued_at, token_expires_at, grace_period_end, key_revoked_at,
-			thing_description
+			shadow_state, desired_state, thing_description
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, 
 			$9, $10, $11,
 			$12, $13, $14, 
 			$15, $16, $17, $18,
-			$19
+			$19, $20, $21
 		)
 	`
 	tdJSON, _ := json.Marshal(device.ThingDescription)
+	shadowJSON, _ := json.Marshal(device.ShadowState)
+	desiredJSON, _ := json.Marshal(device.DesiredState)
+
 	_, err := s.db.Exec(query,
 		device.ID, device.UserID, device.Name, device.Type, device.DeviceUID, device.APIKey, device.Status, device.LastSeen,
 		device.CreatedAt, device.UpdatedAt, device.FirmwareVersion,
 		device.MasterSecret, device.CurrentToken, device.PreviousToken,
 		device.TokenIssuedAt, device.TokenExpiresAt, device.GracePeriodEnd, device.KeyRevokedAt,
-		tdJSON,
+		shadowJSON, desiredJSON, tdJSON,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create device: %w", err)
@@ -250,21 +253,18 @@ func scanDeviceFromRow(scanner Scannable) (*storage.Device, error) {
 	var d storage.Device
 	var deviceUID, fwVer, mSec, cTok, pTok sql.NullString
 	var tIss, tExp, gEnd, kRev, upAt sql.NullTime
-	var shadowStateJSON, tdJSON []byte // For JSONB columns
+	var shadowStateJSON, desiredStateJSON, tdJSON []byte // For JSONB columns
 
 	// SELECT * order must match schema.sql definition exactly:
-	// id, user_id, name, type, device_uid, api_key, status, last_seen,
-	// created_at, updated_at, firmware_version, master_secret, current_token,
-	// previous_token, token_issued_at, token_expires_at, grace_period_end,
-	// key_revoked_at, shadow_state, thing_description (20 columns)
-
+	// ... shadow_state, desired_state, thing_description
 	err := scanner.Scan(
 		&d.ID, &d.UserID, &d.Name, &d.Type, &deviceUID, &d.APIKey, &d.Status, &d.LastSeen,
 		&d.CreatedAt, &upAt, &fwVer,
 		&mSec, &cTok, &pTok,
 		&tIss, &tExp, &gEnd, &kRev,
 		&shadowStateJSON,
-		&tdJSON, // 20th column
+		&desiredStateJSON,
+		&tdJSON,
 	)
 	if err != nil {
 		return nil, err
@@ -300,10 +300,13 @@ func scanDeviceFromRow(scanner Scannable) (*storage.Device, error) {
 	if upAt.Valid {
 		d.UpdatedAt = upAt.Time
 	}
-	// shadow_state is read but not parsed into Device struct as it's stored separately
-	// The shadow is accessed via GetLatestData, not from the Device struct directly
-	_ = shadowStateJSON
 
+	if len(shadowStateJSON) > 0 {
+		_ = json.Unmarshal(shadowStateJSON, &d.ShadowState)
+	}
+	if len(desiredStateJSON) > 0 {
+		_ = json.Unmarshal(desiredStateJSON, &d.DesiredState)
+	}
 	if len(tdJSON) > 0 {
 		_ = json.Unmarshal(tdJSON, &d.ThingDescription)
 	}
@@ -327,4 +330,14 @@ func scanDevices(db *sql.DB, query string, args ...interface{}) ([]storage.Devic
 		devices = append(devices, *d)
 	}
 	return devices, nil
+}
+
+// UpdateDeviceConfig updates the Desired Configuration for a device
+func (s *PostgresStore) UpdateDeviceConfig(deviceID string, config map[string]interface{}) error {
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec("UPDATE devices SET desired_state = $1, updated_at = $2 WHERE id = $3", configJSON, time.Now(), deviceID)
+	return err
 }

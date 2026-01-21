@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -28,6 +29,7 @@ type DeviceResponse struct {
 	CreatedAt        time.Time              `json:"created_at"`
 	Status           string                 `json:"status"`
 	ShadowState      map[string]interface{} `json:"shadow_state"`      // Added ShadowState
+	DesiredState     map[string]interface{} `json:"desired_state"`     // Added DesiredState
 	ThingDescription map[string]interface{} `json:"thing_description"` // Thing Description
 }
 
@@ -103,18 +105,66 @@ func listDevicesHandler(c *gin.Context) {
 			status = "online"
 		}
 		response = append(response, DeviceResponse{
-			ID:        d.ID,
-			Name:      d.Name,
-			Type:      d.Type,
-			DeviceUID: d.DeviceUID,
-			PublicIP:  d.PublicIP,
-			LastSeen:  d.LastSeen,
-			CreatedAt: d.CreatedAt,
-			Status:    status,
+			ID:               d.ID,
+			Name:             d.Name,
+			Type:             d.Type,
+			DeviceUID:        d.DeviceUID,
+			PublicIP:         d.PublicIP,
+			LastSeen:         d.LastSeen,
+			CreatedAt:        d.CreatedAt,
+			Status:           status,
+			ShadowState:      d.ShadowState,
+			DesiredState:     d.DesiredState,
+			ThingDescription: d.ThingDescription,
 		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{"devices": response})
+}
+
+// updateDeviceConfigHandler updates the desired configuration
+// PATCH /devices/:id/config
+func updateDeviceConfigHandler(c *gin.Context) {
+	deviceID := c.Param("device_id")
+	userID, _ := auth.GetUserID(c)
+	role, _ := auth.GetUserRole(c)
+
+	// Check ownership
+	device, err := store.GetDevice(deviceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
+		return
+	}
+	if role != "admin" && device.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	var config map[string]interface{}
+	if err := c.ShouldBindJSON(&config); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := store.UpdateDeviceConfig(deviceID, config); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// MQTT Push
+	if mqttBroker != nil {
+		// Publish config delta to device
+		payload := map[string]interface{}{
+			"desired":   config,
+			"timestamp": time.Now().Unix(),
+		}
+		jsonBytes, _ := json.Marshal(payload)
+		// Topic: dev/{id}/conf/set
+		topic := "dev/" + deviceID + "/conf/set"
+		mqttBroker.Publish(topic, jsonBytes, false)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "updated", "config": config})
 }
 
 // getDeviceHandler gets a single device by ID
@@ -158,6 +208,8 @@ func getDeviceHandler(c *gin.Context) {
 	var shadowState map[string]interface{}
 	if err == nil && shadowData != nil {
 		shadowState = shadowData.Data
+	} else {
+		shadowState = device.ShadowState
 	}
 
 	status := "offline"
@@ -175,6 +227,7 @@ func getDeviceHandler(c *gin.Context) {
 		CreatedAt:        device.CreatedAt,
 		Status:           status,
 		ShadowState:      shadowState,
+		DesiredState:     device.DesiredState,
 		ThingDescription: device.ThingDescription,
 	}
 

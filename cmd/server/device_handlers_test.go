@@ -160,3 +160,93 @@ func TestListDevicesHandler(t *testing.T) {
 		assert.Len(t, resp["devices"], 3) // Should see all 3 devices
 	})
 }
+
+func TestUpdateDeviceConfigHandler(t *testing.T) {
+router, cleanup, user := setupDeviceTestServer(t)
+defer cleanup()
+
+// Register route
+router.PATCH("/device/:device_id/config", func(c *gin.Context) {
+// Mock Auth Middleware behavior
+if val := c.GetHeader("X-Role"); val != "" {
+c.Set("role", val)
+} else {
+c.Set("role", user.Role)
+}
+
+if val := c.GetHeader("X-User-ID"); val != "" {
+c.Set("user_id", val)
+} else {
+c.Set("user_id", user.ID)
+}
+
+updateDeviceConfigHandler(c)
+})
+
+// Create device owned by user
+deviceID := "test-config-dev"
+device := &storage.Device{ID: deviceID, UserID: user.ID, Name: "Config Dev"}
+require.NoError(t, store.CreateDevice(device))
+
+// Create device NOT owned by user
+otherDeviceID := "other-dev"
+otherDevice := &storage.Device{ID: otherDeviceID, UserID: "other-user", Name: "Other Dev"}
+require.NoError(t, store.CreateDevice(otherDevice))
+
+t.Run("Update Config - Own Device Success", func(t *testing.T) {
+config := map[string]interface{}{
+"resolution": "1080p",
+"fps":        30,
+}
+body, _ := json.Marshal(config)
+req := httptest.NewRequest(http.MethodPatch, "/device/"+deviceID+"/config", bytes.NewBuffer(body))
+req.Header.Set("Content-Type", "application/json")
+w := httptest.NewRecorder()
+router.ServeHTTP(w, req)
+
+assert.Equal(t, http.StatusOK, w.Code)
+
+// Verify DB
+updatedDev, err := store.GetDevice(deviceID)
+assert.NoError(t, err)
+assert.Equal(t, "1080p", updatedDev.DesiredState["resolution"])
+// JSON numbers are float64
+assert.Equal(t, float64(30), updatedDev.DesiredState["fps"])
+})
+
+t.Run("Update Config - Other Device Forbidden", func(t *testing.T) {
+config := map[string]interface{}{"foo": "bar"}
+body, _ := json.Marshal(config)
+req := httptest.NewRequest(http.MethodPatch, "/device/"+otherDeviceID+"/config", bytes.NewBuffer(body))
+req.Header.Set("Content-Type", "application/json")
+w := httptest.NewRecorder()
+router.ServeHTTP(w, req)
+
+assert.Equal(t, http.StatusForbidden, w.Code)
+})
+
+t.Run("Update Config - Admin Success on Other Device", func(t *testing.T) {
+config := map[string]interface{}{"admin_override": true}
+body, _ := json.Marshal(config)
+req := httptest.NewRequest(http.MethodPatch, "/device/"+otherDeviceID+"/config", bytes.NewBuffer(body))
+req.Header.Set("Content-Type", "application/json")
+req.Header.Set("X-Role", "admin") // Mock middleware picks this up
+w := httptest.NewRecorder()
+router.ServeHTTP(w, req)
+
+assert.Equal(t, http.StatusOK, w.Code)
+
+updatedDev, err := store.GetDevice(otherDeviceID)
+assert.NoError(t, err)
+assert.Equal(t, true, updatedDev.DesiredState["admin_override"])
+})
+
+t.Run("Update Config - Device Not Found", func(t *testing.T) {
+req := httptest.NewRequest(http.MethodPatch, "/device/non-existent/config", bytes.NewBuffer([]byte("{}")))
+req.Header.Set("Content-Type", "application/json")
+w := httptest.NewRecorder()
+router.ServeHTTP(w, req)
+
+assert.Equal(t, http.StatusNotFound, w.Code)
+})
+}

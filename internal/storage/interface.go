@@ -30,6 +30,7 @@ type Provider interface {
 	GetAllDevices() ([]Device, error)
 	UpdateDevice(id string, status string) error
 	UpdateDeviceThingDescription(id string, td map[string]interface{}) error // New method
+	UpdateDeviceConfig(id string, config map[string]interface{}) error       // Remote Config
 	UpdateDeviceAPIKey(id string, newKey string) error                       // New method
 	UpdateDeviceLastSeen(id string) error
 	DeleteDevice(deviceID, userID string) error

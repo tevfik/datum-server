@@ -322,6 +322,9 @@ func main() {
 		devGroup.GET("", listDevicesHandler)
 		devGroup.DELETE("/:device_id", deleteDeviceHandler)
 
+		// Configuration (Remote Config/Shadow)
+		devGroup.PATCH("/:device_id/config", updateDeviceConfigHandler)
+
 		// Commands (User sends to device)
 		devGroup.POST("/:device_id/cmd", sendCommandHandler)
 		devGroup.GET("/:device_id/cmd", listCommandsHandler) // History of commands sent
