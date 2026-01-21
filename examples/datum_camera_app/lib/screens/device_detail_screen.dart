@@ -51,9 +51,12 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
   // Throttling
   // Timer? _throttleTimer; Using simple debouncer logic inside update
 
+  String? _accessToken; // Store token for stream URL
+
   @override
   void initState() {
     super.initState();
+    _loadToken();
     _streamController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -61,6 +64,15 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     _pollData();
     if (widget.device.type == 'camera') {
       _startStream();
+    }
+  }
+
+  Future<void> _loadToken() async {
+    final token = await TokenStorage.getAccessToken();
+    if (mounted) {
+      setState(() {
+        _accessToken = token;
+      });
     }
   }
 
@@ -212,9 +224,10 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
   }
 
   String _getStreamUrl() {
-    // We need token synchronously for URL string.
-    final token = ref.read(authProvider).value;
-    return 'https://datum.bezg.in/dev/${widget.device.id}/stream/mjpeg?token=$token';
+    // Return empty if token not loaded yet (StreamRecorder should handle or wait)
+    // Or we rely on UI not rendering StreamRecorder until token is ready.
+    if (_accessToken == null) return "";
+    return 'https://datum.bezg.in/dev/${widget.device.id}/stream/mjpeg?token=$_accessToken';
   }
 
   void _showSettingsDialog() {
@@ -656,7 +669,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
             color: Colors.black,
             constraints: const BoxConstraints(maxHeight: 300),
             width: double.infinity,
-            child: _isRunning
+            child: (_isRunning && _accessToken != null)
                 ? Stack(
                     alignment: Alignment.bottomRight,
                     children: [
