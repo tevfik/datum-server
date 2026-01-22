@@ -74,10 +74,15 @@ func (h *AdminHandler) ListUsersHandler(c *gin.Context) {
 		return
 	}
 
+	deviceCounts, err := h.Store.GetUserDeviceCounts()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	// Remove password hashes from response
 	var safeUsers []gin.H
 	for _, u := range users {
-		devices, _ := h.Store.GetUserDevices(u.ID)
 		safeUsers = append(safeUsers, gin.H{
 			"id":            u.ID,
 			"email":         u.Email,
@@ -86,7 +91,7 @@ func (h *AdminHandler) ListUsersHandler(c *gin.Context) {
 			"created_at":    u.CreatedAt,
 			"updated_at":    u.UpdatedAt,
 			"last_login_at": u.LastLoginAt,
-			"device_count":  len(devices),
+			"device_count":  deviceCounts[u.ID],
 		})
 	}
 

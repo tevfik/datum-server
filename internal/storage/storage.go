@@ -272,6 +272,28 @@ func (s *Storage) GetUserDevices(userID string) ([]Device, error) {
 	return devices, err
 }
 
+func (s *Storage) GetUserDeviceCounts() (map[string]int, error) {
+	counts := make(map[string]int)
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		tx.AscendKeys("user:*", func(key, value string) bool {
+			// key looks like user:{id}:devices
+			if strings.HasSuffix(key, ":devices") {
+				parts := strings.Split(key, ":")
+				if len(parts) == 3 {
+					userID := parts[1]
+					var deviceIDs []string
+					if err := json.Unmarshal([]byte(value), &deviceIDs); err == nil {
+						counts[userID] = len(deviceIDs)
+					}
+				}
+			}
+			return true
+		})
+		return nil
+	})
+	return counts, err
+}
+
 func (s *Storage) DeleteDevice(deviceID, userID string) error {
 	return s.db.Update(func(tx *buntdb.Tx) error {
 		deviceKey := fmt.Sprintf("device:%s", deviceID)

@@ -61,6 +61,27 @@ func (s *PostgresStore) GetUserDevices(userID string) ([]storage.Device, error) 
 	return scanDevices(s.db, query, userID)
 }
 
+// GetUserDeviceCounts returns a map of user ID to device count
+func (s *PostgresStore) GetUserDeviceCounts() (map[string]int, error) {
+	query := `SELECT user_id, COUNT(*) FROM devices GROUP BY user_id`
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int)
+	for rows.Next() {
+		var userID string
+		var count int
+		if err := rows.Scan(&userID, &count); err != nil {
+			return nil, err
+		}
+		counts[userID] = count
+	}
+	return counts, nil
+}
+
 // DeleteDevice removes a device if it belongs to the user
 func (s *PostgresStore) DeleteDevice(deviceID, userID string) error {
 	result, err := s.db.Exec("DELETE FROM devices WHERE id = $1 AND user_id = $2", deviceID, userID)

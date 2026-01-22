@@ -27,6 +27,7 @@ type Provider interface {
 	GetDeviceByUID(uid string) (*Device, error)
 	GetDeviceByAPIKey(apiKey string) (*Device, error)
 	GetUserDevices(userID string) ([]Device, error)
+	GetUserDeviceCounts() (map[string]int, error)
 	GetAllDevices() ([]Device, error)
 	UpdateDevice(id string, status string) error
 	UpdateDeviceThingDescription(id string, td map[string]interface{}) error // New method
