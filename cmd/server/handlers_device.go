@@ -33,7 +33,53 @@ type DeviceResponse struct {
 	ThingDescription map[string]interface{} `json:"thing_description"` // Thing Description
 }
 
+type DeviceStatsResponse struct {
+	TotalDevices   int `json:"total_devices"`
+	OnlineDevices  int `json:"online_devices"`
+	OfflineDevices int `json:"offline_devices"`
+}
+
 // ============ Device Handlers ============
+
+// getDeviceStatsHandler returns statistics about the user's devices
+// GET /dev/stats
+func getDeviceStatsHandler(c *gin.Context) {
+	userID, _ := auth.GetUserID(c)
+	role, _ := auth.GetUserRole(c)
+
+	var total, online, offline int
+
+	// Admins see stats for all devices, regular users see only theirs
+	if role == "admin" {
+		devices, err := store.GetAllDevices()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		total = len(devices)
+		for _, d := range devices {
+			if time.Since(d.LastSeen) < 5*time.Minute {
+				online++
+			}
+		}
+		offline = total - online
+	} else {
+		stats, err := store.GetUserDeviceStats(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		total = stats.Total
+		online = stats.Online
+		offline = stats.Offline
+	}
+
+	c.JSON(http.StatusOK, DeviceStatsResponse{
+		TotalDevices:   total,
+		OnlineDevices:  online,
+		OfflineDevices: offline,
+	})
+}
 
 // createDeviceHandler creates a new device for the authenticated user
 // POST /device

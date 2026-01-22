@@ -320,6 +320,7 @@ func main() {
 		// Management
 		devGroup.POST("", createDeviceHandler)
 		devGroup.GET("", listDevicesHandler)
+		devGroup.GET("/stats", getDeviceStatsHandler)
 		devGroup.DELETE("/:device_id", deleteDeviceHandler)
 
 		// Configuration (Remote Config/Shadow)
