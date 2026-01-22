@@ -186,7 +186,6 @@ datum-server/
 │   ├── storage/         # Data storage layer
 │   └── logger/          # Logging utilities
 ├── docs/                # Documentation
-├── examples/            # Integration examples
 └── tests/               # Integration and load tests
 ```
 

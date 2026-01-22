@@ -124,6 +124,46 @@ func (s *PostgresStore) UpdateDeviceLastSeen(deviceID string) error {
 	return err
 }
 
+// GetUserDeviceCounts returns a map of user ID to device count
+func (s *PostgresStore) GetUserDeviceCounts() (map[string]int, error) {
+	rows, err := s.db.Query("SELECT user_id, COUNT(*) FROM devices GROUP BY user_id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int)
+	for rows.Next() {
+		var userID string
+		var count int
+		if err := rows.Scan(&userID, &count); err != nil {
+			return nil, err
+		}
+		counts[userID] = count
+	}
+	return counts, nil
+}
+
+// GetAllDevicesAndOwners returns all devices and their owners
+func (s *PostgresStore) GetAllDevicesAndOwners() ([]storage.Device, map[string]storage.User, error) {
+	devices, err := s.ListAllDevices()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	users, err := s.ListAllUsers()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	userMap := make(map[string]storage.User)
+	for _, u := range users {
+		userMap[u.ID] = u
+	}
+
+	return devices, userMap, nil
+}
+
 // UpdateDeviceThingDescription updates the Thing Description for a device
 func (s *PostgresStore) UpdateDeviceThingDescription(deviceID string, td map[string]interface{}) error {
 	tdJSON, err := json.Marshal(td)

@@ -35,6 +35,7 @@ type Provider interface {
 	GetDeviceByAPIKey(apiKey string) (*Device, error)
 	GetUserDevices(userID string) ([]Device, error)
 	GetUserDeviceStats(userID string) (*DeviceStats, error)
+	GetUserDeviceCounts() (map[string]int, error)
 	GetAllDevices() ([]Device, error)
 	GetAllDevicesAndOwners() ([]Device, map[string]User, error)
 	UpdateDevice(id string, status string) error

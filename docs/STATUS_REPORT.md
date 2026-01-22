@@ -72,7 +72,6 @@ datum-server/
 ├── docs/                  # All documentation
 ├── docker/                # Docker files including .env.example
 ├── build/                 # Build artifacts (gitignored)
-├── examples/              # Example code
 ├── scripts/               # Utility scripts
 └── tests/                 # Integration tests
 ```

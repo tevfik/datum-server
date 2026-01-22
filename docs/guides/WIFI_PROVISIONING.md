@@ -343,7 +343,7 @@ Requests expire after 15 minutes by default. This prevents:
 
 ### ESP32 (Arduino)
 
-See [examples/esp32_provisioning/](../../examples/esp32_provisioning/) for complete implementation.
+See [ESP32 Provisioning Example](https://github.com/datum-iot/examples) for complete implementation.
 
 ### MicroPython
 
@@ -463,6 +463,6 @@ Device is already registered. Either:
 ## Related Documentation
 
 - [API Reference](../reference/API.md)
-- [ESP32 Example](../../examples/esp32_provisioning/)
+- [ESP32 Provisioning Example](https://github.com/datum-iot/examples)
 - [Security Guide](SECURITY.md)
 - [Device Management](../tutorials/CLI.md#device-management)

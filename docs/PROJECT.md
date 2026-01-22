@@ -31,13 +31,8 @@ This is the standalone Go backend for the Datum IoT platform, extracted from the
 - SECURITY.md - Security features
 - RETENTION.md - Data retention policies
 - PROVISIONING.md - Device provisioning
-- FIRMWARE.md - Arduino/ESP32 examples
+- FIRMWARE.md - Firmware integration guide
 - Performance reports and benchmark results
-
-### Device Examples
-- **Arduino/ESP32** firmware examples
-- **MicroPython** client examples
-- Production-ready code for IoT devices
 
 ### Deployment Scripts
 - Docker Compose setup
@@ -104,9 +99,6 @@ datum-server/
 │   ├── processing/      # Async Telemetry Processor
 │   └── email/           # Email service (SMTP)
 ├── docs/                # 12 documentation files
-├── examples/
-│   ├── arduino/         # ESP32 firmware examples
-│   └── micropython/     # MicroPython client examples
 ├── tests/               # Load testing scripts (Locust)
 ├── scripts/             # Backup, restore, setup scripts
 ├── data/                # Database files (generated)
@@ -123,7 +115,6 @@ This project was cleanly extracted from the `datum-py` monorepo:
 - All Go backend code (cmd/, internal/)
 - All tests (55+ tests, full coverage)
 - All backend documentation (12 files)
-- Device examples (arduino, micropython)
 - Deployment scripts and Docker files
 - Load testing infrastructure
 
@@ -164,4 +155,4 @@ MIT License - See [LICENSE](LICENSE)
 
 - **Main Project**: https://github.com/tevfik/datum-py
 - **Documentation**: See [docs/](docs/) directory
-- **Examples**: See [examples/](examples/) directory
+- **Examples**: https://github.com/datum-iot/examples

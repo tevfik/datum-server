@@ -29,52 +29,8 @@ jobs:
           name: backend-binaries
           path: build/release/*
 
-  build-mobile:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - uses: actions/setup-java@v3
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-          cache: 'gradle'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.27.x'
-          channel: 'stable'
-          cache: true
-      
-      - name: Build APK (Inject Version)
-        working-directory: examples/datum_camera_app
-        run: |
-          # Determine version
-          if [[ $GITHUB_REF_TYPE == "tag" ]]; then
-            VERSION=${GITHUB_REF_NAME#v}
-          else
-            VERSION="0.0.0-dev.${{ github.run_number }}"
-          fi
-          echo "Building version: $VERSION"
-          
-          flutter pub get
-          flutter build apk --release --build-name=$VERSION --build-number=${{ github.run_number }}
-          mkdir -p ../../build/release
-          mv build/app/outputs/flutter-apk/app-release.apk ../../build/release/datum_camera_app.apk
-      
-      - name: Upload Mobile Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: mobile-apk
-          path: build/release/datum_camera_app.apk
-
-
-
   create-release:
-    needs: [build-backend, build-mobile]
+    needs: [build-backend]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -86,7 +42,6 @@ jobs:
         run: |
           mkdir -p assets
           cp backend-binaries/* assets/
-          cp mobile-apk/* assets/
 
           ls -R assets/
 

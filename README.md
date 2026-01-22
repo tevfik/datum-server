@@ -7,7 +7,6 @@ High-performance IoT data collection and management platform built with Go.
 - **Time-Series Storage**: Optimized for IoT sensor data with 347K inserts/sec
 - **Real-time Streaming**: Server-Sent Events (SSE) & WebSockets for live video/data
 - **Device Management**: Multi-user provisioning, Token-based Auth (`dk_...`), and OTA Updates
-- **Mobile App**: Production-ready Flutter app for provisioning, streaming, and control
 - **Admin Control**: Role-Based Access Control (RBAC) and Admin Management CLI
 - **CLI Tool**: `datumctl` - powerful interactive command-line interface
 - **Performance**: 633 req/s with 10K concurrent users, 5.6% CPU usage
@@ -42,8 +41,6 @@ See [docs/performance/FINAL_PERFORMANCE_REPORT.md](docs/performance/FINAL_PERFOR
 - `cmd/datumctl/` - CLI tool source code
 - `internal/auth/` - Authentication & rate limiting (JWT + API Keys)
 - `internal/storage/` - Dual storage layer (BuntDB + TStorage)
-- `examples/datum_camera_app/` - Flutter Mobile App
-- `examples/esp32-s3-camera/` - ESP32-S3 Firmware (C++)
 
 ### Advanced Components
 
@@ -320,86 +317,17 @@ The server supports command-line flags that take precedence over environment var
 
 **Priority Order:** Command-line flags > Environment variables > Default values
 
-## 🔌 Device Integration
+## 🔌 Client Libraries & Examples
 
-### Arduino/ESP32
+Client libraries, mobile applications, and firmware examples are now maintained in a separate repository.
 
-```cpp
-#include <WiFi.h>
-#include <HTTPClient.h>
+👉 **[Datum IoT Examples & SDKs](https://github.com/datum-iot/examples)**
 
-const char* apiKey = "your-device-api-key";
-const char* serverUrl = "http://server:8000/dev/YOUR_DEVICE_ID/data";
-
-void sendData(float temp, float humidity) {
-  HTTPClient http;
-  http.begin(serverUrl);
-  http.addHeader("Authorization", String("Bearer ") + apiKey);
-  http.addHeader("Content-Type", "application/json");
-  
-  String payload = "{\"temperature\":" + String(temp) + 
-                   ",\"humidity\":" + String(humidity) + "}";
-  
-  int httpCode = http.POST(payload);
-  http.end();
-}
-```
-
-See [examples/arduino/](examples/arduino/) for simple sensor examples.
-
-### 📱 Mobile App (Flutter)
-
-The **Datum Camera App** (`examples/datum_camera_app`) provides a complete mobile experience:
-- **Provisioning**: Zero-touch WiFi configuration via BLE / SoftAP.
-- **Streaming**: Low-latency MJPEG and WebSocket viewing.
-- **Recording**: Save videos and snapshots to local gallery.
-- **Control**: Toggle LED, flip/mirror stream, restart device.
-- **OTA Updates**: Trigger firmware updates directly from the app.
-
-To build:
-```bash
-cd examples/datum_camera_app
-flutter run
-```
-
-### ESP32-S3 Camera (Features)
-
-The `examples/esp32-s3-camera` directory contains a production-ready firmware supporting:
-
-- **Zero-Touch Provisioning**: Connect to `Datum-Camera-XXXX` hotspot to configure WiFi.
-- **Local Dashboard**: Modern embedded web interface for monitoring and control.
-- **Dual Streaming**: Local MJPEG stream + Cloud WebSocket stream.
-- **Supported Boards**: ESP32-S3-CAM, Freenove S3, AI-Thinker.
-
-See [examples/esp32-s3-camera/README.md](examples/esp32-s3-camera/README.md) for flashing instructions.
-
-### MicroPython
-
-```python
-import urequests
-import ujson
-
-API_KEY = "your-device-api-key"
-SERVER_URL = "http://server:8000/dev/YOUR_DEVICE_ID/data"
-
-def send_data(temperature, humidity):
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    data = {
-        "temperature": temperature,
-        "humidity": humidity
-    }
-    
-    response = urequests.post(SERVER_URL, 
-                              headers=headers, 
-                              data=ujson.dumps(data))
-    response.close()
-```
-
-See [examples/micropython/](examples/micropython/) for complete examples.
+This repository includes:
+- **Arduino/ESP32 Firmware**: Ready-to-use firmware for ESP32 and ESP8266.
+- **MicroPython Client**: Examples for MicroPython devices.
+- **Datum Camera App**: Complete Flutter mobile app for provisioning and streaming.
+- **ESP32-S3 Camera**: Advanced camera firmware with zero-touch provisioning.
 
 ## 🛡️ Security Features
 

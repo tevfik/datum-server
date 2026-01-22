@@ -21,7 +21,7 @@ python tests/device_simulator.py \
 - Auto-acknowledges command completion
 
 ### 2. Arduino/ESP32
-**Location:** `examples/arduino/datum_device.ino`
+**Location:** [Datum Examples Repo](https://github.com/datum-iot/examples)
 
 **Requirements:**
 - ESP32 or ESP8266 board
@@ -39,7 +39,7 @@ python tests/device_simulator.py \
 3. Upload to board
 
 ### 3. MicroPython
-**Location:** `examples/micropython/main.py`
+**Location:** [Datum Examples Repo](https://github.com/datum-iot/examples)
 
 **Requirements:**
 - ESP32/ESP8266 with MicroPython firmware

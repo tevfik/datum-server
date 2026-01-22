@@ -608,6 +608,5 @@ done
 ## Related Documentation
 
 - [API Reference](../reference/API.md)
-- [Arduino Examples](../../examples/arduino/)
-- [MicroPython Examples](../../examples/micropython/)
+- [Datum Examples Repo](https://github.com/datum-iot/examples)
 - [Deployment Guide](../guides/DEPLOYMENT.md)
