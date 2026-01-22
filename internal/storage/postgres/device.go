@@ -61,25 +61,25 @@ func (s *PostgresStore) GetUserDevices(userID string) ([]storage.Device, error) 
 	return scanDevices(s.db, query, userID)
 }
 
-// GetUserDeviceCounts returns a map of user ID to device count
-func (s *PostgresStore) GetUserDeviceCounts() (map[string]int, error) {
-	query := `SELECT user_id, COUNT(*) FROM devices GROUP BY user_id`
-	rows, err := s.db.Query(query)
+// GetUserDeviceStats retrieves statistics for a user's devices
+func (s *PostgresStore) GetUserDeviceStats(userID string) (*storage.DeviceStats, error) {
+	stats := &storage.DeviceStats{}
+
+	// Total devices
+	err := s.db.QueryRow("SELECT COUNT(*) FROM devices WHERE user_id = $1", userID).Scan(&stats.Total)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	counts := make(map[string]int)
-	for rows.Next() {
-		var userID string
-		var count int
-		if err := rows.Scan(&userID, &count); err != nil {
-			return nil, err
-		}
-		counts[userID] = count
+	// Online devices (LastSeen < 5 minutes ago)
+	threshold := time.Now().Add(-5 * time.Minute)
+	err = s.db.QueryRow("SELECT COUNT(*) FROM devices WHERE user_id = $1 AND last_seen > $2", userID, threshold).Scan(&stats.Online)
+	if err != nil {
+		return nil, err
 	}
-	return counts, nil
+
+	stats.Offline = stats.Total - stats.Online
+	return stats, nil
 }
 
 // DeleteDevice removes a device if it belongs to the user

@@ -57,3 +57,9 @@ export interface TelemetryPoint {
 export interface TelemetryHistoryResponse {
     data: TelemetryPoint[];
 }
+
+export interface DeviceStats {
+    total_devices: number;
+    online_devices: number;
+    offline_devices: number;
+}

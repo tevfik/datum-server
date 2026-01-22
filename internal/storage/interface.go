@@ -2,6 +2,13 @@ package storage
 
 import "time"
 
+// DeviceStats holds aggregated device statistics
+type DeviceStats struct {
+	Total   int `json:"total"`
+	Online  int `json:"online"`
+	Offline int `json:"offline"`
+}
+
 // Provider defines the interface for storage operations.
 // This allows swapping the underlying implementation (e.g., BuntDB -> PostgreSQL)
 // without changing the application logic.
@@ -27,8 +34,9 @@ type Provider interface {
 	GetDeviceByUID(uid string) (*Device, error)
 	GetDeviceByAPIKey(apiKey string) (*Device, error)
 	GetUserDevices(userID string) ([]Device, error)
-	GetUserDeviceCounts() (map[string]int, error)
+	GetUserDeviceStats(userID string) (*DeviceStats, error)
 	GetAllDevices() ([]Device, error)
+	GetAllDevicesAndOwners() ([]Device, map[string]User, error)
 	UpdateDevice(id string, status string) error
 	UpdateDeviceThingDescription(id string, td map[string]interface{}) error // New method
 	UpdateDeviceConfig(id string, config map[string]interface{}) error       // Remote Config

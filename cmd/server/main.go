@@ -219,6 +219,9 @@ func main() {
 	// Metrics middleware
 	r.Use(metricsMiddleware())
 
+	// Metrics Endpoint
+	r.GET("/metrics", metricsHandler)
+
 	r.Use(securityHeadersMiddleware())
 	// CORS setup
 	r.Use(func(c *gin.Context) {
@@ -320,6 +323,7 @@ func main() {
 		// Management
 		devGroup.POST("", createDeviceHandler)
 		devGroup.GET("", listDevicesHandler)
+		devGroup.GET("/stats", getDeviceStatsHandler)
 		devGroup.DELETE("/:device_id", deleteDeviceHandler)
 
 		// Configuration (Remote Config/Shadow)

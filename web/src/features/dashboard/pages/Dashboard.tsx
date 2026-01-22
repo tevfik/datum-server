@@ -29,15 +29,15 @@ const chartData = [
 ];
 
 export default function Dashboard() {
-    const { data: devices, isLoading } = useQuery({
-        queryKey: ['devices'],
-        queryFn: deviceService.getAll,
+    const { data: stats, isLoading } = useQuery({
+        queryKey: ['devices', 'stats'],
+        queryFn: deviceService.getStats,
     });
 
     // Calculate Stats
-    const totalDevices = devices?.length || 0;
-    const onlineDevices = devices?.filter(d => d.status === 'online').length || 0;
-    const offlineDevices = totalDevices - onlineDevices;
+    const totalDevices = stats?.total_devices || 0;
+    const onlineDevices = stats?.online_devices || 0;
+    const offlineDevices = stats?.offline_devices || 0;
 
     // Calculate mock "health" (just for visuals)
     const systemHealth = totalDevices > 0 ? Math.round((onlineDevices / totalDevices) * 100) : 100;

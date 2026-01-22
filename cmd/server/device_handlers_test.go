@@ -250,3 +250,44 @@ router.ServeHTTP(w, req)
 assert.Equal(t, http.StatusNotFound, w.Code)
 })
 }
+
+func TestGetDeviceStatsHandler(t *testing.T) {
+	router, cleanup, user := setupDeviceTestServer(t)
+	defer cleanup()
+
+	// Register route
+	router.GET("/dev/stats", func(c *gin.Context) {
+		c.Set("user_id", user.ID)
+		c.Set("role", user.Role)
+		getDeviceStatsHandler(c)
+	})
+
+	// Add devices
+	// 1 Online
+	d1 := &storage.Device{ID: "dev_d1", UserID: user.ID, Name: "D1", LastSeen: time.Now()}
+	require.NoError(t, store.CreateDevice(d1))
+	// 2 Offline
+	d2 := &storage.Device{ID: "dev_d2", UserID: user.ID, Name: "D2", LastSeen: time.Now().Add(-10 * time.Minute)}
+	require.NoError(t, store.CreateDevice(d2))
+	d3 := &storage.Device{ID: "dev_d3", UserID: user.ID, Name: "D3", LastSeen: time.Now().Add(-1 * time.Hour)}
+	require.NoError(t, store.CreateDevice(d3))
+
+	// Other user device (should not be counted)
+	d4 := &storage.Device{ID: "dev_d4", UserID: "other", Name: "D4", LastSeen: time.Now()}
+	require.NoError(t, store.CreateDevice(d4))
+
+	t.Run("Get Device Stats", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/dev/stats", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var resp DeviceStatsResponse
+		json.Unmarshal(w.Body.Bytes(), &resp)
+
+		assert.Equal(t, 3, resp.TotalDevices)
+		assert.Equal(t, 1, resp.OnlineDevices)
+		assert.Equal(t, 2, resp.OfflineDevices)
+	})
+}

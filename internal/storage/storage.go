@@ -272,26 +272,37 @@ func (s *Storage) GetUserDevices(userID string) ([]Device, error) {
 	return devices, err
 }
 
-func (s *Storage) GetUserDeviceCounts() (map[string]int, error) {
-	counts := make(map[string]int)
+func (s *Storage) GetUserDeviceStats(userID string) (*DeviceStats, error) {
+	stats := &DeviceStats{}
 	err := s.db.View(func(tx *buntdb.Tx) error {
-		tx.AscendKeys("user:*", func(key, value string) bool {
-			// key looks like user:{id}:devices
-			if strings.HasSuffix(key, ":devices") {
-				parts := strings.Split(key, ":")
-				if len(parts) == 3 {
-					userID := parts[1]
-					var deviceIDs []string
-					if err := json.Unmarshal([]byte(value), &deviceIDs); err == nil {
-						counts[userID] = len(deviceIDs)
-					}
-				}
+		userDevicesKey := fmt.Sprintf("user:%s:devices", userID)
+		devicesJSON, err := tx.Get(userDevicesKey)
+		if err != nil {
+			return nil // No devices
+		}
+
+		var deviceIDs []string
+		json.Unmarshal([]byte(devicesJSON), &deviceIDs)
+
+		stats.Total = len(deviceIDs)
+
+		for _, deviceID := range deviceIDs {
+			deviceKey := fmt.Sprintf("device:%s", deviceID)
+			deviceData, err := tx.Get(deviceKey)
+			if err != nil {
+				continue
 			}
-			return true
-		})
+			var device Device
+			json.Unmarshal([]byte(deviceData), &device)
+
+			if time.Since(device.LastSeen) < 5*time.Minute {
+				stats.Online++
+			}
+		}
+		stats.Offline = stats.Total - stats.Online
 		return nil
 	})
-	return counts, err
+	return stats, err
 }
 
 func (s *Storage) DeleteDevice(deviceID, userID string) error {
@@ -1210,18 +1221,16 @@ func (s *Storage) DeleteResetToken(token string) error {
 func (s *Storage) GetAllDevices() ([]Device, error) {
 	var devices []Device
 	err := s.db.View(func(tx *buntdb.Tx) error {
-		tx.Ascend("", func(key, value string) bool {
+		tx.AscendKeys("device:*", func(key, value string) bool {
 			// Key format: device:<ID>
 			// Must exclude device:uid:..., device:...:commands, etc.
 			// ID always starts with 'dev_'
-			if strings.HasPrefix(key, "device:") {
-				// Check if it's a subkey (e.g. device:dev_xxx:commands)
-				// key[7:] is the ID part. Check if it contains ":"
-				if !strings.Contains(key[7:], ":") {
-					var device Device
-					if err := json.Unmarshal([]byte(value), &device); err == nil {
-						devices = append(devices, device)
-					}
+			// Check if it's a subkey (e.g. device:dev_xxx:commands)
+			// key[7:] is the ID part. Check if it contains ":"
+			if !strings.Contains(key[7:], ":") {
+				var device Device
+				if err := json.Unmarshal([]byte(value), &device); err == nil {
+					devices = append(devices, device)
 				}
 			}
 			return true
@@ -1229,6 +1238,55 @@ func (s *Storage) GetAllDevices() ([]Device, error) {
 		return nil
 	})
 	return devices, err
+}
+
+// GetAllDevicesAndOwners returns all devices and their owners in a single transaction
+func (s *Storage) GetAllDevicesAndOwners() ([]Device, map[string]User, error) {
+	var devices []Device
+	users := make(map[string]User)
+
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		// Efficiently iterate only device keys
+		tx.AscendKeys("device:*", func(key, value string) bool {
+			// Filter out subkeys (e.g. device:uid:..., device:...:shadow)
+			// device IDs start after "device:" (7 chars)
+			if len(key) <= 7 {
+				return true
+			}
+
+			// Check for sub-keys or different prefixes starting with device:
+			// e.g. "device:uid:..."
+			// But note: AscendKeys matches strictly the glob pattern.
+			// Since we want to support any ID, we use "device:*"
+
+			// Check if it's a sub-property of a device (contains ":" in ID part)
+			// This relies on device IDs NOT containing ":"
+			// Also filters out "device:uid:..." because "uid:..." contains ":"
+			idPart := key[7:]
+			if strings.Contains(idPart, ":") {
+				return true
+			}
+
+			var device Device
+			if err := json.Unmarshal([]byte(value), &device); err == nil {
+				devices = append(devices, device)
+
+				// Fetch owner if we haven't seen them yet
+				if _, seen := users[device.UserID]; !seen {
+					userKey := fmt.Sprintf("user:%s", device.UserID)
+					if userData, err := tx.Get(userKey); err == nil {
+						var user User
+						if json.Unmarshal([]byte(userData), &user) == nil {
+							users[device.UserID] = user
+						}
+					}
+				}
+			}
+			return true
+		})
+		return nil
+	})
+	return devices, users, err
 }
 
 // UpdateDeviceAPIKey updates a device's API key
