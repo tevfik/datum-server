@@ -14,11 +14,12 @@ graph TB
 
     subgraph "Datum Server"
         API[REST API<br/>Gin Framework]
-        SSE[SSE Handler<br/>Real-time Events]
+        MQTT[MQTT Broker<br/>Mochi-MQTT]
+        SSE[SSE Handler<br/>Legacy/Web]
         AUTH[Auth Middleware<br/>JWT + API Keys]
         
         subgraph "Storage Layer"
-            BUNT[(BuntDB<br/>Metadata)]
+            DB[(PostgreSQL/BuntDB<br/>Metadata)]
             TS[(TSStorage<br/>Time-Series)]
         end
         
@@ -31,57 +32,61 @@ graph TB
         APP[Mobile App]
     end
 
-    D1 -->|POST /data/{id}| API
-    D2 -->|POST /data/{id}| API
-    D3 -->|GET /push| API
+    D1 -->|POST /dev/{id}/data| API
+    D1 -->|MQTT dev/{id}/data| MQTT
+    D2 -->|POST /dev/{id}/data| API
+    D3 -->|POST /dev/{id}/data| API
     
-    D1 -->|SSE| SSE
-    D2 -->|Long Poll| API
+    D1 -.->|Sub: dev/{id}/conf| MQTT
+    D1 -->|GET /dev/{id}| API
     
     API --> AUTH
-    AUTH --> BUNT
+    MQTT --> AUTH
+    AUTH --> DB
     AUTH --> TS
     
-    SSE --> BUNT
+    MQTT --> TS
     
     RET -->|Cleanup| TS
     
     WEB -->|JWT Auth| API
+    WEB -.->|Sub: dev/{id}/data| MQTT
     CLI -->|JWT Auth| API
     APP -->|JWT Auth| API
     
     style API fill:#2196F3
-    style BUNT fill:#4CAF50
+    style MQTT fill:#E91E63
+    style DB fill:#4CAF50
     style TS fill:#FF9800
     style AUTH fill:#9C27B0
 ```
 
-## Data Flow: Device to Storage
+## Data Flow: Device to Storage (HTTP & MQTT)
 
 ```mermaid
 sequenceDiagram
     participant Device
+    participant MQTT as MQTT Broker
     participant API as REST API
     participant Auth as Auth Middleware
-    participant BuntDB
+    participant DB as Metadata DB
     participant TSStorage
     
-    Device->>API: POST /data/{device_id}<br/>Bearer: API_KEY
-    API->>Auth: Validate API Key
-    Auth->>BuntDB: Lookup device by API key
-    BuntDB-->>Auth: Device info
-    
-    alt Valid Device
-        Auth-->>API: Device authenticated
-        API->>TSStorage: Store data point
-        TSStorage-->>API: Success
-        API-->>Device: 200 OK<br/>{timestamp, commands_pending}
-    else Invalid Key
-        Auth-->>API: 401 Unauthorized
-        API-->>Device: 401 Invalid API key
-    else Banned Device
-        Auth-->>API: 403 Forbidden
-        API-->>Device: 403 Device banned
+    par HTTP Path
+        Device->>API: POST /dev/{id}/data<br/>Bearer: API_KEY
+        API->>Auth: Validate Credentials
+        Auth->>DB: Lookup Device
+        API->>TSStorage: Store Data
+        API-->>Device: 200 OK
+    and MQTT Path
+        Device->>MQTT: CONNECT (User=ID, Pass=Key)
+        MQTT->>Auth: OnConnect Hook
+        Auth->>DB: Verify Key
+        MQTT-->>Device: CONNACK
+        
+        Device->>MQTT: PUBLISH dev/{id}/data
+        MQTT->>Auth: Ingestion Hook
+        Auth->>TSStorage: Store Data Batch
     end
 ```
 
@@ -92,12 +97,12 @@ sequenceDiagram
     participant User
     participant API as REST API
     participant Auth as Auth Module
-    participant BuntDB
+    participant DB as Metadata DB
     
     User->>API: POST /auth/login<br/>{email, password}
     API->>Auth: Validate credentials
-    Auth->>BuntDB: Get user by email
-    BuntDB-->>Auth: User record
+    Auth->>DB: Get user by email
+    DB-->>Auth: User record
     
     alt Valid Credentials
         Auth->>Auth: Verify password hash
@@ -114,7 +119,7 @@ sequenceDiagram
 
 ```mermaid
 graph LR
-    subgraph "BuntDB (Metadata)"
+    subgraph "Metadata DB (Postgres/Bunt)"
         U[Users<br/>user:&#123;id&#125;]
         D[Devices<br/>device:&#123;id&#125;]
         AK[API Keys<br/>apikey:&#123;key&#125;]
@@ -146,6 +151,31 @@ graph LR
     style PN fill:#FF9800
 ```
 
+## Remote Configuration Flow (Shadow Twin)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant API
+    participant DB as Metadata DB
+    participant MQTT
+    participant Device
+
+    Note over User,Device: 1. Push Update (Real-time)
+    User->>API: PATCH /dev/{id}/config<br/>{ "resolution": "1080p" }
+    API->>DB: Update 'desired_state' JSONB
+    API->>MQTT: Publish 'dev/{id}/conf/set'<br/>Payload: { "desired": {...} }
+    MQTT->>Device: Message Received (Subscribed)
+    Device->>Device: Apply Settings (NVS)
+
+    Note over User,Device: 2. Pull Sync (Boot/Fallback)
+    Device->>Device: Power On / Reboot
+    Device->>API: GET /dev/{id}
+    API->>DB: Read Device + Desired State
+    API-->>Device: JSON { ..., "desired_state": {...} }
+    Device->>Device: Compare & Apply
+```
+
 ## Command Flow: SSE Real-time Commands
 
 ```mermaid
@@ -157,10 +187,10 @@ sequenceDiagram
     participant Device
     
     Note over Device,SSE: Device maintains SSE connection
-    Device->>SSE: GET /devices/{id}/commands/stream
+    Device->>SSE: GET /dev/{id}/cmd/stream
     SSE-->>Device: SSE Connection Open
     
-    Admin->>API: POST /devices/{id}/commands<br/>{action: "reboot"}
+    Admin->>API: POST /dev/{id}/cmd<br/>{action: "reboot"}
     API->>BuntDB: Store command
     BuntDB-->>API: Command ID
     API-->>Admin: 201 Command queued
@@ -168,7 +198,7 @@ sequenceDiagram
     Note over SSE,Device: Command delivered in real-time
     SSE->>Device: event: command<br/>data: {id, action: "reboot"}
     
-    Device->>API: POST /devices/&#123;id&#125;/commands/&#123;cmd_id&#125;/ack<br/>{status: "success"}
+    Device->>API: POST /dev/&#123;id&#125;/cmd/&#123;cmd_id&#125;/ack<br/>{status: "success"}
     API->>BuntDB: Update command status
     API-->>Device: 200 OK
 ```
@@ -208,8 +238,8 @@ graph TD
 graph TB
     subgraph "Host Machine"
         subgraph "Docker"
-            SERVER[Datum Server<br/>:8080]
-            DATA[(Data Volume<br/>/app/data)]
+            SERVER[Datum Server<br/>:8000]
+            DATA[(Data Volume<br/>/root/data)]
         end
         
         NGINX[Nginx Reverse Proxy<br/>:443/:80]
@@ -284,53 +314,50 @@ graph LR
 ```mermaid
 graph TD
     API["/api"] --> AUTH["/auth"]
-    API --> DEVICES["/devices"]
-    API --> DATA["/data"]
-    API --> DEVICE["/devices/{id}"]
-    API --> PUBLIC["/public"]
+    API --> DEV["/dev"]
     API --> ADMIN["/admin"]
-    API --> SYSTEM["/system"]
+    API --> SYS["/sys"]
     
     AUTH --> REGISTER[POST /register]
     AUTH --> LOGIN[POST /login]
     
-    DEVICES --> CREATE_DEV[POST /]
-    DEVICES --> LIST_DEV[GET /]
-    DEVICES --> DELETE_DEV[DELETE /&#123;id&#125;]
-
-    DATA --> POST_DATA[POST /&#123;id&#125;]
-    DATA --> GET_LATEST[GET /&#123;id&#125;]
-    DATA --> GET_HISTORY[GET /&#123;id&#125;/history]
+    DEV --> CREATE_DEV[POST /]
+    DEV --> LIST_DEV[GET /]
     
-    DEVICE --> COMMANDS["/commands"]
-    DEVICE --> PUSH["GET /&#123;id&#125;/push"]
+    DEV --> DEVICE["/&#123;id&#125;"]
+    DEVICE --> DATA["/data"]
+    DEVICE --> CMD["/cmd"]
     
-    COMMANDS --> POLL[GET /poll]
-    COMMANDS --> STREAM[GET /stream]
-    COMMANDS --> ACK[POST /&#123;cmd_id&#125;/ack]
+    DATA --> POST_DATA[POST /]
+    DATA --> GET_HIST[GET /history]
+    
+    CMD --> LIST_CMD[GET /]
+    CMD --> SEND_CMD[POST /]
+    CMD --> STREAM[GET /stream]
+    CMD --> ACK[POST /&#123;cmd_id&#125;/ack]
     
     ADMIN --> USERS["/users"]
-    ADMIN --> DEVICES_ADMIN["/devices"]
+    ADMIN --> DEVICES_ADMIN["/dev"]
     ADMIN --> DATABASE["/database"]
     
     style API fill:#2196F3
     style AUTH fill:#9C27B0
     style ADMIN fill:#f44336
-    style PUBLIC fill:#4CAF50
+    style DEV fill:#4CAF50
 ```
 
 ## Device Lifecycle
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Created: POST /devices
+    [*] --> Created: POST /dev
     Created --> Active: First data sent
     Active --> Active: Sending data
     Active --> Suspended: Admin suspends
     Active --> Banned: Rate limit exceeded
     Suspended --> Active: Admin reactivates
     Banned --> Active: Admin unbans
-    Active --> Deleted: DELETE /devices/&#123;id&#125;
+    Active --> Deleted: DELETE /dev/&#123;id&#125;
     Suspended --> Deleted: Admin deletes
     Deleted --> [*]
     
@@ -373,18 +400,18 @@ sequenceDiagram
     Device-->>Phone: {uid, model, version}
     
     Note over Phone: User names device
-    Phone->>Server: POST /devices/register<br/>{uid, name, wifi_creds}
+    Phone->>Server: POST /dev/register<br/>{uid, name, wifi_creds}
     Server-->>Phone: {device_id, api_key, server_url}
     
     Phone->>Device: POST /configure<br/>{server_url, wifi}
     Device-->>Phone: OK
     
     Note over Device: Restart & connect WiFi
-    Device->>Server: POST /provisioning/activate<br/>{device_uid}
+    Device->>Server: POST /prov/activate<br/>{device_uid}
     Server-->>Device: {device_id, api_key}
     
     Note over Device,Server: Normal operation begins
-    Device->>Server: POST /data (with api_key)
+    Device->>Server: POST /dev/{id}/data (with api_key)
 ```
 
 ## Provisioning State Machine

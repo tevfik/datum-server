@@ -11,7 +11,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-SERVER_URL="${SERVER_URL:-http://localhost:8080}"
+SERVER_URL="${SERVER_URL:-http://localhost:8000}"
 NUM_DEVICES="${NUM_DEVICES:-10}"
 CONCURRENT="${CONCURRENT:-5}"
 

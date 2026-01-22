@@ -120,7 +120,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"
+      # - "8000:8000" # Exposed port if needed, mapped to 8000 internal
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./letsencrypt:/letsencrypt"
@@ -131,7 +131,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     environment:
-      - PORT=8080
+      - PORT=8000
       - JWT_SECRET=${JWT_SECRET}
       - RETENTION_MAX_DAYS=${RETENTION_MAX_DAYS:-7}
     volumes:
@@ -142,7 +142,7 @@ services:
       - "traefik.http.routers.datum-server.entrypoints=websecure"
       - "traefik.http.routers.datum-server.tls.certresolver=letsencrypt"
       # WebSocket support (critical for streaming)
-      - "traefik.http.services.datum-server.loadbalancer.server.port=8080"
+      - "traefik.http.services.datum-server.loadbalancer.server.port=8000"
       - "traefik.http.services.datum-server.loadbalancer.passhostheader=true"
       - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Connection=Upgrade"
       - "traefik.http.middlewares.datum-ws.headers.customrequestheaders.Upgrade=websocket"
@@ -210,7 +210,7 @@ If you are deploying in an offline environment (no internet) or on a local netwo
     Update `.env` file. `DOMAIN` and `ACME_EMAIL` are ignored in this mode.
     ```bash
     # Only these are used
-    PORT=8080
+    PORT=8000
     JWT_SECRET=your-secret
     ```
 
@@ -264,7 +264,8 @@ User=datum
 Group=datum
 
 # Environment
-Environment="PORT=8080"
+Environment="PORT=8000"
+Environment="MQTT_PORT=1883"
 Environment="DATA_DIR=/var/lib/datum/data"
 Environment="LOG_LEVEL=INFO"
 Environment="GIN_MODE=release"
@@ -301,7 +302,7 @@ WantedBy=multi-user.target
 
 **/etc/datum/datum-server.env:**
 ```bash
-PORT=8080
+PORT=8000
 DATA_DIR=/var/lib/datum/data
 JWT_SECRET=your-super-secret-jwt-key-min-32-chars
 RETENTION_MAX_DAYS=7
@@ -388,7 +389,7 @@ metadata:
   name: datum-config
   namespace: datum-iot
 data:
-  PORT: "8080"
+  PORT: "8000"
   LOG_LEVEL: "INFO"
   GIN_MODE: "release"
   RETENTION_MAX_DAYS: "7"
@@ -444,7 +445,7 @@ spec:
         image: datum-server:latest
         imagePullPolicy: Always
         ports:
-        - containerPort: 8080
+        - containerPort: 8000
           name: http
         env:
         - name: JWT_SECRET
@@ -457,7 +458,7 @@ spec:
             name: datum-config
         volumeMounts:
         - name: data
-          mountPath: /app/data
+          mountPath: /root/data
         resources:
           requests:
             memory: "256Mi"
@@ -468,13 +469,13 @@ spec:
         livenessProbe:
           httpGet:
             path: /health
-            port: 8080
+            port: 8000
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /ready
-            port: 8080
+            port: 8000
           initialDelaySeconds: 5
           periodSeconds: 5
       volumes:
@@ -496,7 +497,7 @@ spec:
   ports:
   - protocol: TCP
     port: 80
-    targetPort: 8080
+    targetPort: 8000
   type: LoadBalancer
 ```
 
@@ -585,7 +586,7 @@ metadata:
   name: datum-config
   namespace: datum
 data:
-  PORT: "8080"
+  PORT: "8000"
   LOG_LEVEL: "INFO"
   RETENTION_MAX_DAYS: "7"
 ---
@@ -750,7 +751,7 @@ az container create \
   --name datum-server \
   --image datum-server:latest \
   --dns-name-label datum-iot \
-  --ports 8080 \
+  --ports 8000 \
   --environment-variables JWT_SECRET=your-secret
 ```
 
@@ -772,7 +773,7 @@ server {
     ssl_prefer_server_ciphers on;
 
     location / {
-        proxy_pass http://localhost:8080;
+        proxy_pass http://localhost:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -802,13 +803,13 @@ sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
 
 ```bash
 # Basic health check
-curl http://localhost:8080/health
+curl http://localhost:8000/health
 
 # Readiness check
-curl http://localhost:8080/ready
+curl http://localhost:8000/ready
 
 # Metrics endpoint
-curl http://localhost:8080/metrics
+curl http://localhost:8000/metrics
 ```
 
 ### Prometheus Integration
@@ -818,7 +819,7 @@ curl http://localhost:8080/metrics
 scrape_configs:
   - job_name: 'datum-server'
     static_configs:
-      - targets: ['localhost:8080']
+      - targets: ['localhost:8000']
     metrics_path: '/metrics'
 ```
 

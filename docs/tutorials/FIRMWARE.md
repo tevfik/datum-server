@@ -1,6 +1,6 @@
 # Device Firmware Examples
 
-Ready-to-use firmware for connecting IoT devices to Datumpy.
+Ready-to-use firmware for connecting IoT devices to Datum.
 
 ## Available Examples
 
@@ -21,7 +21,7 @@ python tests/device_simulator.py \
 - Auto-acknowledges command completion
 
 ### 2. Arduino/ESP32
-**Location:** `examples/arduino/datumpy_device.ino`
+**Location:** `examples/arduino/datum_device.ino`
 
 **Requirements:**
 - ESP32 or ESP8266 board
@@ -29,7 +29,7 @@ python tests/device_simulator.py \
 - ArduinoJson library
 
 **Setup:**
-1. Open `datumpy_device.ino` in Arduino IDE
+1. Open `datum_device.ino` in Arduino IDE
 2. Edit configuration section:
    ```cpp
    const char* WIFI_SSID = "your-wifi";
@@ -56,7 +56,7 @@ python tests/device_simulator.py \
 
 1. **Create device in Datumpy:**
    ```bash
-   curl -X POST http://localhost:8007/devices \
+   curl -X POST http://localhost:8000/dev \
      -H "Authorization: Bearer YOUR_JWT_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"name": "My Sensor", "type": "temperature"}'
@@ -71,7 +71,7 @@ python tests/device_simulator.py \
 
 4. **Device sends data:**
    ```
-   POST /data/{device_id}
+   POST /dev/{device_id}/data
    Authorization: Bearer {api_key}
    {"temperature": 25.5, "humidity": 60}
    ```
@@ -101,7 +101,7 @@ For devices that cannot make POST requests with JSON bodies, use the GET push en
 
 ### Simple HTTP GET Request
 ```http
-GET /devices/{device_id}/push?key={api_key}&temp=25.5&humidity=60&battery=85
+GET /dev/{device_id}/data?key={api_key}&temp=25.5&humidity=60&battery=85
 ```
 
 ### Arduino/ESP8266 Example with WiFiClient
@@ -109,8 +109,8 @@ GET /devices/{device_id}/push?key={api_key}&temp=25.5&humidity=60&battery=85
 // Minimal implementation - no JSON library needed
 void sendData(float temp, float humidity, int battery) {
   WiFiClient client;
-  if (client.connect("your-server.com", 8007)) {
-    String url = "/devices/" + String(DEVICE_ID) + "/push";
+  if (client.connect("your-server.com", 8000)) {
+    String url = "/dev/" + String(DEVICE_ID) + "/data";
     url += "?key=" + String(API_KEY);
     url += "&temp=" + String(temp, 1);
     url += "&humidity=" + String(humidity, 1);

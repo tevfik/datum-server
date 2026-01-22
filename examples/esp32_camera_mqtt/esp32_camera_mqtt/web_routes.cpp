@@ -329,7 +329,7 @@ void handleThingDescription(WebServer &server) {
     // Strip trailing slash
     if (host.endsWith("/"))
       host.remove(host.length() - 1);
-    // Strip path if any (e.g. :8080/api) - usually serverURL is just base
+    // Strip path if any (e.g. :8000/api) - usually serverURL is just base
     idx = host.indexOf("/");
     if (idx != -1)
       host = host.substring(0, idx);

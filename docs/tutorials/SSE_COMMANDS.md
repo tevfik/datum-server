@@ -6,21 +6,21 @@ Battery-optimized command delivery for IoT devices.
 
 ### 1. Immediate Poll
 ```http
-GET /devices/{device_id}/commands
+GET /dev/{device_id}/cmd
 Authorization: Bearer {api_key}
 ```
 Returns pending commands immediately.
 
 ### 2. HTTP Long Poll
 ```http
-GET /devices/{device_id}/commands/poll?wait=30
+GET /dev/{device_id}/cmd/poll?wait=30
 Authorization: Bearer {api_key}
 ```
 Waits up to 30 seconds for commands. Returns immediately if command arrives.
 
 ### 3. SSE Stream
 ```http
-GET /devices/{device_id}/commands/stream?wait=30
+GET /dev/{device_id}/cmd/stream?wait=30
 Authorization: Bearer {api_key}
 Accept: text/event-stream
 ```
@@ -45,16 +45,16 @@ data:[{"command_id":"cmd_xxx","action":"reboot"}]
 ## Battery-Optimized Flow
 
 ```
-1. Device sends data → POST /data/{id}
+1. Device sends data → POST /dev/{id}/data
    Response: {"status":"ok", "commands_pending": 1}
 
 2. If commands_pending > 0:
-   → GET /devices/{id}/commands/poll?wait=30
+   → GET /dev/{id}/cmd/poll?wait=30
    
 3. Execute command
 
 4. Acknowledge:
-   → POST /devices/{id}/commands/{cmd_id}/ack
+   → POST /dev/{id}/cmd/{cmd_id}/ack
    
 5. Sleep, repeat
 ```

@@ -175,10 +175,10 @@ Commands progress through these states:
 
 Commands use existing server endpoints:
 
-- `POST /devices/:device_id/commands` - Send command
-- `GET /devices/:device_id/commands` - List commands
-- `GET /devices/:device_id/commands/:command_id` - Get command details
-- `DELETE /devices/:device_id/commands/:command_id` - Cancel command
+- `POST /dev/:device_id/cmd` - Send command
+- `GET /dev/:device_id/cmd` - List commands
+- `GET /dev/:device_id/cmd/:command_id` - Get command details
+- `DELETE /dev/:device_id/cmd/:command_id` - Cancel command
 
 ## Use Cases
 

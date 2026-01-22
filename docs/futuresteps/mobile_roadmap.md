@@ -25,7 +25,7 @@ The Mobile App has local storage (Isar/SQL). The backend needs a Sync API to han
     - Implement "Last-Write-Wins" based on `timestamp`.
     - Return updated state if server has newer data.
 3.  **Data Versioning**:
-    - Add `version` column to critical entities (Devices, Rules) to allow efficient delta downloads (`GET /devices?since_version=102`).
+    - Add `version` column to critical entities (Devices, Rules) to allow efficient delta downloads (`GET /dev?since_version=102`).
 
 ## 3. WebRTC Streaming
 For ESP32-Cam and other camera devices, MJPEG is inefficient over WAN.

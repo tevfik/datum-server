@@ -20,92 +20,126 @@ Content-Type: application/json
 ```
 Response: `{"token": "jwt...", "user_id": "usr_xxx", "role": "admin|user"}`
 
+### Password Reset
+```http
+POST /auth/forgot-password
+POST /auth/reset-password
+PUT /auth/password (Authenticated)
+```
+
 ---
 
-## System
+## System (Initial Setup & Status)
 
 ### Check System Status
 ```http
-GET /system/status
+GET /sys/status
 ```
 Response: `{"initialized": true, "platform_name": "...", "allow_register": true}`
 
 ### Setup System
 ```http
-POST /system/setup
+POST /sys/setup
 Content-Type: application/json
 
 {"platform_name": "My IoT", "admin_email": "admin@example.com", "admin_password": "..."}
 ```
+*Used only once to initialize the first admin.*
 
 ---
 
 ## Admin Endpoints
-*(Require Admin Role)*
-
-### Logs
-```http
-GET /admin/logs?level=INFO&limit=50
-DELETE /admin/logs
-```
-
-### Configuration
-```http
-GET /admin/config
-PUT /admin/config/retention
-PUT /admin/config/rate-limit
-PUT /admin/config/alerts
-PUT /admin/config/registration
-```
+*(Require Admin Role - Authorization: Bearer JWT)*
 
 ### User Management
 ```http
-GET /admin/users
 POST /admin/users
+GET /admin/users
+GET /admin/users/{user_id}
+PUT /admin/users/{user_id}
 DELETE /admin/users/{user_id}
 POST /admin/users/{username}/reset-password
 ```
 
-### Device Management
+### Device Management (Admin)
 ```http
-GET /admin/devices
-POST /admin/devices
-DELETE /admin/devices/{device_id}
+GET /admin/dev
+POST /admin/dev
+GET /admin/dev/{device_id}
+PUT /admin/dev/{device_id}
+DELETE /admin/dev/{device_id}
+```
+
+### Key Management
+```http
+POST /admin/dev/{device_id}/rotate-key
+POST /admin/dev/{device_id}/revoke-key
+```
+
+### System Configuration
+```http
+GET /admin/config
+PUT /admin/config
+PUT /admin/config/retention
+PUT /admin/config/rate-limit
+PUT /admin/config/alerts
+```
+
+### Logs & MQTT
+```http
+GET /admin/logs
+DELETE /admin/logs
+GET /admin/mqtt/stats
+GET /admin/mqtt/clients
 ```
 
 ---
 
-## Devices
+## User Device Management
+*(User Context - Authorization: Bearer JWT)*
 
-### Create Device
+### Register Device
 ```http
-POST /devices
-Authorization: Bearer {jwt_token}
+POST /dev/register
 Content-Type: application/json
 
-{"name": "My Sensor", "type": "temperature"}
+{
+  "device_uid": "mac_addr_or_id",
+  "device_name": "Living Room Sensor"
+}
 ```
-Response: `{"device_id": "dev_xxx", "api_key": "sk_live_xxx"}`
 
 ### List Devices
 ```http
-GET /devices
+GET /dev
 Authorization: Bearer {jwt_token}
+```
+
+### Create Device (Manual)
+```http
+POST /dev
+Content-Type: application/json
+{"name": "New Device", "type": "sensor"}
+```
+
+### Get Device
+```http
+GET /dev/{device_id}
 ```
 
 ### Delete Device
 ```http
-DELETE /devices/{device_id}
-Authorization: Bearer {jwt_token}
+DELETE /dev/{device_id}
 ```
 
 ---
 
-## Data Ingestion
+## Device Operations (Data & Commands)
+*(Hybrid Auth - Supports JWT (User) or API Key (Device))*
 
-### Send Data (Authenticated - POST)
+### Send Data (POST)
 ```http
-POST /data/{device_id}
+POST /dev/{device_id}/data
 Authorization: Bearer {api_key}
 Content-Type: application/json
 
@@ -113,113 +147,60 @@ Content-Type: application/json
 ```
 Response: `{"status": "ok", "commands_pending": 0}`
 
-### Send Data (Authenticated - GET for Constrained Devices)
-For devices that cannot make POST requests with JSON bodies (ESP8266, Arduino, etc.):
+### Send Data (GET - For Constrained Devices)
+For constrained devices (e.g., Simple Arduino/ESP8266 without JSON lib):
 ```http
-GET /devices/{device_id}/push?key={api_key}&temp=25.5&humidity=60&battery=90
+GET /dev/{device_id}/data?temp=25.5&humidity=60&battery=90
+Authorization: Bearer {api_key}
 ```
-Response: `{"status": "ok", "fields_stored": 3, "commands_pending": 0}`
+*Note: Some client libraries may append the key as a query param if header auth is not supported, but Header is preferred.*
 
-> **Note:** The `key` parameter is used for authentication and is not stored as sensor data. All other query parameters are automatically converted to appropriate types (numbers, booleans, strings).
-
-### Send Data (Public)
+### Get Latest Data
 ```http
-POST /public/data/{device_id}
-Content-Type: application/json
-
-{"temperature": 25.5}
+GET /dev/{device_id}/data
 ```
 
----
-
-## Data Query
-
-### Get Latest
+### Get Data History
 ```http
-GET /data/{device_id}
-Authorization: Bearer {jwt_token}
-```
-
-### Get History
-```http
-GET /data/{device_id}/history?limit=100
-Authorization: Bearer {jwt_token}
-```
-
-### Advanced Time Range Query
-```http
-GET /data/{device_id}/history?start=1766439614000&stop=1h&int=1m
-Authorization: Bearer {jwt_token}
+GET /dev/{device_id}/data/history?last=1h
+GET /dev/{device_id}/data/history?start=1766439614000&stop=1h&int=1m
 ```
 
 | Param | Description | Example |
 |-------|-------------|---------|
 | `start` | Unix timestamp (ms) | `1766439614000` |
-| `stop` | Duration from start | `1d`, `1h`, `1m`, `1s` |
-| `range` | Duration back from now | `1h`, `24h`, `7d`, `30d` |
-| `int` | Aggregation interval | `1d`, `1h`, `1m`, `1s` |
-| `limit` | Max results | `1000` (default) |
-| `start_rfc` | RFC3339 start | `2025-12-22T20:00:00Z` |
-| `end_rfc` | RFC3339 end | `2025-12-22T21:00:00Z` |
-
-**Response:**
-```json
-{
-  "device_id": "dev_xxx",
-  "count": 24,
-  "data": [
-    {"timestamp": "...", "timestamp_ms": 1766439614000, "data": {"temperature": 25.5}}
-  ],
-  "range": {"start": "...", "start_ms": 1766439000000, "end": "...", "end_ms": 1766443200000},
-  "interval": "1h0m0s"
-}
-```
-
-**Examples:**
-```bash
-# Last hour, raw data
-GET /data/{id}/history?range=1h
-
-# From unix timestamp, 1 hour duration
-GET /data/{id}/history?start=1766439614000&stop=1h
-
-# Last 24 hours, averaged per hour
-GET /data/{id}/history?range=24h&int=1h
-
-# Last 7 days, averaged per day
-GET /data/{id}/history?range=7d&int=1d
-```
-
-### Public Endpoints
-```http
-GET /public/data/{device_id}
-GET /public/data/{device_id}/history?limit=100
-```
+| `stop` | Duration | `1h`, `15m` |
+| `last` | Quick range from now | `24h`, `7d` |
+| `int` | Aggregation interval | `1m`, `1h`, `1d` |
 
 ---
 
-## Commands
+## Device Commands
 
-### Send Command (User → Device)
+### Send Command (User sends to Device)
 ```http
-POST /devices/{device_id}/commands
+POST /dev/{device_id}/cmd
 Authorization: Bearer {jwt_token}
 Content-Type: application/json
 
 {"action": "reboot", "params": {"delay": 5}}
 ```
 
-### Poll Commands (Device)
+### List Commands
 ```http
-GET /devices/{device_id}/commands
-GET /devices/{device_id}/commands/poll?wait=30
-GET /devices/{device_id}/commands/stream?wait=30
-Authorization: Bearer {api_key}
+GET /dev/{device_id}/cmd
 ```
 
-### Acknowledge Command
+### Poll Pending Commands (Device reads)
 ```http
-POST /devices/{device_id}/commands/{command_id}/ack
+GET /dev/{device_id}/cmd/pending
+Authorization: Bearer {api_key}
+```
+Response: `{"commands": [{"id": "...", "action": "...", "params": {...}}]}`
+
+### Acknowledge Command (Device confirms)
+```http
+POST /dev/{device_id}/cmd/{command_id}/ack
 Authorization: Bearer {api_key}
 Content-Type: application/json
 
@@ -228,13 +209,51 @@ Content-Type: application/json
 
 ---
 
-## Analytics (Port 8001)
+## Provisioning
 
+### Generate Request (App)
 ```http
-GET /analytics/{device_id}/stats
-GET /analytics/{device_id}/hourly?field=temperature
-GET /analytics/{device_id}/daily?field=temperature
-GET /analytics/{device_id}/anomalies?field=temperature&threshold=2.0
-GET /public/analytics/{device_id}/stats
+POST /dev/register
+Authorization: Bearer {jwt_token}
+```
+
+### Activate Device (Device)
+```http
+POST /prov/activate
+Content-Type: application/json
+
+{"device_uid": "..."}
+```
+
+---
+
+## Public Endpoints
+*(No Auth Required)*
+
+### Public Data Ingestion
+```http
+POST /pub/{device_id}
+Content-Type: application/json
+```
+
+### Public Data Read
+```http
+GET /pub/{device_id}
+```
+
+---
+
+## Miscellaneous
+
+### Time Sync
+```http
+GET /sys/time
+```
+Response: `{"unix": 1700000000, "iso": "2024-..."}`
+
+### Health Check
+```http
+GET /health
+GET /ready
 ```
 

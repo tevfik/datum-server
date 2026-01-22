@@ -3,8 +3,8 @@
 ## Where is data stored?
 
 **File Location:**
-- **Container**: `/app/data/data.db`
-- **Host**: `./data/data.db` (in project root)
+- **Container**: `/root/data/meta.db`
+- **Host**: `./data/meta.db` (in project root)
 - **Type**: Persistent file on disk
 
 ## How BuntDB Works
@@ -28,11 +28,11 @@ storage.CreateUser()
      ↓
 BuntDB Transaction
      ↓
-Write to /app/data/data.db (DISK)
+Write to /root/data/meta.db (DISK)
      ↓
 Docker Volume Mount
      ↓
-./data/data.db (HOST)
+./data/meta.db (HOST)
 ```
 
 ## Verification
@@ -40,10 +40,10 @@ Docker Volume Mount
 **Check database file:**
 ```bash
 # On host
-ls -lh ./data/data.db
+ls -lh ./data/meta.db
 
 # In container
-docker exec datumpy-api-1 ls -lh /app/data/data.db
+docker exec datum-server ls -lh /root/data/meta.db
 ```
 
 **Database grows with data:**
@@ -60,9 +60,9 @@ docker exec datumpy-api-1 ls -lh /app/data/data.db
 From `docker-compose.yml`:
 ```yaml
 services:
-  api:
+  datum-server:
     volumes:
-      - ./data:/app/data  # Host:Container mapping
+      - ./data:/root/data  # Host:Container mapping
 ```
 
 This ensures:
@@ -100,7 +100,7 @@ device:dev_xyz789:data:1766176576000000000 → {"device_id":"dev_xyz789","data":
 docker-compose down
 
 # Copy database
-cp ./data/data.db ./backups/data-$(date +%Y%m%d).db
+cp ./data/meta.db ./backups/meta-$(date +%Y%m%d).db
 
 # Restart
 docker-compose up -d
@@ -109,7 +109,7 @@ docker-compose up -d
 **Restore:**
 ```bash
 docker-compose down
-cp ./backups/data-20251219.db ./data/data.db
+cp ./backups/meta-20251219.db ./data/meta.db
 docker-compose up -d
 ```
 
@@ -128,7 +128,7 @@ But still **durable** because:
 ## Summary
 
 ✅ **Your data is safe!**
-- Stored in `./data/data.db` on host
+- Stored in `./data/meta.db` on host
 - Persists across restarts
 - ACID transactions
 - Easy to backup

@@ -47,7 +47,7 @@ For more details on key types, see [KEY_MANAGEMENT.md](../../docs/guides/KEY_MAN
    const char* wifiPass = "YOUR_WIFI_PASS";
    const char* deviceID = "YOUR_DEVICE_ID";
    const char* masterSecret = "YOUR_MASTER_SECRET"; // Keep this safe!
-   const char* serverURL = "http://YOUR_SERVER_IP:8080";
+   const char* serverURL = "http://YOUR_SERVER_IP:8000";
    ```
 3. Flash to your ESP32.
 

@@ -33,13 +33,13 @@ environment:
 ### Pretty Format (Development)
 ```
 2025-12-27T23:53:41+03:00 INF Server started port=8000
-2025-12-27T23:53:41+03:00 DBG Database connected path=/app/data/meta.db
+2025-12-27T23:53:41+03:00 DBG Database connected path=/root/data/meta.db
 ```
 
 ### JSON Format (Production)
 ```json
 {"level":"info","time":"2025-12-27T23:53:41+03:00","caller":"server/main.go:123","message":"Server started","port":8000}
-{"level":"debug","time":"2025-12-27T23:53:41+03:00","caller":"storage/storage.go:45","message":"Database connected","path":"/app/data/meta.db"}
+{"level":"debug","time":"2025-12-27T23:53:41+03:00","caller":"storage/storage.go:45","message":"Database connected","path":"/root/data/meta.db"}
 ```
 
 ## Log Levels

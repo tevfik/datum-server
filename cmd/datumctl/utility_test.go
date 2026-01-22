@@ -19,7 +19,7 @@ func TestSaveToken(t *testing.T) {
 	// Reset viper and globals
 	viper.Reset()
 	configFile = ""
-	serverURL = "http://localhost:8080"
+	serverURL = "http://localhost:8000"
 
 	tokenVal := "test-token-xyz-12345"
 	err := saveToken(tokenVal, "")
@@ -41,7 +41,7 @@ func TestSaveAPIKey(t *testing.T) {
 	// Reset viper and globals
 	viper.Reset()
 	configFile = ""
-	serverURL = "http://localhost:8080"
+	serverURL = "http://localhost:8000"
 
 	// Capture stdout to suppress output
 	oldStdout := os.Stdout

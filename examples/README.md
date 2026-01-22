@@ -29,7 +29,7 @@ A complete ESP32/Arduino client that demonstrates:
    ```cpp
    const char* WIFI_SSID = "your-wifi-ssid";
    const char* WIFI_PASSWORD = "your-wifi-password";
-   const char* API_URL = "http://your-server:8080";
+   const char* API_URL = "http://your-server:8000";
    const char* DEVICE_ID = "dev_xxxxxxxx";
    const char* API_KEY = "dk_xxxxxxxx";
    ```
@@ -63,7 +63,7 @@ A MicroPython client for Raspberry Pi Pico W, ESP32, or any MicroPython-compatib
    ```python
    WIFI_SSID = "your-wifi-ssid"
    WIFI_PASSWORD = "your-wifi-password"
-   API_URL = "http://your-server:8080"
+   API_URL = "http://your-server:8000"
    DEVICE_ID = "dev_xxxxxxxx"
    API_KEY = "dk_xxxxxxxx"
    ```

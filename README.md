@@ -85,7 +85,7 @@ docker-compose up -d
 docker-compose -f docker-compose.dev.yml up
 ```
 
-Server runs on `http://localhost:8080`
+Server runs on `http://localhost:8000`
 
 ## �️ CLI Tool (datumctl)
 
@@ -124,7 +124,7 @@ This viewer handles JWT token acquisition and passes it to the stream endpoint s
 
 ```bash
 # Data ingestion
-curl -X POST http://localhost:8080/data/YOUR_DEVICE_ID \
+curl -X POST http://localhost:8000/dev/YOUR_DEVICE_ID/data \
   -H "Authorization: Bearer <device-api-key>" \
   -H "Content-Type: application/json" \
   -d '{"temperature": 23.5, "humidity": 65}'
@@ -134,12 +134,12 @@ curl -X POST http://localhost:8080/data/YOUR_DEVICE_ID \
 
 ```bash
 # Login
-curl -X POST http://localhost:8080/auth/login \
+curl -X POST http://localhost:8000/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "secret"}'
 
 # Create device
-curl -X POST http://localhost:8080/devices \
+curl -X POST http://localhost:8000/dev \
   -H "Authorization: Bearer <jwt-token>" \
   -H "Content-Type: application/json" \
   -d '{"name": "Sensor-01", "type": "temperature"}'
@@ -149,7 +149,7 @@ curl -X POST http://localhost:8080/devices \
 
 ```bash
 # Subscribe to device data stream
-curl -N http://localhost:8080/devices/<device-id>/stream/mjpeg \
+curl -N http://localhost:8000/dev/<device-id>/stream/mjpeg \
   -H "Authorization: Bearer <jwt-token>"
 ```
 
@@ -247,7 +247,7 @@ See [Testing Guide](docs/guides/TESTING.md) for comprehensive testing documentat
 
 ```bash
 # Server
-PORT=8080
+PORT=8000
 GIN_MODE=release
 
 # Storage
@@ -327,7 +327,7 @@ The server supports command-line flags that take precedence over environment var
 #include <HTTPClient.h>
 
 const char* apiKey = "your-device-api-key";
-const char* serverUrl = "http://server:8080/data";
+const char* serverUrl = "http://server:8000/dev/YOUR_DEVICE_ID/data";
 
 void sendData(float temp, float humidity) {
   HTTPClient http;
@@ -378,7 +378,7 @@ import urequests
 import ujson
 
 API_KEY = "your-device-api-key"
-SERVER_URL = "http://server:8080/data/YOUR_DEVICE_ID"
+SERVER_URL = "http://server:8000/dev/YOUR_DEVICE_ID/data"
 
 def send_data(temperature, humidity):
     headers = {
@@ -445,13 +445,13 @@ Retention worker runs in background and removes partitions older than configured
 ### Health Check
 
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:8000/health
 ```
 
 ### Metrics Endpoint
 
 ```bash
-curl http://localhost:8080/metrics
+curl http://localhost:8000/metrics
 ```
 
 Returns:
@@ -502,7 +502,7 @@ make clean
 docker-compose up -d
 
 # View logs
-docker-compose logs -f datumpy-server
+docker-compose logs -f datum-server
 
 # Stop
 docker-compose down

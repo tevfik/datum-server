@@ -11,9 +11,9 @@ Datum Server supports **Over-The-Air (OTA)** firmware updates for ESP32 devices.
 
 ## Security Model
 
-*   **Protected Access**: The `/devices/firmware/:filename` endpoint is protected by the `DeviceAuthMiddleware`.
+*   **Protected Access**: The `/dev/fw/:filename` endpoint is protected by the `DeviceAuthMiddleware`.
 *   **Token Authentication**: Devices must authenticate using their `auth_token`. Since ESP32's `HTTPUpdate` library has limitations with custom headers, authentication is done via a query parameter:
-    *   URL: `https://your-server.com/devices/firmware/my_fw.bin?token=dk_...`
+    *   URL: `https://your-server.com/dev/fw/my_fw.bin?token=dk_...`
 *   **Targeted Update**: The update command is sent to a specific Device ID. Only that device receives the command and initiates the download using its own token.
 
 ## Step-by-Step Procedure
@@ -36,20 +36,32 @@ In Arduino IDE or PlatformIO:
 ### 3. Trigger the Update
 Send a command to the target device to tell it to download this specific file.
 
-**Using curl:**
+**Option A: Using HTTP API (curl)**
 ```bash
-curl -X POST https://datum.bezg.in/devices/<DEVICE_ID>/commands \
+curl -X POST https://datum.bezg.in/dev/<DEVICE_ID>/cmd \
   -H "Authorization: Bearer <USER_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
     "action": "update_firmware",
     "params": {
-        "url": "https://datum.bezg.in/devices/firmware/fw_v1.0.1.bin"
+        "url": "https://datum.bezg.in/dev/fw/fw_v1.0.1.bin"
     }
 }'
 ```
 
-**Note**: You DO NOT need to append `?token=...` in the command. The firmware logic automatically appends the device's current auth token to the URL before downloading.
+**Option B: Using MQTT**
+Publish to topic `dev/<DEVICE_ID>/cmd`:
+```json
+{
+  "id": "ota_cmd_1",
+  "action": "update_firmware",
+  "params": {
+    "url": "https://datum.bezg.in/dev/fw/fw_v1.0.1.bin"
+  }
+}
+```
+
+**Note**: You DO NOT need to append `?token=...` to the URL parameter. The device firmware logic should automatically append its current auth token to the URL before downloading.
 
 ### 4. Verify
 1.  The device will receive the command.

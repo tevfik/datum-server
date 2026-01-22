@@ -1,5 +1,5 @@
 """
-Datumpy IoT Device Simulator
+Datum IoT Device Simulator
 
 Python example for devices to send data and receive commands.
 Works with MicroPython (ESP32, Raspberry Pi Pico) or standard Python.
@@ -8,7 +8,7 @@ Usage:
     python device_simulator.py --device-id dev_xxx --api-key sk_live_xxx
 
 Environment variables:
-    DATUMPY_API_URL - API endpoint (default: http://localhost:8007)
+    DATUM_API_URL - API endpoint (default: http://localhost:8000)
     DEVICE_ID - Device ID
     API_KEY - Device API key
 """
@@ -28,13 +28,13 @@ except ImportError:
     import requests
 
 # Configuration
-API_URL = os.environ.get("DATUMPY_API_URL", "http://localhost:8007")
+API_URL = os.environ.get("DATUM_API_URL", "http://localhost:8000")
 DEVICE_ID = os.environ.get("DEVICE_ID", "")
 API_KEY = os.environ.get("API_KEY", "")
 
 def send_data(device_id: str, api_key: str, data: dict) -> dict:
     """Send sensor data to the platform"""
-    url = f"{API_URL}/data/{device_id}"
+    url = f"{API_URL}/dev/{device_id}/data"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
@@ -48,7 +48,7 @@ def send_data(device_id: str, api_key: str, data: dict) -> dict:
 
 def poll_commands(device_id: str, api_key: str, wait: int = 30) -> list:
     """Long poll for pending commands"""
-    url = f"{API_URL}/devices/{device_id}/commands/poll?wait={wait}"
+    url = f"{API_URL}/dev/{device_id}/cmd/poll?wait={wait}"
     headers = {"Authorization": f"Bearer {api_key}"}
     
     try:
@@ -61,7 +61,7 @@ def poll_commands(device_id: str, api_key: str, wait: int = 30) -> list:
 
 def acknowledge_command(device_id: str, api_key: str, command_id: str, result: dict) -> dict:
     """Acknowledge command execution"""
-    url = f"{API_URL}/devices/{device_id}/commands/{command_id}/ack"
+    url = f"{API_URL}/dev/{device_id}/cmd/{command_id}/ack"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"

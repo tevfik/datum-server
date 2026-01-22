@@ -57,3 +57,33 @@ The following `ui:widget` values are supported by the Datum Web Dashboard and Mo
   }
 }
 ```
+
+## API Usage
+
+### Uploading a Thing Description
+
+Devices or Administrators can upload a Thing Description (TD) JSON to define the device capabilities.
+
+**Endpoint:** `PUT /dev/:device_id/thing-description`
+
+**Headers:**
+- `Content-Type: application/json`
+- `Authorization: Bearer <USER_TOKEN_OR_DEVICE_API_KEY>`
+
+**Request Body:** (The JSON TD)
+
+```bash
+# Example using curl with a device API key
+curl -X PUT http://localhost:8000/dev/dev_123/thing-description \
+  -H "Authorization: Bearer dk_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "@context": "https://www.w3.org/2019/wot/td/v1",
+    "title": "Sensor",
+    "properties": {
+       "temp": { "type": "number", "ui:widget": "gauge" }
+    }
+  }'
+```
+
+Once uploaded, the Datum Dashboard will immediately render the UI widgets defined in the TD.

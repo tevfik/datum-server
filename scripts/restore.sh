@@ -1,5 +1,5 @@
 #!/bin/bash
-# Datumpy Restore Script
+# Datum Restore Script
 # Restores database and time-series data from backup
 
 set -e
@@ -15,7 +15,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}=== Datumpy Restore Utility ===${NC}"
+echo -e "${YELLOW}=== Datum Restore Utility ===${NC}"
 echo ""
 
 # Check if backup directory exists
@@ -26,7 +26,7 @@ fi
 
 # List available backups
 echo -e "${YELLOW}Available backups:${NC}"
-BACKUPS=($(ls -t "$BACKUP_DIR"/datumpy-backup-*.tar.gz 2>/dev/null))
+BACKUPS=($(ls -t "$BACKUP_DIR"/datum-backup-*.tar.gz 2>/dev/null))
 
 if [ ${#BACKUPS[@]} -eq 0 ]; then
     echo -e "${RED}❌ No backups found in $BACKUP_DIR${NC}"
@@ -37,7 +37,7 @@ for i in "${!BACKUPS[@]}"; do
     BACKUP_FILE="${BACKUPS[$i]}"
     BACKUP_NAME=$(basename "$BACKUP_FILE")
     BACKUP_SIZE=$(du -sh "$BACKUP_FILE" | cut -f1)
-    BACKUP_DATE=$(echo "$BACKUP_NAME" | sed 's/datumpy-backup-//' | sed 's/.tar.gz//')
+    BACKUP_DATE=$(echo "$BACKUP_NAME" | sed 's/datum-backup-//' | sed 's/.tar.gz//')
     echo -e "  ${GREEN}[$((i+1))]${NC} $BACKUP_NAME (${BACKUP_SIZE})"
 done
 echo ""

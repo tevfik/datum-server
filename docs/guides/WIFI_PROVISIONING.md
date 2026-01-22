@@ -30,7 +30,7 @@ sequenceDiagram
     D-->>P: {uid, model, version}
     
     Note over P,S: User authenticates with server
-    P->>S: POST /devices/register<br/>{uid, name, wifi_creds}
+    P->>S: POST /dev/register<br/>{uid, name, wifi_creds}
     S-->>P: {request_id, device_id, api_key}
     
     Note over P,D: Configure device
@@ -39,11 +39,11 @@ sequenceDiagram
     
     Note over D: Device restarts
     D->>D: Connect to WiFi
-    D->>S: POST /provisioning/activate<br/>{device_uid}
+    D->>S: POST /prov/activate<br/>{device_uid}
     S-->>D: {device_id, api_key}
     
     Note over D,S: Normal operation
-    D->>S: POST /data (with api_key)
+    D->>S: POST /dev/{id}/data (with api_key)
 ```
 
 ## Provisioning Flow
@@ -75,7 +75,7 @@ Mobile app registers device with Datum server:
 
 ```bash
 # Mobile app calls this endpoint
-POST /devices/register
+POST /dev/register
 Authorization: Bearer <user_jwt_token>
 Content-Type: application/json
 
@@ -98,7 +98,7 @@ Response:
     "server_url": "https://api.datum.io",
     "expires_at": "2025-01-15T12:30:00Z",
     "status": "pending",
-    "activate_url": "https://api.datum.io/provisioning/activate"
+    "activate_url": "https://api.datum.io/prov/activate"
 }
 ```
 
@@ -126,7 +126,7 @@ Device connects to WiFi and activates:
 
 ```bash
 # Device calls this endpoint
-POST /provisioning/activate
+POST /prov/activate
 Content-Type: application/json
 
 {
@@ -151,7 +151,7 @@ Response:
 Device uses API key for all subsequent requests:
 
 ```bash
-POST /devices/dev_xyz789/push
+POST /dev/dev_xyz789/data
 Authorization: Bearer dk_secret123...
 Content-Type: application/json
 
@@ -165,7 +165,7 @@ Content-Type: application/json
 
 ### Mobile App Endpoints (JWT Auth Required)
 
-#### POST /devices/register
+#### POST /dev/register
 
 Register a device to the current user's account.
 
@@ -190,7 +190,7 @@ Register a device to the current user's account.
     "server_url": "https://api.datum.io",
     "expires_at": "2024-01-15T12:30:00Z",
     "status": "pending",
-    "activate_url": "https://api.datum.io/provisioning/activate"
+    "activate_url": "https://api.datum.io/prov/activate"
 }
 ```
 
@@ -201,7 +201,7 @@ Register a device to the current user's account.
 
 ---
 
-#### GET /devices/check-uid/:uid
+#### GET /dev/check-uid/:uid
 
 Check if a device UID is already registered.
 
@@ -224,7 +224,7 @@ Or if registered:
 
 ---
 
-#### GET /devices/provisioning
+#### GET /dev/prov
 
 List all provisioning requests for current user.
 
@@ -245,13 +245,13 @@ List all provisioning requests for current user.
 
 ---
 
-#### GET /devices/provisioning/:request_id
+#### GET /dev/prov/:request_id
 
 Get status of a specific provisioning request.
 
 ---
 
-#### DELETE /devices/provisioning/:request_id
+#### DELETE /dev/prov/:request_id
 
 Cancel a pending provisioning request.
 
@@ -259,7 +259,7 @@ Cancel a pending provisioning request.
 
 ### Device Endpoints (No Auth)
 
-#### POST /provisioning/activate
+#### POST /prov/activate
 
 Called by device to complete activation.
 
@@ -289,7 +289,7 @@ Called by device to complete activation.
 
 ---
 
-#### GET /provisioning/check/:uid
+#### GET /prov/check/:uid
 
 Check if there's a pending provisioning request for a UID.
 
@@ -297,8 +297,8 @@ Check if there's a pending provisioning request for a UID.
 ```json
 {
     "status": "pending",
-    "message": "Provisioning request found. Call /provisioning/activate to complete.",
-    "activate_url": "https://api.datum.io/provisioning/activate",
+    "message": "Provisioning request found. Call /prov/activate to complete.",
+    "activate_url": "https://api.datum.io/prov/activate",
     "expires_at": "2024-01-15T12:30:00Z"
 }
 ```
@@ -397,7 +397,7 @@ class DeviceProvisioning {
     final deviceUID = info['device_uid'];
     
     // 3. Register with server
-    final result = await api.post('/devices/register', {
+    final result = await api.post('/dev/register', {
       'device_uid': deviceUID,
       'device_name': 'My Sensor',
     });

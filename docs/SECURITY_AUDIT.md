@@ -26,14 +26,14 @@ The WiFi provisioning system implements appropriate security controls for IoT de
 ### Mobile App Endpoints (JWT Required)
 ```go
 // All mobile app endpoints protected by auth middleware
-devicesGroup := r.Group("/devices")
-devicesGroup.Use(auth.AuthMiddleware())
+devicesGroup := r.Group("/dev")
+devicesGroup.Use(authMiddleware)
 {
     devicesGroup.POST("/register", registerDeviceHandler)
-    devicesGroup.GET("/provisioning", listProvisioningRequestsHandler)
-    devicesGroup.GET("/provisioning/:request_id", getProvisioningStatusHandler)
-    devicesGroup.DELETE("/provisioning/:request_id", cancelProvisioningHandler)
-    devicesGroup.GET("/check", checkDeviceUIDHandler)
+    devicesGroup.GET("/prov", listProvisioningRequestsHandler)
+    devicesGroup.GET("/prov/:request_id", getProvisioningStatusHandler)
+    devicesGroup.DELETE("/prov/:request_id", cancelProvisioningHandler)
+    devicesGroup.GET("/check-uid/:uid", checkDeviceUIDHandler)
 }
 ```
 
@@ -44,9 +44,13 @@ devicesGroup.Use(auth.AuthMiddleware())
 
 ### Device Endpoints (No Auth by Design)
 ```go
-// Device endpoints - NO authentication required
-r.POST("/provisioning/activate/:request_id", deviceActivateHandler)
-r.GET("/provisioning/check/:uid", deviceCheckHandler)
+// Device endpoints - NO authentication required, rate-limited
+provisioning := r.Group("/prov")
+provisioning.Use(auth.RateLimitMiddleware())
+{
+    provisioning.POST("/activate", deviceActivateHandler)
+    provisioning.GET("/check/:uid", deviceCheckHandler)
+}
 ```
 
 **Status**: ✅ **ACCEPTABLE**
@@ -326,10 +330,10 @@ Example: dk_1735660800.a1b2c3d4e5f67890abcdef12
 #### API Endpoints
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/admin/devices/:id/rotate-key` | POST | Admin-initiated key rotation |
-| `/admin/devices/:id/revoke-key` | POST | Emergency key revocation |
-| `/admin/devices/:id/token-info` | GET | Token status information |
-| `/devices/token/refresh` | POST | Device self-refresh (before expiry) |
+| `/admin/dev/:id/rotate-key` | POST | Admin-initiated key rotation |
+| `/admin/dev/:id/revoke-key` | POST | Emergency key revocation |
+| `/admin/dev/:id/token-info` | GET | Token status information |
+| `/dev/token/refresh` | POST | Device self-refresh (before expiry) |
 
 #### CLI Commands
 ```bash
@@ -447,7 +451,7 @@ type Device struct {
 }
 
 // Admin endpoint
-POST /admin/devices/:device_id/rotate-key
+POST /admin/dev/:device_id/rotate-key
 {
   "grace_period_days": 7,  // Both keys valid for 7 days
   "notify_device": true    // Send new key via command channel

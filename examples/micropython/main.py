@@ -19,7 +19,7 @@ import machine
 CONFIG = {
     "wifi_ssid": "your-wifi-ssid",
     "wifi_password": "your-wifi-password",
-    "api_url": "http://your-server:8007",
+    "api_url": "http://your-server:8000",
     "device_id": "dev_xxxxxxxxxxxxxxxx",
     "api_key": "sk_live_xxxxxxxxxxxxxxxx",
     "send_interval": 60,  # seconds
@@ -58,7 +58,7 @@ def read_sensors():
     }
 
 def send_data(data):
-    """Send sensor data to Datumpy API"""
+    """Send sensor data to Datum API"""
     url = f"{CONFIG['api_url']}/dev/{CONFIG['device_id']}/data"
     headers = {
         "Authorization": f"Bearer {CONFIG['api_key']}",
@@ -76,7 +76,7 @@ def send_data(data):
 
 def poll_commands(wait=5):
     """Poll for pending commands"""
-    url = f"{CONFIG['api_url']}/dev/{CONFIG['device_id']}/cmd?wait={wait}"
+    url = f"{CONFIG['api_url']}/dev/{CONFIG['device_id']}/cmd/poll?wait={wait}"
     headers = {"Authorization": f"Bearer {CONFIG['api_key']}"}
     
     try:

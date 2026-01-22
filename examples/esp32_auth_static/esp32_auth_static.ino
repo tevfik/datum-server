@@ -28,7 +28,7 @@ const char *deviceID = "YOUR_DEVICE_ID";
 const char *apiKey = "sk_YOUR_STATIC_API_KEY"; // Starts with sk_ or dk_
 
 const char *serverURL =
-    "http://YOUR_SERVER_IP:8080"; // e.g. https://api.datum.io
+    "http://YOUR_SERVER_IP:8000"; // e.g. https://api.datum.io
 
 void setup() {
   Serial.begin(115200);

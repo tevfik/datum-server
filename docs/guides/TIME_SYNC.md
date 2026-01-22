@@ -7,7 +7,7 @@ Accurate time is critical for the "Rotating Auth" (SAS) security model. While NT
 2. **Fallback**: Datum HTTP Time Sync via TCP/80-443.
 
 ## Datum Time Endpoint
-- **URL**: `GET /system/time`
+- **URL**: `GET /sys/time`
 - **Response**:
   ```json
   {
@@ -28,7 +28,7 @@ To compensate for network latency (RTT), use Cristian's Algorithm:
      |                                                |
      | 1. Record T_start                              |
      +----------------------------------------------->|
-     |      GET /system/time                          |
+     |      GET /sys/time                          |
      |                                                | 2. Handle Request
      |                                                |
      |      200 OK {"unix_ms": T_server}              |
@@ -43,7 +43,7 @@ To compensate for network latency (RTT), use Cristian's Algorithm:
 ```
 
 1. Record `T_start` (Device tick).
-2. Request `GET /system/time`.
+2. Request `GET /sys/time`.
 3. Receive `T_server` (from JSON) and record `T_end` (Device tick).
 4. Calculate Round Trip Time: `RTT = T_end - T_start`.
 5. Estimate Accurate Time: `T_now = T_server + (RTT / 2)`.
@@ -51,7 +51,7 @@ To compensate for network latency (RTT), use Cristian's Algorithm:
 ### Pseudo Code (C++)
 ```cpp
 long t_start = millis();
-long t_server = http.get("/system/time").json()["unix_ms"];
+long t_server = http.get("/sys/time").json()["unix_ms"];
 long t_end = millis();
 
 long rtt = t_end - t_start;

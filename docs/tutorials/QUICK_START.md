@@ -19,14 +19,14 @@ cd datum-server
 docker-compose up -d
 ```
 
-The server starts at `http://localhost:8080`.
+The server starts at `http://localhost:8000`.
 
 ## Step 2: Complete Initial Setup
 
 On first run, you'll need to create an admin user:
 
 ```bash
-curl -X POST http://localhost:8080/system/setup \
+curl -X POST http://localhost:8000/sys/setup \
   -H "Content-Type: application/json" \
   -d '{
     "admin_email": "admin@example.com",
@@ -45,7 +45,7 @@ Response:
 ## Step 3: Login and Get Token
 
 ```bash
-curl -X POST http://localhost:8080/auth/login \
+curl -X POST http://localhost:8000/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@example.com",
@@ -68,7 +68,7 @@ Save this token - you'll need it for authenticated requests.
 ```bash
 export TOKEN="eyJhbGciOiJIUzI1NiIs..."
 
-curl -X POST http://localhost:8080/devices \
+curl -X POST http://localhost:8000/dev \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -97,7 +97,7 @@ Response:
 export API_KEY="dk_a1b2c3d4e5f6..."
 export DEVICE_ID="dev_xyz789"
 
-curl -X POST "http://localhost:8080/data/$DEVICE_ID" \
+curl -X POST "http://localhost:8000/dev/$DEVICE_ID/data" \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -126,7 +126,7 @@ const char* WIFI_SSID = "YourWiFi";
 const char* WIFI_PASS = "YourPassword";
 const char* API_KEY = "dk_a1b2c3d4e5f6...";
 const char* DEVICE_ID = "dev_xyz789";
-const char* SERVER = "http://your-server:8080";
+const char* SERVER = "http://your-server:8000";
 
 void setup() {
     Serial.begin(115200);
@@ -138,7 +138,7 @@ void setup() {
 void loop() {
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
-        String url = String(SERVER) + "/data/" + DEVICE_ID;
+        String url = String(SERVER) + "/dev/" + DEVICE_ID + "/data";
         
         http.begin(url);
         http.addHeader("Authorization", String("Bearer ") + API_KEY);
@@ -164,11 +164,11 @@ import urequests  # MicroPython
 
 API_KEY = "dk_a1b2c3d4e5f6..."
 DEVICE_ID = "dev_xyz789"
-SERVER = "http://your-server:8080"
+SERVER = "http://your-server:8000"
 
 def send_data(temperature, humidity):
     response = urequests.post(
-        f"{SERVER}/data/{DEVICE_ID}",
+        f"{SERVER}/dev/{DEVICE_ID}/data",
         headers={
             "Authorization": f"Bearer {API_KEY}",
             "Content-Type": "application/json"
@@ -187,7 +187,7 @@ def send_data(temperature, humidity):
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:8080/data/$DEVICE_ID"
+  "http://localhost:8000/dev/$DEVICE_ID/data"
 ```
 
 Response:
@@ -208,7 +208,7 @@ Response:
 ```bash
 # Last 24 hours, hourly intervals
 curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:8080/data/$DEVICE_ID/history?period=24h&interval=1h"
+  "http://localhost:8000/dev/$DEVICE_ID/data/history?period=24h&interval=1h"
 ```
 
 Response:
@@ -236,7 +236,7 @@ Response:
 ### Queue a Command
 
 ```bash
-curl -X POST "http://localhost:8080/devices/$DEVICE_ID/commands" \
+curl -X POST "http://localhost:8000/dev/$DEVICE_ID/cmd" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -250,7 +250,7 @@ curl -X POST "http://localhost:8080/devices/$DEVICE_ID/commands" \
 ```bash
 # Device polls for commands
 curl -H "Authorization: Bearer $API_KEY" \
-  "http://localhost:8080/devices/$DEVICE_ID/commands/poll"
+  "http://localhost:8000/dev/$DEVICE_ID/cmd/pending"
 ```
 
 ### Acknowledge Command
@@ -258,7 +258,7 @@ curl -H "Authorization: Bearer $API_KEY" \
 ```bash
 export CMD_ID="cmd_abc123"
 
-curl -X POST "http://localhost:8080/devices/$DEVICE_ID/commands/$CMD_ID/ack" \
+curl -X POST "http://localhost:8000/dev/$DEVICE_ID/cmd/$CMD_ID/ack" \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"status": "success"}'
@@ -289,7 +289,7 @@ Login with your admin credentials to see:
 
 ### Device Can't Connect
 
-1. Check firewall allows port 8080
+1. Check firewall allows port 8000
 2. Verify API key is correct
 3. Ensure device ID matches
 4. Check server logs: `docker-compose logs backend`
@@ -302,7 +302,7 @@ Login with your admin credentials to see:
 
 ### High Latency
 
-1. Use `/push` endpoint (device-initiated)
+1. Use `/data` endpoint (device-initiated)
 2. Reduce payload size
 3. Check network connection
 4. Consider using SSE for real-time needs
@@ -311,12 +311,12 @@ Login with your admin credentials to see:
 
 ```mermaid
 graph LR
-    DEVICE[IoT Device] -->|POST /push| API[Datum API]
+    DEVICE[IoT Device] -->|POST /data| API[Datum API]
     API -->|Store| DB[(Storage)]
     USER[User/Dashboard] -->|GET /data| API
     API -->|Query| DB
-    USER -->|POST /commands| API
-    DEVICE -->|GET /commands| API
+    USER -->|POST /cmd| API
+    DEVICE -->|GET /cmd| API
 ```
 
 Your IoT platform is now ready! Start collecting data from your devices.

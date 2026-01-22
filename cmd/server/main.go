@@ -488,7 +488,7 @@ func healthHandler(c *gin.Context) {
 	status := gin.H{
 		"status":    "healthy",
 		"timestamp": time.Now().Unix(),
-		"service":   "datumpy-api",
+		"service":   "datum-api",
 		"version":   Version,
 	}
 

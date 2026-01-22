@@ -25,6 +25,6 @@ Currently, configuration is mostly static or custom commands.
 ### Plan
 1.  **Device Shadow**:
     - Store `desired_config` and `reported_config` in DB.
-    - MQTT Topic: `devices/{id}/config/set` (Server -> Device).
-    - MQTT Topic: `devices/{id}/config/status` (Device -> Server).
+    - MQTT Topic: `dev/{id}/config/set` (Server -> Device).
+    - MQTT Topic: `dev/{id}/config/status` (Device -> Server).
 2.  **UI Editor**: generated JSON Schema form for editing config in Web Dashboard.

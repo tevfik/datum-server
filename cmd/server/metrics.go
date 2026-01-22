@@ -77,7 +77,7 @@ func metricsHandler(c *gin.Context) {
 	}
 
 	response := gin.H{
-		"service":        "datumpy-api",
+		"service":        "datum-api",
 		"uptime_seconds": uptime,
 		"requests": gin.H{
 			"total":   atomic.LoadUint64(&metrics.RequestsTotal),
@@ -103,37 +103,37 @@ func metricsHandler(c *gin.Context) {
 	// If Prometheus format is requested
 	if c.Query("format") == "prometheus" {
 		c.Header("Content-Type", "text/plain")
-		c.String(200, `# HELP datumpy_requests_total Total number of HTTP requests
-# TYPE datumpy_requests_total counter
-datumpy_requests_total %d
+		c.String(200, `# HELP datum_requests_total Total number of HTTP requests
+# TYPE datum_requests_total counter
+datum_requests_total %d
 
-# HELP datumpy_requests_success Successful HTTP requests
-# TYPE datumpy_requests_success counter
-datumpy_requests_success %d
+# HELP datum_requests_success Successful HTTP requests
+# TYPE datum_requests_success counter
+datum_requests_success %d
 
-# HELP datumpy_requests_error Failed HTTP requests
-# TYPE datumpy_requests_error counter
-datumpy_requests_error %d
+# HELP datum_requests_error Failed HTTP requests
+# TYPE datum_requests_error counter
+datum_requests_error %d
 
-# HELP datumpy_data_points_total Total data points received
-# TYPE datumpy_data_points_total counter
-datumpy_data_points_total %d
+# HELP datum_data_points_total Total data points received
+# TYPE datum_data_points_total counter
+datum_data_points_total %d
 
-# HELP datumpy_commands_total Total commands sent
-# TYPE datumpy_commands_total counter
-datumpy_commands_total %d
+# HELP datum_commands_total Total commands sent
+# TYPE datum_commands_total counter
+datum_commands_total %d
 
-# HELP datumpy_uptime_seconds Service uptime in seconds
-# TYPE datumpy_uptime_seconds gauge
-datumpy_uptime_seconds %.2f
+# HELP datum_uptime_seconds Service uptime in seconds
+# TYPE datum_uptime_seconds gauge
+datum_uptime_seconds %.2f
 
-# HELP datumpy_memory_alloc_bytes Allocated memory in bytes
-# TYPE datumpy_memory_alloc_bytes gauge
-datumpy_memory_alloc_bytes %d
+# HELP datum_memory_alloc_bytes Allocated memory in bytes
+# TYPE datum_memory_alloc_bytes gauge
+datum_memory_alloc_bytes %d
 
-# HELP datumpy_goroutines Number of goroutines
-# TYPE datumpy_goroutines gauge
-datumpy_goroutines %d
+# HELP datum_goroutines Number of goroutines
+# TYPE datum_goroutines gauge
+datum_goroutines %d
 `,
 			atomic.LoadUint64(&metrics.RequestsTotal),
 			atomic.LoadUint64(&metrics.RequestsSuccess),

@@ -42,7 +42,7 @@ config := storage.RetentionConfig{
     MaxAge:       30 * 24 * time.Hour,
     CleanupEvery: 6 * time.Hour,
 }
-store.StartRetentionWorker(config, "/app/data/tsdata")
+store.StartRetentionWorker(config, "/root/data/tsdata")
 ```
 
 ## Manual Cleanup

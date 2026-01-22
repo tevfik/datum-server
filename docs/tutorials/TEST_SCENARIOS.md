@@ -27,7 +27,7 @@ This document provides a comprehensive guide to testing the Datum IoT Platform u
 3.  **Verify Initialization**
     Check if the system status now reports as initialized.
     ```bash
-    curl http://localhost:8000/system/status
+    curl http://localhost:8000/sys/status
     ```
 
 ## Scenario 2: Authentication

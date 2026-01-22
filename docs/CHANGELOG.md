@@ -84,16 +84,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data aggregation support
 
 ### API Endpoints
-- `POST /system/setup` - Initialize system
+- `POST /sys/setup` - Initialize system
 - `POST /auth/register` - User registration
 - `POST /auth/login` - User login
-- `POST /devices` - Create device
-- `GET /devices` - List user devices
-- `POST /data` - Ingest device data
-- `GET /data/history` - Query historical data
-- `GET /data/latest` - Get latest data point
-- `GET /stream/:device_id` - SSE data streaming
-- `GET /health` - Health check
+- `POST /dev` - Create device
+- `GET /dev` - List user devices
+- `POST /dev/:id/data` - Ingest device data
+- `GET /dev/:id/data/history` - Query historical data
+- `GET /dev/:id/data` - Get latest data point
+- `GET /dev/:id/stream/ws` - SSE/WS data streaming
+- `GET /sys/status` - Health check
 - `GET /ready` - Readiness check
 - `GET /metrics` - System metrics
 
@@ -103,13 +103,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PUT /admin/users/:id` - Update user
 - `DELETE /admin/users/:id` - Delete user
 - `POST /admin/users/:username/reset-password` - Reset password
-- `GET /admin/devices` - List all devices
-- `PUT /admin/devices/:id` - Update device
+- `GET /admin/dev` - List all devices (across all users)
+- `PUT /admin/dev/:id` - Update device
 - `GET /admin/database/stats` - Database statistics
 - `GET /admin/database/export` - Export database
 - `POST /admin/database/reset` - Reset database
-- `POST /admin/system/retention` - Update retention policy
-- `GET /admin/system/config` - Get system configuration
+- `PUT /admin/config/retention` - Update retention policy
+- `GET /admin/config` - Get system configuration
 
 ### CLI Tool (datumctl)
 - `datumctl login` - Authenticate user
@@ -218,7 +218,7 @@ We use [Semantic Versioning](https://semver.org/):
 3. Update binary: `sudo cp datum-server /usr/local/bin/`
 4. Update configuration: Review `.env` for new options
 5. Start new version: `sudo systemctl start datum-server`
-6. Verify: `curl http://localhost:8080/health`
+6. Verify: `curl http://localhost:8000/sys/status`
 
 ### Deprecations
 

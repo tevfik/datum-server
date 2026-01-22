@@ -12,7 +12,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-SERVER_URL="${SERVER_URL:-http://localhost:8080}"
+SERVER_URL="${SERVER_URL:-http://localhost:8000}"
 DEVICE_UID="TEST-ESP32-$(date +%s)"
 DEVICE_NAME="Test Device Integration"
 WIFI_SSID="TestNetwork"

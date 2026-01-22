@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timedelta
 
 # Configuration
-SERVER_URL = "http://localhost:8080"
+SERVER_URL = "http://localhost:8000"
 EXPIRATION_SECONDS = 15 * 60  # 15 minutes
 
 # Colors for output

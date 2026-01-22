@@ -31,7 +31,7 @@ Before creating bug reports, please check existing issues. When creating a bug r
 - Server Version: 1.0.0
 
 **Steps to Reproduce:**
-1. Send POST request to `/api/data` with 10MB payload
+1. Send POST request to `/dev/data` with 10MB payload
 2. Server returns 413 error
 
 **Expected:** Data should be accepted up to 16MB
@@ -77,7 +77,7 @@ make test
 make run
 
 # 5. Verify installation
-curl http://localhost:8080/health
+curl http://localhost:8000/health
 ```
 
 ### Development Workflow

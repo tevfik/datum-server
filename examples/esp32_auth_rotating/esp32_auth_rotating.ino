@@ -31,7 +31,7 @@ const char *deviceID = "YOUR_DEVICE_ID";
 // In production, store this in Encrypted NVS or Secure Element.
 const char *masterSecret = "YOUR_MASTER_SECRET_BASE64";
 
-const char *serverURL = "http://YOUR_SERVER_IP:8080";
+const char *serverURL = "http://YOUR_SERVER_IP:8000";
 
 // Token Settings
 const int TOKEN_VALIDITY_DAYS = 1; // Short life for demo

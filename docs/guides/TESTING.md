@@ -164,10 +164,10 @@ go tool cover -func=coverage.out | grep "createUserHandler"
 ```
 Package                          Coverage
 ----------------------------------------
-datum-go/cmd/server              68.6%
-datum-go/internal/storage        94.0%
-datum-go/internal/auth           89.1%
-datum-go/internal/logger        100.0%
+datum-server/cmd/server          68.6%
+datum-server/internal/storage    94.0%
+datum-server/internal/auth       89.1%
+datum-server/internal/logger    100.0%
 ----------------------------------------
 Overall                          ~70%
 ```
@@ -244,20 +244,21 @@ func TestCreateDeviceHandler(t *testing.T) {
     user := createTestUser(t, store)
     
     // Setup route
-    router.POST("/devices", func(c *gin.Context) {
+    router.POST("/dev/register", func(c *gin.Context) {
         c.Set("user_id", user.ID)
         createDeviceHandler(c)
     })
     
     // Prepare request
     requestBody := map[string]interface{}{
-        "name": "Test Device",
-        "type": "sensor",
+        "device_uid": "test-device-001",
+        "device_name": "Test Device",
+        "device_type": "sensor",
     }
     jsonBody, _ := json.Marshal(requestBody)
     
     // Make request
-    req := httptest.NewRequest(http.MethodPost, "/devices", 
+    req := httptest.NewRequest(http.MethodPost, "/dev/register", 
                                bytes.NewBuffer(jsonBody))
     req.Header.Set("Content-Type", "application/json")
     w := httptest.NewRecorder()
@@ -331,17 +332,12 @@ func TestCreateDeviceErrors(t *testing.T) {
     }{
         {
             name:       "missing name",
-            payload:    map[string]interface{}{"type": "sensor"},
+            payload:    map[string]interface{}{"device_uid": "d1", "device_type": "sensor"},
             wantStatus: http.StatusBadRequest,
         },
         {
             name:       "missing type",
-            payload:    map[string]interface{}{"name": "Device"},
-            wantStatus: http.StatusBadRequest,
-        },
-        {
-            name:       "invalid type",
-            payload:    map[string]interface{}{"name": "Device", "type": "invalid"},
+            payload:    map[string]interface{}{"device_uid": "d1", "device_name": "Device"},
             wantStatus: http.StatusBadRequest,
         },
     }
@@ -349,7 +345,7 @@ func TestCreateDeviceErrors(t *testing.T) {
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
             jsonBody, _ := json.Marshal(tt.payload)
-            req := httptest.NewRequest(http.MethodPost, "/devices", 
+            req := httptest.NewRequest(http.MethodPost, "/dev/register", 
                                        bytes.NewBuffer(jsonBody))
             w := httptest.NewRecorder()
             router.ServeHTTP(w, req)
@@ -421,7 +417,7 @@ python3 device_simulator.py
 #!/bin/bash
 
 # 1. Setup system
-curl -X POST http://localhost:8080/system/setup \
+curl -X POST http://localhost:8000/sys/setup \
   -H "Content-Type: application/json" \
   -d '{
     "platform_name": "Test Platform",
@@ -430,7 +426,7 @@ curl -X POST http://localhost:8080/system/setup \
   }'
 
 # 2. Login
-TOKEN=$(curl -s -X POST http://localhost:8080/api/login \
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@test.com",
@@ -438,18 +434,19 @@ TOKEN=$(curl -s -X POST http://localhost:8080/api/login \
   }' | jq -r '.token')
 
 # 3. Create device
-DEVICE=$(curl -s -X POST http://localhost:8080/api/devices \
+DEVICE=$(curl -s -X POST http://localhost:8000/dev/register \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Test Sensor",
-    "type": "temperature"
+    "device_uid": "test-device-001",
+    "device_name": "Test Sensor",
+    "device_type": "sensor_plus"
   }')
 
 API_KEY=$(echo $DEVICE | jq -r '.api_key')
 
 # 4. Send data
-curl -X POST http://localhost:8080/api/data \
+curl -X POST http://localhost:8000/dev/data \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -458,7 +455,13 @@ curl -X POST http://localhost:8080/api/data \
   }'
 
 # 5. Query data
-curl "http://localhost:8080/api/data/history?last=1h" \
+# Get history
+curl "http://localhost:8000/dev/data/history?range=1h" \
+  -H "Authorization: Bearer $JWT_TOKEN"
+
+# or
+curl "http://localhost:8000/dev/{device_id}/data?range=1h" \
+  -H "Authorization: Bearer $JWT_TOKEN"
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -482,7 +485,7 @@ locust -f load_test.py \
   --users 1000 \
   --spawn-rate 10 \
   --run-time 60s \
-  --host http://localhost:8080
+  --host http://localhost:8000
 ```
 
 ### Load Test Scenarios

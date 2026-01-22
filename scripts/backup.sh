@@ -1,5 +1,5 @@
 #!/bin/bash
-# Datumpy Backup Script
+# Datum Backup Script
 # Creates timestamped backups of database and time-series data
 
 set -e
@@ -9,7 +9,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 DATA_DIR="$PROJECT_DIR/data"
 BACKUP_DIR="$PROJECT_DIR/backups"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-BACKUP_FILE="$BACKUP_DIR/datumpy-backup-$TIMESTAMP.tar.gz"
+BACKUP_FILE="$BACKUP_DIR/datum-backup-$TIMESTAMP.tar.gz"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -17,7 +17,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}=== Datumpy Backup Utility ===${NC}"
+echo -e "${YELLOW}=== Datum Backup Utility ===${NC}"
 echo ""
 
 # Check if data directory exists
@@ -53,7 +53,7 @@ if [ $? -eq 0 ]; then
     echo ""
     echo -e "${YELLOW}🧹 Cleaning old backups (keeping last 7)...${NC}"
     cd "$BACKUP_DIR"
-    ls -t datumpy-backup-*.tar.gz | tail -n +8 | xargs -r rm -f
+    ls -t datum-backup-*.tar.gz | tail -n +8 | xargs -r rm -f
     echo -e "${GREEN}✅ Cleanup complete${NC}"
 else
     echo -e "${RED}❌ Backup failed!${NC}"

@@ -19,7 +19,7 @@
 const char *WIFI_SSID = "your-wifi-ssid";
 const char *WIFI_PASSWORD = "your-wifi-password";
 
-const char *API_URL = "http://your-server:8007";
+const char *API_URL = "http://your-server:8000";
 const char *DEVICE_ID = "dev_xxxxxxxxxxxxxxxx";
 const char *API_KEY = "sk_live_xxxxxxxxxxxxxxxx";
 

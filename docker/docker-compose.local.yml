@@ -7,7 +7,7 @@ services:
     container_name: datum-server
     restart: unless-stopped
     # Expose directly on port 80 (HTTP)
-    # You can change "80:8000" to "8080:8000" if you want to use port 8080
+    # You can change "80:8000" to "8000:8000" if you want to use port 8000
     ports:
       - "80:8000"
     environment:

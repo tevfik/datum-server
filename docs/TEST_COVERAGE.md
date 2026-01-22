@@ -74,13 +74,13 @@ Storage layer comprehensively tested:
 **Status**: ✅ **TESTED**
 
 ✅ **Tests**:
-- `RegisterDeviceHandler` (`POST /devices/register`)
-- `ActivateDeviceHandler` (`POST /provisioning/activate`)
-- `CheckDeviceUIDHandler` (`GET /devices/check-uid/:uid`)
-- `ListProvisioningRequestsHandler` (`GET /devices/provisioning`)
-- `GetProvisioningStatusHandler` (`GET /devices/provisioning/:request_id`)
-- `CancelProvisioningRequestHandler` (`DELETE /devices/provisioning/:request_id`)
-- `CheckProvisioningHandler` (`GET /provisioning/check/:uid`)
+- `RegisterDeviceHandler` (`POST /dev/register`)
+- `ActivateDeviceHandler` (`POST /prov/activate`)
+- `CheckDeviceUIDHandler` (`GET /dev/check-uid/:uid`)
+- `ListProvisioningRequestsHandler` (`GET /dev/prov`)
+- `GetProvisioningStatusHandler` (`GET /dev/prov/:request_id`)
+- `CancelProvisioningRequestHandler` (`DELETE /dev/prov/:request_id`)
+- `CheckProvisioningHandler` (`GET /prov/check/:uid`)
 
 **Impact**: ✅ **SAFE**
 - Mobile app integration verified

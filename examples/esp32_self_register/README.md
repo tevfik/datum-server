@@ -108,7 +108,7 @@ Open `esp32_self_register.ino` and update the **Configuration Section** at the t
 const char *wifiSSID = "YOUR_WIFI_SSID";       // Your WiFi Name
 const char *wifiPass = "YOUR_WIFI_PASS";       // Your WiFi Password
 const char *userToken = "YOUR_USER_TOKEN";     // Your JWT User Token
-const char *serverURL = "http://192.168.1.100:8080"; // Your Server URL
+const char *serverURL = "http://192.168.1.100:8000"; // Your Server URL
 const char *deviceName = "My Self-Reg Device"; // Desired Device Name
 ```
 

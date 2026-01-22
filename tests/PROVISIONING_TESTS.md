@@ -58,7 +58,7 @@ NUM_DEVICES=20 CONCURRENT=10 ./tests/provisioning_concurrent_test.sh
 ```
 
 **Environment Variables**:
-- `SERVER_URL` - Server address (default: http://localhost:8080)
+- `SERVER_URL` - Server address (default: http://localhost:8000)
 - `NUM_DEVICES` - Number of devices to register (default: 10)
 - `CONCURRENT` - Concurrent request limit (default: 5)
 
@@ -176,7 +176,7 @@ Tests create temporary users and devices. To clean up:
 ```bash
 # Reset entire database (if using development environment)
 curl -X POST -H "Authorization: Bearer <admin-token>" \
-  http://localhost:8080/admin/reset-system
+  http://localhost:8000/admin/reset-system
 ```
 
 ### Automatic Cleanup
@@ -234,7 +234,7 @@ Tests Failed: 1
 
 ### Server Not Running
 ```
-Error: Server is not running at http://localhost:8080
+Error: Server is not running at http://localhost:8000
 Please start the server first: cd backend/go && go run ./cmd/server
 ```
 
@@ -242,10 +242,10 @@ Please start the server first: cd backend/go && go run ./cmd/server
 
 ### Connection Refused
 ```
-curl: (7) Failed to connect to localhost port 8080: Connection refused
+curl: (7) Failed to connect to localhost port 8000: Connection refused
 ```
 
-**Solution**: Check server is running and listening on port 8080
+**Solution**: Check server is running and listening on port 8000
 
 ### Test Timeouts
 If tests are slow or timing out:

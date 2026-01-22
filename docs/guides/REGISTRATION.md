@@ -61,7 +61,7 @@ This will prompt only for password and then setup everything.
 ### Method 3: Direct API Call (curl)
 
 ```bash
-curl -X POST http://localhost:8080/system/setup \
+curl -X POST http://localhost:8000/sys/setup \
   -H "Content-Type: application/json" \
   -d '{
     "platform_name": "My IoT Platform",
@@ -100,7 +100,7 @@ Admin can create user accounts using CLI:
 
 Or using API:
 ```bash
-curl -X POST http://localhost:8080/admin/users \
+curl -X POST http://localhost:8000/admin/users \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -115,7 +115,7 @@ curl -X POST http://localhost:8080/admin/users \
 If you enabled `allow_register` during setup:
 
 ```bash
-curl -X POST http://localhost:8080/auth/register \
+curl -X POST http://localhost:8000/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "newuser@example.com",
@@ -130,7 +130,7 @@ curl -X POST http://localhost:8080/auth/register \
 Admin can enable/disable registration via system config:
 
 ```bash
-curl -X PUT http://localhost:8080/admin/config \
+curl -X PUT http://localhost:8000/admin/config \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -153,11 +153,11 @@ sequenceDiagram
     participant Device
 
     User->>CLI: datumctl device create --name "Sensor 1"
-    CLI->>Server: POST /devices
+    CLI->>Server: POST /dev
     Server-->>CLI: { "device_id": "...", "api_key": "dk_..." }
     CLI-->>User: Shows API Key
     User->>Device: Flash Firmware (Hardcode API Key)
-    Device->>Server: POST /data (Auth: API Key)
+    Device->>Server: POST /dev/:id/data (Auth: API Key)
 ```
 
 ### Flow 2: Self-Registration (HTTP)
@@ -169,10 +169,10 @@ sequenceDiagram
     participant Server
 
     Note over Device: Has User Token
-    Device->>Server: POST /devices/register (Auth: User Token)
+    Device->>Server: POST /dev/register (Auth: User Token)
     Server-->>Device: { "device_id": "...", "api_key": "..." }
     Note over Device: Saves Creds to NVS
-    Device->>Server: POST /data (Auth: API Key)
+    Device->>Server: POST /dev/:id/data (Auth: API Key)
 ```
 
 ### Flow 3: WiFi Provisioning (Mobile App)
@@ -186,7 +186,7 @@ sequenceDiagram
 
     Device->>Device: Start SoftAP
     App->>Device: Connect to SoftAP & Push User Token
-    Device->>Server: POST /devices/register (Auth: User Token)
+    Device->>Server: POST /dev/register (Auth: User Token)
     Server-->>Device: { "device_id": "...", "api_key": "..." }
     Device->>Server: Activate / Confirm
     Device-->>App: Success
@@ -209,7 +209,7 @@ Devices don't use email/password. They use API keys:
    dk_0123456789abcdef
 
 📝 Use this API key for device authentication:
-   curl -X POST http://localhost:8080/data/YOUR_DEVICE_ID \
+   curl -X POST http://localhost:8000/dev/YOUR_DEVICE_ID/data \
      -H "Authorization: Bearer dk_0123456789abcdef" \
      -H "Content-Type: application/json" \
      -d '{"temperature": 25.5}'
@@ -237,7 +237,7 @@ datumctl setup --allow-register
 
 Or enable it later as admin:
 ```bash
-curl -X PUT http://localhost:8080/admin/config \
+curl -X PUT http://localhost:8000/admin/config \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -d '{"allow_register": true}'
 ```
@@ -250,7 +250,7 @@ curl -X PUT http://localhost:8080/admin/config \
 
 ### Q: Can devices register themselves?
 ### Q: Can devices register themselves?
-**A:** Yes! Devices can use **Self-Registration** if they possess a valid **User Token**. They call `POST /devices/register` to exchange the User Token for a permanent Device API Key. See [Flow 2](#flow-2-self-registration-http) above.
+**A:** Yes! Devices can use **Self-Registration** if they possess a valid **User Token**. They call `POST /dev/register` to exchange the User Token for a permanent Device API Key. See [Flow 2](#flow-2-self-registration-http) above.
 
 ### Q: What's the difference between datumctl setup and login?
 **A:** 
@@ -270,7 +270,7 @@ make run-server
 ./datumctl device create --name "My Sensor"
 
 # 4. Start sending data (use the API key from step 3)
-curl -X POST http://localhost:8080/data/YOUR_DEVICE_ID \
+curl -X POST http://localhost:8000/dev/YOUR_DEVICE_ID/data \
   -H "Authorization: Bearer YOUR_DEVICE_API_KEY" \
   -d '{"temperature": 22.5, "humidity": 60}'
 

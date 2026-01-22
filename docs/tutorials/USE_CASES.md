@@ -78,7 +78,7 @@ graph LR
 
 DHT dht(DHT_PIN, DHT_TYPE);
 const char* API_KEY = "your_device_api_key";
-const char* SERVER = "http://your-server:8080";
+const char* SERVER = "http://your-server:8000";
 
 void sendData() {
     StaticJsonDocument<256> doc;
@@ -91,7 +91,7 @@ void sendData() {
     serializeJson(doc, payload);
     
     HTTPClient http;
-    http.begin(String(SERVER) + "/data/living-room-sensor");
+    http.begin(String(SERVER) + "/dev/living-room-sensor/data");
     http.addHeader("Authorization", "Bearer " + String(API_KEY));
     http.addHeader("Content-Type", "application/json");
     
@@ -106,15 +106,15 @@ void sendData() {
 ```bash
 # Get current readings
 curl -H "Authorization: Bearer $TOKEN" \
-  "$SERVER/data/living-room-sensor"
+  "$SERVER/dev/living-room-sensor/data"
 
 # Get 24-hour history
 curl -H "Authorization: Bearer $TOKEN" \
-  "$SERVER/data/living-room-sensor/history?period=24h&interval=1h"
+  "$SERVER/dev/living-room-sensor/data/history?period=24h&interval=1h"
 
 # Get all home sensors
 curl -H "Authorization: Bearer $TOKEN" \
-  "$SERVER/device?owner=$USER_ID"
+  "$SERVER/dev?owner=$USER_ID"
 ```
 
 ### Automation Example
@@ -123,7 +123,7 @@ Use SSE to trigger automation when motion is detected:
 
 ```javascript
 const eventSource = new EventSource(
-  `${SERVER}/devices/living-room-sensor/commands/stream`,
+  `${SERVER}/dev/living-room-sensor/cmd/stream`,
   { headers: { 'Authorization': `Bearer ${API_KEY}` } }
 );
 
@@ -206,11 +206,11 @@ void loop() {
 ```bash
 # Get monthly precipitation data
 curl -H "Authorization: Bearer $TOKEN" \
-  "$SERVER/data/weather-station-01/history?start=2024-01-01&end=2024-01-31&aggregation=sum&fields=rain_mm"
+  "$SERVER/dev/weather-station-01/data/history?start=2024-01-01&end=2024-01-31&aggregation=sum&fields=rain_mm"
 
 # Get temperature trends
 curl -H "Authorization: Bearer $TOKEN" \
-  "$SERVER/data/weather-station-01/history?period=7d&interval=1h&fields=temperature"
+  "$SERVER/dev/weather-station-01/data/history?period=7d&interval=1h&fields=temperature"
 ```
 
 ---
@@ -288,7 +288,7 @@ Configure commands to alert on anomalies:
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"action": "alert", "payload": {"type": "vibration_high", "threshold": 0.5}}' \
-  "$SERVER/devices/cnc-machine-001/commands"
+  "$SERVER/dev/cnc-machine-001/cmd"
 ```
 
 ### Edge Gateway (Python)
@@ -303,7 +303,7 @@ instrument = minimalmodbus.Instrument('/dev/ttyUSB0', 1)
 instrument.serial.baudrate = 9600
 
 API_KEY = "device_api_key"
-SERVER = "https://your-server:8080"
+SERVER = "https://your-server:8000"
 
 def read_and_send():
     data = {
@@ -315,7 +315,7 @@ def read_and_send():
     }
     
     response = requests.post(
-        f"{SERVER}/data/cnc-machine-001",
+        f"{SERVER}/dev/cnc-machine-001/data",
         headers={"Authorization": f"Bearer {API_KEY}"},
         json=data
     )
@@ -397,14 +397,14 @@ graph TB
 ```bash
 # Check soil moisture
 MOISTURE=$(curl -s -H "Authorization: Bearer $TOKEN" \
-  "$SERVER/data/field-a-sensor-1" | jq '.payload.soil_moisture_percent')
+  "$SERVER/dev/field-a-sensor-1/data" | jq '.payload.soil_moisture_percent')
 
 # Trigger irrigation if needed
 if [ "$MOISTURE" -lt 30 ]; then
   curl -X POST -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -d '{"action": "irrigate", "payload": {"duration_minutes": 30}}' \
-    "$SERVER/devices/valve-controller-1/commands"
+    "$SERVER/dev/valve-controller-1/cmd"
 fi
 ```
 
@@ -456,19 +456,19 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
       "alert_on": "exit"
     }
   }' \
-  "$SERVER/devices/truck-142/commands"
+  "$SERVER/dev/truck-142/cmd"
 ```
 
 ### Fleet Dashboard Query
 
 ```bash
-# Get all vehicle positions
+# Get vehicle position
 curl -H "Authorization: Bearer $TOKEN" \
-  "$SERVER/data/fleet-vehicles?latest=true"
+  "$SERVER/dev/truck-142/data"
 
 # Get trip history for a specific truck
 curl -H "Authorization: Bearer $TOKEN" \
-  "$SERVER/data/truck-142/history?start=2024-01-15T08:00:00Z&end=2024-01-15T18:00:00Z"
+  "$SERVER/dev/truck-142/data/history?start=2024-01-15T08:00:00Z&end=2024-01-15T18:00:00Z"
 ```
 
 ---
@@ -552,7 +552,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
       "lighting_level": 10
     }
   }' \
-  "$SERVER/devices/floor-3-zone-a/commands"
+  "$SERVER/dev/floor-3-zone-a/cmd"
 ```
 
 ### Energy Monitoring
@@ -560,13 +560,13 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 ```bash
 # Get daily energy consumption
 curl -H "Authorization: Bearer $TOKEN" \
-  "$SERVER/data/main-meter/history?period=24h&interval=1h&aggregation=sum&fields=kwh"
+  "$SERVER/dev/main-meter/data/history?period=24h&interval=1h&aggregation=sum&fields=kwh"
 
 # Compare zones
 for zone in zone-a zone-b zone-c; do
   echo "Floor 3 $zone:"
   curl -s -H "Authorization: Bearer $TOKEN" \
-    "$SERVER/data/floor-3-$zone/history?period=7d&aggregation=avg" | \
+    "$SERVER/dev/floor-3-$zone/data/history?period=7d&aggregation=avg" | \
     jq '.data[].payload.hvac_power_percent'
 done
 ```

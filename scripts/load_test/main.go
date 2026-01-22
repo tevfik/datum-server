@@ -36,7 +36,7 @@ type Stats struct {
 var stats Stats
 
 func main() {
-	baseURL := flag.String("url", "http://localhost:8080", "Target Server URL (HTTP)")
+	baseURL := flag.String("url", "http://localhost:8000", "Target Server URL (HTTP)")
 	mqttBroker := flag.String("mqtt-broker", "tcp://localhost:1883", "MQTT Broker URL")
 	protocol := flag.String("proto", "http", "Protocol: http, mqtt, mixed")
 	numUsers := flag.Int("users", 5, "Number of users to simulate")

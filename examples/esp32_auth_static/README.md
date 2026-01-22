@@ -19,7 +19,7 @@ In this method, the device uses a permanent API Key (`sk_...` or `dk_...`) that 
    const char* wifiPass = "YOUR_WIFI_PASS";
    const char* deviceID = "YOUR_DEVICE_ID";
    const char* apiKey   = "sk_YOUR_STATIC_KEY";
-   const char* serverURL = "http://YOUR_SERVER_IP:8080";
+   const char* serverURL = "http://YOUR_SERVER_IP:8000";
    ```
 3. Flash to your ESP32.
 

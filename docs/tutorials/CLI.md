@@ -105,7 +105,7 @@ datumctl data get --device temp-sensor-01 --last 1h
 ### Global Flags
 
 ```bash
---server string      Datum server URL (default: http://localhost:8080)
+--server string      Datum server URL (default: http://localhost:8000)
 --token string       JWT token for authentication
 --api-key string     API key for authentication
 --json               Output in JSON format
@@ -244,7 +244,7 @@ datumctl status
 
 ✅ Server Status
 
-  URL:      http://localhost:8080
+  URL:      http://localhost:8000
   Status:   healthy
   Version:  1.0.0
   Uptime:   5h 23m
@@ -258,7 +258,7 @@ datumctl config show
 ⚙️  Configuration
 
   Config file: /home/user/.datumctl.yaml
-  Server:      http://localhost:8080
+  Server:      http://localhost:8000
   Token:       eyJhbGciOiJIUzI1NiIs...
   API Key:     (not set)
 ```
@@ -277,7 +277,7 @@ Datum IoT Platform CLI
 The CLI saves credentials in `~/.datumctl.yaml`:
 
 ```yaml
-server: http://localhost:8080
+server: http://localhost:8000
 token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 # OR
 api_key: dev_xxxxxxxxxxxxxxxxxxxxxxxx
@@ -318,7 +318,7 @@ datumctl data stats --device office-sensor --last 24h
 # Use verbose mode to see API calls
 datumctl -v device list
 
-→ GET /admin/devices
+→ GET /admin/dev
 ← 200 OK
 
 # Use JSON output for scripting
@@ -378,7 +378,7 @@ Error: request failed: dial tcp: connection refused
 You can also use environment variables:
 
 ```bash
-export DATUM_SERVER=http://localhost:8080
+export DATUM_SERVER=http://localhost:8000
 export DATUM_TOKEN=eyJhbGci...
 export DATUM_API_KEY=dev_xxxxx
 
@@ -432,7 +432,7 @@ ddata --device temp-01 --last 1h
 
 ```bash
 # Development
-alias dctl-dev='datumctl --server http://localhost:8080'
+alias dctl-dev='datumctl --server http://localhost:8000'
 
 # Staging
 alias dctl-staging='datumctl --server https://staging.datum.example.com'
@@ -447,7 +447,7 @@ alias dctl-prod='datumctl --server https://api.datum.example.com'
 
 ```bash
 # Test server connectivity
-curl http://localhost:8080/health
+curl http://localhost:8000/health
 
 # Verbose mode to debug
 datumctl -v status

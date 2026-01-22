@@ -176,7 +176,7 @@ go build
 ```cpp
 const char* ssid = "YOUR_WIFI_SSID";
 const char* password = "YOUR_WIFI_PASSWORD";
-const char* serverURL = "http://192.168.1.100:8080";
+const char* serverURL = "http://192.168.1.100:8000";
 const char* deviceID = "esp32-cam-01";
 const char* deviceID = "esp32-cam-01";
 // Use either API Key OR Token (dk_...)
@@ -221,12 +221,12 @@ datumctl command send esp32-cam-01 capture-frame
 
 **Option B: MJPEG in Browser**
 ```
-http://your-server:8080/devices/esp32-cam-01/stream/mjpeg?token=YOUR_JWT
+http://your-server:8000/devices/esp32-cam-01/stream/mjpeg?token=YOUR_JWT
 ```
 
 **Option C: VLC Player**
 ```bash
-vlc http://your-server:8080/devices/esp32-cam-01/stream/mjpeg?token=YOUR_JWT
+vlc http://your-server:8000/devices/esp32-cam-01/stream/mjpeg?token=YOUR_JWT
 ```
 
 ---
@@ -344,7 +344,7 @@ services:
       - "traefik.http.routers.datum.middlewares=datum-headers"
       
       # Port
-      - "traefik.http.services.datum.loadbalancer.server.port=8080"
+      - "traefik.http.services.datum.loadbalancer.server.port=8000"
 ```
 
 ### Static Configuration (traefik.yml)
@@ -387,7 +387,7 @@ http:
     datum:
       loadBalancer:
         servers:
-          - url: "http://datum-server:8080"
+          - url: "http://datum-server:8000"
         passHostHeader: true
 ```
 
@@ -577,16 +577,16 @@ void handleAdvancedCommands() {
 
 1. Open `stream_viewer.html`
 2. Configure:
-   - **Server**: `http://localhost:8080`
+   - **Server**: `http://localhost:8000`
    - **Device ID**: `esp32-cam-01`
    - **Token**: Your JWT token
    - **Protocol**: WebSocket or MJPEG
 3. Click "Connect"
 
-### Embedding in Dashboard
+### Embedding in dashboard
 
 ```html
-<iframe src="stream_viewer.html?server=http://localhost:8080&device=esp32-cam-01&token=YOUR_TOKEN&protocol=ws"
+<iframe src="stream_viewer.html?server=http://localhost:8000&device=esp32-cam-01&token=YOUR_TOKEN&protocol=ws"
         width="800" height="600" frameborder="0"></iframe>
 ```
 
@@ -653,7 +653,7 @@ Solution:
 **Behind Traefik/NAT:**
 ```bash
 # Test from inside network
-curl http://localhost:8080/devices/esp32-cam-01/stream/info
+curl http://localhost:8000/devices/esp32-cam-01/stream/info
 
 # Test through Traefik
 curl https://datum.example.com/devices/esp32-cam-01/stream/info

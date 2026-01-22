@@ -198,7 +198,7 @@ sequenceDiagram
     participant Device as IoT Device
     
     Note over Phone,Server: User initiates provisioning
-    Phone->>Server: POST /devices/register<br/>{uid, name}
+    Phone->>Server: POST /dev/register<br/>{uid, name}
     Server->>Server: Generate MasterSecret<br/>Generate Initial Token
     Server-->>Phone: {device_id, master_secret, token, server_url}
     
@@ -208,12 +208,12 @@ sequenceDiagram
     Device-->>Phone: OK
     
     Note over Device,Server: Device activates
-    Device->>Server: POST /provisioning/activate<br/>Bearer: token
+    Device->>Server: POST /prov/activate<br/>Bearer: token
     Server->>Server: Validate token<br/>Mark device active
     Server-->>Device: {ok, token_expires_at}
     
     Note over Device,Server: Normal operation
-    Device->>Server: POST /data<br/>Bearer: token
+    Device->>Server: POST /dev/data<br/>Bearer: token
 ```
 
 ### 2. Token Self-Renewal (Automatic)
@@ -229,13 +229,13 @@ sequenceDiagram
     
     alt Token expires in < 7 days
         Device->>Device: Generate new token from MasterSecret
-        Device->>Server: POST /devices/token/refresh<br/>Bearer: old_token<br/>{new_token_signature}
+        Device->>Server: POST /dev/token/refresh<br/>Bearer: old_token<br/>{new_token_signature}
         Server->>Server: Validate old token<br/>Verify new token signature
         Server->>Server: Store new token<br/>Keep old as PreviousToken
         Server-->>Device: {token_accepted, expires_at}
         Device->>Device: Use new token
     else Token still valid
-        Device->>Server: POST /data<br/>Bearer: current_token
+        Device->>Server: POST /dev/data<br/>Bearer: current_token
         Server-->>Device: {ok}
     end
 ```
@@ -249,7 +249,7 @@ sequenceDiagram
     participant Device as IoT Device
     
     Note over Admin: Suspect key compromised
-    Admin->>Server: POST /admin/devices/{id}/rotate-key<br/>{grace_period_days: 7, revoke_old: false}
+    Admin->>Server: POST /admin/dev/{id}/rotate-key<br/>{grace_period_days: 7, revoke_old: false}
     
     Server->>Server: Generate new MasterSecret<br/>Generate new Token
     Server->>Server: Set grace period<br/>Keep old credentials valid
@@ -260,7 +260,7 @@ sequenceDiagram
     
     alt Device online
         Device->>Device: Store new credentials
-        Device->>Server: POST /commands/{cmd}/ack<br/>{status: key_updated}
+        Device->>Server: POST /dev/{id}/cmd/{cmd}/ack<br/>{status: key_updated}
         Server->>Server: Mark rotation complete
         Server-->>Device: {ok}
     else Device offline
@@ -308,13 +308,13 @@ sequenceDiagram
     participant Device as IoT Device
     
     Note over Admin: Key confirmed compromised
-    Admin->>Server: POST /admin/devices/{id}/revoke-key<br/>{immediate: true}
+    Admin->>Server: POST /admin/dev/{id}/revoke-key<br/>{immediate: true}
     
     Server->>Server: Invalidate ALL tokens immediately<br/>Add to revocation list
     Server-->>Admin: {revoked, device_offline_until_reprovisioned}
     
     Note over Device: Next request fails
-    Device->>Server: POST /data<br/>Bearer: compromised_token
+    Device->>Server: POST /dev/data<br/>Bearer: compromised_token
     Server-->>Device: 401 Key Revoked<br/>{error: "key_revoked", action: "reprovision"}
     
     Note over Device: Device enters setup mode
@@ -512,7 +512,7 @@ datumctl device revoke-key my-device-001 --force
 
 ```bash
 # Rotate device key
-curl -X POST https://your-server/admin/devices/my-device-001/rotate-key \
+curl -X POST https://your-server/admin/dev/my-device-001/rotate-key \
   -H "Authorization: Bearer $JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -533,7 +533,7 @@ curl -X POST https://your-server/admin/devices/my-device-001/rotate-key \
 
 ```bash
 # Emergency revocation
-curl -X POST https://your-server/admin/devices/my-device-001/revoke-key \
+curl -X POST https://your-server/admin/dev/my-device-001/revoke-key \
   -H "Authorization: Bearer $JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"immediate": true}'
@@ -550,7 +550,7 @@ curl -X POST https://your-server/admin/devices/my-device-001/revoke-key \
 
 ```bash
 # Device refreshes its own token before expiry
-curl -X POST https://your-server/devices/token/refresh \
+curl -X POST https://your-server/auth/refresh \
   -H "Authorization: Bearer $CURRENT_TOKEN" \
   -H "Content-Type: application/json"
 
@@ -591,7 +591,7 @@ void checkAndRefreshToken() {
         Serial.println("Token expiring soon, refreshing...");
         
         HTTPClient http;
-        http.begin(serverURL + "/devices/token/refresh");
+        http.begin(serverURL + "/auth/refresh");
         http.addHeader("Authorization", "Bearer " + currentToken);
         http.addHeader("Content-Type", "application/json");
         

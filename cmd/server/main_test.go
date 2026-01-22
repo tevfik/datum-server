@@ -127,7 +127,7 @@ func TestMetricsHandler(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "datumpy-api", response["service"])
+	assert.Equal(t, "datum-api", response["service"])
 	assert.Contains(t, response, "requests")
 	assert.Contains(t, response, "system")
 }
@@ -142,8 +142,8 @@ func TestMetricsHandlerPrometheusFormat(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "text/plain", w.Header().Get("Content-Type"))
-	assert.Contains(t, w.Body.String(), "datumpy_requests_total")
-	assert.Contains(t, w.Body.String(), "datumpy_uptime_seconds")
+	assert.Contains(t, w.Body.String(), "datum_requests_total")
+	assert.Contains(t, w.Body.String(), "datum_uptime_seconds")
 }
 
 func TestRegisterHandlerSystemNotInitialized(t *testing.T) {

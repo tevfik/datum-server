@@ -23,7 +23,7 @@ type ProvisioningConfig struct {
 }
 
 var provisioningConfig = ProvisioningConfig{
-	ServerURL:         "http://localhost:8080",
+	ServerURL:         "http://localhost:8000",
 	DefaultExpiration: 15 * time.Minute,
 }
 

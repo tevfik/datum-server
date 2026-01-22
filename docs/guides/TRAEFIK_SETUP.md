@@ -62,7 +62,7 @@ services:
       - "traefik.http.routers.datum-server.rule=Host(`datum.example.com`)"
       - "traefik.http.routers.datum-server.entrypoints=websecure"
       - "traefik.http.routers.datum-server.tls=true"
-      - "traefik.http.services.datum-server.loadbalancer.server.port=8080"
+      - "traefik.http.services.datum-server.loadbalancer.server.port=8000"
 
       # --- MQTT TCP (1883) ---
       # Uses HostSNI(`*`) because raw TCP doesn't have Host headers without TLS

@@ -18,8 +18,8 @@ docker-compose down
 ### Step 2: Delete the database files
 ```bash
 # From datum-server directory
-rm -rf /app/data/meta.db
-rm -rf /app/data/tsdata/*
+rm -rf ./data/meta.db
+rm -rf ./data/tsdata/*
 ```
 
 ### Step 3: Restart and setup again
@@ -31,7 +31,7 @@ datumctl status
 # Should show: "initialized": false
 
 # Run setup to create new admin
-curl -X POST http://localhost:8080/system/setup \
+curl -X POST http://localhost:8000/sys/setup \
   -H "Content-Type: application/json" \
   -d '{
     "platform_name": "My IoT Platform",
@@ -57,7 +57,7 @@ datumctl admin reset-password admin@example.com --new-password "newpass123"
 ### Method B: Direct database manipulation
 
 1. Stop the server
-2. Delete `/app/data/meta.db`
+2. Delete `./data/meta.db`
 3. Restart - system will be uninitialized
 4. Run setup again
 
