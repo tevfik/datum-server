@@ -360,6 +360,8 @@ cd examples/datum_camera_app
 flutter run
 ```
 
+For detailed setup instructions, including Linux dependencies, see [Mobile App Setup Guide](docs/guides/MOBILE_APP_SETUP.md).
+
 ### ESP32-S3 Camera (Features)
 
 The `examples/esp32-s3-camera` directory contains a production-ready firmware supporting:

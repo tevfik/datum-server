@@ -55,6 +55,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev libjsoncpp-dev libglu1-mesa-dev
+
       - name: Install dependencies
         run: flutter pub get
       
@@ -75,6 +80,15 @@ jobs:
         with:
           name: datum-app-release-apk
           path: examples/datum_camera_app/build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Build Linux
+        run: flutter build linux --release
+
+      - name: Upload Linux Build
+        uses: actions/upload-artifact@v3
+        with:
+          name: datum-app-release-linux
+          path: examples/datum_camera_app/build/linux/x64/release/bundle
 
 #  build-ios:
 #    needs: test
