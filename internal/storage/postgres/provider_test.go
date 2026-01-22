@@ -1,95 +1,34 @@
 package postgres
 
 import (
-	"database/sql"
-	"fmt"
-	"net/url"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
 	"datum-go/internal/storage"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // setupPostgres Test Helper
 func setupPostgres(t *testing.T) (*PostgresStore, func()) {
-	originalDBURL := os.Getenv("DATABASE_URL")
-	if originalDBURL == "" {
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
 		t.Skip("Skipping Postgres integration tests: DATABASE_URL not set")
 	}
 
-	// Connect to the maintenance database to create the test DB
-	maintDB, err := sql.Open("postgres", originalDBURL)
+	// Use a unique DB/Suffix if possible, but for now assuming specific test DB
+	store, err := New(dbURL)
 	require.NoError(t, err)
-
-	// Verify connection
-	if err := maintDB.Ping(); err != nil {
-		maintDB.Close()
-		t.Skipf("Skipping Postgres integration tests: Could not connect to DATABASE_URL: %v", err)
-	}
-
-	// Generate a unique database name
-	uniqueSuffix := strings.ReplaceAll(uuid.New().String(), "-", "")
-	testDBName := fmt.Sprintf("datum_test_%s", uniqueSuffix)
-
-	// Create the test database
-	_, err = maintDB.Exec(fmt.Sprintf(`CREATE DATABASE "%s"`, testDBName))
-	require.NoError(t, err, "failed to create test database")
-
-	// Construct connection string for the new DB
-	var testDBURL string
-	u, err := url.Parse(originalDBURL)
-	if err == nil && u.Scheme != "" {
-		// It's a URL
-		u.Path = "/" + testDBName
-		testDBURL = u.String()
-	} else {
-		// Assume DSN string (key=value)
-		// If it's a DSN, appending "dbname=..." overrides previous settings
-		testDBURL = fmt.Sprintf("%s dbname=%s", originalDBURL, testDBName)
-	}
-
-	store, err := New(testDBURL)
-	if err != nil {
-		// Cleanup if New fails
-		maintDB.Exec(fmt.Sprintf(`DROP DATABASE "%s"`, testDBName))
-		maintDB.Close()
-		require.NoError(t, err)
-	}
 
 	// Clean up data before/after?
 	// For integration tests, we usually want to start clean.
-	// Since we created a fresh DB, ResetSystem isn't strictly necessary for cleanliness,
-	// but might be useful if it initializes anything else.
 	err = store.ResetSystem()
-	if err != nil {
-		store.Close()
-		maintDB.Exec(fmt.Sprintf(`DROP DATABASE "%s"`, testDBName))
-		maintDB.Close()
-		require.NoError(t, err)
-	}
+	require.NoError(t, err)
 
 	return store, func() {
 		store.Close()
-
-		// Terminate any remaining connections to the test database to ensure DROP succeeds
-		terminateQuery := fmt.Sprintf(`
-			SELECT pg_terminate_backend(pg_stat_activity.pid)
-			FROM pg_stat_activity
-			WHERE pg_stat_activity.datname = '%s'
-			AND pid <> pg_backend_pid()`, testDBName)
-		maintDB.Exec(terminateQuery)
-
-		_, err := maintDB.Exec(fmt.Sprintf(`DROP DATABASE "%s"`, testDBName))
-		if err != nil {
-			t.Logf("Failed to drop test database %s: %v", testDBName, err)
-		}
-		maintDB.Close()
 	}
 }
 
