@@ -272,6 +272,39 @@ func (s *Storage) GetUserDevices(userID string) ([]Device, error) {
 	return devices, err
 }
 
+func (s *Storage) GetUserDeviceStats(userID string) (*DeviceStats, error) {
+	stats := &DeviceStats{}
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		userDevicesKey := fmt.Sprintf("user:%s:devices", userID)
+		devicesJSON, err := tx.Get(userDevicesKey)
+		if err != nil {
+			return nil // No devices
+		}
+
+		var deviceIDs []string
+		json.Unmarshal([]byte(devicesJSON), &deviceIDs)
+
+		stats.Total = len(deviceIDs)
+
+		for _, deviceID := range deviceIDs {
+			deviceKey := fmt.Sprintf("device:%s", deviceID)
+			deviceData, err := tx.Get(deviceKey)
+			if err != nil {
+				continue
+			}
+			var device Device
+			json.Unmarshal([]byte(deviceData), &device)
+
+			if time.Since(device.LastSeen) < 5*time.Minute {
+				stats.Online++
+			}
+		}
+		stats.Offline = stats.Total - stats.Online
+		return nil
+	})
+	return stats, err
+}
+
 func (s *Storage) DeleteDevice(deviceID, userID string) error {
 	return s.db.Update(func(tx *buntdb.Tx) error {
 		deviceKey := fmt.Sprintf("device:%s", deviceID)

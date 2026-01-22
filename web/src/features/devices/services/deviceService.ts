@@ -8,10 +8,17 @@ import type {
     SendCommandRequest,
     SendCommandResponse,
     TelemetryPoint,
-    TelemetryHistoryResponse
+    TelemetryHistoryResponse,
+    DeviceStats
 } from '@/types/device';
 
 export const deviceService = {
+    // Get device stats
+    getStats: async (): Promise<DeviceStats> => {
+        const { data } = await api.get<DeviceStats>('/dev/stats');
+        return data;
+    },
+
     // List all devices (user-scoped)
     getAll: async (): Promise<Device[]> => {
         const { data } = await api.get<DeviceListResponse>('/dev');
