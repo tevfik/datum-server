@@ -63,16 +63,6 @@ func (s *PostgresStore) StoreDataBatch(points []*storage.DataPoint) error {
 	}
 	defer tx.Rollback()
 
-	// Prepare statements for efficiency
-	stmtInsert, err := tx.Prepare(`
-		INSERT INTO data_points (time, device_id, data)
-		VALUES ($1, $2, $3)
-	`)
-	if err != nil {
-		return err
-	}
-	defer stmtInsert.Close()
-
 	stmtUpdateShadow, err := tx.Prepare(`
 		UPDATE devices 
 		SET 
@@ -89,24 +79,41 @@ func (s *PostgresStore) StoreDataBatch(points []*storage.DataPoint) error {
 	// Group by device for shadow update to minimize locking/updates
 	latestState := make(map[string]*storage.DataPoint)
 
-	for _, point := range points {
-		jsonData, err := json.Marshal(point.Data)
+	// Chunk size for bulk insert to avoid parameter limit (65535 parameters)
+	// 3 params per row -> max ~21845 rows. Safe limit: 5000.
+	const chunkSize = 5000
+
+	for i := 0; i < len(points); i += chunkSize {
+		end := i + chunkSize
+		if end > len(points) {
+			end = len(points)
+		}
+
+		chunk := points[i:end]
+
+		// 1. Insert into Time-Series (Bulk Insert)
+		query, args, validChunkPoints, err := buildBulkInsertQuery(chunk)
 		if err != nil {
-			continue
+			return err
 		}
 
-		// 1. Insert into Time-Series
-		if _, err := stmtInsert.Exec(point.Timestamp, point.DeviceID, jsonData); err != nil {
-			return fmt.Errorf("failed to insert batch point: %w", err)
+		if len(args) > 0 {
+			if _, err := tx.Exec(query, args...); err != nil {
+				return fmt.Errorf("failed to insert batch points (chunk %d-%d): %w", i, end, err)
+			}
 		}
 
-		latestState[point.DeviceID] = point
+		// Accumulate valid points for shadow update
+		for _, point := range validChunkPoints {
+			latestState[point.DeviceID] = point
+		}
 	}
 
 	// 2. Update Device Shadows (Latest State)
 	for deviceID, point := range latestState {
 		jsonData, err := json.Marshal(point.Data)
 		if err != nil {
+			// This shouldn't happen if it passed buildBulkInsertQuery, but safe to skip
 			continue
 		}
 		if _, err := stmtUpdateShadow.Exec(jsonData, time.Now(), deviceID); err != nil {
