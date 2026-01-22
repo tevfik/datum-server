@@ -29,22 +29,19 @@ PUT /auth/password (Authenticated)
 
 ---
 
-## System (Initial Setup & Status)
+## System
 
-### Check System Status
+### Get Server Time
 ```http
-GET /sys/status
+GET /sys/time
 ```
-Response: `{"initialized": true, "platform_name": "...", "allow_register": true}`
+Response: `{"unix": 1700000000, "iso": "2024-..."}`
 
-### Setup System
+### Get Client IP
 ```http
-POST /sys/setup
-Content-Type: application/json
-
-{"platform_name": "My IoT", "admin_email": "admin@example.com", "admin_password": "..."}
+GET /sys/ip
 ```
-*Used only once to initialize the first admin.*
+Response: `192.168.1.1`
 
 ---
 
@@ -244,12 +241,6 @@ GET /pub/{device_id}
 ---
 
 ## Miscellaneous
-
-### Time Sync
-```http
-GET /sys/time
-```
-Response: `{"unix": 1700000000, "iso": "2024-..."}`
 
 ### Health Check
 ```http
