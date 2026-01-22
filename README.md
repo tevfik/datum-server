@@ -45,9 +45,9 @@ See [docs/performance/FINAL_PERFORMANCE_REPORT.md](docs/performance/FINAL_PERFOR
 - `examples/datum_camera_app/` - Flutter Mobile App
 - `examples/esp32-s3-camera/` - ESP32-S3 Firmware (C++)
 
-### Advanced Components (Undocumented)
+### Advanced Components
 
-- **MQTT Broker**: Integrated MQTT v5 broker running on ports 1883 (TCP) and 1884 (WS).
+- **MQTT Broker**: Integrated MQTT v5 broker running on ports 1883 (TCP) and 1884 (WS). See `internal/mqtt` for implementation details.
 - **Telemetry Processor**: Asynchronous high-throughput data ingestion pipeline (`internal/processing`).
 - **PostgreSQL Support**: Optional backend controllable via `DATABASE_URL`.
 
@@ -251,8 +251,10 @@ PORT=8000
 GIN_MODE=release
 
 # Storage
-DATA_PATH=./data/tsdata
-META_PATH=./data/metadata.db
+DATA_DIR=./data
+# Internally maps to:
+# - Metadata: $DATA_DIR/meta.db
+# - Time-Series: $DATA_DIR/tsdata
 
 # Retention
 RETENTION_MAX_DAYS=7

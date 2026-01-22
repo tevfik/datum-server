@@ -219,6 +219,9 @@ func main() {
 	// Metrics middleware
 	r.Use(metricsMiddleware())
 
+	// Metrics Endpoint
+	r.GET("/metrics", metricsHandler)
+
 	r.Use(securityHeadersMiddleware())
 	// CORS setup
 	r.Use(func(c *gin.Context) {
