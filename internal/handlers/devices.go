@@ -74,7 +74,7 @@ func (h *AdminHandler) ProvisionDeviceHandler(c *gin.Context) {
 }
 
 func (h *AdminHandler) ListAllDevicesHandler(c *gin.Context) {
-	devices, err := h.Store.GetAllDevices()
+	devices, owners, err := h.Store.GetAllDevicesAndOwners()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -83,10 +83,9 @@ func (h *AdminHandler) ListAllDevicesHandler(c *gin.Context) {
 	// Enrich with owner info
 	var enrichedDevices []gin.H
 	for _, d := range devices {
-		owner, _ := h.Store.GetUserByID(d.UserID)
 		ownerEmail := ""
-		if owner != nil {
-			ownerEmail = owner.Email
+		if user, ok := owners[d.UserID]; ok {
+			ownerEmail = user.Email
 		}
 
 		// Calculate dynamic status (online/offline)

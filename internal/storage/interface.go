@@ -28,6 +28,7 @@ type Provider interface {
 	GetDeviceByAPIKey(apiKey string) (*Device, error)
 	GetUserDevices(userID string) ([]Device, error)
 	GetAllDevices() ([]Device, error)
+	GetAllDevicesAndOwners() ([]Device, map[string]User, error)
 	UpdateDevice(id string, status string) error
 	UpdateDeviceThingDescription(id string, td map[string]interface{}) error // New method
 	UpdateDeviceConfig(id string, config map[string]interface{}) error       // Remote Config
