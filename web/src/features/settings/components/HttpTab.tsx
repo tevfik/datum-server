@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Play, RotateCw } from 'lucide-react';
-import axios from 'axios';
+import { api } from '@/services/api';
 
 interface ResponseData {
     status: number;
@@ -25,8 +25,6 @@ export function HttpTab() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const [autoAuth, setAutoAuth] = useState(true);
-
     const handleSend = async () => {
         setIsLoading(true);
         setError(null);
@@ -43,14 +41,6 @@ export function HttpTab() {
                 throw new Error("Invalid Headers JSON");
             }
 
-            // Auto-Inject Auth Token
-            if (autoAuth) {
-                const token = localStorage.getItem('datum_token');
-                if (token) {
-                    headerObj['Authorization'] = `Bearer ${token}`;
-                }
-            }
-
             // Parse body
             let bodyData = undefined;
             if (method !== 'GET' && method !== 'HEAD') {
@@ -62,7 +52,7 @@ export function HttpTab() {
             }
 
             // Execute Request
-            const res = await axios({
+            const res = await api({
                 method,
                 url,
                 headers: headerObj,
@@ -123,19 +113,6 @@ export function HttpTab() {
                             {isLoading ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
                             Send
                         </Button>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                        <input
-                            type="checkbox"
-                            id="autoAuth"
-                            checked={autoAuth}
-                            onChange={(e) => setAutoAuth(e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                        />
-                        <label htmlFor="autoAuth" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                            Auto-Inject Auth Token
-                        </label>
                     </div>
 
                     {/* Editors */}
