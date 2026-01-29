@@ -886,41 +886,7 @@ paths:
         '200':
           description: Thing Description updated
 
-  /dev/{device_id}/config:
-    get:
-      summary: Get device details
-      description: Returns device details, including Thing Description.
-      tags: [Devices]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: device_id
-        - name: device_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Device details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeviceResponse'
-    delete:
-      summary: Delete device
-      tags: [Devices]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: device_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '204':
-          description: Device deleted
+
 
   /dev/{device_id}/config:
     patch:
