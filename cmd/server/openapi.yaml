@@ -1743,59 +1743,7 @@ paths:
         '200':
           description: Collection dropped
 
-  /admin/mqtt/stats:
-    get:
-      summary: Get MQTT Broker stats
-      tags: [MQTT]
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: Broker statistics
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
 
-  /admin/mqtt/clients:
-    get:
-      summary: Get connected MQTT clients
-      tags: [MQTT]
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: List of clients
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-
-  /admin/mqtt/publish:
-    post:
-      summary: Publish MQTT message
-      tags: [MQTT]
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [topic, message]
-              properties:
-                topic:
-                  type: string
-                message:
-                  type: string
-                retain:
-                  type: boolean
-      responses:
-        '200':
-          description: Message published
     get:
       summary: List user documents (Admin)
       tags: [Admin]
