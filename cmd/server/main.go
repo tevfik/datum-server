@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"datum-go/internal/api"
 	"datum-go/internal/auth"
 	"datum-go/internal/email"
 	"datum-go/internal/handlers"
@@ -326,27 +327,19 @@ func main() {
 	// r.GET("/sys/time", getSystemTimeHandler)
 	r.GET("/sys/ip", getSystemIPHandler)
 
-	// Auth routes
-	authGroup := r.Group("/auth")
-	{
-		authGroup.POST("/register", registerHandler)
-		authGroup.POST("/login", loginHandler)
-		authGroup.POST("/refresh", refreshTokenHandler)
-		// Password Reset
-		authGroup.POST("/forgot-password", forgotPasswordHandler)
-		authGroup.POST("/reset-password", completeResetPasswordHandler)
-	}
+	// Auth routes (using new internal/api package)
+	api.RegisterAuthRoutes(r, api.Config{
+		Store:        store,
+		Processor:    telemetryProcessor,
+		MQTTBroker:   mqttBroker,
+		EmailService: emailService,
+		PublicURL:    publicURL,
+	})
 
-	// Password Reset Web Page (for deep linking fallback)
-	r.GET("/reset-password", resetPasswordWebHandler)
-
-	// Authenticated user routes (password change, self-deletion)
+	// User API Key routes (still in main package, to be migrated later)
 	authProtectedGroup := r.Group("/auth")
 	authProtectedGroup.Use(auth.UserAuthMiddleware(store))
 	{
-		authProtectedGroup.PUT("/password", changePasswordHandler)
-		authProtectedGroup.DELETE("/user", deleteSelfHandler)
-
 		// User API Key Management
 		authProtectedGroup.POST("/keys", createKeyHandler)
 		authProtectedGroup.GET("/keys", listKeysHandler)
@@ -356,45 +349,32 @@ func main() {
 		RegisterDBRoutes(authProtectedGroup, store)
 	}
 
-	// Device management routes (require user auth)
-	devGroup := r.Group("/dev")
-	devGroup.Use(auth.UserAuthMiddleware(store))
-	{
-		// Management
-		devGroup.POST("", createDeviceHandler)
-		devGroup.GET("", listDevicesHandler)
-		devGroup.DELETE("/:device_id", deleteDeviceHandler)
-
-		// Configuration (Remote Config/Shadow)
-		devGroup.PATCH("/:device_id/config", updateDeviceConfigHandler)
-
-		// Commands (User sends to device)
-		devGroup.POST("/:device_id/cmd", sendCommandHandler)
-		devGroup.GET("/:device_id/cmd", listCommandsHandler) // History of commands sent
+	// Device management routes (using new internal/api package for CRUD)
+	apiConfig := api.Config{
+		Store:        store,
+		Processor:    telemetryProcessor,
+		MQTTBroker:   mqttBroker,
+		EmailService: emailService,
+		PublicURL:    publicURL,
 	}
+	api.RegisterDeviceRoutes(r, apiConfig)
 
-	// Device-side routes (Device Auth)
+	// Command routes (using new internal/api package)
+	api.RegisterCommandRoutes(r, apiConfig)
+
+	// Legacy SSE/Webhook polling routes (kept in main for compatibility)
 	devAuthGroup := r.Group("/dev")
 	devAuthGroup.Use(auth.DeviceAuthMiddleware())
 	{
-		// Data Ingestion
-		devAuthGroup.POST("/:device_id/data", postDataHandler)
+		devAuthGroup.GET("/:device_id/cmd/stream", sseCommandsHandler)
+		devAuthGroup.GET("/:device_id/cmd/poll", webhookPollHandler)
 
-		// Command Polling (Device gets pending commands)
-		// Consolidating all polling to single GET /cmd endpoint
-		devAuthGroup.GET("/:device_id/cmd/pending", pollCommandsHandler)
-
-		// Legacy polling support aliases (can be deprecated later)
-		devAuthGroup.GET("/:device_id/cmd/stream", sseCommandsHandler) // SSE long polling
-		devAuthGroup.GET("/:device_id/cmd/poll", webhookPollHandler)   // HTTP long polling
-
-		// Command Ack
-		devAuthGroup.POST("/:device_id/cmd/:command_id/ack", ackCommandHandler)
-
-		// Video streaming upload (device uploads frames)
+		// Video streaming upload
 		devAuthGroup.POST("/:device_id/stream/frame", uploadFrameHandler)
-
 	}
+
+	// Data routes (using new internal/api package)
+	api.RegisterDataRoutes(r, apiConfig)
 
 	// Specialized route for Thing Description (supports both User and Device Auth)
 	// Must be registered outside of Auth Groups to avoid conflict and allow hybrid auth
