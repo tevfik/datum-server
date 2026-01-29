@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,7 +37,12 @@ func NewAPIClient(baseURL, token, apiKey string) *APIClient {
 		Token:        token,
 		RefreshToken: refreshToken,
 		APIKey:       apiKey,
-		HTTPClient:   &http.Client{Timeout: 30 * time.Second},
+		HTTPClient: &http.Client{
+			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+			},
+		},
 	}
 }
 

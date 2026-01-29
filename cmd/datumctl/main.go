@@ -19,6 +19,7 @@ var (
 	configFile string
 	verbose    bool
 	showCurl   bool
+	insecure   bool
 )
 
 var rootCmd = &cobra.Command{
@@ -58,6 +59,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Config file (default: $HOME/.datumctl.yaml or /root/data/.datumctl.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&showCurl, "curl", false, "Print equivalent curl command")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
+	rootCmd.PersistentFlags().BoolVarP(&insecure, "insecure", "k", false, "Skip SSL certificate verification")
 }
 
 func main() {
