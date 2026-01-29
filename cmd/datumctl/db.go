@@ -9,6 +9,8 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+
+	"datum-go/internal/cli/utils"
 )
 
 var dbCmd = &cobra.Command{
@@ -92,7 +94,7 @@ func runDBList(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(docs)
+		return utils.PrintJSON(os.Stdout, docs)
 	}
 
 	if len(docs) == 0 {
@@ -136,7 +138,7 @@ func runDBGet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return printJSON(doc)
+	return utils.PrintJSON(os.Stdout, doc)
 }
 
 func runDBCreate(cmd *cobra.Command, args []string) error {
@@ -227,7 +229,7 @@ func runDBCollections(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return printJSON(result)
+	return utils.PrintJSON(os.Stdout, result)
 }
 
 // docPreview returns a shortened preview of the document content

@@ -91,6 +91,8 @@ func (tp *TelemetryProcessor) Process(deviceID string, data map[string]interface
 	if tStr, ok := data["timestamp"].(string); ok {
 		if t, err := time.Parse(time.RFC3339, tStr); err == nil {
 			ts = t
+		} else {
+			fmt.Printf("WARN: Failed to parse timestamp '%s': %v\n", tStr, err)
 		}
 	}
 

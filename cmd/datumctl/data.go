@@ -8,6 +8,8 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+
+	"datum-go/internal/cli/utils"
 )
 
 var dataCmd = &cobra.Command{
@@ -97,21 +99,21 @@ func runDataGet(cmd *cobra.Command, args []string) error {
 	queryParams := ""
 
 	if dataLast != "" {
-		_, err := parseDuration(dataLast)
+		_, err := utils.ParseDuration(dataLast)
 		if err != nil {
 			return fmt.Errorf("invalid duration: %w", err)
 		}
 		// Use server's 'range' parameter for convenience
 		queryParams = fmt.Sprintf("?range=%s&limit=%d", dataLast, dataLimit)
 	} else if dataFrom != "" {
-		fromTime, err := parseTime(dataFrom)
+		fromTime, err := utils.ParseTime(dataFrom)
 		if err != nil {
 			return fmt.Errorf("invalid from time: %w", err)
 		}
 		queryParams = fmt.Sprintf("?start_rfc=%s&limit=%d", fromTime.Format(time.RFC3339), dataLimit)
 
 		if dataTo != "" {
-			toTime, err := parseTime(dataTo)
+			toTime, err := utils.ParseTime(dataTo)
 			if err != nil {
 				return fmt.Errorf("invalid to time: %w", err)
 			}
@@ -133,7 +135,7 @@ func runDataGet(cmd *cobra.Command, args []string) error {
 	data := respData.Data
 
 	if outputJSON {
-		return printJSON(data)
+		return utils.PrintJSON(os.Stdout, data)
 	}
 
 	// Print as table
@@ -165,9 +167,9 @@ func runDataGet(cmd *cobra.Command, args []string) error {
 
 	// Add rows
 	for _, item := range data {
-		rowArgs := []any{getString(item, "timestamp")}
+		rowArgs := []any{utils.GetString(item, "timestamp")}
 		for _, key := range keys {
-			rowArgs = append(rowArgs, getString(item, key))
+			rowArgs = append(rowArgs, utils.GetString(item, key))
 		}
 		table.Append(rowArgs...)
 	}
@@ -212,7 +214,7 @@ func runDataStats(cmd *cobra.Command, args []string) error {
 	loadConfig()
 	client := NewAPIClient(serverURL, token, apiKey)
 
-	duration, err := parseDuration(dataLast)
+	duration, err := utils.ParseDuration(dataLast)
 	if err != nil {
 		return fmt.Errorf("invalid duration: %w", err)
 	}
@@ -231,7 +233,7 @@ func runDataStats(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(stats)
+		return utils.PrintJSON(os.Stdout, stats)
 	}
 
 	fmt.Printf("\n📈 Statistics for device: %s (last %s)\n\n", dataDevice, dataLast)
@@ -253,24 +255,4 @@ func runDataStats(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	return nil
-}
-
-func parseDuration(s string) (time.Duration, error) {
-	return time.ParseDuration(s)
-}
-
-func parseTime(s string) (time.Time, error) {
-	// Try RFC3339 first
-	t, err := time.Parse(time.RFC3339, s)
-	if err == nil {
-		return t, nil
-	}
-
-	// Try common format
-	t, err = time.Parse("2006-01-02 15:04", s)
-	if err == nil {
-		return t, nil
-	}
-
-	return time.Time{}, fmt.Errorf("unsupported time format (use RFC3339 or 'YYYY-MM-DD HH:MM')")
 }

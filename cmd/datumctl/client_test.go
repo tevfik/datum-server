@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"datum-go/internal/cli/utils"
 )
 
 // MockServer creates a test HTTP server for datumctl testing
@@ -560,14 +562,14 @@ func TestGetStringHelper(t *testing.T) {
 	}
 
 	// Test existing string key
-	assert.Equal(t, "test", getString(data, "name"))
+	assert.Equal(t, "test", utils.GetString(data, "name"))
 
 	// Test non-existent key (returns "-" not "")
-	assert.Equal(t, "-", getString(data, "nonexistent"))
+	assert.Equal(t, "-", utils.GetString(data, "nonexistent"))
 
 	// Test non-string value (gets formatted using fmt.Sprintf)
-	assert.Equal(t, "42", getString(data, "count"))
-	assert.Equal(t, "true", getString(data, "active"))
+	assert.Equal(t, "42", utils.GetString(data, "count"))
+	assert.Equal(t, "true", utils.GetString(data, "active"))
 }
 
 func TestPrintJSONHelper(t *testing.T) {
@@ -577,7 +579,7 @@ func TestPrintJSONHelper(t *testing.T) {
 		"nested": map[string]string{"key": "value"},
 	}
 
-	err := printJSON(data)
+	err := utils.PrintJSON(os.Stdout, data)
 	assert.NoError(t, err)
 }
 
@@ -585,7 +587,7 @@ func TestPrintJSONHelperError(t *testing.T) {
 	// Channel cannot be marshaled to JSON
 	invalid := make(chan int)
 
-	err := printJSON(invalid)
+	err := utils.PrintJSON(os.Stdout, invalid)
 	assert.Error(t, err)
 }
 
@@ -859,10 +861,10 @@ func TestGetString(t *testing.T) {
 		"active": true,
 	}
 
-	assert.Equal(t, "test-device", getString(data, "name"))
-	assert.Equal(t, "42", getString(data, "count"))
-	assert.Equal(t, "true", getString(data, "active"))
-	assert.Equal(t, "-", getString(data, "missing"))
+	assert.Equal(t, "test-device", utils.GetString(data, "name"))
+	assert.Equal(t, "42", utils.GetString(data, "count"))
+	assert.Equal(t, "true", utils.GetString(data, "active"))
+	assert.Equal(t, "-", utils.GetString(data, "missing"))
 }
 
 func TestPrintJSON(t *testing.T) {
@@ -870,6 +872,6 @@ func TestPrintJSON(t *testing.T) {
 		"test": "value",
 	}
 
-	err := printJSON(data)
+	err := utils.PrintJSON(os.Stdout, data)
 	assert.NoError(t, err)
 }

@@ -63,6 +63,46 @@ func securityHeadersMiddleware() gin.HandlerFunc {
 	}
 }
 
+// loadOrGenerateJWTSecret manages JWT secret persistence
+func loadOrGenerateJWTSecret(dataDir string) {
+	// 1. Check environment variable (highest priority)
+	if os.Getenv("JWT_SECRET") != "" {
+		return // internal/auth already handles this
+	}
+
+	// 2. Check for persistent secret file
+	// Basic path join to avoid extra imports if possible, though filepath is better
+	secretFile := dataDir + "/.jwt_secret"
+	if strings.HasSuffix(dataDir, "/") {
+		secretFile = dataDir + ".jwt_secret"
+	}
+
+	if content, err := os.ReadFile(secretFile); err == nil {
+		if len(content) >= 32 {
+			auth.SetJWTSecret(content)
+			return
+		}
+	}
+
+	// 3. Generate new secret
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		fmt.Printf("Critical: Failed to generate random bytes: %v\n", err)
+		return
+	}
+	secret := hex.EncodeToString(bytes)
+
+	// 4. Save to file
+	if err := os.WriteFile(secretFile, []byte(secret), 0600); err != nil {
+		fmt.Printf("Warning: Failed to persist JWT secret to %s: %v\n", secretFile, err)
+	} else {
+		fmt.Printf("Info: Persisted new JWT secret to %s\n", secretFile)
+	}
+
+	// 5. Update auth package
+	auth.SetJWTSecret([]byte(secret))
+}
+
 func main() {
 	// Record server start time for uptime tracking
 	serverStartTime = time.Now()
@@ -140,6 +180,9 @@ func main() {
 
 	logger.InitLogger(logFile)
 	log := logger.GetLogger()
+
+	// Handle JWT Secret persistence
+	loadOrGenerateJWTSecret(dataDirPath)
 
 	// Configure retention (priority: flag > env > default)
 	retentionConfig := storage.GetRetentionConfigFromEnv()

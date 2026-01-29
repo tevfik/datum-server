@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"datum-go/internal/cli/utils"
 )
 
 func TestIdentifierContainsEmail(t *testing.T) {
@@ -41,7 +43,7 @@ func TestIdentifierContainsEmail(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := identifierContainsEmail(tt.input)
+			result := utils.IdentifierContainsEmail(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

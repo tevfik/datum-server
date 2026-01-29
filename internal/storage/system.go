@@ -54,6 +54,7 @@ func (s *Storage) SaveSystemConfig(config *SystemConfig) error {
 }
 
 // IsSystemInitialized checks if the system has been set up
+// IsSystemInitialized checks if the system has been set up
 func (s *Storage) IsSystemInitialized() bool {
 	config, err := s.GetSystemConfig()
 	if err != nil {

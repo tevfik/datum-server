@@ -1114,6 +1114,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dev/{device_id}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update device configuration (Remote Config)
+         * @description Sets the desired configuration for the device. The server will sync this to the device via MQTT.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    device_id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Configuration object (free JSON) */
+            requestBody: {
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            responses: {
+                /** @description Configuration updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example updated */
+                            status?: string;
+                            config?: Record<string, never>;
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
     "/dev/{device_id}/cmd": {
         parameters: {
             query?: never;
@@ -3104,6 +3156,14 @@ export interface components {
             thing_description?: {
                 [key: string]: unknown;
             };
+            /** @description Last reported state (Read Only) */
+            shadow_state?: {
+                [key: string]: unknown;
+            };
+            /** @description Desired configuration (Remote Config) */
+            desired_state?: {
+                [key: string]: unknown;
+            };
         };
         /**
          * @example {
@@ -3127,6 +3187,12 @@ export interface components {
             device_uid: string;
             device_name: string;
             device_type?: string;
+            /**
+             * @description Authentication security mode
+             * @default static
+             * @enum {string}
+             */
+            auth_mode: "static" | "rotating";
             wifi_ssid?: string;
             wifi_pass?: string;
         };
@@ -3134,12 +3200,14 @@ export interface components {
             request_id?: string;
             device_uid?: string;
             device_id?: string;
+            /** @description Returned only for static auth mode */
+            api_key?: string;
+            /** @description Returned only for rotating auth mode */
+            master_secret?: string;
             status?: string;
             activate_url?: string;
             /** Format: date-time */
             expires_at?: string;
-            /** @description Temporary provisioning key */
-            api_key?: string;
         };
         DeviceActivateRequest: {
             device_uid: string;

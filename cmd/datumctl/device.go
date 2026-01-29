@@ -1,13 +1,14 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+
+	"datum-go/internal/cli/utils"
 )
 
 var deviceCmd = &cobra.Command{
@@ -158,7 +159,7 @@ func runDeviceList(cmd *cobra.Command, args []string) error {
 		// Check if it's an empty response or wrong format
 		if resp.StatusCode == 404 {
 			if outputJSON {
-				return printJSON(map[string]interface{}{"devices": []interface{}{}})
+				return utils.PrintJSON(os.Stdout, map[string]interface{}{"devices": []interface{}{}})
 			}
 			fmt.Println("\n📱 No devices found")
 			fmt.Println("\nCreate your first device:")
@@ -172,7 +173,7 @@ func runDeviceList(cmd *cobra.Command, args []string) error {
 	devicesInterface, ok := result["devices"]
 	if !ok {
 		if outputJSON {
-			return printJSON(map[string]interface{}{"devices": []interface{}{}})
+			return utils.PrintJSON(os.Stdout, map[string]interface{}{"devices": []interface{}{}})
 		}
 		fmt.Println("\n📱 No devices found. Create your first device!")
 		return nil
@@ -181,14 +182,14 @@ func runDeviceList(cmd *cobra.Command, args []string) error {
 	devices, ok := devicesInterface.([]interface{})
 	if !ok || len(devices) == 0 {
 		if outputJSON {
-			return printJSON(map[string]interface{}{"devices": []interface{}{}})
+			return utils.PrintJSON(os.Stdout, map[string]interface{}{"devices": []interface{}{}})
 		}
 		fmt.Println("\n📱 No devices found. Create your first device!")
 		return nil
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	// Print as table
@@ -200,11 +201,11 @@ func runDeviceList(cmd *cobra.Command, args []string) error {
 		if !ok {
 			continue
 		}
-		id := getString(device, "id")
-		name := getString(device, "name")
-		dtype := getString(device, "type")
-		status := getString(device, "status")
-		lastSeen := getString(device, "last_seen")
+		id := utils.GetString(device, "id")
+		name := utils.GetString(device, "name")
+		dtype := utils.GetString(device, "type")
+		status := utils.GetString(device, "status")
+		lastSeen := utils.GetString(device, "last_seen")
 
 		// Format last seen time
 		if lastSeen == "0001-01-01T00:00:00Z" {
@@ -240,17 +241,17 @@ func runDeviceGet(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(device)
+		return utils.PrintJSON(os.Stdout, device)
 	}
 
 	// Pretty print device info
-	fmt.Printf("\n📱 Device: %s\n\n", getString(device, "name"))
-	fmt.Printf("  ID:         %s\n", getString(device, "id"))
-	fmt.Printf("  Name:       %s\n", getString(device, "name"))
-	fmt.Printf("  Type:       %s\n", getString(device, "type"))
-	fmt.Printf("  Status:     %s\n", getString(device, "status"))
-	fmt.Printf("  Created:    %s\n", getString(device, "created_at"))
-	fmt.Printf("  Last Seen:  %s\n", getString(device, "last_seen"))
+	fmt.Printf("\n📱 Device: %s\n\n", utils.GetString(device, "name"))
+	fmt.Printf("  ID:         %s\n", utils.GetString(device, "id"))
+	fmt.Printf("  Name:       %s\n", utils.GetString(device, "name"))
+	fmt.Printf("  Type:       %s\n", utils.GetString(device, "type"))
+	fmt.Printf("  Status:     %s\n", utils.GetString(device, "status"))
+	fmt.Printf("  Created:    %s\n", utils.GetString(device, "created_at"))
+	fmt.Printf("  Last Seen:  %s\n", utils.GetString(device, "last_seen"))
 	fmt.Printf("  Data Count: %v\n", device["data_count"])
 	fmt.Println()
 
@@ -282,13 +283,13 @@ func runDeviceCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	fmt.Printf("\n✅ Device created!\n\n")
-	fmt.Printf("  ID:      %s\n", getString(result, "device_id"))
-	fmt.Printf("  Name:    %s\n", getString(result, "name"))
-	fmt.Printf("  Type:    %s\n", getString(result, "type"))
+	fmt.Printf("  ID:      %s\n", utils.GetString(result, "device_id"))
+	fmt.Printf("  Name:    %s\n", utils.GetString(result, "name"))
+	fmt.Printf("  Type:    %s\n", utils.GetString(result, "type"))
 
 	if apiKeyVal, ok := result["api_key"].(string); ok && apiKeyVal != "" {
 		fmt.Printf("\n  🔑 API Key: %s\n", apiKeyVal)
@@ -296,7 +297,7 @@ func runDeviceCreate(cmd *cobra.Command, args []string) error {
 
 		fmt.Println("  📝 Usage examples:")
 		fmt.Printf("     # Send data from device:\n")
-		fmt.Printf("     curl -X POST %s/pub/%s \\\n", serverURL, getString(result, "device_id"))
+		fmt.Printf("     curl -X POST %s/pub/%s \\\n", serverURL, utils.GetString(result, "device_id"))
 		fmt.Printf("       -H 'Authorization: Bearer %s' \\\n", apiKeyVal)
 		fmt.Printf("       -H 'Content-Type: application/json' \\\n")
 		fmt.Printf("       -d '{\"temperature\": 25.5, \"humidity\": 60}'\n\n")
@@ -360,7 +361,7 @@ func runDeviceRotateKey(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	fmt.Println("\n🔑 API Key Rotated Successfully")
@@ -419,7 +420,7 @@ func runDeviceRevokeKey(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	fmt.Println("\n🚨 Device Keys Revoked")
@@ -448,7 +449,7 @@ func runDeviceTokenInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	fmt.Println("\n🔐 Device Token Information")
@@ -479,21 +480,4 @@ func runDeviceTokenInfo(cmd *cobra.Command, args []string) error {
 
 	fmt.Println()
 	return nil
-}
-
-// Helper functions
-func getString(m map[string]interface{}, key string) string {
-	if val, ok := m[key]; ok {
-		if str, ok := val.(string); ok {
-			return str
-		}
-		return fmt.Sprintf("%v", val)
-	}
-	return "-"
-}
-
-func printJSON(data interface{}) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(data)
 }

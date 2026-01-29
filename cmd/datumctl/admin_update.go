@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
+
+	"datum-go/internal/cli/utils"
 )
 
 func runUpdateUser(cmd *cobra.Command, args []string) error {
@@ -24,7 +27,7 @@ func runUpdateUser(cmd *cobra.Command, args []string) error {
 
 	// If identifier looks like an email, try to resolve it to an ID first
 	userID := identifier
-	if identifierContainsEmail(identifier) {
+	if utils.IdentifierContainsEmail(identifier) {
 		// List users to find the ID
 		resp, err := client.Get("/admin/users")
 		if err != nil {
@@ -40,8 +43,8 @@ func runUpdateUser(cmd *cobra.Command, args []string) error {
 		if users, ok := response["users"].([]interface{}); ok {
 			for _, u := range users {
 				user := u.(map[string]interface{})
-				if getString(user, "email") == identifier {
-					userID = getString(user, "id")
+				if utils.GetString(user, "email") == identifier {
+					userID = utils.GetString(user, "id")
 					found = true
 					break
 				}
@@ -80,7 +83,7 @@ func runUpdateUser(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(response)
+		return utils.PrintJSON(os.Stdout, response)
 	}
 
 	fmt.Printf("✅ User updated successfully\n")
@@ -92,14 +95,4 @@ func runUpdateUser(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-func identifierContainsEmail(s string) bool {
-	// Simple check for @
-	for _, c := range s {
-		if c == '@' {
-			return true
-		}
-	}
-	return false
 }

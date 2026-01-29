@@ -23,15 +23,18 @@ func NewEmailSender(publicURL string) *EmailSender {
 	fromAddress := os.Getenv("EMAIL_FROM")
 
 	if apiKey == "" {
-		log.Warn().Msg("RESEND_API_KEY is not set. Email sending will fail.")
+		log.Info().Msg("Email service disabled (RESEND_API_KEY not set)")
 	}
-	if fromAddress == "" {
+	if apiKey != "" && fromAddress == "" {
 		fromAddress = "onboarding@resend.dev" // Default for testing
 		log.Warn().Msgf("EMAIL_FROM is not set. Using default: %s", fromAddress)
 	}
 	if publicURL == "" {
 		publicURL = "http://localhost:8000"
-		log.Warn().Msgf("Public URL is empty. Using default: %s", publicURL)
+		// Only log warning if we might actually send emails
+		if apiKey != "" {
+			log.Warn().Msgf("Public URL is empty. Using default: %s", publicURL)
+		}
 	}
 
 	return &EmailSender{

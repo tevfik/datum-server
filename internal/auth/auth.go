@@ -43,6 +43,16 @@ func initJWTSecret() []byte {
 	return []byte(secret)
 }
 
+// SetJWTSecret sets the JWT secret explicitly (e.g. from a persistent file)
+func SetJWTSecret(secret []byte) {
+	if len(secret) >= 32 {
+		jwtSecret = secret
+		log.Info().Msg("JWT secret updated from persistence")
+	} else {
+		log.Warn().Msg("Attempted to set weak JWT secret from persistence, ignoring")
+	}
+}
+
 type Claims struct {
 	UserID string `json:"user_id"`
 	Email  string `json:"email"`

@@ -6,6 +6,8 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+
+	"datum-go/internal/cli/utils"
 )
 
 var (
@@ -65,7 +67,7 @@ func runMQTTStats(cmd *cobra.Command, args []string) error {
 	if outputJSON {
 		var result interface{}
 		ParseResponse(resp, &result)
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	var stats map[string]interface{}
@@ -93,7 +95,7 @@ func runMQTTClients(cmd *cobra.Command, args []string) error {
 	if outputJSON {
 		var result interface{}
 		ParseResponse(resp, &result)
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	var result struct {
@@ -141,7 +143,7 @@ func runMQTTPublish(cmd *cobra.Command, args []string) error {
 	if outputJSON {
 		var result interface{}
 		ParseResponse(resp, &result)
-		printJSON(result)
+		utils.PrintJSON(os.Stdout, result)
 	} else {
 		// Consume body to avoid leak if not outputting JSON
 		ParseResponse(resp, nil)

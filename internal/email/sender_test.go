@@ -29,7 +29,8 @@ func TestNewEmailSender(t *testing.T) {
 	os.Unsetenv("EMAIL_FROM")
 
 	sender := NewEmailSender("")
-	assert.Equal(t, "onboarding@resend.dev", sender.fromAddress)
+	// valid: if api key is missing, fromAddress is not set default (service disabled)
+	assert.Empty(t, sender.fromAddress)
 	assert.Equal(t, "http://localhost:8000", sender.publicURL)
 	assert.Empty(t, sender.apiKey)
 

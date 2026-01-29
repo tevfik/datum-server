@@ -122,6 +122,10 @@ test-load: ## Run HTTP load tests with Locust
 	@echo "⚡ Running HTTP load tests..."
 	@bash tests/run_load_test.sh
 
+test-integration: build-all ## Run integration tests
+	@echo "🧪 Running integration tests..."
+	@SERVER_BINARY=$(SERVER_BINARY) CLI_BINARY=$(CLI_BINARY) bash tests/integration_test.sh
+
 # Build commands
 # Build commands
 # Build commands

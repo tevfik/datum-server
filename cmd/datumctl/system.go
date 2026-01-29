@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
+
+	"datum-go/internal/cli/utils"
 )
 
 var Version = "1.1.0"
@@ -60,14 +63,14 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(health)
+		return utils.PrintJSON(os.Stdout, health)
 	}
 
 	fmt.Printf("\n✅ Server Status\n\n")
 	fmt.Printf("  URL:      %s\n", serverURL)
-	fmt.Printf("  Status:   %s\n", getString(health, "status"))
-	fmt.Printf("  Version:  %s\n", getString(health, "version"))
-	fmt.Printf("  Uptime:   %s\n", getString(health, "uptime"))
+	fmt.Printf("  Status:   %s\n", utils.GetString(health, "status"))
+	fmt.Printf("  Version:  %s\n", utils.GetString(health, "version"))
+	fmt.Printf("  Uptime:   %s\n", utils.GetString(health, "uptime"))
 	fmt.Println()
 
 	return nil

@@ -8,6 +8,8 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+
+	"datum-go/internal/cli/utils"
 )
 
 func TestSaveToken(t *testing.T) {
@@ -157,7 +159,7 @@ func TestParseTime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := parseTime(tt.timeStr)
+			_, err := utils.ParseTime(tt.timeStr)
 			if tt.shouldErr {
 				assert.Error(t, err)
 			} else {
@@ -181,7 +183,7 @@ func TestParseDuration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := parseDuration(tt.durStr)
+			_, err := utils.ParseDuration(tt.durStr)
 			if tt.shouldErr {
 				assert.Error(t, err)
 			} else {

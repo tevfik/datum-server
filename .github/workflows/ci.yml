@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: [ '1.22' ]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+        cache-dependency-path: go.sum
+
+    - name: Install Tools
+      run: make install-tools
+
+    - name: Build All
+      run: make build-all
+
+    - name: Run Unit Tests
+      run: make test
+
+    - name: Run Integration Tests
+      run: make test-integration

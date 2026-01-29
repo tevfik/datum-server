@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
+
+	"datum-go/internal/cli/utils"
 )
 
 var updateFirmwareDeviceCmd = &cobra.Command{
@@ -46,7 +49,7 @@ func runUpdateFirmwareDevice(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	fmt.Printf("✓ OTA Update Command Sent\n\n")

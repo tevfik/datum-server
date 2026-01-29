@@ -9,6 +9,8 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+
+	"datum-go/internal/cli/utils"
 )
 
 var commandCmd = &cobra.Command{
@@ -173,7 +175,7 @@ func runCommandSend(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	fmt.Printf("✓ Command sent successfully\n\n")
@@ -238,7 +240,7 @@ func runCommandList(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	commands, ok := result["commands"].([]interface{})
@@ -318,7 +320,7 @@ func runCommandGet(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	// Display command details
@@ -393,7 +395,7 @@ func runCommandHistory(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	commands, ok := result["commands"].([]interface{})
@@ -487,7 +489,7 @@ func runCommandCancel(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	fmt.Printf("✓ Command cancelled successfully\n")
