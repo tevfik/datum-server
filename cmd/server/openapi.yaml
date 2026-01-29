@@ -447,6 +447,19 @@ paths:
                   initialized:
                     type: boolean
 
+  /sys/metrics:
+    get:
+      summary: Get system metrics
+      description: Returns Prometheus-compatible metrics.
+      tags: [System]
+      responses:
+        '200':
+          description: Metrics text
+          content:
+            text/plain:
+              schema:
+                type: string
+
   /sys/setup:
     post:
       summary: Initialize system
@@ -818,6 +831,64 @@ paths:
   /dev/{device_id}:
     get:
       summary: Get device details
+      tags: [Devices]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Device details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+    delete:
+      summary: Delete device
+      tags: [Devices]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Device deleted
+
+  /dev/{device_id}/thing-description:
+    put:
+      summary: Update Thing Description (WoT)
+      tags: [Devices]
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Thing Description updated
+
+  /dev/{device_id}/config:
+    get:
+      summary: Get device details
       description: Returns device details, including Thing Description.
       tags: [Devices]
       security:
@@ -1075,6 +1146,65 @@ paths:
                     type: integer
                   height:
                     type: integer
+  /data/{device_id}:
+    post:
+      summary: Ingest Telemetry Data
+      tags: [Data]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataPayload'
+      responses:
+        '200':
+          description: Data accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string}
+                  commands_pending: {type: boolean}
+
+    get:
+      summary: Get Device Data (User Auth)
+      tags: [Data]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema: {type: integer}
+        - name: start
+          in: query
+          schema: {type: string}
+        - name: stop
+          in: query
+          schema: {type: string}
+      responses:
+        '200':
+          description: Telemetry data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/DataPayload'}}
+
   /dev/{device_id}/data:
     post:
       summary: Send data (device)
@@ -1627,6 +1757,79 @@ paths:
                           type: integer
 
   /admin/db/{user_id}/{collection}:
+    delete:
+      summary: Drop database collection
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Collection dropped
+
+  /admin/mqtt/stats:
+    get:
+      summary: Get MQTT Broker stats
+      tags: [MQTT]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Broker statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /admin/mqtt/clients:
+    get:
+      summary: Get connected MQTT clients
+      tags: [MQTT]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of clients
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /admin/mqtt/publish:
+    post:
+      summary: Publish MQTT message
+      tags: [MQTT]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [topic, message]
+              properties:
+                topic:
+                  type: string
+                message:
+                  type: string
+                retain:
+                  type: boolean
+      responses:
+        '200':
+          description: Message published
     get:
       summary: List user documents (Admin)
       tags: [Admin]

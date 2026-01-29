@@ -34,11 +34,8 @@ func NewHandler(store storage.Provider, broker *mqtt.Broker) *Handler {
 func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("", h.CreateDevice)
 	r.GET("", h.ListDevices)
-	r.GET("/:device_id", h.GetDevice)
 	r.DELETE("/:device_id", h.DeleteDevice)
 	r.PATCH("/:device_id/config", h.UpdateDeviceConfig)
-	r.PATCH("/:device_id/config", h.UpdateDeviceConfig)
-	r.PUT("/:device_id/thing-description", h.UpdateDeviceThingDescription)
 }
 
 // RegisterHybridRoutes registers routes compatible with hybrid auth (User or Device).
