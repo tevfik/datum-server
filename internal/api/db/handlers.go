@@ -143,3 +143,15 @@ func (h *Handler) DeleteDoc(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"status": "deleted"})
 }
+
+// GetStats returns database statistics (admin only).
+// GET /admin/database/stats
+func (h *Handler) GetStats(c *gin.Context) {
+	stats, err := h.Store.GetStats()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get DB stats")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get stats"})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}

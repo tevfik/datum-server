@@ -90,9 +90,12 @@ type Provider interface {
 	InitializeSystem(platformName string, allowRegister bool, retention int) error
 	ResetSystem() error
 	ExportDatabase() (map[string]interface{}, error)
-	UpdateDataRetention(days int) error
+	UpdateDataRetention(days int) error // Keep for compatibility or deprecate
+	UpdateRetentionPolicy(days int, checkIntervalHours int) error
 	UpdatePublicDataRetention(days int) error
 	UpdateRegistrationConfig(allow bool) error
+	GetSystemLogs(limit int) ([]string, error)
+	ClearSystemLogs() error
 
 	// Generic Document Store (Collections)
 	CreateDocument(userID, collection string, doc map[string]interface{}) (string, error)
@@ -101,6 +104,9 @@ type Provider interface {
 	UpdateDocument(userID, collection, docID string, doc map[string]interface{}) error
 	DeleteDocument(userID, collection, docID string) error
 	ListAllCollections() ([]CollectionInfo, error)
+
+	// Stats
+	GetStats() (*SystemStats, error)
 }
 
 // CollectionInfo represents metadata about a collection

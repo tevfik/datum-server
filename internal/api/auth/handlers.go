@@ -56,6 +56,13 @@ func (h *Handler) RegisterRoutes(r *gin.Engine, authMiddleware gin.HandlerFunc) 
 	}
 }
 
+// RegisterAdminRoutes registers admin authentication/user routes.
+func (h *Handler) RegisterAdminRoutes(r *gin.RouterGroup) {
+	r.GET("", h.ListUsers)
+	r.DELETE("/:id", h.AdminDeleteUser)
+	r.PUT("/:id", h.UpdateUserStatus)
+}
+
 // ============ Request/Response types ============
 
 // RegisterRequest holds registration data.
@@ -424,6 +431,70 @@ func (h *Handler) CompleteResetPassword(c *gin.Context) {
 	h.Store.DeleteResetToken(req.Token)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully. You can now login."})
+}
+
+// ListUsers returns all users (admin only).
+// GET /admin/users
+func (h *Handler) ListUsers(c *gin.Context) {
+	users, err := h.Store.ListAllUsers() // Using ListAllUsers from interface
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list users"})
+		return
+	}
+	// Sanitize - remove password hashes
+	for i := range users {
+		users[i].PasswordHash = ""
+	}
+	c.JSON(http.StatusOK, gin.H{"users": users})
+}
+
+// AdminDeleteUser deletes a user by ID (admin only).
+// DELETE /admin/users/:id
+func (h *Handler) AdminDeleteUser(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID required"})
+		return
+	}
+
+	// Prevent deleting self? Frontend handles it, but good to enforce.
+	selfID := c.GetString("user_id")
+	if userID == selfID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot delete your own account via admin endpoint"})
+		return
+	}
+
+	if err := h.Store.DeleteUser(userID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "User deleted"})
+}
+
+// UpdateUserStatus updates a user's status (active/suspended) (admin only).
+// PUT /admin/users/:id
+func (h *Handler) UpdateUserStatus(c *gin.Context) {
+	userID := c.Param("id")
+	var req struct {
+		Status string `json:"status" binding:"required,oneof=active suspended"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := h.Store.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	if err := h.Store.UpdateUser(userID, user.Role, req.Status); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user status"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "User status updated"})
 }
 
 // ============ Helper Functions ============

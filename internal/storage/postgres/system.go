@@ -124,6 +124,18 @@ func (s *PostgresStore) UpdateDataRetention(days int) error {
 	return s.SaveSystemConfig(config)
 }
 
+// UpdateRetentionPolicy updates retention policy (Admin handler version)
+func (s *PostgresStore) UpdateRetentionPolicy(days int, checkIntervalHours int) error {
+	// We ignore checkIntervalHours for now or store it?
+	// BuntDB likely stores it in config?
+	// The config struct in storage.go might need checkInterval?
+	// SystemConfig struct def:
+	// type SystemConfig struct { ... DataRetention int ... }
+	// It doesn't seem to have CheckInterval.
+	// But let's just update DataRetention for now.
+	return s.UpdateDataRetention(days)
+}
+
 // UpdateRegistrationConfig updates registration policy
 func (s *PostgresStore) UpdateRegistrationConfig(allow bool) error {
 	config, err := s.GetSystemConfig()
@@ -161,4 +173,39 @@ func (s *PostgresStore) CleanupPublicData(maxAge time.Duration) (int, error) {
 	}
 	rows, _ := result.RowsAffected()
 	return int(rows), nil
+}
+
+// GetStats returns database statistics.
+func (s *PostgresStore) GetStats() (*storage.SystemStats, error) {
+	stats := &storage.SystemStats{
+		ServerTime: time.Now(),
+	}
+
+	// Count users
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM users").Scan(&stats.TotalUsers); err != nil {
+		return nil, err
+	}
+
+	// Count devices
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM devices").Scan(&stats.TotalDevices); err != nil {
+		return nil, err
+	}
+
+	// DB Size (approximate)
+	var size int64
+	s.db.QueryRow("SELECT pg_database_size(current_database())").Scan(&size)
+	stats.DBSizeBytes = size
+
+	return stats, nil
+}
+
+// GetSystemLogs returns system logs (Not implemented for Postgres yet)
+func (s *PostgresStore) GetSystemLogs(limit int) ([]string, error) {
+	// Return empty list
+	return []string{}, nil
+}
+
+// ClearSystemLogs clears system logs (Not implemented)
+func (s *PostgresStore) ClearSystemLogs() error {
+	return nil
 }

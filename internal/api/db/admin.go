@@ -17,7 +17,7 @@ func (h *Handler) RegisterAdminRoutes(r *gin.RouterGroup) {
 
 	// NOTE: In router.go we likely group by /admin/db.
 	// Dependencies for admin routes are same: Store.
-
+	r.GET("/stats", h.GetStats)
 	r.GET("/collections", h.ListAllCollections)
 	r.GET("/:user_id/:collection", h.ListUserDocuments)
 	r.POST("/:user_id/:collection", h.CreateUserDocument)

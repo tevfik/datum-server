@@ -18,7 +18,6 @@ import (
 	"datum-go/internal/api"
 	"datum-go/internal/auth"
 	"datum-go/internal/email"
-	"datum-go/internal/handlers"
 	"datum-go/internal/logger"
 	"datum-go/internal/metrics"
 	mqtt_internal "datum-go/internal/mqtt"
@@ -389,11 +388,7 @@ func main() {
 	// Auth routes
 	// setupAuthRoutes(r, store) // Assuming this is a new call, but not explicitly in the original file.
 	// Admin routes
-	adminHandler := handlers.NewAdminHandler(store, mqttBroker, serverStartTime)
-	adminHandler.RegisterRoutes(r)
-
-	// Legacy setup call removed
-	// setupAdminRoutes(r, store)
+	// Legacy admin handlers removed (migrated to internal/api)
 
 	// API Key routes
 	// setupKeyRoutes(r, store) // Assuming this is a new call, but not explicitly in the original file.

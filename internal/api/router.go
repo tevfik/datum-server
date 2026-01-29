@@ -39,6 +39,12 @@ type Config struct {
 func RegisterAuthRoutes(r *gin.Engine, cfg Config) {
 	authHandler := auth.NewHandler(cfg.Store, cfg.EmailService, cfg.PublicURL)
 	authHandler.RegisterRoutes(r, internalauth.UserAuthMiddleware(cfg.Store))
+
+	// Admin User Routes
+	adminUserGroup := r.Group("/admin/users")
+	adminUserGroup.Use(internalauth.UserAuthMiddleware(cfg.Store))
+	adminUserGroup.Use(internalauth.AdminMiddleware(cfg.Store))
+	authHandler.RegisterAdminRoutes(adminUserGroup)
 }
 
 // RegisterDeviceRoutes registers device management routes.
@@ -185,7 +191,8 @@ func RegisterDBRoutes(r *gin.Engine, cfg Config) {
 	dbHandler.RegisterRoutes(userDBGroup)
 
 	// Admin DB routes
-	adminDBGroup := r.Group("/admin/db")
+	// Frontend expects /admin/database/stats, so we map /admin/database
+	adminDBGroup := r.Group("/admin/database")
 	adminDBGroup.Use(internalauth.UserAuthMiddleware(cfg.Store))
 	adminDBGroup.Use(internalauth.AdminMiddleware(cfg.Store))
 	dbHandler.RegisterAdminRoutes(adminDBGroup)
@@ -193,9 +200,15 @@ func RegisterDBRoutes(r *gin.Engine, cfg Config) {
 
 // RegisterSystemRoutes registers system info routes.
 func RegisterSystemRoutes(r *gin.Engine, cfg Config) {
-	sysHandler := system.NewHandler(cfg.Version, cfg.BuildDate)
+	sysHandler := system.NewHandler(cfg.Version, cfg.BuildDate, cfg.Store)
 	sysGroup := r.Group("/sys")
 	sysHandler.RegisterRoutes(sysGroup)
+
+	// Admin System Routes (/admin/sys/...)
+	adminSysGroup := r.Group("/admin/sys")
+	adminSysGroup.Use(internalauth.UserAuthMiddleware(cfg.Store))
+	adminSysGroup.Use(internalauth.AdminMiddleware(cfg.Store))
+	sysHandler.RegisterAdminRoutes(adminSysGroup)
 }
 
 // RegisterProvisioningRoutes registers provisioning routes.
