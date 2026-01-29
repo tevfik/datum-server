@@ -37,6 +37,17 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/:device_id", h.GetDevice)
 	r.DELETE("/:device_id", h.DeleteDevice)
 	r.PATCH("/:device_id/config", h.UpdateDeviceConfig)
+	r.PATCH("/:device_id/config", h.UpdateDeviceConfig)
+	r.PUT("/:device_id/thing-description", h.UpdateDeviceThingDescription)
+}
+
+// RegisterHybridRoutes registers routes compatible with hybrid auth (User or Device).
+func (h *Handler) RegisterHybridRoutes(r *gin.RouterGroup) {
+	r.GET("/:device_id", h.GetDevice)
+}
+
+// RegisterThingDescriptionRoutes registers Thing Description update route.
+func (h *Handler) RegisterThingDescriptionRoutes(r *gin.RouterGroup) {
 	r.PUT("/:device_id/thing-description", h.UpdateDeviceThingDescription)
 }
 

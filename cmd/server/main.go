@@ -20,6 +20,7 @@ import (
 	"datum-go/internal/email"
 	"datum-go/internal/handlers"
 	"datum-go/internal/logger"
+	"datum-go/internal/metrics"
 	mqtt_internal "datum-go/internal/mqtt"
 	"datum-go/internal/processing"
 	"datum-go/internal/storage"
@@ -158,7 +159,6 @@ func main() {
 			publicURL = "http://localhost:" + serverPort
 		}
 	}
-	SetProvisioningServerURL(publicURL)
 
 	// Get data directory (priority: flag > env > default)
 	dataDirPath := *dataDir
@@ -245,9 +245,6 @@ func main() {
 		defer mqttBroker.Stop()
 	}
 
-	// Set global PublicURL for handlers that need it (e.g. web fallback)
-	GlobalPublicURL = publicURL
-
 	// Setup router
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
@@ -261,7 +258,7 @@ func main() {
 	// Use our custom structured logger for requests which filters noisy endpoints
 	r.Use(logger.GinLogger())
 	// Metrics middleware
-	r.Use(metricsMiddleware())
+	r.Use(metrics.Middleware())
 
 	r.Use(securityHeadersMiddleware())
 	// CORS setup
@@ -317,90 +314,51 @@ func main() {
 
 	// Root handler (Explicit /)
 	r.GET("/", rootHandler)
-	r.GET("/health", healthHandler)
-	r.GET("/healthz", healthHandler)
-	r.GET("/live", livenessHandler)
-	r.GET("/ready", readinessHandler)
-	// System routes
-	r.GET("/sys/time", getSystemTimeHandler)
-	// Also map /sys/time for backward compatibility if desired, or just clean cut
-	// r.GET("/sys/time", getSystemTimeHandler)
-	r.GET("/sys/ip", getSystemIPHandler)
-
-	// Auth routes (using new internal/api package)
-	api.RegisterAuthRoutes(r, api.Config{
-		Store:        store,
-		Processor:    telemetryProcessor,
-		MQTTBroker:   mqttBroker,
-		EmailService: emailService,
-		PublicURL:    publicURL,
-	})
-
-	// User API Key routes (still in main package, to be migrated later)
-	authProtectedGroup := r.Group("/auth")
-	authProtectedGroup.Use(auth.UserAuthMiddleware(store))
-	{
-		// User API Key Management
-		authProtectedGroup.POST("/keys", createKeyHandler)
-		authProtectedGroup.GET("/keys", listKeysHandler)
-		authProtectedGroup.DELETE("/keys/:id", deleteKeyHandler)
-
-		// Generic Database API (Collections)
-		RegisterDBRoutes(authProtectedGroup, store)
-	}
-
-	// Device management routes (using new internal/api package for CRUD)
+	// Define API Config for all route registers
 	apiConfig := api.Config{
 		Store:        store,
 		Processor:    telemetryProcessor,
 		MQTTBroker:   mqttBroker,
 		EmailService: emailService,
 		PublicURL:    publicURL,
+		Version:      Version,
+		BuildDate:    BuildDate,
 	}
-	api.RegisterDeviceRoutes(r, apiConfig)
+
+	r.GET("/health", healthHandler)
+	r.GET("/healthz", healthHandler)
+	r.GET("/live", livenessHandler)
+	r.GET("/ready", readinessHandler)
+	// System routes (using new internal/api package)
+	api.RegisterSystemRoutes(r, apiConfig)
+
+	// Auth routes (using new internal/api package)
+	api.RegisterAuthRoutes(r, apiConfig)
+
+	// User API Key routes (using new internal/api package)
+	api.RegisterKeyRoutes(r, apiConfig)
+
+	// Database Routes (using new internal/api package)
+	// Registers /db (User) and /admin/db (Admin)
+	api.RegisterDBRoutes(r, apiConfig)
+
+	// Public Routes (using new internal/api package)
+	api.RegisterPublicRoutes(r, apiConfig)
+
+	// Admin routes
 
 	// Command routes (using new internal/api package)
 	api.RegisterCommandRoutes(r, apiConfig)
 
-	// Legacy SSE/Webhook polling routes (kept in main for compatibility)
-	devAuthGroup := r.Group("/dev")
-	devAuthGroup.Use(auth.DeviceAuthMiddleware())
-	{
-		devAuthGroup.GET("/:device_id/cmd/stream", sseCommandsHandler)
-		devAuthGroup.GET("/:device_id/cmd/poll", webhookPollHandler)
-
-		// Video streaming upload
-		devAuthGroup.POST("/:device_id/stream/frame", uploadFrameHandler)
-	}
+	// Stream and SSE routes (using new internal/api package)
+	api.RegisterStreamRoutes(r, apiConfig)
+	api.RegisterSSERoutes(r, apiConfig)
 
 	// Data routes (using new internal/api package)
 	api.RegisterDataRoutes(r, apiConfig)
 
-	// Specialized route for Thing Description (supports both User and Device Auth)
-	// Must be registered outside of Auth Groups to avoid conflict and allow hybrid auth
-	r.PUT("/dev/:device_id/thing-description", auth.HybridAuthMiddleware(store), updateDeviceThingDescriptionHandler)
-
-	// Hybrid Auth Routes (User OR Device can access)
-	hybridGroup := r.Group("/dev")
-	hybridGroup.Use(auth.HybridAuthMiddleware(store))
-	{
-		hybridGroup.GET("/:device_id", getDeviceHandler)
-		hybridGroup.GET("/:device_id/data", getDataHandler)
-
-		// Video streaming routes
-		hybridGroup.GET("/:device_id/stream/mjpeg", mjpegStreamHandler)       // MJPEG over HTTP
-		hybridGroup.GET("/:device_id/stream/snapshot", streamSnapshotHandler) // Current frame snapshot
-		hybridGroup.GET("/:device_id/stream/ws", websocketStreamHandler)      // WebSocket binary stream
-		hybridGroup.GET("/:device_id/stream/info", streamInfoHandler)         // Stream metadata
-	}
-
-	// Public routes (No Auth)
-	pubGroup := r.Group("/pub")
-	{
-		pubGroup.POST("/:device_id", postPublicDataHandler)
-		pubGroup.GET("/:device_id", getPublicDataHandler)
-		// pubGroup.GET("/:device_id/rec", getPublicDataHistoryHandler) // DEPRECATED: merged into /pub/:device_id
-	}
+	// Specialized/Hybrid Routes (using new internal/api package)
+	api.RegisterSpecializedRoutes(r, apiConfig)
 
 	// Serve firmware updates (protected)
 	// Devices must provide ?token=<API_KEY> query parameter
@@ -434,22 +392,14 @@ func main() {
 	adminHandler := handlers.NewAdminHandler(store, mqttBroker, serverStartTime)
 	adminHandler.RegisterRoutes(r)
 
-	// Admin DB Collection Management routes
-	dbAdminHandler := NewDBAdminHandler(store)
-	dbAdminHandler.RegisterRoutes(r)
-
-	// System Info routes (Version, Build Date)
-	sysInfoHandler := NewSystemInfoHandler()
-	sysInfoHandler.RegisterRoutes(r)
-
 	// Legacy setup call removed
 	// setupAdminRoutes(r, store)
 
 	// API Key routes
 	// setupKeyRoutes(r, store) // Assuming this is a new call, but not explicitly in the original file.
 
-	// Provisioning routes (Mobile App & Device Activation)
-	RegisterProvisioningRoutes(r, auth.UserAuthMiddleware(store))
+	// Provisioning Endpoints (using new internal/api package)
+	api.RegisterProvisioningRoutes(r, apiConfig)
 
 	// Swagger UI documentation
 	setupSwagger(r)
@@ -624,10 +574,4 @@ func rootHandler(c *gin.Context) {
 		return
 	}
 	c.Data(http.StatusOK, "text/html; charset=utf-8", content)
-}
-
-func getSystemIPHandler(c *gin.Context) {
-	// Returns the client's public IP as seen by the server
-	// Gin's ClientIP() handles X-Forwarded-For and X-Real-IP headers
-	c.String(http.StatusOK, c.ClientIP())
 }

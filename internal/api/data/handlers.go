@@ -43,6 +43,11 @@ func (h *Handler) RegisterUserRoutes(r *gin.RouterGroup) {
 	r.GET("/:device_id", h.GetData)
 }
 
+// RegisterHybridRoutes registers routes compatible with hybrid auth.
+func (h *Handler) RegisterHybridRoutes(r *gin.RouterGroup) {
+	r.GET("/:device_id/data", h.GetData)
+}
+
 // ============ Response types ============
 
 // DataResponse represents a single data point response.
@@ -108,7 +113,21 @@ func (h *Handler) GetData(c *gin.Context) {
 	}
 	if device.UserID != userID {
 		role, _ := auth.GetUserRole(c)
-		if role != "admin" {
+		isAuthorized := false
+
+		if role == "admin" {
+			isAuthorized = true
+		} else if val, exists := c.Get("api_key"); exists {
+			// Device Auth check
+			apiKey := val.(string)
+			if requesterDevice, err := h.Store.GetDeviceByAPIKey(apiKey); err == nil {
+				if requesterDevice.ID == device.ID {
+					isAuthorized = true
+				}
+			}
+		}
+
+		if !isAuthorized {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 			return
 		}

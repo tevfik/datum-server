@@ -60,10 +60,10 @@ func (h *AdminHandler) RegisterRoutes(r *gin.Engine) {
 		admin.GET("/logs/stream", h.StreamLogsHandler) // WebSocket for real-time streaming
 		admin.DELETE("/logs", h.ClearLogsHandler)
 
-		// MQTT Management
-		admin.GET("/mqtt/stats", h.GetMQTTStatsHandler)
-		admin.GET("/mqtt/clients", h.GetMQTTClientsHandler)
-		admin.POST("/mqtt/publish", h.PostMQTTPublishHandler)
+		// MQTT Management (Moved to api.RegisterMQTTRoutes)
+		// admin.GET("/mqtt/stats", h.GetMQTTStatsHandler)
+		// admin.GET("/mqtt/clients", h.GetMQTTClientsHandler)
+		// admin.POST("/mqtt/publish", h.PostMQTTPublishHandler)
 
 		// Firmware Management
 		admin.POST("/firmware", h.UploadFirmwareHandler)
