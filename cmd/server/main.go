@@ -18,6 +18,7 @@ import (
 	"datum-go/internal/api"
 	"datum-go/internal/auth"
 	"datum-go/internal/email"
+	"datum-go/internal/handlers"
 	"datum-go/internal/logger"
 	"datum-go/internal/metrics"
 	mqtt_internal "datum-go/internal/mqtt"
@@ -398,6 +399,11 @@ func main() {
 
 	// Provisioning Endpoints (using new internal/api package)
 	api.RegisterProvisioningRoutes(r, apiConfig)
+
+	// Legacy Admin Routes (not yet migrated to internal/api)
+	// Registers: /admin/dev/*, /admin/config/*, /admin/logs/*, /admin/firmware
+	adminHandler := handlers.NewAdminHandler(store, mqttBroker, serverStartTime)
+	adminHandler.RegisterRoutes(r)
 
 	// Swagger UI documentation
 	setupSwagger(r)
