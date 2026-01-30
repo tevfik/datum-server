@@ -2,6 +2,7 @@ package storage
 
 import (
 	"crypto/rand"
+	"datum-go/internal/logger"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -2290,9 +2291,9 @@ func (s *Storage) UpdateRetentionPolicy(days int, checkIntervalHours int) error 
 }
 
 // GetSystemLogs returns system logs
-func (s *Storage) GetSystemLogs(limit int) ([]string, error) {
-	// Stub
-	return []string{}, nil
+// GetSystemLogs returns system logs
+func (s *Storage) GetSystemLogs(limit int, level string, search string) ([]string, error) {
+	return logger.GetRecentLogs(limit, level, search)
 }
 
 // ClearSystemLogs clears logs

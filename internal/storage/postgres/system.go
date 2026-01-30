@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"datum-go/internal/logger"
 	"datum-go/internal/storage"
 )
 
@@ -200,9 +201,9 @@ func (s *PostgresStore) GetStats() (*storage.SystemStats, error) {
 }
 
 // GetSystemLogs returns system logs (Not implemented for Postgres yet)
-func (s *PostgresStore) GetSystemLogs(limit int) ([]string, error) {
-	// Return empty list
-	return []string{}, nil
+// GetSystemLogs returns system logs
+func (s *PostgresStore) GetSystemLogs(limit int, level string, search string) ([]string, error) {
+	return logger.GetRecentLogs(limit, level, search)
 }
 
 // ClearSystemLogs clears system logs (Not implemented)

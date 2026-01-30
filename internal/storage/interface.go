@@ -94,7 +94,7 @@ type Provider interface {
 	UpdateRetentionPolicy(days int, checkIntervalHours int) error
 	UpdatePublicDataRetention(days int) error
 	UpdateRegistrationConfig(allow bool) error
-	GetSystemLogs(limit int) ([]string, error)
+	GetSystemLogs(limit int, level string, search string) ([]string, error)
 	ClearSystemLogs() error
 
 	// Generic Document Store (Collections)

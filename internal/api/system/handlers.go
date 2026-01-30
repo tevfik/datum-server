@@ -133,7 +133,10 @@ func (h *Handler) UpdateRegistration(c *gin.Context) {
 // GetLogs returns system logs.
 // GET /admin/sys/logs
 func (h *Handler) GetLogs(c *gin.Context) {
-	logs, err := h.Store.GetSystemLogs(500) // Default limit
+	level := c.Query("level")
+	search := c.Query("search")
+
+	logs, err := h.Store.GetSystemLogs(500, level, search) // Default limit
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get logs"})
 		return

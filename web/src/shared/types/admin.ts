@@ -67,7 +67,7 @@ export interface LogEntry {
 }
 
 export interface LogsResponse {
-    logs: LogEntry[];
+    logs: string[];
     total: number;
     message?: string;
 }

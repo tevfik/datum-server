@@ -227,15 +227,22 @@ export function SystemTab() {
                         </div>
                     </CardHeader>
                     <CardContent className="flex-1 overflow-hidden p-0">
-                        <div className="h-full overflow-auto bg-muted/50 p-4 font-mono text-xs">
+                        <div className="h-full overflow-auto bg-slate-950 p-4 font-mono text-xs md:text-sm text-slate-300">
                             {logsData?.logs && logsData.logs.length > 0 ? (
-                                logsData.logs.map((log, i) => (
-                                    <div key={i} className="whitespace-pre-wrap border-b border-border/50 py-1 last:border-0 hover:bg-muted/80">
-                                        {log.raw}
-                                    </div>
-                                ))
+                                logsData.logs.map((log, i) => {
+                                    let textColor = "text-slate-300";
+                                    if (log.includes("ERROR") || log.includes("FATAL")) textColor = "text-red-400";
+                                    else if (log.includes("WARN")) textColor = "text-yellow-400";
+                                    else if (log.includes("INFO")) textColor = "text-blue-400";
+
+                                    return (
+                                        <div key={i} className={`whitespace-pre-wrap py-0.5 hover:bg-white/5 ${textColor}`}>
+                                            {log}
+                                        </div>
+                                    );
+                                })
                             ) : (
-                                <div className="text-muted-foreground italic p-4">No logs available or logging disabled.</div>
+                                <div className="text-slate-500 italic p-4">No logs available or logging disabled.</div>
                             )}
                         </div>
                     </CardContent>
