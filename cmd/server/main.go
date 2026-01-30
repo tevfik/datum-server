@@ -353,6 +353,9 @@ func main() {
 	api.RegisterStreamRoutes(r, apiConfig)
 	api.RegisterSSERoutes(r, apiConfig)
 
+	// Device routes (using new internal/api package)
+	api.RegisterDeviceRoutes(r, apiConfig)
+
 	// Data routes (using new internal/api package)
 	api.RegisterDataRoutes(r, apiConfig)
 
