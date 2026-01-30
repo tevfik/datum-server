@@ -402,6 +402,8 @@ func main() {
 	log.Info().
 		Str("port", serverPort).
 		Str("public_url", publicURL).
+		Str("version", Version).
+		Str("build_date", BuildDate).
 		Str("endpoints", "/auth, /dev, /dev/data, /pub, /prov").
 		Str("docs", publicURL+"/docs").
 		Msg("🚀 Datum IoT Platform starting")

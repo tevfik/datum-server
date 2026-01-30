@@ -34,21 +34,21 @@ interface Document {
 // API Service for Collections
 const collectionsService = {
     getCollections: async (): Promise<CollectionInfo[]> => {
-        const res = await api.get('/sys/db/collections');
+        const res = await api.get('/admin/database/collections');
         return res.data.collections || [];
     },
     getDocuments: async (userId: string, collection: string): Promise<Document[]> => {
-        const res = await api.get(`/sys/db/${userId}/${collection}`);
+        const res = await api.get(`/admin/database/${userId}/${collection}`);
         return res.data || [];
     },
     createDocument: async (userId: string, collection: string, doc: any): Promise<void> => {
-        await api.post(`/sys/db/${userId}/${collection}`, doc);
+        await api.post(`/admin/database/${userId}/${collection}`, doc);
     },
     updateDocument: async (userId: string, collection: string, docId: string, doc: any): Promise<void> => {
-        await api.put(`/sys/db/${userId}/${collection}/${docId}`, doc);
+        await api.put(`/admin/database/${userId}/${collection}/${docId}`, doc);
     },
     deleteDocument: async (userId: string, collection: string, docId: string): Promise<void> => {
-        await api.delete(`/sys/db/${userId}/${collection}/${docId}`);
+        await api.delete(`/admin/database/${userId}/${collection}/${docId}`);
     },
 };
 

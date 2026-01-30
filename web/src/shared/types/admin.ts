@@ -54,20 +54,12 @@ export interface PublishRequest {
 
 // System Config Types
 export interface SystemConfig {
-    retention: {
-        days: number;
-        public_days?: number;
-        check_interval_hours: number;
-    };
-    rate_limit: {
-        max_requests: number;
-        window_seconds: number;
-    };
-    alerts: {
-        email_enabled: boolean;
-        disk_threshold: number;
-        memory_threshold: number;
-    };
+    initialized: boolean;
+    setup_at?: string;
+    platform_name: string;
+    allow_register: boolean;
+    data_retention: number;
+    public_data_retention: number;
 }
 
 export interface LogEntry {
