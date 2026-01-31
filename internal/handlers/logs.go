@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"io"
+	"bytes"
 	"net/http"
 	"os"
 	"strings"
@@ -123,34 +123,99 @@ func readLastLines(filename string, n int) ([]string, error) {
 	}
 	defer file.Close()
 
-	// 1. Get file size
 	stat, err := file.Stat()
 	if err != nil {
 		return nil, err
 	}
 	filesize := stat.Size()
 
-	// 2. Read file (for now simple implementation: read all, split, take last N)
-	// Optimization: seek to end and read backwards is better but more complex.
-	// Given typical log sizes for this project, reading 1-5MB into memory is okay.
-	// If file is huge (>10MB), we should limit.
-
-	startPos := int64(0)
-	if filesize > 5*1024*1024 { // If > 5MB
-		startPos = filesize - 5*1024*1024 // Read last 5MB
+	if filesize == 0 {
+		return []string{}, nil
 	}
 
-	buf := make([]byte, filesize-startPos)
-	_, err = file.ReadAt(buf, startPos)
-	if err != nil && err != io.EOF {
-		return nil, err
+	// Buffer size for chunks
+	const bufSize = 4096
+	// Safety limit to prevent reading entire huge files
+	const maxBytesToRead = 5 * 1024 * 1024
+
+	var lines []string
+	// Pre-allocate lines slice to avoid resizing if n is large
+	lines = make([]string, 0, n)
+
+	var cursor int64 = filesize
+	var totalRead int64 = 0
+	var remainder []byte
+
+	for cursor > 0 && len(lines) < n && totalRead < maxBytesToRead {
+		chunkSize := int64(bufSize)
+		if cursor < chunkSize {
+			chunkSize = cursor
+		}
+
+		cursor -= chunkSize
+		totalRead += chunkSize
+
+		buf := make([]byte, chunkSize)
+		_, err := file.ReadAt(buf, cursor)
+		if err != nil {
+			return nil, err
+		}
+
+		// Prepend chunk to remainder
+		// data = chunk + remainder
+		data := append(buf, remainder...)
+
+		// Reset remainder, we will compute new remainder
+		remainder = nil
+
+		// Process data from end to start
+		right := len(data)
+		for {
+			// Find newline from right
+			// We scan data[:right]
+			if right == 0 {
+				break
+			}
+
+			// bytes.LastIndexByte is efficient
+			idx := bytes.LastIndexByte(data[:right], '\n')
+
+			if idx == -1 {
+				// No more newlines in this data
+				remainder = data[:right]
+				break
+			}
+
+			// Found newline at idx
+			// Line is data[idx+1 : right]
+			lineBytes := data[idx+1 : right]
+			lineStr := string(lineBytes)
+
+			lines = append(lines, lineStr)
+
+			if len(lines) >= n {
+				break
+			}
+
+			// Move right cursor
+			right = idx
+		}
+
+		if len(lines) >= n {
+			break
+		}
 	}
 
-	strContent := string(buf)
-	lines := strings.Split(strContent, "\n")
-
-	if len(lines) > n {
-		return lines[len(lines)-n:], nil
+	// If we have leftover remainder and we haven't reached limit of N
+	if len(remainder) > 0 && len(lines) < n {
+		lines = append(lines, string(remainder))
 	}
+
+	// Reverse lines to restore file order (Oldest -> Newest)
+	// Currently lines is [Newest, ..., Oldest]
+	for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
+		lines[i], lines[j] = lines[j], lines[i]
+	}
+
 	return lines, nil
 }
