@@ -71,7 +71,7 @@ func TestProvisionDeviceHandler(t *testing.T) {
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusCreated, w.Code)
-		
+
 		var resp map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.NoError(t, err)
@@ -119,14 +119,14 @@ func TestListAllDevicesHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	var resp map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.NoError(t, err)
-	
+
 	devices := resp["devices"].([]interface{})
 	assert.Len(t, devices, 1)
-	
+
 	dev := devices[0].(map[string]interface{})
 	assert.Equal(t, "List Test Device", dev["name"])
 }
@@ -154,7 +154,7 @@ func TestGetDeviceAdminHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	var resp map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.NoError(t, err)
@@ -186,7 +186,7 @@ func TestUpdateDeviceHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	updated, _ := handler.Store.GetDevice("dev_update_test")
 	assert.Equal(t, "suspended", updated.Status)
 }
@@ -211,7 +211,37 @@ func TestRevokeDeviceKeyHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	updated, _ := handler.Store.GetDevice("dev_revoke_test")
 	assert.Empty(t, updated.APIKey)
+}
+
+func TestRotateDeviceKeyHandler(t *testing.T) {
+	handler, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	device := &storage.Device{
+		ID:     "dev_rotate_admin_test",
+		UserID: "admin_user_id",
+		APIKey: "old_key",
+	}
+	require.NoError(t, handler.Store.CreateDevice(device))
+
+	r := setupRouter(handler)
+	r.POST("/devices/:device_id/rotate-key", handler.RotateDeviceKeyHandler)
+
+	req, _ := http.NewRequest("POST", "/devices/dev_rotate_admin_test/rotate-key", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	assert.NoError(t, err)
+	assert.NotEqual(t, "old_key", resp["api_key"])
+
+	updated, _ := handler.Store.GetDevice("dev_rotate_admin_test")
+	assert.Equal(t, resp["api_key"], updated.APIKey)
 }

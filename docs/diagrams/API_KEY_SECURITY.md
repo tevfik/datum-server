@@ -137,9 +137,26 @@ After analyzing the Datum Server architecture, I recommend a **Hybrid SAS-Inspir
 
 ---
 
-## Proposed Architecture
+---
 
-### Data Model Changes
+## Current Status: Interim Implementation
+
+The system currently implements **Option 4: Simple Rotating API Keys**.
+
+- **Authentication**: Devices authenticate using a static `APIKey` (or `api_key` in JSON).
+- **Rotation**: 
+    - **Admin**: Can rotate any device key via `/admin/dev/:id/rotate-key`.
+    - **User**: Can rotate their own device keys via `/dev/:id/rotate-key`.
+- **Mechanism**: The rotation immediately invalidates the old key and generates a new random 32-character hex string.
+- **Limits**: There is no grace period and no token expiration in the current version.
+
+---
+
+## Future Architecture [PROPOSAL]
+
+The following sections describe the planned **Hybrid SAS-Inspired** approach for future implementation.
+
+### Proposed Data Model Changes
 
 ```mermaid
 classDiagram

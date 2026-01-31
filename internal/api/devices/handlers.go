@@ -36,6 +36,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("", h.ListDevices)
 	r.DELETE("/:device_id", h.DeleteDevice)
 	r.PATCH("/:device_id/config", h.UpdateDeviceConfig)
+	r.POST("/:device_id/rotate-key", h.RotateKey)
 }
 
 // RegisterHybridRoutes registers routes compatible with hybrid auth (User or Device).
@@ -340,6 +341,41 @@ func (h *Handler) UpdateDeviceThingDescription(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Thing Description updated", "thing_description": td})
+}
+
+// RotateKey rotates the API key for a device.
+// POST /dev/:device_id/rotate-key
+func (h *Handler) RotateKey(c *gin.Context) {
+	userID, _ := auth.GetUserID(c)
+	deviceID := c.Param("device_id")
+
+	device, err := h.Store.GetDevice(deviceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
+		return
+	}
+
+	if device.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Generate new key
+	newKey, err := auth.GenerateAPIKey()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate key"})
+		return
+	}
+
+	if err := h.Store.UpdateDeviceAPIKey(deviceID, newKey); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to rotate key"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Key rotated successfully",
+		"api_key": newKey,
+	})
 }
 
 // ============ Helper Functions ============
