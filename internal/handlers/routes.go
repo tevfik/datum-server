@@ -20,10 +20,10 @@ func (h *AdminHandler) RegisterRoutes(r *gin.Engine) {
 	{
 		// User management
 		admin.POST("/users", h.CreateUserHandler)
-		admin.GET("/users", h.ListUsersHandler)
-		admin.GET("/users/:user_id", h.GetUserHandler)
-		admin.PUT("/users/:user_id", h.UpdateUserHandler)
-		admin.DELETE("/users/:user_id", h.DeleteUserHandler)
+		// admin.GET("/users", h.ListUsersHandler)        // Handled by api/auth
+		admin.GET("/users/:user_id", h.GetUserHandler) // Keep: Not in api/auth
+		// admin.PUT("/users/:user_id", h.UpdateUserHandler)   // Handled by api/auth
+		// admin.DELETE("/users/:user_id", h.DeleteUserHandler) // Handled by api/auth
 		admin.POST("/users/:username/reset-password", h.ResetPasswordHandler)
 
 		// Device management (all devices across users)
@@ -38,10 +38,10 @@ func (h *AdminHandler) RegisterRoutes(r *gin.Engine) {
 		admin.POST("/dev/:device_id/revoke-key", h.RevokeDeviceKeyHandler)
 
 		// Database operations
-		admin.GET("/database/stats", h.GetDatabaseStatsHandler)
-		admin.POST("/database/export", h.ExportDatabaseHandler)
-		admin.POST("/database/cleanup", h.ForceCleanupHandler)
-		admin.DELETE("/database/reset", h.ResetDatabaseHandler)
+		// admin.GET("/database/stats", h.GetDatabaseStatsHandler) // Handled by api/db
+		admin.POST("/database/export", h.ExportDatabaseHandler) // Keep: Check if in api/db
+		admin.POST("/database/cleanup", h.ForceCleanupHandler)  // Keep: Check if in api/db
+		admin.DELETE("/database/reset", h.ResetDatabaseHandler) // Keep: Check if in api/db
 
 		// System Configuration
 		// Note: The previous code had `admin.PUT("/config", updateRegistrationConfigHandler)`
