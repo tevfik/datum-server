@@ -38,8 +38,6 @@ Technical reference documentation:
 Performance benchmarks and test results:
 
 - **[Performance Report](performance/FINAL_PERFORMANCE_REPORT.md)** - Comprehensive performance analysis
-- **[BuntDB Test Results](performance/BUNTDB_TEST_RESULTS.md)** - Metadata storage benchmarks
-- **[TSStorage Test Results](performance/TSTORAGE_TEST_RESULTS.md)** - Time-series storage benchmarks
 
 ## 📊 Diagrams
 
@@ -113,9 +111,7 @@ docs/
 │   ├── STORAGE.md                    # Storage architecture
 │   └── TSTORAGE.md                   # Time-series storage
 └── performance/                       # Benchmarks & reports
-    ├── BUNTDB_TEST_RESULTS.md        # BuntDB benchmarks
-    ├── FINAL_PERFORMANCE_REPORT.md   # Overall performance
-    └── TSTORAGE_TEST_RESULTS.md      # TSStorage benchmarks
+    └── FINAL_PERFORMANCE_REPORT.md   # Overall performance
 ```
 
 ---

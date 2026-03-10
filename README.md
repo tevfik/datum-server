@@ -233,8 +233,6 @@ See [Testing Guide](docs/guides/TESTING.md) for comprehensive testing documentat
 | Document | Description |
 |----------|-------------|
 | [Performance Report](docs/performance/FINAL_PERFORMANCE_REPORT.md) | Load testing results |
-| [TSStorage Benchmarks](docs/performance/TSTORAGE_TEST_RESULTS.md) | Time-series storage benchmarks |
-| [BuntDB Benchmarks](docs/performance/BUNTDB_TEST_RESULTS.md) | Metadata storage benchmarks |
 
 ### Visual Documentation
 | Document | Description |

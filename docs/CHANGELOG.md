@@ -133,8 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - FIRMWARE.md - Arduino/ESP32 firmware examples
 - SSE_COMMANDS.md - Server-Sent Events documentation
 - FINAL_PERFORMANCE_REPORT.md - Performance benchmarks
-- TSTORAGE_TEST_RESULTS.md - Time-series storage tests
-- BUNTDB_TEST_RESULTS.md - Metadata storage tests
+
 
 ### Examples
 - Arduino/ESP32 device firmware
