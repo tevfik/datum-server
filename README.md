@@ -1,5 +1,10 @@
 # Datum IoT Server
 
+![Build Status](https://img.shields.io/github/actions/workflow/status/tevfik/datum-server/ci.yml?branch=main)
+![Go Report Card](https://goreportcard.com/badge/github.com/tevfik/datum-server)
+![Test Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)
+![License](https://img.shields.io/github/license/tevfik/datum-server)
+
 High-performance IoT data collection and management platform built with Go.
 
 ## 🚀 Features
