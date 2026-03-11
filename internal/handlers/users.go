@@ -77,7 +77,10 @@ func (h *AdminHandler) ListUsersHandler(c *gin.Context) {
 	// Remove password hashes from response
 	var safeUsers []gin.H
 	for _, u := range users {
-		devices, _ := h.Store.GetUserDevices(u.ID)
+		var deviceCount int
+		if devices, err := h.Store.GetUserDevices(u.ID); err == nil {
+			deviceCount = len(devices)
+		}
 		safeUsers = append(safeUsers, gin.H{
 			"id":            u.ID,
 			"email":         u.Email,
@@ -86,7 +89,7 @@ func (h *AdminHandler) ListUsersHandler(c *gin.Context) {
 			"created_at":    u.CreatedAt,
 			"updated_at":    u.UpdatedAt,
 			"last_login_at": u.LastLoginAt,
-			"device_count":  len(devices),
+			"device_count":  deviceCount,
 		})
 	}
 
@@ -102,7 +105,10 @@ func (h *AdminHandler) GetUserHandler(c *gin.Context) {
 		return
 	}
 
-	devices, _ := h.Store.GetUserDevices(userID)
+	devices, devErr := h.Store.GetUserDevices(userID)
+	if devErr != nil {
+		devices = nil
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"id":            user.ID,
@@ -155,11 +161,14 @@ func (h *AdminHandler) UpdateUserHandler(c *gin.Context) {
 
 	// Prevent demoting the last admin
 	if req.Role == "user" {
-		stats, _ := h.Store.GetDatabaseStats()
-		adminCount, _ := stats["admin_users"].(int)
+		stats, statsErr := h.Store.GetDatabaseStats()
+		var adminCount int
+		if statsErr == nil && stats != nil {
+			adminCount, _ = stats["admin_users"].(int)
+		}
 		if adminCount <= 1 {
-			user, _ := h.Store.GetUserByID(userID)
-			if user.Role == "admin" {
+			user, userErr := h.Store.GetUserByID(userID)
+			if userErr == nil && user != nil && user.Role == "admin" {
 				c.JSON(http.StatusForbidden, gin.H{"error": "Cannot demote the last admin"})
 				return
 			}
@@ -192,8 +201,11 @@ func (h *AdminHandler) DeleteUserHandler(c *gin.Context) {
 	}
 
 	if user.Role == "admin" {
-		stats, _ := h.Store.GetDatabaseStats()
-		adminCount, _ := stats["admin_users"].(int)
+		stats, statsErr := h.Store.GetDatabaseStats()
+		var adminCount int
+		if statsErr == nil && stats != nil {
+			adminCount, _ = stats["admin_users"].(int)
+		}
 		if adminCount <= 1 {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete the last admin"})
 			return

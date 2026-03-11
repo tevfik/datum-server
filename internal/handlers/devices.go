@@ -83,9 +83,8 @@ func (h *AdminHandler) ListAllDevicesHandler(c *gin.Context) {
 	// Enrich with owner info
 	var enrichedDevices []gin.H
 	for _, d := range devices {
-		owner, _ := h.Store.GetUserByID(d.UserID)
 		ownerEmail := ""
-		if owner != nil {
+		if owner, err := h.Store.GetUserByID(d.UserID); err == nil && owner != nil {
 			ownerEmail = owner.Email
 		}
 
@@ -123,9 +122,8 @@ func (h *AdminHandler) GetDeviceAdminHandler(c *gin.Context) {
 		return
 	}
 
-	owner, _ := h.Store.GetUserByID(device.UserID)
 	ownerEmail := ""
-	if owner != nil {
+	if owner, err := h.Store.GetUserByID(device.UserID); err == nil && owner != nil {
 		ownerEmail = owner.Email
 	}
 
@@ -216,9 +214,18 @@ func (h *AdminHandler) RevokeDeviceKeyHandler(c *gin.Context) {
 }
 
 func (h *AdminHandler) UploadFirmwareHandler(c *gin.Context) {
+	// Limit upload size to 16MB
+	const maxFirmwareSize int64 = 16 << 20
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxFirmwareSize)
+
 	file, err := c.FormFile("firmware")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No firmware file uploaded"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No firmware file uploaded or file exceeds 16MB limit"})
+		return
+	}
+
+	if file.Size > maxFirmwareSize {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Firmware file exceeds 16MB limit"})
 		return
 	}
 

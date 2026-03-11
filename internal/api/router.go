@@ -82,7 +82,6 @@ func RegisterAllRoutes(r *gin.Engine, cfg Config) {
 	RegisterPublicRoutes(r, cfg)
 	RegisterDBRoutes(r, cfg)
 	RegisterSystemRoutes(r, cfg)
-	RegisterSystemRoutes(r, cfg)
 	RegisterProvisioningRoutes(r, cfg)
 	RegisterKeyRoutes(r, cfg)
 	RegisterMQTTRoutes(r, cfg)

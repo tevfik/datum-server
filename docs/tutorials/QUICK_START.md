@@ -12,7 +12,7 @@ Get your first IoT device sending data to Datum in under 10 minutes.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/datum-server.git
+git clone https://github.com/tevfik/datum-server.git
 cd datum-server
 
 # Start with Docker Compose

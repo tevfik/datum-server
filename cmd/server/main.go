@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -55,8 +56,10 @@ func securityHeadersMiddleware() gin.HandlerFunc {
 		c.Header("X-Content-Type-Options", "nosniff")
 		// Enable XSS protection
 		c.Header("X-XSS-Protection", "1; mode=block")
-		// Strict transport security (HTTPS only - uncomment in production with HTTPS)
-		// c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		// Strict transport security (enabled when ENABLE_HSTS=true)
+		if os.Getenv("ENABLE_HSTS") == "true" {
+			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 		// Referrer policy
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 		// Content security policy (basic)
@@ -73,11 +76,7 @@ func loadOrGenerateJWTSecret(dataDir string) {
 	}
 
 	// 2. Check for persistent secret file
-	// Basic path join to avoid extra imports if possible, though filepath is better
-	secretFile := dataDir + "/.jwt_secret"
-	if strings.HasSuffix(dataDir, "/") {
-		secretFile = dataDir + ".jwt_secret"
-	}
+	secretFile := filepath.Join(dataDir, ".jwt_secret")
 
 	if content, err := os.ReadFile(secretFile); err == nil {
 		if len(content) >= 32 {
@@ -121,7 +120,6 @@ func main() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(os.Stderr, "PANIC: %v\n", r)
 		}
-		fmt.Fprintf(os.Stderr, "DEBUG: Main function exiting\n")
 	}()
 
 	// Command-line flags
@@ -170,14 +168,7 @@ func main() {
 	}
 
 	// Initialize structured logging
-	// Log file path: data/server.log
-	logFile := "server.log"
-	// Basic path join if filepath not imported, valid for linux
-	if strings.HasSuffix(dataDirPath, "/") {
-		logFile = dataDirPath + "server.log"
-	} else {
-		logFile = dataDirPath + "/server.log"
-	}
+	logFile := filepath.Join(dataDirPath, "server.log")
 
 	logger.InitLogger(logFile)
 	log := logger.GetLogger()
@@ -263,10 +254,23 @@ func main() {
 	r.Use(securityHeadersMiddleware())
 	// CORS setup
 	r.Use(func(c *gin.Context) {
-		// Basic CORS for development
-		// In production, configure stricter rules
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		origin := c.Request.Header.Get("Origin")
+		allowedOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
+
+		if allowedOrigins == "" || allowedOrigins == "*" {
+			// No credentials with wildcard origin
+			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		} else {
+			// Check if the request origin is in the allowed list
+			for _, allowed := range strings.Split(allowedOrigins, ",") {
+				if strings.TrimSpace(allowed) == origin {
+					c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+					c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+					break
+				}
+			}
+		}
+
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 
@@ -364,26 +368,29 @@ func main() {
 	api.RegisterSpecializedRoutes(r, apiConfig)
 
 	// Serve firmware updates (protected)
-	// Devices must provide ?token=<API_KEY> query parameter
-	// This replaces public static serving
-	// Serve firmware updates (protected)
-	// Devices must provide ?token=<API_KEY> query parameter
-	// This replaces public static serving
+	// Devices must provide valid device auth
+	firmwareDir, _ := filepath.Abs("./firmware")
 	r.GET("/dev/fw/:filename", auth.DeviceAuthMiddleware(), func(c *gin.Context) {
 		filename := c.Param("filename")
-		// Prevent directory traversal
+		// Only allow alphanumeric, dash, underscore, dot
 		if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filename"})
 			return
 		}
 
-		filePath := "./firmware/" + filename
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		// Use filepath.Join with absolute base and verify the resolved path stays within firmwareDir
+		filePath := filepath.Join(firmwareDir, filepath.Base(filename))
+		resolved, err := filepath.EvalSymlinks(filePath)
+		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Firmware not found"})
 			return
 		}
+		if !strings.HasPrefix(resolved, firmwareDir) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filename"})
+			return
+		}
 
-		c.File(filePath)
+		c.File(resolved)
 	})
 
 	// Public command access (for demo purposes)

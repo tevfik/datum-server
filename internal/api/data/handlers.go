@@ -63,9 +63,18 @@ type DataResponse struct {
 // POST /data/:device_id
 func (h *Handler) PostData(c *gin.Context) {
 	deviceID := c.Param("device_id")
-	apiKey, _ := c.Get("api_key")
+	apiKeyVal, exists := c.Get("api_key")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing API key"})
+		return
+	}
+	apiKey, ok := apiKeyVal.(string)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid API key format"})
+		return
+	}
 
-	device, err := h.Store.GetDeviceByAPIKey(apiKey.(string))
+	device, err := h.Store.GetDeviceByAPIKey(apiKey)
 	if err != nil || device.ID != deviceID {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid device credentials"})
 		return

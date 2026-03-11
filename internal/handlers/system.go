@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -228,11 +229,12 @@ func (h *AdminHandler) GetDatabaseStatsHandler(c *gin.Context) {
 		return
 	}
 
-	config, _ := h.Store.GetSystemConfig()
-	stats["platform_name"] = config.PlatformName
-	stats["allow_register"] = config.AllowRegister
-	stats["data_retention_days"] = config.DataRetention
-	stats["public_data_retention_days"] = config.PublicDataRetention
+	if config, cfgErr := h.Store.GetSystemConfig(); cfgErr == nil && config != nil {
+		stats["platform_name"] = config.PlatformName
+		stats["allow_register"] = config.AllowRegister
+		stats["data_retention_days"] = config.DataRetention
+		stats["public_data_retention_days"] = config.PublicDataRetention
+	}
 
 	// Add Server Time and Uptime
 	stats["server_time"] = time.Now().Format(time.RFC3339)
@@ -303,9 +305,23 @@ func (h *AdminHandler) ResetDatabaseHandler(c *gin.Context) {
 		return
 	}
 
-	// Create backup first
-	export, _ := h.Store.ExportDatabase()
-	_ = export // In production, save this to a backup file
+	// Create backup and save to disk before reset
+	export, err := h.Store.ExportDatabase()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create backup before reset: " + err.Error()})
+		return
+	}
+	backupDir := os.Getenv("DATA_DIR")
+	if backupDir == "" {
+		backupDir = "./data"
+	}
+	backupPath := filepath.Join(backupDir, "pre_reset_backup.json")
+	if backupJSON, err := json.Marshal(export); err == nil {
+		if writeErr := os.WriteFile(backupPath, backupJSON, 0600); writeErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save backup: " + writeErr.Error()})
+			return
+		}
+	}
 
 	// Reset database
 	if err := h.Store.ResetSystem(); err != nil {
@@ -313,13 +329,16 @@ func (h *AdminHandler) ResetDatabaseHandler(c *gin.Context) {
 		return
 	}
 
-	// Optionally clear tstorage data
-	dataPath := "/app/data/tsdata"
+	// Clear tstorage data using a validated path
+	dataPath := filepath.Join(backupDir, "tsdata")
 	if envPath := os.Getenv("TSDATA_PATH"); envPath != "" {
-		dataPath = envPath
+		dataPath = filepath.Clean(envPath)
 	}
-	os.RemoveAll(dataPath)
-	os.MkdirAll(dataPath, 0755)
+	// Safety: only remove if path contains expected directory name
+	if strings.Contains(dataPath, "tsdata") {
+		os.RemoveAll(dataPath)
+		os.MkdirAll(dataPath, 0755)
+	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "System reset to factory state"})
+	c.JSON(http.StatusOK, gin.H{"message": "System reset to factory state", "backup": backupPath})
 }

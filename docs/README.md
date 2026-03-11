@@ -48,7 +48,7 @@ Visual documentation and architecture diagrams:
 ## Quick Links
 
 ### Getting Started
-1. [Quick Start Guide](../QUICKSTART.md) - Get up and running in 5 minutes
+1. [Quick Start Guide](tutorials/QUICK_START.md) - Get up and running in 5 minutes
 2. [Registration Guide](guides/REGISTRATION.md) - Setup your first admin user
 3. [CLI Tutorial](tutorials/CLI.md) - Learn the command-line tools
 
@@ -74,7 +74,7 @@ Visual documentation and architecture diagrams:
 
 ### Project Root Documentation
 - [README.md](../README.md) - Project overview
-- [QUICKSTART.md](../QUICKSTART.md) - Fast setup guide
+- [QUICKSTART.md](tutorials/QUICK_START.md) - Fast setup guide
 - [PROJECT.md](../PROJECT.md) - Project structure and architecture
 
 ### Need Help?

@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Datumpy, please report it responsibly:
+If you discover a security vulnerability in Datum, please report it responsibly:
 
 **DO NOT** open a public GitHub issue for security vulnerabilities.
 
@@ -20,6 +20,7 @@ We will respond within 48 hours and work with you to understand and resolve the 
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 1.5.x   | :white_check_mark: |
 | 1.0.x   | :white_check_mark: |
 | < 1.0   | :x:                |
 
@@ -38,7 +39,7 @@ We will respond within 48 hours and work with you to understand and resolve the 
 2. **Use HTTPS/TLS**
    - Deploy behind a reverse proxy (nginx, Traefik, Caddy)
    - Enable HTTPS with valid SSL certificates
-   - Uncomment Strict-Transport-Security header in code
+   - Enable HSTS by setting `ENABLE_HSTS=true` in your environment
 
 3. **Database Security**
    - Keep data directory outside web root
@@ -116,6 +117,6 @@ go get -u && go mod tidy
 
 ## Contact
 
-For security concerns: [your-email@example.com]
+For security concerns: See [SECURITY.yml](../../.github/SECURITY.md) or use GitHub Security Advisories
 
 For general issues: GitHub Issues

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -20,7 +21,10 @@ var (
 )
 
 // JWT secret - loaded from environment or generated
-var jwtSecret = initJWTSecret()
+var (
+	jwtSecret   = initJWTSecret()
+	jwtSecretMu sync.RWMutex
+)
 
 // initJWTSecret initializes JWT secret from env or generates a secure random one
 func initJWTSecret() []byte {
@@ -38,19 +42,27 @@ func initJWTSecret() []byte {
 	}
 	secret := hex.EncodeToString(bytes)
 	log.Warn().Msg("No JWT_SECRET set, generated random secret (will invalidate tokens on restart)")
-	log.Info().Msgf("Generated JWT_SECRET: %s", secret)
-	log.Info().Msg("Set JWT_SECRET environment variable to persist tokens across restarts")
+	log.Warn().Msg("Set JWT_SECRET environment variable to persist tokens across restarts")
 	return []byte(secret)
 }
 
 // SetJWTSecret sets the JWT secret explicitly (e.g. from a persistent file)
 func SetJWTSecret(secret []byte) {
 	if len(secret) >= 32 {
+		jwtSecretMu.Lock()
 		jwtSecret = secret
+		jwtSecretMu.Unlock()
 		log.Info().Msg("JWT secret updated from persistence")
 	} else {
 		log.Warn().Msg("Attempted to set weak JWT secret from persistence, ignoring")
 	}
+}
+
+// getJWTSecret returns the current JWT secret (thread-safe)
+func getJWTSecret() []byte {
+	jwtSecretMu.RLock()
+	defer jwtSecretMu.RUnlock()
+	return jwtSecret
 }
 
 type Claims struct {
@@ -84,12 +96,15 @@ func GenerateToken(userID, email, role string) (string, error) {
 		},
 	}
 
+	secret := getJWTSecret()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+	return token.SignedString(secret)
 }
 
 // GenerateTokenPair creates an access token (15 min) and a refresh token (30 days)
 func GenerateTokenPair(userID, email, role string) (accessToken string, refreshToken string, err error) {
+	secret := getJWTSecret()
+
 	// 1. Access Token (Short-lived)
 	accessClaims := Claims{
 		UserID: userID,
@@ -101,7 +116,7 @@ func GenerateTokenPair(userID, email, role string) (accessToken string, refreshT
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
-	accessToken, err = token.SignedString(jwtSecret)
+	accessToken, err = token.SignedString(secret)
 	if err != nil {
 		return "", "", err
 	}
@@ -119,7 +134,7 @@ func GenerateTokenPair(userID, email, role string) (accessToken string, refreshT
 		},
 	}
 	rToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	refreshToken, err = rToken.SignedString(jwtSecret)
+	refreshToken, err = rToken.SignedString(secret)
 	if err != nil {
 		return "", "", err
 	}
@@ -130,7 +145,7 @@ func GenerateTokenPair(userID, email, role string) (accessToken string, refreshT
 // ValidateToken validates a JWT token and returns the claims
 func ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
+		return getJWTSecret(), nil
 	})
 
 	if err != nil {

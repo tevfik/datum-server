@@ -16,7 +16,7 @@ services:
       - RETENTION_MAX_DAYS=${RETENTION_MAX_DAYS:-7}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       # Allow all origins since we are accessing via IP
-      - CORS_ORIGINS=*
+      - CORS_ALLOWED_ORIGINS=*
     volumes:
       - ${DATA_DIR:-../data}:/root/data
       - ../firmware:/root/firmware

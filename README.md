@@ -60,14 +60,14 @@ See [docs/performance/FINAL_PERFORMANCE_REPORT.md](docs/performance/FINAL_PERFOR
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.24+
 - Docker & Docker Compose (optional)
 
 ### Local Development
 
 ```bash
 # Clone repository
-git clone <repository-url>
+git clone https://github.com/tevfik/datum-server.git
 cd datum-server
 
 # Install dependencies

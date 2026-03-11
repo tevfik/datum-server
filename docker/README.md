@@ -54,7 +54,7 @@ The image is configured using environment variables.
 |:--- |:--- |:--- |
 | `PORT` | `8000` | The port the server listens on. |
 | `JWT_SECRET` | **Required** | Secret key for signing JWT tokens. Must be at least 32 characters. |
-| `CORS_ORIGINS` | `*` | Comma-separated list of allowed CORS origins. |
+| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated list of allowed CORS origins. |
 
 ### Logging
 

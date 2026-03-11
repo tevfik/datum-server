@@ -17,7 +17,20 @@ var wsUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for admin access
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true // Allow non-browser clients (CLI, devices)
+		}
+		allowed := os.Getenv("CORS_ALLOWED_ORIGINS")
+		if allowed == "" || allowed == "*" {
+			return true
+		}
+		for _, a := range strings.Split(allowed, ",") {
+			if strings.TrimSpace(a) == origin {
+				return true
+			}
+		}
+		return false
 	},
 }
 

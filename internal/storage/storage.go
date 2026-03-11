@@ -39,13 +39,13 @@ func New(metaPath, dataPath string, retention time.Duration) (*Storage, error) {
 		db.Close()
 		return nil, fmt.Errorf("tstorage: %w", err)
 	}
-	fmt.Printf("DEBUG: tstorage initialized at %s\n", dataPath)
+	logger.GetLogger().Debug().Str("path", dataPath).Msg("tstorage initialized")
 
 	return &Storage{db: db, ts: ts}, nil
 }
 
 func (s *Storage) Close() error {
-	fmt.Println("DEBUG: Closing tstorage...")
+	logger.GetLogger().Debug().Msg("Closing tstorage")
 	if err := s.ts.Close(); err != nil {
 		return err
 	}
@@ -562,7 +562,7 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 	var rows []tstorage.Row
 	for _, point := range points {
 		ts := point.Timestamp.UnixNano()
-		fmt.Printf("DEBUG: StoreDataBatch - Device: %s, Time: %v, Data: %v\n", point.DeviceID, point.Timestamp, point.Data)
+		logger.GetLogger().Debug().Str("device", point.DeviceID).Time("time", point.Timestamp).Msg("StoreDataBatch")
 		for key, val := range point.Data {
 			var floatVal float64
 			switch v := val.(type) {
@@ -633,7 +633,7 @@ func (s *Storage) GetLatestData(deviceID string) (*DataPoint, error) {
 
 // GetDataHistoryWithRange retrieves historical data with time range filtering
 func (s *Storage) GetDataHistoryWithRange(deviceID string, start, end time.Time, limit int) ([]DataPoint, error) {
-	fmt.Printf("DEBUG: GetDataHistoryWithRange - Device: %s, Start: %v, End: %v\n", deviceID, start, end)
+	logger.GetLogger().Debug().Str("device", deviceID).Time("start", start).Time("end", end).Msg("GetDataHistoryWithRange")
 	// Collect all timestamps and their values
 	tsMap := make(map[int64]map[string]float64)
 
@@ -652,7 +652,7 @@ func (s *Storage) GetDataHistoryWithRange(deviceID string, start, end time.Time,
 		metrics = []string{"temperature", "humidity", "pressure", "battery", "battery_voltage", "value"}
 	}
 
-	fmt.Printf("DEBUG: GetDataHistoryWithRange - Device: %s, Metrics: %v\n", deviceID, metrics)
+	logger.GetLogger().Debug().Str("device", deviceID).Strs("metrics", metrics).Msg("GetDataHistoryWithRange metrics")
 
 	for _, metric := range metrics {
 		metricName := fmt.Sprintf("%s.%s", deviceID, metric)
@@ -705,7 +705,7 @@ func (s *Storage) GetDataHistoryWithRange(deviceID string, start, end time.Time,
 
 // GetDataHistory retrieves historical data points for a device
 func (s *Storage) GetDataHistory(deviceID string, limit int) ([]DataPoint, error) {
-	fmt.Printf("DEBUG: GetDataHistory - Device: %s, Limit: %d\n", deviceID, limit)
+	logger.GetLogger().Debug().Str("device", deviceID).Int("limit", limit).Msg("GetDataHistory")
 	end := time.Now()
 	start := end.Add(-7 * 24 * time.Hour) // Last 7 days
 
@@ -730,7 +730,7 @@ func (s *Storage) GetDataHistory(deviceID string, limit int) ([]DataPoint, error
 		metrics = []string{"temperature", "humidity", "pressure", "battery", "battery_voltage", "value"}
 	}
 
-	fmt.Printf("DEBUG: GetDataHistory - Device: %s, Metrics: %v\n", deviceID, metrics)
+	logger.GetLogger().Debug().Str("device", deviceID).Strs("metrics", metrics).Msg("GetDataHistory metrics")
 
 	for _, metric := range metrics {
 		metricName := fmt.Sprintf("%s.%s", deviceID, metric)
