@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/mail"
 	"time"
 )
 
@@ -48,12 +47,6 @@ func ParseTime(s string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("unsupported time format (use RFC3339 or 'YYYY-MM-DD HH:MM')")
 }
 
-// IsValidEmail validates an email address
-func IsValidEmail(email string) bool {
-	_, err := mail.ParseAddress(email)
-	return err == nil
-}
-
 // IdentifierContainsEmail checks if a string looks like an email (contains @)
 func IdentifierContainsEmail(s string) bool {
 	for _, c := range s {
@@ -62,15 +55,4 @@ func IdentifierContainsEmail(s string) bool {
 		}
 	}
 	return false
-}
-
-// FormatOutput formats data based on the type (placeholder for future expansion)
-// Currently just a wrapper around PrintJSON for testing purposes or simple output
-func FormatOutput(w io.Writer, data interface{}, format string) error {
-	if format == "json" {
-		return PrintJSON(w, data)
-	}
-	// Default to just printing string representation for now if not json
-	_, err := fmt.Fprintln(w, data)
-	return err
 }

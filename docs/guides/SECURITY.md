@@ -74,12 +74,31 @@ We will respond within 48 hours and work with you to understand and resolve the 
 
 ### Security Headers
 
-The following security headers are automatically set:
+The following security headers are automatically set on all responses:
 - `X-Frame-Options: DENY`
 - `X-Content-Type-Options: nosniff`
 - `X-XSS-Protection: 1; mode=block`
 - `Referrer-Policy: strict-origin-when-cross-origin`
-- `Content-Security-Policy: default-src 'self'`
+- `Content-Security-Policy: default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data:; connect-src 'self' ws: wss:;`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- `X-Request-ID: <uuid>` — Unique per-request ID for tracing and debugging
+
+**Custom CSP**: Override the default Content-Security-Policy by setting the `CONTENT_SECURITY_POLICY` environment variable.
+
+### MQTT TLS
+
+For direct TLS encryption on MQTT connections (without a reverse proxy):
+
+1. Generate or obtain TLS certificates.
+2. Set `MQTT_TLS_CERT` and `MQTT_TLS_KEY` environment variables to the certificate and key file paths.
+3. The broker will listen on port **8883** (MQTTS) in addition to the unencrypted port 1883.
+
+```bash
+MQTT_TLS_CERT=/etc/datum/certs/mqtt.crt
+MQTT_TLS_KEY=/etc/datum/certs/mqtt.key
+```
+
+> **Note**: For Traefik-terminated TLS, see the [Deployment Guide](DEPLOYMENT.md). Direct TLS is useful when MQTT clients connect directly without a proxy.
 
 ### Dependencies
 

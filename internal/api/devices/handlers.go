@@ -3,6 +3,7 @@ package devices
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"datum-go/internal/auth"
+	"datum-go/internal/logger"
 	"datum-go/internal/mqtt"
 	"datum-go/internal/storage"
 
@@ -78,7 +80,11 @@ type DeviceResponse struct {
 // CreateDevice creates a new device for the authenticated user.
 // POST /dev
 func (h *Handler) CreateDevice(c *gin.Context) {
-	userID, _ := auth.GetUserID(c)
+	userID, err := auth.GetUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization required"})
+		return
+	}
 
 	var req CreateDeviceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -120,20 +126,24 @@ func (h *Handler) CreateDevice(c *gin.Context) {
 // ListDevices lists all devices for the authenticated user.
 // GET /dev
 func (h *Handler) ListDevices(c *gin.Context) {
-	userID, _ := auth.GetUserID(c)
+	userID, err := auth.GetUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization required"})
+		return
+	}
 	role, _ := auth.GetUserRole(c)
 
 	var devices []storage.Device
-	var err error
+	var listErr error
 
 	if role == "admin" {
-		devices, err = h.Store.GetAllDevices()
+		devices, listErr = h.Store.GetAllDevices()
 	} else {
-		devices, err = h.Store.GetUserDevices(userID)
+		devices, listErr = h.Store.GetUserDevices(userID)
 	}
 
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if listErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": listErr.Error()})
 		return
 	}
 
@@ -226,7 +236,11 @@ func (h *Handler) GetDevice(c *gin.Context) {
 // DeleteDevice deletes a device.
 // DELETE /dev/:device_id
 func (h *Handler) DeleteDevice(c *gin.Context) {
-	userID, _ := auth.GetUserID(c)
+	userID, err := auth.GetUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization required"})
+		return
+	}
 	role, _ := auth.GetUserRole(c)
 	deviceID := c.Param("device_id")
 
@@ -253,7 +267,11 @@ func (h *Handler) DeleteDevice(c *gin.Context) {
 // PATCH /dev/:device_id/config
 func (h *Handler) UpdateDeviceConfig(c *gin.Context) {
 	deviceID := c.Param("device_id")
-	userID, _ := auth.GetUserID(c)
+	userID, err := auth.GetUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization required"})
+		return
+	}
 	role, _ := auth.GetUserRole(c)
 
 	device, err := h.Store.GetDevice(deviceID)
@@ -346,7 +364,11 @@ func (h *Handler) UpdateDeviceThingDescription(c *gin.Context) {
 // RotateKey rotates the API key for a device.
 // POST /dev/:device_id/rotate-key
 func (h *Handler) RotateKey(c *gin.Context) {
-	userID, _ := auth.GetUserID(c)
+	userID, err := auth.GetUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization required"})
+		return
+	}
 	deviceID := c.Param("device_id")
 
 	device, err := h.Store.GetDevice(deviceID)
@@ -366,6 +388,15 @@ func (h *Handler) RotateKey(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate key"})
 		return
 	}
+
+	// Audit log: record key rotation with hash of old key
+	oldKeyHash := sha256.Sum256([]byte(device.APIKey))
+	logger.GetLogger().Info().
+		Str("device_id", deviceID).
+		Str("user_id", userID).
+		Str("old_key_hash", hex.EncodeToString(oldKeyHash[:8])).
+		Str("client_ip", c.ClientIP()).
+		Msg("API key rotated")
 
 	if err := h.Store.UpdateDeviceAPIKey(deviceID, newKey); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to rotate key"})

@@ -2,7 +2,10 @@ package processing
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"datum-go/internal/storage"
@@ -15,19 +18,26 @@ type TelemetryProcessor struct {
 	flushInterval time.Duration
 	batchSize     int
 	wg            sync.WaitGroup
+	droppedCount  uint64 // atomic counter for dropped data points
 }
 
 // NewTelemetryProcessor creates a new instance with async batch processing
 func NewTelemetryProcessor(store storage.Provider) *TelemetryProcessor {
+	bufSize := 10000
+	if v := os.Getenv("TELEMETRY_BUFFER_SIZE"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+			bufSize = parsed
+		}
+	}
+
 	tp := &TelemetryProcessor{
 		Store:         store,
-		dataChan:      make(chan *storage.DataPoint, 50000), // Increased buffer for high throughput (bursts)
+		dataChan:      make(chan *storage.DataPoint, bufSize),
 		flushInterval: 500 * time.Millisecond,
 		batchSize:     5000,
 	}
 
 	// Start worker pool
-	// 5-8 workers is a good starting point for I/O bound tasks
 	workerCount := 8
 	for i := 0; i < workerCount; i++ {
 		tp.wg.Add(1)
@@ -35,6 +45,16 @@ func NewTelemetryProcessor(store storage.Provider) *TelemetryProcessor {
 	}
 
 	return tp
+}
+
+// DroppedCount returns the number of data points dropped due to full buffer.
+func (tp *TelemetryProcessor) DroppedCount() uint64 {
+	return atomic.LoadUint64(&tp.droppedCount)
+}
+
+// BufferUsage returns the current buffer utilization as a fraction (0.0 - 1.0).
+func (tp *TelemetryProcessor) BufferUsage() float64 {
+	return float64(len(tp.dataChan)) / float64(cap(tp.dataChan))
 }
 
 // Close gracefully shuts down the processor
@@ -107,7 +127,8 @@ func (tp *TelemetryProcessor) Process(deviceID string, data map[string]interface
 	case tp.dataChan <- point:
 		// Success
 	default:
-		return nil, fmt.Errorf("telemetry buffer full, dropping data")
+		atomic.AddUint64(&tp.droppedCount, 1)
+		return nil, fmt.Errorf("telemetry buffer full, dropping data (total dropped: %d)", atomic.LoadUint64(&tp.droppedCount))
 	}
 
 	// Check for pending commands to notify the device/response

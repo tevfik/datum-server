@@ -26,11 +26,14 @@ type Handler struct {
 
 // NewHandler creates a new stream handler with dependencies.
 func NewHandler(store storage.Provider) *Handler {
+	sm := &StreamManager{
+		streams: make(map[string]*DeviceStream),
+	}
+	// Start background cleanup for stale streams
+	go sm.cleanupLoop()
 	return &Handler{
-		Store: store,
-		StreamManager: &StreamManager{
-			streams: make(map[string]*DeviceStream),
-		},
+		Store:         store,
+		StreamManager: sm,
 	}
 }
 
@@ -75,10 +78,15 @@ var wsUpgrader = websocket.Upgrader{
 			return true
 		}
 		origin := r.Header.Get("Origin")
-		return strings.Contains(allowedOrigins, origin)
+		for _, allowed := range strings.Split(allowedOrigins, ",") {
+			if strings.TrimSpace(allowed) == origin {
+				return true
+			}
+		}
+		return false
 	},
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024 * 1024, // 1MB for video frames
+	ReadBufferSize:  4096,
+	WriteBufferSize: 4096,
 }
 
 // ============ Handlers ============
@@ -488,4 +496,22 @@ func (sm *StreamManager) GetStream(deviceID string) *DeviceStream {
 	defer sm.mu.RUnlock()
 
 	return sm.streams[deviceID]
+}
+
+// cleanupLoop periodically removes stale streams with no clients and no recent frames.
+func (sm *StreamManager) cleanupLoop() {
+	ticker := time.NewTicker(2 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		sm.mu.Lock()
+		for id, stream := range sm.streams {
+			stream.mu.RLock()
+			stale := len(stream.Clients) == 0 && time.Since(stream.LastUpdated) > 5*time.Minute
+			stream.mu.RUnlock()
+			if stale {
+				delete(sm.streams, id)
+			}
+		}
+		sm.mu.Unlock()
+	}
 }

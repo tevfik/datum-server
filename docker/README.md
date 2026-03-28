@@ -77,6 +77,27 @@ The image is configured using environment variables.
 | `RATE_LIMIT_REQUESTS` | `100` | Maximum requests allowed per window. |
 | `RATE_LIMIT_WINDOW_SECONDS` | `60` | Duration of the rate limit window in seconds. |
 
+### Request Limits
+
+| Variable | Default | Description |
+|:--- |:--- |:--- |
+| `MAX_REQUEST_BODY_BYTES` | `5242880` | Maximum HTTP request body size in bytes (5MB). |
+| `QUERY_MAX_LIMIT` | `10000` | Maximum data points returned in a single query. |
+| `TELEMETRY_BUFFER_SIZE` | `10000` | Async telemetry ingestion buffer size. Increase for high-throughput deployments. |
+
+### Security Headers
+
+| Variable | Default | Description |
+|:--- |:--- |:--- |
+| `CONTENT_SECURITY_POLICY` | *(built-in)* | Override the default Content-Security-Policy header. |
+
+### MQTT
+
+| Variable | Default | Description |
+|:--- |:--- |:--- |
+| `MQTT_TLS_CERT` | *(unset)* | Path to TLS certificate for MQTT port 8883. |
+| `MQTT_TLS_KEY` | *(unset)* | Path to TLS private key for MQTT port 8883. |
+
 ## Volumes
 
 | Path | Description |
@@ -88,6 +109,9 @@ The image is configured using environment variables.
 | Port | Description |
 |:--- |:--- |
 | `8000` | Main HTTP API port. |
+| `1883` | MQTT TCP port. |
+| `1884` | MQTT WebSocket port. |
+| `8883` | MQTT TLS port (only when `MQTT_TLS_CERT`/`MQTT_TLS_KEY` are set). |
 
 ## Health Check
 

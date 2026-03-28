@@ -104,46 +104,6 @@ func HybridAuthMiddleware(store storage.Provider) gin.HandlerFunc {
 	}
 }
 
-// AuthMiddleware validates JWT tokens (Legacy/Simple)
-func AuthMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			// Fallback: check query parameter (useful for WebSockets and MJPEG streams)
-			tokenParam := c.Query("token")
-			if tokenParam != "" {
-				authHeader = "Bearer " + tokenParam
-			} else {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
-				c.Abort()
-				return
-			}
-		}
-
-		// Extract token from "Bearer <token>"
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format"})
-			c.Abort()
-			return
-		}
-
-		token := parts[1]
-		claims, err := ValidateToken(token)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			c.Abort()
-			return
-		}
-
-		// Store user info in context
-		c.Set("user_id", claims.UserID)
-		c.Set("email", claims.Email)
-		c.Set("role", claims.Role)
-		c.Next()
-	}
-}
-
 // DeviceAuthMiddleware validates device API keys and tokens
 // Supports both legacy API keys (sk_xxx) and new token format (dk_{expiry}.{signature})
 func DeviceAuthMiddleware() gin.HandlerFunc {

@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"datum-go/internal/storage/postgres"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
 
@@ -62,8 +64,42 @@ func securityHeadersMiddleware() gin.HandlerFunc {
 		}
 		// Referrer policy
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
-		// Content security policy (basic)
-		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data:;")
+		// Content security policy
+		csp := os.Getenv("CONTENT_SECURITY_POLICY")
+		if csp == "" {
+			csp = "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data:; connect-src 'self' ws: wss:;"
+		}
+		c.Header("Content-Security-Policy", csp)
+		// Permissions policy
+		c.Header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		c.Next()
+	}
+}
+
+// requestIDMiddleware adds a unique request ID to each request context and response header.
+func requestIDMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		requestID := c.GetHeader("X-Request-ID")
+		if requestID == "" {
+			requestID = uuid.New().String()
+		}
+		c.Set("request_id", requestID)
+		c.Header("X-Request-ID", requestID)
+		c.Next()
+	}
+}
+
+// requestBodyLimitMiddleware limits the maximum request body size.
+func requestBodyLimitMiddleware() gin.HandlerFunc {
+	// Default 5MB, configurable via MAX_REQUEST_BODY_BYTES
+	maxBytes := int64(5 * 1024 * 1024)
+	if v := os.Getenv("MAX_REQUEST_BODY_BYTES"); v != "" {
+		if parsed, err := strconv.ParseInt(v, 10, 64); err == nil && parsed > 0 {
+			maxBytes = parsed
+		}
+	}
+	return func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBytes)
 		c.Next()
 	}
 }
@@ -246,6 +282,10 @@ func main() {
 
 	// Middleware setup
 	r.Use(gin.Recovery())
+	// Request ID for tracing
+	r.Use(requestIDMiddleware())
+	// Request body size limit
+	r.Use(requestBodyLimitMiddleware())
 	// Use our custom structured logger for requests which filters noisy endpoints
 	r.Use(logger.GinLogger())
 	// Metrics middleware
@@ -367,6 +407,12 @@ func main() {
 	// Specialized/Hybrid Routes (using new internal/api package)
 	api.RegisterSpecializedRoutes(r, apiConfig)
 
+	// MQTT admin routes (using new internal/api package)
+	api.RegisterMQTTRoutes(r, apiConfig)
+
+	// Metrics endpoint
+	api.RegisterMetricsRoutes(r, apiConfig)
+
 	// Serve firmware updates (protected)
 	// Devices must provide valid device auth
 	firmwareDir, _ := filepath.Abs("./firmware")
@@ -451,6 +497,12 @@ func main() {
 		log.Fatal().Err(err).Msg("Server forced to shutdown")
 	}
 
+	// Flush remaining telemetry data
+	if telemetryProcessor != nil {
+		log.Info().Msg("Flushing telemetry processor...")
+		telemetryProcessor.Close()
+	}
+
 	// Close storage
 	if err := store.Close(); err != nil {
 		log.Error().Err(err).Msg("Error closing storage")
@@ -521,12 +573,6 @@ func readinessHandler(c *gin.Context) {
 }
 
 // Utility functions
-
-func generateID(prefix string) string {
-	bytes := make([]byte, 6)
-	rand.Read(bytes)
-	return prefix + "_" + hex.EncodeToString(bytes)
-}
 
 // startPeriodicCleanup runs background cleanup tasks periodically
 func startPeriodicCleanup() {

@@ -1,16 +1,39 @@
 package storage
 
 import (
+	"bytes"
 	"crypto/rand"
 	"datum-go/internal/logger"
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nakabonne/tstorage"
 	"github.com/tidwall/buntdb"
 )
+
+// jsonBufPool reduces allocations in hot-path JSON encoding.
+var jsonBufPool = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
+
+// marshalJSON encodes v to JSON using a pooled buffer, returning the result as a string.
+func marshalJSON(v interface{}) (string, error) {
+	buf := jsonBufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer jsonBufPool.Put(buf)
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return "", err
+	}
+	// Encoder adds a trailing newline; trim it for BuntDB key consistency
+	return strings.TrimSuffix(buf.String(), "\n"), nil
+}
 
 // Storage handles both metadata (BuntDB) and time-series data (tstorage)
 type Storage struct {
@@ -478,10 +501,15 @@ func (s *Storage) StoreData(point *DataPoint) error {
 	})
 }
 
-// StoreDataBatch stores multiple data points in a single batch operation
+// StoreDataBatch stores multiple data points in a single batch operation.
+// Maximum batch size is capped to prevent memory exhaustion.
 func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 	if len(points) == 0 {
 		return nil
+	}
+	const maxBatchSize = 50000
+	if len(points) > maxBatchSize {
+		return fmt.Errorf("batch size %d exceeds maximum of %d", len(points), maxBatchSize)
 	}
 
 	// 1. Group by device for efficient metadata updates
@@ -516,8 +544,8 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 				}
 			}
 			if changed {
-				mJSON, _ := json.Marshal(currentMetrics)
-				tx.Set(metricsKey, string(mJSON), nil)
+				mStr, _ := marshalJSON(currentMetrics)
+				tx.Set(metricsKey, mStr, nil)
 			}
 
 			// 2. Update Shadow
@@ -535,8 +563,8 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 			shadowData["timestamp"] = point.Timestamp.Unix()
 			shadowData["_last_updated"] = time.Now().Format(time.RFC3339)
 
-			newJSON, _ := json.Marshal(shadowData)
-			if _, _, err = tx.Set(shadowKey, string(newJSON), nil); err != nil {
+			newStr, _ := marshalJSON(shadowData)
+			if _, _, err = tx.Set(shadowKey, newStr, nil); err != nil {
 				return err
 			}
 
@@ -548,8 +576,8 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 					if ip, ok := point.Data["public_ip"].(string); ok && ip != "" {
 						device.PublicIP = ip
 					}
-					dJSON, _ := json.Marshal(device)
-					tx.Set(deviceKey, string(dJSON), nil)
+					dStr, _ := marshalJSON(device)
+					tx.Set(deviceKey, dStr, nil)
 				}
 			}
 		}

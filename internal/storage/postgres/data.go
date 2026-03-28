@@ -51,10 +51,15 @@ func (s *PostgresStore) StoreData(point *storage.DataPoint) error {
 	return tx.Commit()
 }
 
-// StoreDataBatch stores multiple data points in a single batch operation
+// StoreDataBatch stores multiple data points in a single batch operation.
+// Maximum batch size is capped to prevent memory exhaustion.
 func (s *PostgresStore) StoreDataBatch(points []*storage.DataPoint) error {
 	if len(points) == 0 {
 		return nil
+	}
+	const maxBatchSize = 50000
+	if len(points) > maxBatchSize {
+		return fmt.Errorf("batch size %d exceeds maximum of %d", len(points), maxBatchSize)
 	}
 
 	tx, err := s.db.Begin()

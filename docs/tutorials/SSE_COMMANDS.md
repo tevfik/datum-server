@@ -24,7 +24,7 @@ GET /dev/{device_id}/cmd/stream?wait=30
 Authorization: Bearer {api_key}
 Accept: text/event-stream
 ```
-Server-Sent Events stream. Sends keepalives and commands.
+Server-Sent Events stream. The server polls for pending commands every **3 seconds** and sends keepalives and commands as they arrive.
 
 ## Response Format
 

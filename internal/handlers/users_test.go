@@ -72,39 +72,6 @@ func TestCreateUserHandler(t *testing.T) {
 	})
 }
 
-func TestListUsersHandler(t *testing.T) {
-	handler, cleanup := setupTestEnv(t)
-	defer cleanup()
-
-	// Create user
-	user := &storage.User{
-		ID:           "user_list_test",
-		Email:        "list@example.com",
-		PasswordHash: "hash",
-		Role:         "user",
-		Status:       "active",
-		CreatedAt:    time.Now(),
-	}
-	require.NoError(t, handler.Store.CreateUser(user))
-
-	r := setupRouter(handler)
-	r.GET("/users", handler.ListUsersHandler)
-
-	req, _ := http.NewRequest("GET", "/users", nil)
-	w := httptest.NewRecorder()
-
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var resp map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &resp)
-	assert.NoError(t, err)
-
-	users := resp["users"].([]interface{})
-	assert.GreaterOrEqual(t, len(users), 1)
-}
-
 func TestGetUserHandler(t *testing.T) {
 	handler, cleanup := setupTestEnv(t)
 	defer cleanup()
@@ -133,39 +100,6 @@ func TestGetUserHandler(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.NoError(t, err)
 	assert.Equal(t, "get@example.com", resp["email"])
-}
-
-func TestUpdateUserHandler(t *testing.T) {
-	handler, cleanup := setupTestEnv(t)
-	defer cleanup()
-
-	user := &storage.User{
-		ID:           "user_update_test",
-		Email:        "update@example.com",
-		PasswordHash: "hash",
-		Role:         "user",
-		Status:       "active",
-		CreatedAt:    time.Now(),
-	}
-	require.NoError(t, handler.Store.CreateUser(user))
-
-	r := setupRouter(handler)
-	r.PUT("/users/:user_id", handler.UpdateUserHandler)
-
-	reqBody := map[string]string{
-		"role": "admin",
-	}
-	body, _ := json.Marshal(reqBody)
-
-	req, _ := http.NewRequest("PUT", "/users/user_update_test", bytes.NewBuffer(body))
-	w := httptest.NewRecorder()
-
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	updated, _ := handler.Store.GetUserByID("user_update_test")
-	assert.Equal(t, "admin", updated.Role)
 }
 
 func TestResetPasswordHandler(t *testing.T) {

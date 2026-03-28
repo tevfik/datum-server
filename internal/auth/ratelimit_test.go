@@ -20,7 +20,7 @@ func TestNewRateLimiterDefault(t *testing.T) {
 	assert.NotNil(t, limiter)
 	assert.Equal(t, 100, limiter.rate)
 	assert.Equal(t, 60*time.Second, limiter.window)
-	assert.NotNil(t, limiter.visitors)
+	assert.NotNil(t, limiter.shards[0])
 }
 
 func TestNewRateLimiterCustom(t *testing.T) {
@@ -96,26 +96,34 @@ func TestGetVisitor(t *testing.T) {
 func TestCleanup(t *testing.T) {
 	limiter := NewRateLimiter()
 
-	// Add old visitor
-	limiter.visitors["old-ip"] = &visitor{
-		limiter:  newTokenBucket(100, time.Minute),
-		lastSeen: time.Now().Add(-15 * time.Minute), // 15 minutes ago
-	}
+	// Add an old visitor and a recent visitor via the same shard
+	oldIP := "10.0.0.1"
+	recentIP := "10.0.0.2"
 
-	// Add recent visitor
-	limiter.visitors["recent-ip"] = &visitor{
-		limiter:  newTokenBucket(100, time.Minute),
-		lastSeen: time.Now(),
-	}
+	// Create visitors via the public API
+	limiter.getVisitor(oldIP)
+	limiter.getVisitor(recentIP)
 
-	assert.Len(t, limiter.visitors, 2)
+	// Manually set the old visitor's lastSeen to 15 minutes ago
+	oldShard := limiter.getShard(oldIP)
+	oldShard.mu.Lock()
+	oldShard.visitors[oldIP].lastSeen = time.Now().Add(-15 * time.Minute)
+	oldShard.mu.Unlock()
 
 	limiter.cleanup()
 
-	// Old visitor should be removed, recent should remain
-	assert.Len(t, limiter.visitors, 1)
-	assert.Contains(t, limiter.visitors, "recent-ip")
-	assert.NotContains(t, limiter.visitors, "old-ip")
+	// Old visitor should be removed
+	oldShard.mu.RLock()
+	_, oldExists := oldShard.visitors[oldIP]
+	oldShard.mu.RUnlock()
+	assert.False(t, oldExists, "old visitor should be removed")
+
+	// Recent visitor should still exist
+	recentShard := limiter.getShard(recentIP)
+	recentShard.mu.RLock()
+	_, recentExists := recentShard.visitors[recentIP]
+	recentShard.mu.RUnlock()
+	assert.True(t, recentExists, "recent visitor should remain")
 }
 
 func TestRateLimitMiddlewareAllow(t *testing.T) {

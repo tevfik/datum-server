@@ -4,6 +4,9 @@ package public
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"strconv"
+	"sync"
 	"time"
 
 	"datum-go/internal/storage"
@@ -14,6 +17,41 @@ import (
 // Handler provides public HTTP handlers.
 type Handler struct {
 	Store storage.Provider
+
+	configCache   *storage.SystemConfig
+	configCacheMu sync.RWMutex
+	configCacheAt time.Time
+}
+
+// configCacheTTL is how long the cached system config stays valid.
+const configCacheTTL = 5 * time.Minute
+
+// getCachedConfig returns system config, using an in-memory cache to avoid
+// hitting the database on every public request.
+func (h *Handler) getCachedConfig() *storage.SystemConfig {
+	h.configCacheMu.RLock()
+	if h.configCache != nil && time.Since(h.configCacheAt) < configCacheTTL {
+		defer h.configCacheMu.RUnlock()
+		return h.configCache
+	}
+	h.configCacheMu.RUnlock()
+
+	// Cache miss or expired
+	h.configCacheMu.Lock()
+	defer h.configCacheMu.Unlock()
+
+	// Double-check after acquiring write lock
+	if h.configCache != nil && time.Since(h.configCacheAt) < configCacheTTL {
+		return h.configCache
+	}
+
+	config, err := h.Store.GetSystemConfig()
+	if err != nil || config == nil {
+		return nil
+	}
+	h.configCache = config
+	h.configCacheAt = time.Now()
+	return config
 }
 
 // NewHandler creates a new public handler with dependencies.
@@ -66,10 +104,10 @@ func (h *Handler) PostPublicData(c *gin.Context) {
 func (h *Handler) GetPublicData(c *gin.Context) {
 	deviceID := "public_" + c.Param("device_id")
 
-	// Get system config for public retention
-	config, err := h.Store.GetSystemConfig()
+	// Get system config for public retention (cached)
+	config := h.getCachedConfig()
 	retentionDays := 1 // Default
-	if err == nil && config != nil && config.PublicDataRetention > 0 {
+	if config != nil && config.PublicDataRetention > 0 {
 		retentionDays = config.PublicDataRetention
 	}
 	cutoffTime := time.Now().Add(-time.Duration(retentionDays) * 24 * time.Hour)
@@ -107,9 +145,21 @@ func (h *Handler) GetPublicData(c *gin.Context) {
 	}
 
 	// === HISTORY ===
+	maxLimit := 10000
+	if v := os.Getenv("QUERY_MAX_LIMIT"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+			maxLimit = parsed
+		}
+	}
 	limit := 100
 	if limitStr := c.Query("limit"); limitStr != "" {
 		fmt.Sscanf(limitStr, "%d", &limit)
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > maxLimit {
+		limit = maxLimit
 	}
 
 	points, err := h.Store.GetDataHistory(deviceID, limit)

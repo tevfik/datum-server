@@ -5,6 +5,44 @@ All notable changes to Datum IoT Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-03-28
+
+### Added
+- **Request ID Middleware**: All API responses include an `X-Request-ID` header (UUID v4) for request correlation and debugging. Clients can provide their own value.
+- **Request Body Limit**: Configurable `MAX_REQUEST_BODY_BYTES` (default: 5MB) to prevent oversized payloads.
+- **MQTT TLS**: Optional native TLS listener on port 8883 via `MQTT_TLS_CERT` / `MQTT_TLS_KEY` environment variables.
+- **Telemetry Drop Metrics**: `DroppedCount()` and `BufferUsage()` methods on telemetry processor; `points_dropped` in metrics endpoint.
+- **ACL Cache**: MQTT device ownership lookups cached for 60 seconds, reducing database load.
+- **Stream Cleanup**: Automatic cleanup of stale video streams (no clients + no frames for 5 minutes), checked every 2 minutes.
+- **Audit Logging**: Key rotation events now log SHA256 hash of old key, device ID, user ID, and client IP.
+- **Configurable CSP**: Override Content-Security-Policy header via `CONTENT_SECURITY_POLICY` env var.
+- **Configurable Query Limit**: `QUERY_MAX_LIMIT` env var (default: 10000) for data history queries.
+- **Configurable Telemetry Buffer**: `TELEMETRY_BUFFER_SIZE` env var (default: 10000) for burst absorption tuning.
+- **System Config Cache**: Public config endpoint cached for 5 minutes with double-checked locking.
+
+### Changed
+- **Rate Limiter**: Refactored from single mutex to 32-shard design for better concurrency under high load.
+- **Telemetry Buffer**: Default reduced from 50000 to 10000 (configurable via `TELEMETRY_BUFFER_SIZE`).
+- **SSE Polling Interval**: Increased from 2s to 3s to reduce server-side CPU usage. Devices receive commands slightly slower.
+- **WebSocket Buffers**: Read buffer increased to 4KB, write buffer reduced from 1MB to 4KB for more efficient memory usage.
+- **WebSocket Origin Check**: Now strictly enforces `CORS_ALLOWED_ORIGINS` whitelist (default `*` allows all, no change for most deployments).
+- **CSP Header**: Removed `unsafe-inline` from `script-src`, added `connect-src 'self' ws: wss:` and `Permissions-Policy` header.
+- **Sort Algorithm**: Replaced O(n²) bubble sort with `sort.Slice` in data history handler.
+- **JSON Serialization**: Uses `sync.Pool` buffer reuse in storage layer to reduce GC pressure.
+- **Batch Cap**: Data ingestion capped at 50,000 points per batch to prevent memory exhaustion.
+- **PostgreSQL Queries**: All queries now use context with 10-second timeout to prevent hanging connections.
+
+### Fixed
+- **Auth Error Handling**: All device/data handlers now return 401 on `GetUserID` failure instead of proceeding with empty user ID.
+- **Password Reset Token**: Token is consumed (deleted) before password update, enforcing single-use semantics.
+- **Forgot Password Timing**: Constant-time response (minimum 200ms) to prevent email enumeration via timing attacks.
+- **Graceful Shutdown**: Telemetry processor buffer is flushed before storage is closed.
+
+### Migration Notes
+- **Telemetry Buffer**: If your deployment relied on the old 50K buffer for burst absorption, set `TELEMETRY_BUFFER_SIZE=50000` to restore previous behavior.
+- **WebSocket Origins**: If you have `CORS_ALLOWED_ORIGINS` set to specific domains, ensure all WebSocket client origins are included.
+- **SSE Polling**: Devices now poll every 3s instead of 2s. If sub-3-second command latency is critical, consider using the `/cmd/poll` long-polling endpoint instead.
+
 ## [1.5.1] - 2026-01-20
 
 ### Fixed

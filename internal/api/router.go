@@ -70,24 +70,6 @@ func RegisterDataRoutes(r *gin.Engine, cfg Config) {
 	dataHandler.RegisterUserRoutes(dataUserGroup)
 }
 
-// RegisterAllRoutes registers all API routes (auth, devices, data).
-// Use this for a full migration, or call individual Register*Routes for incremental migration.
-func RegisterAllRoutes(r *gin.Engine, cfg Config) {
-	RegisterAuthRoutes(r, cfg)
-	RegisterDeviceRoutes(r, cfg)
-	RegisterDataRoutes(r, cfg)
-	RegisterCommandRoutes(r, cfg)
-	RegisterStreamRoutes(r, cfg)
-	RegisterSSERoutes(r, cfg)
-	RegisterPublicRoutes(r, cfg)
-	RegisterDBRoutes(r, cfg)
-	RegisterSystemRoutes(r, cfg)
-	RegisterProvisioningRoutes(r, cfg)
-	RegisterKeyRoutes(r, cfg)
-	RegisterMQTTRoutes(r, cfg)
-	RegisterMetricsRoutes(r, cfg)
-}
-
 // RegisterKeyRoutes registers user API key management routes.
 func RegisterKeyRoutes(r *gin.Engine, cfg Config) {
 	keyHandler := keys.NewHandler(cfg.Store)

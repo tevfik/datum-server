@@ -52,7 +52,7 @@ See [docs/performance/FINAL_PERFORMANCE_REPORT.md](docs/performance/FINAL_PERFOR
 
 ### Advanced Components (Undocumented)
 
-- **MQTT Broker**: Integrated MQTT v5 broker running on ports 1883 (TCP) and 1884 (WS).
+- **MQTT Broker**: Integrated MQTT v5 broker running on ports 1883 (TCP), 1884 (WS), and 8883 (TLS, optional).
 - **Telemetry Processor**: Asynchronous high-throughput data ingestion pipeline (`internal/processing`).
 - **PostgreSQL Support**: Optional backend controllable via `DATABASE_URL`.
 
@@ -281,9 +281,18 @@ DATABASE_URL=postgres://user:pass@localhost:5432/datum?sslmode=disable
 # Comma-separated list of allowed origins for WebSocket streams.
 # Defaults to "*" (allow all) if empty.
 CORS_ALLOWED_ORIGINS=https://myapp.com,https://admin.myapp.com
+# Override the default Content-Security-Policy header
+# CONTENT_SECURITY_POLICY=default-src 'self'; script-src 'self'; ...
+
+# Request Limits
+MAX_REQUEST_BODY_BYTES=5242880     # Max HTTP body size (default: 5MB)
+QUERY_MAX_LIMIT=10000              # Max data points per query (default: 10000)
+TELEMETRY_BUFFER_SIZE=10000        # Async ingestion buffer (default: 10000)
 
 # MQTT
-# MQTT ports are currently fixed at 1883 (TCP) and 1884 (WS)
+# TCP: 1883, WebSocket: 1884, TLS: 8883 (when MQTT_TLS_CERT/KEY are set)
+# MQTT_TLS_CERT=/path/to/cert.pem
+# MQTT_TLS_KEY=/path/to/key.pem
 ```
 
 

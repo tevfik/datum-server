@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -113,14 +115,14 @@ func (h *Handler) PostData(c *gin.Context) {
 // GET /data/:device_id
 func (h *Handler) GetData(c *gin.Context) {
 	deviceID := c.Param("device_id")
-	userID, _ := auth.GetUserID(c)
+	userID, userErr := auth.GetUserID(c)
 
 	device, err := h.Store.GetDevice(deviceID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
 		return
 	}
-	if device.UserID != userID {
+	if userErr != nil || device.UserID != userID {
 		role, _ := auth.GetUserRole(c)
 		isAuthorized := false
 
@@ -174,9 +176,21 @@ func (h *Handler) GetData(c *gin.Context) {
 	}
 
 	// === HISTORY MODE ===
+	maxLimit := 10000
+	if v := os.Getenv("QUERY_MAX_LIMIT"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+			maxLimit = parsed
+		}
+	}
 	limit := 1000
 	if limitStr := c.Query("limit"); limitStr != "" {
 		fmt.Sscanf(limitStr, "%d", &limit)
+	}
+	if limit <= 0 {
+		limit = 1000
+	}
+	if limit > maxLimit {
+		limit = maxLimit
 	}
 
 	end := time.Now()
@@ -259,13 +273,9 @@ func (h *Handler) GetData(c *gin.Context) {
 		for k := range buckets {
 			bucketKeys = append(bucketKeys, k)
 		}
-		for i := 0; i < len(bucketKeys)-1; i++ {
-			for j := i + 1; j < len(bucketKeys); j++ {
-				if bucketKeys[i] < bucketKeys[j] {
-					bucketKeys[i], bucketKeys[j] = bucketKeys[j], bucketKeys[i]
-				}
-			}
-		}
+		sort.Slice(bucketKeys, func(i, j int) bool {
+			return bucketKeys[i] > bucketKeys[j] // Descending (newest first)
+		})
 
 		for _, bucket := range bucketKeys {
 			pts := buckets[bucket]

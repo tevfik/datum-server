@@ -72,17 +72,3 @@ func AdminMiddleware(store storage.Provider) gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-// GetUserFromToken extracts user info from JWT token and checks status
-func CheckUserStatus(store storage.Provider, userID string) error {
-	user, err := store.GetUserByID(userID)
-	if err != nil {
-		return err
-	}
-
-	if user.Status == "suspended" {
-		return jwt.ErrTokenInvalidClaims
-	}
-
-	return nil
-}

@@ -29,7 +29,15 @@ info:
     - **Data (Pub)**: `dev/{device_id}/data`
     - **Commands (Sub)**: `dev/{device_id}/cmd`
     - **Firmware (Sub)**: `dev/{device_id}/fw`
-  version: 1.1.0
+
+    ## Common Headers
+    All responses include an `X-Request-ID` header (UUID v4) for request correlation. Provide your own or the server generates one.
+
+    ## Request Limits
+    - **Max Body**: 5 MB (configurable via `MAX_REQUEST_BODY_BYTES`)
+    - **Query Limit**: 10,000 data points per query (configurable via `QUERY_MAX_LIMIT`)
+    - **Batch Limit**: 50,000 data points per ingestion batch (fixed)
+  version: 1.6.0
   contact:
     name: API Support
   license:
@@ -52,6 +60,24 @@ components:
       type: http
       scheme: bearer
       description: Device Authentication. Accepts Device API Key (starts with `sk_`) OR Dynamic Device Token (starts with `dk_`).
+
+  headers:
+    X-Request-ID:
+      description: Unique request identifier (UUID v4). The server generates one if the client does not provide it. Useful for log correlation and debugging.
+      schema:
+        type: string
+        format: uuid
+
+  parameters:
+    QueryLimit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of data points to return. Server-side maximum is configurable via `QUERY_MAX_LIMIT` (default 10000).
+      schema:
+        type: integer
+        default: 10000
+        maximum: 10000
 
   schemas:
     Error:
@@ -1221,10 +1247,11 @@ paths:
             type: string
         - name: limit
           in: query
-          description: Maximum number of data points to return (triggers history mode)
+          description: Maximum number of data points to return (triggers history mode). Server-side maximum is configurable via QUERY_MAX_LIMIT env var (default 10000).
           schema:
             type: integer
             default: 100
+            maximum: 10000
         - name: range
           in: query
           description: Duration backwards from now (e.g., 1h, 24h, 7d, 30d)
@@ -1362,10 +1389,11 @@ paths:
             type: string
         - name: limit
           in: query
-          description: Maximum number of data points to return (triggers history mode)
+          description: Maximum number of data points to return (triggers history mode). Server-side maximum is configurable via QUERY_MAX_LIMIT env var (default 10000).
           schema:
             type: integer
             default: 100
+            maximum: 10000
       responses:
         '200':
           description: Latest data OR list of historical data

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 
 // CreateDevice inserts a new device
 func (s *PostgresStore) CreateDevice(device *storage.Device) error {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `
 		INSERT INTO devices (
 			id, user_id, name, type, device_uid, api_key, status, last_seen, 
@@ -30,7 +33,7 @@ func (s *PostgresStore) CreateDevice(device *storage.Device) error {
 	shadowJSON, _ := json.Marshal(device.ShadowState)
 	desiredJSON, _ := json.Marshal(device.DesiredState)
 
-	_, err := s.db.Exec(query,
+	_, err := s.db.ExecContext(ctx, query,
 		device.ID, device.UserID, device.Name, device.Type, device.DeviceUID, device.APIKey, device.Status, device.LastSeen,
 		device.CreatedAt, device.UpdatedAt, device.FirmwareVersion,
 		device.MasterSecret, device.CurrentToken, device.PreviousToken,
@@ -45,20 +48,26 @@ func (s *PostgresStore) CreateDevice(device *storage.Device) error {
 
 // GetDevice retrieves a device by ID
 func (s *PostgresStore) GetDevice(deviceID string) (*storage.Device, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `SELECT * FROM devices WHERE id = $1`
-	return scanDevice(s.db.QueryRow(query, deviceID))
+	return scanDevice(s.db.QueryRowContext(ctx, query, deviceID))
 }
 
 // GetDeviceByAPIKey retrieves a device by API Key
 func (s *PostgresStore) GetDeviceByAPIKey(apiKey string) (*storage.Device, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `SELECT * FROM devices WHERE api_key = $1`
-	return scanDevice(s.db.QueryRow(query, apiKey))
+	return scanDevice(s.db.QueryRowContext(ctx, query, apiKey))
 }
 
 // GetUserDevices retrieves all devices for a user
 func (s *PostgresStore) GetUserDevices(userID string) ([]storage.Device, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `SELECT * FROM devices WHERE user_id = $1`
-	return scanDevices(s.db, query, userID)
+	return scanDevicesCtx(ctx, s.db, query, userID)
 }
 
 // DeleteDevice removes a device if it belongs to the user
@@ -316,6 +325,24 @@ func scanDeviceFromRow(scanner Scannable) (*storage.Device, error) {
 
 func scanDevices(db *sql.DB, query string, args ...interface{}) ([]storage.Device, error) {
 	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var devices []storage.Device
+	for rows.Next() {
+		d, err := scanDeviceFromRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		devices = append(devices, *d)
+	}
+	return devices, nil
+}
+
+func scanDevicesCtx(ctx context.Context, db *sql.DB, query string, args ...interface{}) ([]storage.Device, error) {
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

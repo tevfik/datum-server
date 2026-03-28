@@ -61,7 +61,7 @@ func (h *Handler) SSECommands(c *gin.Context) {
 
 	// Channel for early termination
 	clientGone := c.Request.Context().Done()
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
 	timeout := time.After(time.Duration(waitSec) * time.Second)
@@ -132,7 +132,13 @@ func (h *Handler) WebhookPoll(c *gin.Context) {
 		}
 
 		deadline := time.Now().Add(time.Duration(waitSec) * time.Second)
+		ctx := c.Request.Context()
 		for time.Now().Before(deadline) {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			commands, _ := h.Store.GetPendingCommands(deviceID)
 			if len(commands) > 0 {
 				c.JSON(http.StatusOK, gin.H{

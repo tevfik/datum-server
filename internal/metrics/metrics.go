@@ -14,6 +14,7 @@ type Metrics struct {
 	RequestsSuccess    uint64
 	RequestsError      uint64
 	DataPointsReceived uint64
+	DataPointsDropped  uint64
 	CommandsSent       uint64
 	DevicesConnected   uint64
 	StartTime          time.Time
@@ -47,6 +48,10 @@ func (m *Metrics) IncrementDataPoints(count uint64) {
 
 func (m *Metrics) IncrementCommands() {
 	atomic.AddUint64(&m.CommandsSent, 1)
+}
+
+func (m *Metrics) IncrementDropped(count uint64) {
+	atomic.AddUint64(&m.DataPointsDropped, count)
 }
 
 // Middleware tracks request metrics
@@ -87,6 +92,7 @@ func Handler(c *gin.Context) {
 		},
 		"data": gin.H{
 			"points_received": atomic.LoadUint64(&globalMetrics.DataPointsReceived),
+			"points_dropped":  atomic.LoadUint64(&globalMetrics.DataPointsDropped),
 			"commands_sent":   atomic.LoadUint64(&globalMetrics.CommandsSent),
 		},
 		"resources": gin.H{

@@ -372,22 +372,33 @@ func (h *Handler) ForgotPassword(c *gin.Context) {
 	}
 	req.Email = strings.ToLower(req.Email)
 
+	// Always respond with the same message and timing to prevent email enumeration
+	defer func(start time.Time) {
+		elapsed := time.Since(start)
+		minDuration := 200 * time.Millisecond
+		if elapsed < minDuration {
+			time.Sleep(minDuration - elapsed)
+		}
+	}(time.Now())
+
+	const successMsg = "If an account exists with this email, a reset link has been sent."
+
 	user, err := h.Store.GetUserByEmail(req.Email)
 	if err != nil {
-		time.Sleep(100 * time.Millisecond)
-		c.JSON(http.StatusOK, gin.H{"message": "If an account exists with this email, a reset link has been sent."})
+		c.JSON(http.StatusOK, gin.H{"message": successMsg})
 		return
 	}
 
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		// Don't reveal internal error
+		c.JSON(http.StatusOK, gin.H{"message": successMsg})
 		return
 	}
 	token := hex.EncodeToString(tokenBytes)
 
 	if err := h.Store.SavePasswordResetToken(user.ID, token, 1*time.Hour); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save reset token"})
+		c.JSON(http.StatusOK, gin.H{"message": successMsg})
 		return
 	}
 
@@ -399,7 +410,7 @@ func (h *Handler) ForgotPassword(c *gin.Context) {
 		}()
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "If an account exists with this email, a reset link has been sent."})
+	c.JSON(http.StatusOK, gin.H{"message": successMsg})
 }
 
 // CompleteResetPassword handles the actual password reset using a token.
@@ -417,6 +428,9 @@ func (h *Handler) CompleteResetPassword(c *gin.Context) {
 		return
 	}
 
+	// Delete the token first to ensure single-use (prevent race conditions)
+	h.Store.DeleteResetToken(req.Token)
+
 	hashedPassword, err := auth.HashPassword(req.NewPassword)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
@@ -427,8 +441,6 @@ func (h *Handler) CompleteResetPassword(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
 		return
 	}
-
-	h.Store.DeleteResetToken(req.Token)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully. You can now login."})
 }

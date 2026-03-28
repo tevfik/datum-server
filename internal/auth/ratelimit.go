@@ -10,12 +10,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RateLimiter implements a simple token bucket rate limiter
+// RateLimiter implements a sharded token bucket rate limiter.
+// Sharding reduces lock contention under high concurrency.
+const shardCount = 32
+
 type RateLimiter struct {
+	shards [shardCount]*rateLimiterShard
+	rate   int
+	window time.Duration
+}
+
+type rateLimiterShard struct {
 	visitors map[string]*visitor
 	mu       sync.RWMutex
-	rate     int
-	window   time.Duration
 }
 
 type visitor struct {
@@ -74,9 +81,13 @@ func NewRateLimiter() *RateLimiter {
 	}
 
 	rl := &RateLimiter{
-		visitors: make(map[string]*visitor),
-		rate:     rate,
-		window:   window,
+		rate:   rate,
+		window: window,
+	}
+	for i := 0; i < shardCount; i++ {
+		rl.shards[i] = &rateLimiterShard{
+			visitors: make(map[string]*visitor),
+		}
 	}
 
 	// Cleanup old visitors every 5 minutes
@@ -85,17 +96,27 @@ func NewRateLimiter() *RateLimiter {
 	return rl
 }
 
-func (rl *RateLimiter) getVisitor(ip string) *visitor {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
+// getShard returns the shard for a given IP using FNV-like hash.
+func (rl *RateLimiter) getShard(ip string) *rateLimiterShard {
+	var hash uint32
+	for i := 0; i < len(ip); i++ {
+		hash = hash*31 + uint32(ip[i])
+	}
+	return rl.shards[hash%shardCount]
+}
 
-	v, exists := rl.visitors[ip]
+func (rl *RateLimiter) getVisitor(ip string) *visitor {
+	shard := rl.getShard(ip)
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
+
+	v, exists := shard.visitors[ip]
 	if !exists {
 		v = &visitor{
 			limiter:  newTokenBucket(rl.rate, rl.window),
 			lastSeen: time.Now(),
 		}
-		rl.visitors[ip] = v
+		shard.visitors[ip] = v
 	}
 
 	v.lastSeen = time.Now()
@@ -112,14 +133,16 @@ func (rl *RateLimiter) cleanupLoop() {
 }
 
 func (rl *RateLimiter) cleanup() {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
 	threshold := time.Now().Add(-10 * time.Minute)
-	for ip, v := range rl.visitors {
-		if v.lastSeen.Before(threshold) {
-			delete(rl.visitors, ip)
+	for i := 0; i < shardCount; i++ {
+		shard := rl.shards[i]
+		shard.mu.Lock()
+		for ip, v := range shard.visitors {
+			if v.lastSeen.Before(threshold) {
+				delete(shard.visitors, ip)
+			}
 		}
+		shard.mu.Unlock()
 	}
 }
 
