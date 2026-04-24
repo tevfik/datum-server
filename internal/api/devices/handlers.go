@@ -56,8 +56,8 @@ func (h *Handler) RegisterThingDescriptionRoutes(r *gin.RouterGroup) {
 // CreateDeviceRequest holds device creation data.
 type CreateDeviceRequest struct {
 	ID   string `json:"device_id"`
-	Name string `json:"name" binding:"required"`
-	Type string `json:"type" binding:"required"`
+	Name string `json:"name" binding:"required,max=100"`
+	Type string `json:"type" binding:"required,max=50"`
 }
 
 // DeviceResponse represents a device in API responses.
@@ -112,7 +112,7 @@ func (h *Handler) CreateDevice(c *gin.Context) {
 	}
 
 	if err := h.Store.CreateDevice(device); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create device"})
 		return
 	}
 
@@ -143,7 +143,7 @@ func (h *Handler) ListDevices(c *gin.Context) {
 	}
 
 	if listErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": listErr.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list devices"})
 		return
 	}
 
@@ -291,7 +291,7 @@ func (h *Handler) UpdateDeviceConfig(c *gin.Context) {
 	}
 
 	if err := h.Store.UpdateDeviceConfig(deviceID, config); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update config"})
 		return
 	}
 

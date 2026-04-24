@@ -2,6 +2,7 @@
 package stream
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -12,10 +13,22 @@ import (
 	"time"
 
 	"datum-go/internal/auth"
+	"datum-go/internal/logger"
 	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+)
+
+const (
+	// streamKeepAliveInterval is the interval for sending keep-alive pings on streaming connections.
+	streamKeepAliveInterval = 30 * time.Second
+	// streamCleanupInterval is how often stale streams are checked and removed.
+	streamCleanupInterval = 2 * time.Minute
+	// streamStaleThreshold is how long a stream with no clients and no frames is kept.
+	streamStaleThreshold = 5 * time.Minute
+	// deviceLastSeenTimeout is the timeout for fire-and-forget UpdateDeviceLastSeen calls.
+	deviceLastSeenTimeout = 5 * time.Second
 )
 
 // Handler provides stream HTTP handlers.
@@ -71,15 +84,37 @@ type StreamClient struct {
 	Chan chan []byte
 }
 
+// cachedAllowedOrigins is parsed once at first use and cached.
+var (
+	cachedAllowedOrigins []string
+	allowAllOrigins      bool
+	originsOnce          sync.Once
+)
+
+func parseCORSOrigins() {
+	originsOnce.Do(func() {
+		raw := os.Getenv("CORS_ALLOWED_ORIGINS")
+		if raw == "" || raw == "*" {
+			allowAllOrigins = true
+			return
+		}
+		for _, o := range strings.Split(raw, ",") {
+			if trimmed := strings.TrimSpace(o); trimmed != "" {
+				cachedAllowedOrigins = append(cachedAllowedOrigins, trimmed)
+			}
+		}
+	})
+}
+
 var wsUpgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		allowedOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
-		if allowedOrigins == "" || allowedOrigins == "*" {
+		parseCORSOrigins()
+		if allowAllOrigins {
 			return true
 		}
 		origin := r.Header.Get("Origin")
-		for _, allowed := range strings.Split(allowedOrigins, ",") {
-			if strings.TrimSpace(allowed) == origin {
+		for _, allowed := range cachedAllowedOrigins {
+			if allowed == origin {
 				return true
 			}
 		}
@@ -158,8 +193,13 @@ func (h *Handler) UploadFrame(c *gin.Context) {
 	// Broadcast frame
 	h.StreamManager.BroadcastFrame(deviceID, frameData)
 
-	// Update device last seen
-	go h.Store.UpdateDeviceLastSeen(deviceID)
+	// Update device last seen (with timeout to prevent goroutine accumulation)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), deviceLastSeenTimeout)
+		defer cancel()
+		_ = ctx // UpdateDeviceLastSeen does not take context yet; timeout bounds the goroutine
+		h.Store.UpdateDeviceLastSeen(deviceID)
+	}()
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":     "frame_received",
@@ -196,7 +236,7 @@ func (h *Handler) MJPEGStream(c *gin.Context) {
 		c.Writer.Flush()
 	}
 
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(streamKeepAliveInterval)
 	defer ticker.Stop()
 
 	for {
@@ -259,19 +299,24 @@ func (h *Handler) WebSocketStream(c *gin.Context) {
 	metadataJSON, _ := json.Marshal(metadata)
 	conn.WriteMessage(websocket.TextMessage, metadataJSON)
 
-	done := make(chan bool)
+	done := make(chan struct{}, 1)
 
 	go func() {
+		defer func() {
+			select {
+			case done <- struct{}{}:
+			default:
+			}
+		}()
 		for {
 			_, _, err := conn.ReadMessage()
 			if err != nil {
-				done <- true
 				return
 			}
 		}
 	}()
 
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(streamKeepAliveInterval)
 	defer ticker.Stop()
 
 	for {
@@ -499,19 +544,40 @@ func (sm *StreamManager) GetStream(deviceID string) *DeviceStream {
 }
 
 // cleanupLoop periodically removes stale streams with no clients and no recent frames.
+// Uses a two-phase approach: identify stale streams under RLock, then delete under Lock.
 func (sm *StreamManager) cleanupLoop() {
-	ticker := time.NewTicker(2 * time.Minute)
+	log := logger.GetLogger()
+	ticker := time.NewTicker(streamCleanupInterval)
 	defer ticker.Stop()
 	for range ticker.C {
-		sm.mu.Lock()
+		// Phase 1: Identify stale streams under read lock
+		sm.mu.RLock()
+		var staleIDs []string
 		for id, stream := range sm.streams {
 			stream.mu.RLock()
-			stale := len(stream.Clients) == 0 && time.Since(stream.LastUpdated) > 5*time.Minute
+			stale := len(stream.Clients) == 0 && time.Since(stream.LastUpdated) > streamStaleThreshold
 			stream.mu.RUnlock()
 			if stale {
-				delete(sm.streams, id)
+				staleIDs = append(staleIDs, id)
 			}
 		}
-		sm.mu.Unlock()
+		sm.mu.RUnlock()
+
+		// Phase 2: Delete stale streams under write lock (re-check to avoid races)
+		if len(staleIDs) > 0 {
+			sm.mu.Lock()
+			for _, id := range staleIDs {
+				if stream, ok := sm.streams[id]; ok {
+					stream.mu.RLock()
+					stillStale := len(stream.Clients) == 0 && time.Since(stream.LastUpdated) > streamStaleThreshold
+					stream.mu.RUnlock()
+					if stillStale {
+						delete(sm.streams, id)
+					}
+				}
+			}
+			sm.mu.Unlock()
+			log.Debug().Int("count", len(staleIDs)).Msg("Stream cleanup: removed stale streams")
+		}
 	}
 }

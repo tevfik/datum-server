@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"datum-go/internal/logger"
 	"datum-go/internal/storage"
 )
 
@@ -75,7 +76,7 @@ func (tp *TelemetryProcessor) worker() {
 			return
 		}
 		if err := tp.Store.StoreDataBatch(buffer); err != nil {
-			fmt.Printf("ERROR: Failed to store data batch: %v\n", err)
+			logger.GetLogger().Error().Err(err).Int("batch_size", len(buffer)).Msg("Failed to store data batch")
 		}
 		buffer = make([]*storage.DataPoint, 0, tp.batchSize)
 	}
@@ -112,7 +113,7 @@ func (tp *TelemetryProcessor) Process(deviceID string, data map[string]interface
 		if t, err := time.Parse(time.RFC3339, tStr); err == nil {
 			ts = t
 		} else {
-			fmt.Printf("WARN: Failed to parse timestamp '%s': %v\n", tStr, err)
+			logger.GetLogger().Warn().Str("timestamp", tStr).Err(err).Msg("Failed to parse telemetry timestamp")
 		}
 	}
 

@@ -42,12 +42,12 @@ func NewHandler(store storage.Provider, cfg Config) *Handler {
 // ============ Request/Response types ============
 
 type RegisterDeviceRequest struct {
-	DeviceUID  string `json:"device_uid" binding:"required"`  // Hardware UID from device
-	DeviceName string `json:"device_name" binding:"required"` // User-provided name
-	DeviceType string `json:"device_type"`                    // Optional device type
-	AuthMode   string `json:"auth_mode"`                      // Optional: "static" (default) or "rotating"
-	WiFiSSID   string `json:"wifi_ssid"`                      // Optional WiFi SSID
-	WiFiPass   string `json:"wifi_pass"`                      // Optional WiFi password
+	DeviceUID  string `json:"device_uid" binding:"required,max=128"`  // Hardware UID from device
+	DeviceName string `json:"device_name" binding:"required,max=100"` // User-provided name
+	DeviceType string `json:"device_type" binding:"max=50"`           // Optional device type
+	AuthMode   string `json:"auth_mode" binding:"max=20"`             // Optional: "static" (default) or "rotating"
+	WiFiSSID   string `json:"wifi_ssid" binding:"max=64"`             // Optional WiFi SSID
+	WiFiPass   string `json:"wifi_pass" binding:"max=128"`            // Optional WiFi password
 }
 
 type RegisterDeviceResponse struct {

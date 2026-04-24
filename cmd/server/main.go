@@ -58,8 +58,8 @@ func securityHeadersMiddleware() gin.HandlerFunc {
 		c.Header("X-Content-Type-Options", "nosniff")
 		// Enable XSS protection
 		c.Header("X-XSS-Protection", "1; mode=block")
-		// Strict transport security (enabled when ENABLE_HSTS=true)
-		if os.Getenv("ENABLE_HSTS") == "true" {
+		// Strict transport security (enabled by default, disable with ENABLE_HSTS=false)
+		if os.Getenv("ENABLE_HSTS") != "false" {
 			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
 		// Referrer policy
@@ -104,6 +104,25 @@ func requestBodyLimitMiddleware() gin.HandlerFunc {
 	}
 }
 
+// requestTimeoutMiddleware adds a deadline to non-streaming requests.
+func requestTimeoutMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		path := c.Request.URL.Path
+		// Skip timeout for streaming, SSE, and WebSocket endpoints
+		if strings.Contains(path, "/stream/") ||
+			strings.Contains(path, "/cmd/stream") ||
+			strings.Contains(path, "/cmd/poll") ||
+			strings.Contains(path, "/logs/stream") {
+			c.Next()
+			return
+		}
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+		defer cancel()
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	}
+}
+
 // loadOrGenerateJWTSecret manages JWT secret persistence
 func loadOrGenerateJWTSecret(dataDir string) {
 	// 1. Check environment variable (highest priority)
@@ -124,16 +143,18 @@ func loadOrGenerateJWTSecret(dataDir string) {
 	// 3. Generate new secret
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
-		fmt.Printf("Critical: Failed to generate random bytes: %v\n", err)
+		log := logger.GetLogger()
+		log.Fatal().Err(err).Msg("Critical: Failed to generate random bytes for JWT secret")
 		return
 	}
 	secret := hex.EncodeToString(bytes)
 
+	log := logger.GetLogger()
 	// 4. Save to file
 	if err := os.WriteFile(secretFile, []byte(secret), 0600); err != nil {
-		fmt.Printf("Warning: Failed to persist JWT secret to %s: %v\n", secretFile, err)
+		log.Warn().Err(err).Str("file", secretFile).Msg("Failed to persist JWT secret")
 	} else {
-		fmt.Printf("Info: Persisted new JWT secret to %s\n", secretFile)
+		log.Info().Str("file", secretFile).Msg("Persisted new JWT secret")
 	}
 
 	// 5. Update auth package
@@ -267,10 +288,8 @@ func main() {
 	mqttBroker = mqtt_internal.NewBroker(store, telemetryProcessor)
 	if err := mqttBroker.Start(); err != nil {
 		log.Error().Err(err).Msg("Failed to start MQTT Broker")
-	} else {
-		// Ensure Broker closes on shutdown
-		defer mqttBroker.Stop()
 	}
+	// mqttBroker is stopped in the graceful shutdown handler below
 
 	// Setup router
 	gin.SetMode(gin.ReleaseMode)
@@ -286,24 +305,37 @@ func main() {
 	r.Use(requestIDMiddleware())
 	// Request body size limit
 	r.Use(requestBodyLimitMiddleware())
+	// Request timeout for non-streaming endpoints
+	r.Use(requestTimeoutMiddleware())
 	// Use our custom structured logger for requests which filters noisy endpoints
 	r.Use(logger.GinLogger())
 	// Metrics middleware
 	r.Use(metrics.Middleware())
 
 	r.Use(securityHeadersMiddleware())
-	// CORS setup
+	// CORS setup (origins parsed once and cached)
+	var corsAllowedOrigins []string
+	var corsAllowAll bool
+	{
+		raw := os.Getenv("CORS_ALLOWED_ORIGINS")
+		if raw == "" || raw == "*" {
+			corsAllowAll = true
+		} else {
+			for _, o := range strings.Split(raw, ",") {
+				if trimmed := strings.TrimSpace(o); trimmed != "" {
+					corsAllowedOrigins = append(corsAllowedOrigins, trimmed)
+				}
+			}
+		}
+	}
 	r.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		allowedOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
 
-		if allowedOrigins == "" || allowedOrigins == "*" {
-			// No credentials with wildcard origin
+		if corsAllowAll {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		} else {
-			// Check if the request origin is in the allowed list
-			for _, allowed := range strings.Split(allowedOrigins, ",") {
-				if strings.TrimSpace(allowed) == origin {
+			for _, allowed := range corsAllowedOrigins {
+				if allowed == origin {
 					c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 					c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 					break
@@ -323,8 +355,12 @@ func main() {
 	})
 
 	// Static Assets
-	// Serve /assets from embedded "dist/assets"
-	r.StaticFS("/assets", http.FS(mustSubFS(webFS, "dist/assets")))
+	// Serve /assets from embedded "dist/assets" (gracefully skip if dist not built)
+	if sub, err := fs.Sub(webFS, "dist/assets"); err == nil {
+		r.StaticFS("/assets", http.FS(sub))
+	} else {
+		log.Warn().Msg("Web assets (dist/assets) not found in embed — UI will not be served")
+	}
 
 	// SPA Fallback / Root Handler
 	// If no route matches, check if it's an API call or UI
@@ -497,6 +533,12 @@ func main() {
 		log.Fatal().Err(err).Msg("Server forced to shutdown")
 	}
 
+	// Stop MQTT Broker
+	if mqttBroker != nil {
+		log.Info().Msg("Stopping MQTT broker...")
+		mqttBroker.Stop()
+	}
+
 	// Flush remaining telemetry data
 	if telemetryProcessor != nil {
 		log.Info().Msg("Flushing telemetry processor...")
@@ -511,18 +553,18 @@ func main() {
 	log.Info().Msg("Server exiting")
 }
 
-// Helper to get sub-fs without error return (panics on error, safe for init)
+// Helper to get sub-fs without error return
 func mustSubFS(f fs.FS, dir string) fs.FS {
 	sub, err := fs.Sub(f, dir)
 	if err != nil {
-		panic(err)
+		log := logger.GetLogger()
+		log.Fatal().Err(err).Str("dir", dir).Msg("Failed to load embedded sub-filesystem")
 	}
 	return sub
 }
 
 // Health check handlers
 func healthHandler(c *gin.Context) {
-	// Basic health check
 	status := gin.H{
 		"status":    "healthy",
 		"timestamp": time.Now().Unix(),
@@ -530,10 +572,18 @@ func healthHandler(c *gin.Context) {
 		"version":   Version,
 	}
 
-	// Check storage connection
 	if store == nil {
 		status["status"] = "unhealthy"
 		status["storage"] = "disconnected"
+		c.JSON(http.StatusServiceUnavailable, status)
+		return
+	}
+
+	// Verify storage is actually responsive with a lightweight query
+	if _, err := store.GetSystemConfig(); err != nil {
+		status["status"] = "degraded"
+		status["storage"] = "error"
+		status["storage_error"] = err.Error()
 		c.JSON(http.StatusServiceUnavailable, status)
 		return
 	}
@@ -580,26 +630,29 @@ func startPeriodicCleanup() {
 	ticker := time.NewTicker(1 * time.Hour) // Run every hour
 	go func() {
 		for range ticker.C {
+			opID := uuid.New().String()[:8]
+			clog := log.With().Str("op", "periodic-cleanup").Str("op_id", opID).Logger()
+
 			// Cleanup expired grace periods (old tokens after grace period)
 			if count, err := store.CleanupExpiredGracePeriods(); err == nil && count > 0 {
-				log.Info().Int("count", count).Msg("Periodic cleanup: expired grace periods")
+				clog.Info().Int("count", count).Msg("Cleaned expired grace periods")
 			}
 
 			// Cleanup expired provisioning requests (Soft Delete)
 			if count, err := store.CleanupExpiredProvisioningRequests(); err == nil && count > 0 {
-				log.Info().Int("count", count).Msg("Periodic cleanup: expired provisioning requests")
+				clog.Info().Int("count", count).Msg("Cleaned expired provisioning requests")
 			}
 
 			// Purge old provisioning requests (Hard Delete > 7 days old)
 			if count, err := store.PurgeProvisioningRequests(7 * 24 * time.Hour); err == nil && count > 0 {
-				log.Info().Int("count", count).Msg("Periodic cleanup: purged old provisioning requests")
+				clog.Info().Int("count", count).Msg("Purged old provisioning requests")
 			}
 
 			// Cleanup Public Data (Soft/Hard check)
 			config, _ := store.GetSystemConfig()
 			if config != nil && config.PublicDataRetention > 0 {
 				if count, err := store.CleanupPublicData(time.Duration(config.PublicDataRetention) * 24 * time.Hour); err == nil && count > 0 {
-					log.Info().Int("count", count).Msg("Periodic cleanup: public data")
+					clog.Info().Int("count", count).Msg("Cleaned public data")
 				}
 			}
 		}

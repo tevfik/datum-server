@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"datum-go/internal/logger"
@@ -17,8 +18,8 @@ import (
 
 type ProvisionDeviceRequest struct {
 	DeviceID string `json:"device_id"`
-	Name     string `json:"name" binding:"required"`
-	Type     string `json:"type"`
+	Name     string `json:"name" binding:"required,max=100"`
+	Type     string `json:"type" binding:"max=50"`
 }
 
 func (h *AdminHandler) ProvisionDeviceHandler(c *gin.Context) {
@@ -76,13 +77,37 @@ func (h *AdminHandler) ProvisionDeviceHandler(c *gin.Context) {
 func (h *AdminHandler) ListAllDevicesHandler(c *gin.Context) {
 	devices, err := h.Store.GetAllDevices()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list devices"})
 		return
 	}
 
+	// Pagination (applied after fetch since storage doesn't support limit/offset)
+	limit := 100
+	offset := 0
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 500 {
+			limit = n
+		}
+	}
+	if v := c.Query("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+
+	total := len(devices)
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	paged := devices[offset:end]
+
 	// Enrich with owner info
-	var enrichedDevices []gin.H
-	for _, d := range devices {
+	enrichedDevices := make([]gin.H, 0, len(paged))
+	for _, d := range paged {
 		ownerEmail := ""
 		if owner, err := h.Store.GetUserByID(d.UserID); err == nil && owner != nil {
 			ownerEmail = owner.Email
@@ -110,7 +135,12 @@ func (h *AdminHandler) ListAllDevicesHandler(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"devices": enrichedDevices})
+	c.JSON(http.StatusOK, gin.H{
+		"devices": enrichedDevices,
+		"total":   total,
+		"limit":   limit,
+		"offset":  offset,
+	})
 }
 
 func (h *AdminHandler) GetDeviceAdminHandler(c *gin.Context) {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"datum-go/internal/auth"
@@ -16,6 +17,37 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// resetRateLimit enforces per-email throttling on password reset requests.
+// Allows at most 3 reset requests per email per 15 minutes.
+var resetRateLimit = struct {
+	mu       sync.Mutex
+	attempts map[string][]time.Time
+}{attempts: make(map[string][]time.Time)}
+
+func isResetRateLimited(email string) bool {
+	const maxAttempts = 3
+	const window = 15 * time.Minute
+
+	resetRateLimit.mu.Lock()
+	defer resetRateLimit.mu.Unlock()
+
+	now := time.Now()
+	// Prune expired entries
+	recent := resetRateLimit.attempts[email][:0]
+	for _, t := range resetRateLimit.attempts[email] {
+		if now.Sub(t) < window {
+			recent = append(recent, t)
+		}
+	}
+	resetRateLimit.attempts[email] = recent
+
+	if len(recent) >= maxAttempts {
+		return true
+	}
+	resetRateLimit.attempts[email] = append(recent, now)
+	return false
+}
 
 // Handler provides authentication HTTP handlers.
 type Handler struct {
@@ -382,6 +414,12 @@ func (h *Handler) ForgotPassword(c *gin.Context) {
 	}(time.Now())
 
 	const successMsg = "If an account exists with this email, a reset link has been sent."
+
+	// Per-email rate limiting (silent — returns same success message)
+	if isResetRateLimited(req.Email) {
+		c.JSON(http.StatusOK, gin.H{"message": successMsg})
+		return
+	}
 
 	user, err := h.Store.GetUserByEmail(req.Email)
 	if err != nil {
