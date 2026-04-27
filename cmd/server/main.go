@@ -553,16 +553,6 @@ func main() {
 	log.Info().Msg("Server exiting")
 }
 
-// Helper to get sub-fs without error return
-func mustSubFS(f fs.FS, dir string) fs.FS {
-	sub, err := fs.Sub(f, dir)
-	if err != nil {
-		log := logger.GetLogger()
-		log.Fatal().Err(err).Str("dir", dir).Msg("Failed to load embedded sub-filesystem")
-	}
-	return sub
-}
-
 // Health check handlers
 func healthHandler(c *gin.Context) {
 	status := gin.H{

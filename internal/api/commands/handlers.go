@@ -10,6 +10,7 @@ import (
 
 	"datum-go/internal/auth"
 	"datum-go/internal/logger"
+	"datum-go/internal/metrics"
 	"datum-go/internal/mqtt"
 	"datum-go/internal/storage"
 
@@ -102,6 +103,8 @@ func (h *Handler) SendCommand(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	metrics.GetGlobalMetrics().IncrementCommands()
 
 	status := "pending"
 	message := "Command queued for device (offline)"

@@ -197,6 +197,7 @@ func RegisterProvisioningRoutes(r *gin.Engine, cfg Config) {
 	provHandler := provisioning.NewHandler(cfg.Store, provisioning.Config{
 		ServerURL: cfg.PublicURL,
 	})
+	provHandler.MQTTBroker = cfg.MQTTBroker
 
 	provHandler.RegisterRoutes(r, internalauth.UserAuthMiddleware(cfg.Store), internalauth.RateLimitMiddleware())
 }

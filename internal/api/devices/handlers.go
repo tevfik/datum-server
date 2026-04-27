@@ -116,6 +116,11 @@ func (h *Handler) CreateDevice(c *gin.Context) {
 		return
 	}
 
+	// Invalidate ACL cache so MQTT picks up the new device immediately
+	if h.MQTTBroker != nil {
+		h.MQTTBroker.InvalidateACLCache(userID)
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"device_id": deviceID,
 		"api_key":   apiKey,
@@ -258,6 +263,11 @@ func (h *Handler) DeleteDevice(c *gin.Context) {
 	if err := h.Store.DeleteDevice(deviceID, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete device"})
 		return
+	}
+
+	// Invalidate ACL cache so MQTT stops granting access to the deleted device
+	if h.MQTTBroker != nil {
+		h.MQTTBroker.InvalidateACLCache(device.UserID)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Device deleted"})

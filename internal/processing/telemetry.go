@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"datum-go/internal/logger"
+	"datum-go/internal/metrics"
 	"datum-go/internal/storage"
 )
 
@@ -129,6 +130,7 @@ func (tp *TelemetryProcessor) Process(deviceID string, data map[string]interface
 		// Success
 	default:
 		atomic.AddUint64(&tp.droppedCount, 1)
+		metrics.GetGlobalMetrics().IncrementDropped(1)
 		return nil, fmt.Errorf("telemetry buffer full, dropping data (total dropped: %d)", atomic.LoadUint64(&tp.droppedCount))
 	}
 

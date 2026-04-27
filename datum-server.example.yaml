@@ -1,0 +1,44 @@
+# datum-server configuration
+# Environment variables override these settings.
+
+server:
+  port: 8000
+  # url: https://datum.example.com  # auto-detected if empty
+  data_dir: ./data
+  cors_allowed_origins: "*"
+  enable_hsts: true
+  max_request_body_bytes: 5242880  # 5MB
+  # docs_user: admin
+  # docs_pass: changeme
+
+database:
+  # url: postgres://user:pass@localhost:5432/datum?sslmode=disable
+  max_open_conns: 25
+  max_idle_conns: 25
+  conn_max_lifetime_minutes: 5
+
+auth:
+  # jwt_secret: ""  # auto-generated if empty
+  jwt_refresh_expiry_days: 30
+  jwt_access_expiry_minutes: 15
+  rate_limit_requests: 100
+  rate_limit_window_seconds: 60
+
+mqtt:
+  # tls_cert: /etc/datum/mqtt.crt
+  # tls_key: /etc/datum/mqtt.key
+
+email:
+  # resend_api_key: re_xxxxx
+  from_address: onboarding@resend.dev
+
+logging:
+  level: INFO       # DEBUG, INFO, WARN, ERROR, FATAL
+  output: console   # console, json, file
+
+data:
+  retention_max_days: 7
+  public_data_retention_days: 1
+  retention_check_hours: 1
+  telemetry_buffer_size: 10000
+  query_max_limit: 10000

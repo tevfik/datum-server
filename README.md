@@ -2,7 +2,7 @@
 
 ![Build Status](https://img.shields.io/github/actions/workflow/status/tevfik/datum-server/ci.yml?branch=main)
 ![Go Report Card](https://goreportcard.com/badge/github.com/tevfik/datum-server)
-![Test Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)
+![Test Coverage](https://img.shields.io/badge/coverage-24%25-yellow.svg)
 ![License](https://img.shields.io/github/license/tevfik/datum-server)
 
 High-performance IoT data collection and management platform built with Go.
@@ -52,9 +52,11 @@ See [docs/performance/FINAL_PERFORMANCE_REPORT.md](docs/performance/FINAL_PERFOR
 
 ### Advanced Components (Undocumented)
 
-- **MQTT Broker**: Integrated MQTT v5 broker running on ports 1883 (TCP), 1884 (WS), and 8883 (TLS, optional).
+- **MQTT Broker**: Integrated MQTT v5 broker running on ports 1883 (TCP), 1884 (WS), and 8883 (TLS, optional). Includes ACL cache with automatic invalidation on device ownership changes.
 - **Telemetry Processor**: Asynchronous high-throughput data ingestion pipeline (`internal/processing`).
-- **PostgreSQL Support**: Optional backend controllable via `DATABASE_URL`.
+- **PostgreSQL Support**: Optional backend controllable via `DATABASE_URL`, with versioned schema migrations (golang-migrate).
+- **Configuration**: YAML config file support via `datum-server.yaml` (see `datum-server.example.yaml`). All settings can also be set via environment variables.
+- **Stream Management**: Bounded video streaming with per-stream (50) and global (500) client limits to prevent resource exhaustion.
 
 ## 🛠️ Quick Start
 

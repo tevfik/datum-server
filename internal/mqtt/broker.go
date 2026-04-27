@@ -25,6 +25,7 @@ type Broker struct {
 	server    *mqtt.Server
 	store     storage.Provider
 	processor *processing.TelemetryProcessor
+	authHook  *AuthHook
 }
 
 // NewBroker creates a new MQTT broker instance
@@ -85,7 +86,8 @@ func (b *Broker) Start() error {
 	}
 
 	// Auth Hook
-	if err := b.server.AddHook(newAuthHook(b.store), nil); err != nil {
+	b.authHook = newAuthHook(b.store)
+	if err := b.server.AddHook(b.authHook, nil); err != nil {
 		return err
 	}
 
@@ -108,6 +110,21 @@ func (b *Broker) Start() error {
 // Stop gracefully shuts down the broker
 func (b *Broker) Stop() {
 	b.server.Close()
+}
+
+// InvalidateACLCache removes the cached device-ownership list for a
+// specific user, forcing the next MQTT ACL check to re-query the DB.
+func (b *Broker) InvalidateACLCache(userID string) {
+	if h := b.authHook; h != nil {
+		h.aclCache.invalidate(userID)
+	}
+}
+
+// InvalidateACLCacheAll clears the entire ACL cache.
+func (b *Broker) InvalidateACLCacheAll() {
+	if h := b.authHook; h != nil {
+		h.aclCache.invalidateAll()
+	}
 }
 
 // PublishCommand sends a command payload to a specific device
@@ -238,6 +255,22 @@ func (c *aclCache) set(userID string, deviceIDs map[string]bool) {
 		deviceIDs: deviceIDs,
 		expiresAt: time.Now().Add(c.ttl),
 	}
+}
+
+// invalidate removes a specific user's cached ACL entry so the next
+// ACL check fetches fresh device ownership from the database.
+func (c *aclCache) invalidate(userID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.entries, userID)
+}
+
+// invalidateAll clears the entire ACL cache. Useful when a bulk
+// operation (e.g. device transfer) may affect multiple users.
+func (c *aclCache) invalidateAll() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries = make(map[string]*aclCacheEntry)
 }
 
 func newAuthHook(store storage.Provider) *AuthHook {

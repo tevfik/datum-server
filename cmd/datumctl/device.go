@@ -8,6 +8,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
+	"datum-go/internal/cli/styles"
 	"datum-go/internal/cli/utils"
 )
 
@@ -245,14 +246,14 @@ func runDeviceGet(cmd *cobra.Command, args []string) error {
 	}
 
 	// Pretty print device info
-	fmt.Printf("\n📱 Device: %s\n\n", utils.GetString(device, "name"))
-	fmt.Printf("  ID:         %s\n", utils.GetString(device, "id"))
-	fmt.Printf("  Name:       %s\n", utils.GetString(device, "name"))
-	fmt.Printf("  Type:       %s\n", utils.GetString(device, "type"))
-	fmt.Printf("  Status:     %s\n", utils.GetString(device, "status"))
-	fmt.Printf("  Created:    %s\n", utils.GetString(device, "created_at"))
-	fmt.Printf("  Last Seen:  %s\n", utils.GetString(device, "last_seen"))
-	fmt.Printf("  Data Count: %v\n", device["data_count"])
+	fmt.Println(styles.Header("📱 Device: " + utils.GetString(device, "name")))
+	fmt.Println(styles.KVPadded("ID", 12, utils.GetString(device, "id")))
+	fmt.Println(styles.KVPadded("Name", 12, utils.GetString(device, "name")))
+	fmt.Println(styles.KVPadded("Type", 12, utils.GetString(device, "type")))
+	fmt.Println(styles.KVPadded("Status", 12, styles.StatusIcon(utils.GetString(device, "status"))+" "+utils.GetString(device, "status")))
+	fmt.Println(styles.KVPadded("Created", 12, utils.GetString(device, "created_at")))
+	fmt.Println(styles.KVPadded("Last Seen", 12, utils.GetString(device, "last_seen")))
+	fmt.Println(styles.KVPadded("Data Count", 12, fmt.Sprintf("%v", device["data_count"])))
 	fmt.Println()
 
 	return nil
@@ -286,16 +287,19 @@ func runDeviceCreate(cmd *cobra.Command, args []string) error {
 		return utils.PrintJSON(os.Stdout, result)
 	}
 
-	fmt.Printf("\n✅ Device created!\n\n")
-	fmt.Printf("  ID:      %s\n", utils.GetString(result, "device_id"))
-	fmt.Printf("  Name:    %s\n", utils.GetString(result, "name"))
-	fmt.Printf("  Type:    %s\n", utils.GetString(result, "type"))
+	fmt.Println(styles.SuccessBox.Render("✅ Device created!"))
+	fmt.Println()
+	fmt.Println(styles.KVPadded("ID", 8, utils.GetString(result, "device_id")))
+	fmt.Println(styles.KVPadded("Name", 8, utils.GetString(result, "name")))
+	fmt.Println(styles.KVPadded("Type", 8, utils.GetString(result, "type")))
 
 	if apiKeyVal, ok := result["api_key"].(string); ok && apiKeyVal != "" {
-		fmt.Printf("\n  🔑 API Key: %s\n", apiKeyVal)
-		fmt.Printf("  ⚠️  Save this key - it won't be shown again!\n\n")
+		fmt.Println()
+		keyBox := fmt.Sprintf("🔑 API Key: %s\n⚠️  Save this key — it won't be shown again!", apiKeyVal)
+		fmt.Println(styles.WarningBox.Render(keyBox))
+		fmt.Println()
 
-		fmt.Println("  📝 Usage examples:")
+		fmt.Println(styles.SubTitle.Render("  📝 Usage examples:"))
 		fmt.Printf("     # Send data from device:\n")
 		fmt.Printf("     curl -X POST %s/pub/%s \\\n", serverURL, utils.GetString(result, "device_id"))
 		fmt.Printf("       -H 'Authorization: Bearer %s' \\\n", apiKeyVal)

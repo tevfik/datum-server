@@ -13,7 +13,9 @@ import (
 
 // StoreData stores data points and updates device shadow
 func (s *PostgresStore) StoreData(point *storage.DataPoint) error {
-	tx, err := s.db.Begin()
+	ctx, cancel := queryCtx()
+	defer cancel()
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -62,7 +64,9 @@ func (s *PostgresStore) StoreDataBatch(points []*storage.DataPoint) error {
 		return fmt.Errorf("batch size %d exceeds maximum of %d", len(points), maxBatchSize)
 	}
 
-	tx, err := s.db.Begin()
+	ctx2, cancel2 := queryCtx()
+	defer cancel2()
+	tx, err := s.db.BeginTx(ctx2, nil)
 	if err != nil {
 		return err
 	}
@@ -124,10 +128,12 @@ func (s *PostgresStore) StoreDataBatch(points []*storage.DataPoint) error {
 
 // GetLatestData retrieves the merged shadow state
 func (s *PostgresStore) GetLatestData(deviceID string) (*storage.DataPoint, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	var shadowJSON []byte
 	var lastSeen time.Time
 
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT shadow_state, last_seen FROM devices WHERE id = $1
 	`, deviceID).Scan(&shadowJSON, &lastSeen)
 
@@ -156,9 +162,8 @@ func (s *PostgresStore) GetLatestData(deviceID string) (*storage.DataPoint, erro
 
 // GetDataHistory retrieving history
 func (s *PostgresStore) GetDataHistory(deviceID string, limit int) ([]storage.DataPoint, error) {
-	// Default to last 7 days if no range specified logic needed?
-	// Interface definition: GetLatestData(deviceID string) vs GetDataHistory(deviceID string, limit int)
-
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `
 		SELECT time, data 
 		FROM data_points 
@@ -166,7 +171,7 @@ func (s *PostgresStore) GetDataHistory(deviceID string, limit int) ([]storage.Da
 		ORDER BY time DESC 
 		LIMIT $2
 	`
-	rows, err := s.db.Query(query, deviceID, limit)
+	rows, err := s.db.QueryContext(ctx, query, deviceID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -194,6 +199,8 @@ func (s *PostgresStore) GetDataHistory(deviceID string, limit int) ([]storage.Da
 
 // GetDataHistoryWithRange retrieves historical data with time range filtering
 func (s *PostgresStore) GetDataHistoryWithRange(deviceID string, start, end time.Time, limit int) ([]storage.DataPoint, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `
 		SELECT time, data 
 		FROM data_points 
@@ -201,7 +208,7 @@ func (s *PostgresStore) GetDataHistoryWithRange(deviceID string, start, end time
 		ORDER BY time DESC 
 		LIMIT $4
 	`
-	rows, err := s.db.Query(query, deviceID, start, end, limit)
+	rows, err := s.db.QueryContext(ctx, query, deviceID, start, end, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +265,9 @@ func (s *PostgresStore) GetDatabaseStats() (map[string]interface{}, error) {
 
 // UpdateDeviceAPIKey updates a device's API key
 func (s *PostgresStore) UpdateDeviceAPIKey(id string, newKey string) error {
-	result, err := s.db.Exec(
+	ctx, cancel := queryCtx()
+	defer cancel()
+	result, err := s.db.ExecContext(ctx,
 		"UPDATE devices SET api_key = $1, updated_at = $2 WHERE id = $3",
 		newKey, time.Now(), id,
 	)
@@ -280,13 +289,12 @@ func (s *PostgresStore) UpdateDeviceAPIKey(id string, newKey string) error {
 
 // GetDeviceByUID retrieves a device by its generic UID (e.g. MAC address)
 func (s *PostgresStore) GetDeviceByUID(uid string) (*storage.Device, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	var device storage.Device
 	var created, updated, ls sql.NullTime
 
-	// Adjust column selection based on actual schema. Assuming standard columns.
-	// If schema differs, this query needs adjustment.
-	// Using generic selection or specific columns.
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT id, user_id, name, type, device_uid, api_key, status, last_seen, created_at, updated_at 
 		FROM devices 
 		WHERE device_uid = $1

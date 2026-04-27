@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"datum-go/internal/auth"
@@ -29,6 +30,10 @@ const (
 	streamStaleThreshold = 5 * time.Minute
 	// deviceLastSeenTimeout is the timeout for fire-and-forget UpdateDeviceLastSeen calls.
 	deviceLastSeenTimeout = 5 * time.Second
+	// maxClientsPerStream is the maximum concurrent viewers per device stream.
+	maxClientsPerStream = 50
+	// maxTotalClients is the global maximum concurrent stream clients across all devices.
+	maxTotalClients = 500
 )
 
 // Handler provides stream HTTP handlers.
@@ -67,8 +72,9 @@ func (h *Handler) RegisterHybridRoutes(r *gin.RouterGroup) {
 
 // StreamManager manages active video streams from devices
 type StreamManager struct {
-	mu      sync.RWMutex
-	streams map[string]*DeviceStream
+	mu           sync.RWMutex
+	streams      map[string]*DeviceStream
+	totalClients int32 // atomic: global client count
 }
 
 type DeviceStream struct {
@@ -223,7 +229,11 @@ func (h *Handler) MJPEGStream(c *gin.Context) {
 	c.Header("Connection", "keep-alive")
 	c.Header("X-Accel-Buffering", "no")
 
-	clientChan := h.StreamManager.RegisterClient(deviceID)
+	clientChan, err := h.StreamManager.RegisterClient(deviceID)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Stream capacity reached"})
+		return
+	}
 	defer h.StreamManager.UnregisterClient(deviceID, clientChan)
 
 	// Send initial frame
@@ -284,7 +294,12 @@ func (h *Handler) WebSocketStream(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	clientChan := h.StreamManager.RegisterClient(deviceID)
+	clientChan, regErr := h.StreamManager.RegisterClient(deviceID)
+	if regErr != nil {
+		conn.WriteMessage(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseTryAgainLater, "Stream capacity reached"))
+		return
+	}
 	defer h.StreamManager.UnregisterClient(deviceID, clientChan)
 
 	if frame := h.StreamManager.GetLastFrame(deviceID); frame != nil {
@@ -459,7 +474,12 @@ func (sm *StreamManager) BroadcastFrame(deviceID string, frame []byte) {
 	stream.mu.Unlock()
 }
 
-func (sm *StreamManager) RegisterClient(deviceID string) chan []byte {
+func (sm *StreamManager) RegisterClient(deviceID string) (chan []byte, error) {
+	// Check global limit
+	if atomic.LoadInt32(&sm.totalClients) >= maxTotalClients {
+		return nil, fmt.Errorf("global stream client limit reached (%d)", maxTotalClients)
+	}
+
 	sm.mu.Lock()
 	stream, exists := sm.streams[deviceID]
 	if !exists {
@@ -474,6 +494,11 @@ func (sm *StreamManager) RegisterClient(deviceID string) chan []byte {
 	stream.mu.Lock()
 	defer stream.mu.Unlock()
 
+	// Check per-stream limit
+	if len(stream.Clients) >= maxClientsPerStream {
+		return nil, fmt.Errorf("stream client limit reached for device %s (%d)", deviceID, maxClientsPerStream)
+	}
+
 	clientID := fmt.Sprintf("client_%d", time.Now().UnixNano())
 	clientChan := make(chan []byte, 2)
 
@@ -481,8 +506,9 @@ func (sm *StreamManager) RegisterClient(deviceID string) chan []byte {
 		ID:   clientID,
 		Chan: clientChan,
 	}
+	atomic.AddInt32(&sm.totalClients, 1)
 
-	return clientChan
+	return clientChan, nil
 }
 
 func (sm *StreamManager) UnregisterClient(deviceID string, clientChan chan []byte) {
@@ -501,6 +527,7 @@ func (sm *StreamManager) UnregisterClient(deviceID string, clientChan chan []byt
 		if client.Chan == clientChan {
 			close(client.Chan)
 			delete(stream.Clients, id)
+			atomic.AddInt32(&sm.totalClients, -1)
 			break
 		}
 	}

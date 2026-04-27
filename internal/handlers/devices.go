@@ -64,6 +64,11 @@ func (h *AdminHandler) ProvisionDeviceHandler(c *gin.Context) {
 		return
 	}
 
+	// Invalidate ACL cache so MQTT picks up the new device
+	if h.MqttBroker != nil {
+		h.MqttBroker.InvalidateACLCache(adminUserID)
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"device_id":  deviceID,
 		"name":       req.Name,
@@ -200,9 +205,16 @@ func (h *AdminHandler) UpdateDeviceHandler(c *gin.Context) {
 func (h *AdminHandler) ForceDeleteDeviceHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 
+	// Look up owner before deleting so we can invalidate their ACL cache
+	device, _ := h.Store.GetDevice(deviceID)
+
 	if err := h.Store.ForceDeleteDevice(deviceID); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
+	}
+
+	if device != nil && h.MqttBroker != nil {
+		h.MqttBroker.InvalidateACLCache(device.UserID)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Device deleted"})

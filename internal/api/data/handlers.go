@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"datum-go/internal/auth"
+	"datum-go/internal/logger"
+	"datum-go/internal/metrics"
 	"datum-go/internal/mqtt"
 	"datum-go/internal/processing"
 	"datum-go/internal/storage"
@@ -94,6 +96,8 @@ func (h *Handler) PostData(c *gin.Context) {
 		return
 	}
 
+	metrics.GetGlobalMetrics().IncrementDataPoints(1)
+
 	// Bridge to MQTT for Live UI Updates
 	if h.MQTTBroker != nil {
 		if jsonBytes, err := json.Marshal(data); err == nil {
@@ -128,6 +132,14 @@ func (h *Handler) GetData(c *gin.Context) {
 
 		if role == "admin" {
 			isAuthorized = true
+			// Audit trail: admin accessing another user's device data
+			logger.GetLogger().Warn().
+				Str("event", "admin_data_access").
+				Str("admin_id", userID).
+				Str("device_id", deviceID).
+				Str("device_owner", device.UserID).
+				Str("ip", c.ClientIP()).
+				Msg("Admin accessed another user's device data")
 		} else if val, exists := c.Get("api_key"); exists {
 			// Device Auth check
 			apiKey := val.(string)

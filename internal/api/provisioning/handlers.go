@@ -10,6 +10,7 @@ import (
 
 	"datum-go/internal/auth"
 	"datum-go/internal/logger"
+	"datum-go/internal/mqtt"
 	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -24,8 +25,9 @@ type Config struct {
 
 // Handler handles provisioning requests
 type Handler struct {
-	Store  storage.Provider
-	Config Config
+	Store      storage.Provider
+	Config     Config
+	MQTTBroker *mqtt.Broker // optional, used to invalidate ACL cache
 }
 
 // NewHandler creates a new provisioning handler
@@ -203,6 +205,11 @@ func (h *Handler) RegisterDeviceHandler(c *gin.Context) {
 		// Update Status and API Key using the permanent device key
 		provReq.Status = "active"
 		apiKey = device.APIKey // Use the confirmed key
+
+		// Invalidate ACL cache so MQTT picks up the new device
+		if h.MQTTBroker != nil {
+			h.MQTTBroker.InvalidateACLCache(userID)
+		}
 	}
 
 	// 2. Log successful provisioning registration
@@ -456,6 +463,11 @@ func (h *Handler) DeviceActivateHandler(c *gin.Context) {
 		Str("model", req.Model).
 		Str("ip", c.ClientIP()).
 		Msg("Device activated successfully")
+
+	// Invalidate ACL cache so MQTT recognizes the newly activated device
+	if h.MQTTBroker != nil {
+		h.MQTTBroker.InvalidateACLCache(provReq.UserID)
+	}
 
 	c.JSON(http.StatusOK, DeviceActivateResponse{
 		DeviceID:  device.ID,

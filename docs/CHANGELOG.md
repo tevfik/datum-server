@@ -5,6 +5,32 @@ All notable changes to Datum IoT Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-04-27
+
+### Added
+- **MQTT ACL Cache Invalidation**: Device create/delete/provisioning operations now immediately invalidate the MQTT ACL cache for affected users, preventing stale access control.
+- **Admin Data Access Audit Trail**: Zerolog audit events are emitted when an admin accesses another user's device data, logging admin ID, device ID, device owner, and client IP.
+- **PostgreSQL Migration Framework**: Schema management now uses golang-migrate with versioned SQL migration files under `internal/storage/postgres/migrations/`. Falls back to legacy schema.sql for compatibility.
+- **YAML Configuration File**: Server supports `datum-server.yaml` config file (see `datum-server.example.yaml`). All 30 environment variables are mapped to structured config with viper. File → env var → default priority chain.
+- **Centralized Config Package**: `internal/config/` provides a typed `Config` struct with all server settings, replacing scattered `os.Getenv()` calls.
+- **datumctl Lipgloss Styling**: CLI output upgraded with charmbracelet/lipgloss for styled boxes, colored key-value pairs, status indicators, and a branded interactive mode banner.
+- **CLI Style Module**: `internal/cli/styles/` provides shared lipgloss styles (colors, boxes, text formatters, KV helpers, status icons) for consistent CLI output.
+- **Stream Goroutine Limits**: Video streaming bounded to 50 clients per stream and 500 total clients globally, preventing unbounded goroutine growth.
+- **Comprehensive API Tests**: 50+ new handler tests across 8 packages (auth, commands, data, db, devices, keys, public, system) using httptest + real BuntDB storage. Coverage: 19.5% → 24.4%.
+- **Metrics Wire-up**: `IncrementDataPoints`, `IncrementCommands`, and `IncrementDropped` counters are now called from their respective handlers (previously dead code).
+
+### Changed
+- **Go Toolchain**: go1.24.11 → go1.24.13 (security patches for TLS vulnerabilities).
+- **lib/pq**: v1.10.9 → v1.12.3 (security fix).
+- **quic-go**: v0.54.0 → v0.59.0 (HTTP/3 DoS fix).
+- **go.uber.mock**: v0.5.0 → v0.5.2.
+- **PG Query Timeouts**: All 42+ PostgreSQL query functions now use `context.WithTimeout(10s)` via a shared `queryCtx()` helper, standardizing timeout behavior across 8 source files.
+- **Test Race Safety**: `TestHighVolumeTransactions` and `TestBuntDBMemoryUsage` use `testing.Short()` guard to reduce device count from 10000/5000 to 500 under race detector.
+- **README Coverage Badge**: Fixed from false 95% claim to actual 24.4%.
+
+### Removed
+- **Dead Code**: `mustSubFS` function removed from `cmd/server/main.go` (was unused after previous embed safeguard fix).
+
 ## [1.6.0] - 2026-03-28
 
 ### Added

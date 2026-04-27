@@ -1,21 +1,12 @@
 package postgres
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"time"
 
 	"datum-go/internal/storage"
 )
-
-// defaultQueryTimeout is the maximum time a single query may take.
-const defaultQueryTimeout = 10 * time.Second
-
-// queryCtx returns a context with the default query timeout.
-func queryCtx() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), defaultQueryTimeout)
-}
 
 // CreateUser inserts a new user
 func (s *PostgresStore) CreateUser(user *storage.User) error {
@@ -212,17 +203,21 @@ func (s *PostgresStore) SavePasswordResetToken(userID, token string, ttl time.Du
 }
 
 func (s *PostgresStore) GetUserByResetToken(token string) (*storage.User, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `
 		SELECT u.id, u.email, u.password_hash, u.role, u.status, u.created_at, u.updated_at, u.last_login_at, u.refresh_token
 		FROM users u
 		JOIN password_reset_tokens t ON u.id = t.user_id
 		WHERE t.token = $1 AND t.expires_at > $2
 	`
-	row := s.db.QueryRow(query, token, time.Now())
+	row := s.db.QueryRowContext(ctx, query, token, time.Now())
 	return scanUser(row)
 }
 
 func (s *PostgresStore) DeleteResetToken(token string) error {
-	_, err := s.db.Exec("DELETE FROM password_reset_tokens WHERE token = $1", token)
+	ctx, cancel := queryCtx()
+	defer cancel()
+	_, err := s.db.ExecContext(ctx, "DELETE FROM password_reset_tokens WHERE token = $1", token)
 	return err
 }

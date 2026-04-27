@@ -20,11 +20,13 @@ func (s *PostgresStore) CreateCommand(cmd *storage.Command) error {
 		return err
 	}
 
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `
 		INSERT INTO commands (id, device_id, action, params, status, created_at, expires_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
-	_, err = s.db.Exec(query,
+	_, err = s.db.ExecContext(ctx, query,
 		cmd.ID, cmd.DeviceID, cmd.Action, paramsJSON, cmd.Status, cmd.CreatedAt, cmd.ExpiresAt,
 	)
 	if err != nil {
@@ -35,13 +37,15 @@ func (s *PostgresStore) CreateCommand(cmd *storage.Command) error {
 
 // GetPendingCommands retrieves commands that are pending and not expired
 func (s *PostgresStore) GetPendingCommands(deviceID string) ([]storage.Command, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `
 		SELECT id, device_id, action, params, status, created_at, expires_at
 		FROM commands
 		WHERE device_id = $1 AND status = 'pending' AND expires_at > $2
 		ORDER BY created_at ASC
 	`
-	rows, err := s.db.Query(query, deviceID, time.Now())
+	rows, err := s.db.QueryContext(ctx, query, deviceID, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -74,13 +78,15 @@ func (s *PostgresStore) GetPendingCommands(deviceID string) ([]storage.Command, 
 
 // GetPendingCommandCount returns count of pending commands
 func (s *PostgresStore) GetPendingCommandCount(deviceID string) int {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	var count int
 	query := `
 		SELECT COUNT(*) 
 		FROM commands 
 		WHERE device_id = $1 AND status = 'pending' AND expires_at > $2
 	`
-	_ = s.db.QueryRow(query, deviceID, time.Now()).Scan(&count)
+	_ = s.db.QueryRowContext(ctx, query, deviceID, time.Now()).Scan(&count)
 	return count
 }
 
@@ -91,12 +97,14 @@ func (s *PostgresStore) AcknowledgeCommand(cmdID string, result map[string]inter
 		return err
 	}
 
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `
 		UPDATE commands 
 		SET status = 'acknowledged', result = $1, acked_at = $2
 		WHERE id = $3
 	`
-	res, err := s.db.Exec(query, resultJSON, time.Now(), cmdID)
+	res, err := s.db.ExecContext(ctx, query, resultJSON, time.Now(), cmdID)
 	if err != nil {
 		return err
 	}
@@ -110,6 +118,8 @@ func (s *PostgresStore) AcknowledgeCommand(cmdID string, result map[string]inter
 
 // GetCommand retrieves a command by ID
 func (s *PostgresStore) GetCommand(cmdID string) (*storage.Command, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `
 		SELECT id, device_id, action, params, status, created_at, expires_at, acked_at, result
 		FROM commands
@@ -121,7 +131,7 @@ func (s *PostgresStore) GetCommand(cmdID string) (*storage.Command, error) {
 	var expiresAt sql.NullTime
 	var ackedAt sql.NullTime
 
-	err := s.db.QueryRow(query, cmdID).Scan(
+	err := s.db.QueryRowContext(ctx, query, cmdID).Scan(
 		&cmd.ID, &cmd.DeviceID, &cmd.Action, &paramsJSON, &cmd.Status, &cmd.CreatedAt, &expiresAt, &ackedAt, &resultJSON,
 	)
 	if err != nil {

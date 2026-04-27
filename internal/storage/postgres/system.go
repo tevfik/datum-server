@@ -14,8 +14,10 @@ const systemConfigKey = "system_config"
 
 // GetSystemConfig retrieves the current system configuration
 func (s *PostgresStore) GetSystemConfig() (*storage.SystemConfig, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	var valueJSON []byte
-	err := s.db.QueryRow("SELECT value FROM system_settings WHERE key = $1", systemConfigKey).Scan(&valueJSON)
+	err := s.db.QueryRowContext(ctx, "SELECT value FROM system_settings WHERE key = $1", systemConfigKey).Scan(&valueJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// Return default/nil? Or uninitialized config?
@@ -45,7 +47,9 @@ func (s *PostgresStore) SaveSystemConfig(config *storage.SystemConfig) error {
 		VALUES ($1, $2, $3)
 		ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = $3
 	`
-	_, err = s.db.Exec(query, systemConfigKey, valueJSON, time.Now())
+	ctx, cancel := queryCtx()
+	defer cancel()
+	_, err = s.db.ExecContext(ctx, query, systemConfigKey, valueJSON, time.Now())
 	return err
 }
 
@@ -78,8 +82,8 @@ func (s *PostgresStore) InitializeSystem(platformName string, allowRegister bool
 
 // ResetSystem clears all data (TRUNCATE tables)
 func (s *PostgresStore) ResetSystem() error {
-	// Truncate tables with cascade
-	// Order matters if not using CASCADE, but CASCADE handles FKs.
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `
 		TRUNCATE TABLE 
 			users, devices, data_points, commands, 
@@ -87,7 +91,7 @@ func (s *PostgresStore) ResetSystem() error {
 			user_api_keys, system_settings 
 		CASCADE
 	`
-	_, err := s.db.Exec(query)
+	_, err := s.db.ExecContext(ctx, query)
 	return err
 }
 
@@ -165,10 +169,11 @@ func (s *PostgresStore) UpdatePublicDataRetention(days int) error {
 
 // CleanupPublicData deletes public data older than maxAge
 func (s *PostgresStore) CleanupPublicData(maxAge time.Duration) (int, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	cutoff := time.Now().Add(-maxAge)
-	// Assuming device_id for public data starts with 'public_'
 	query := `DELETE FROM data_points WHERE device_id LIKE 'public_%' AND timestamp < $1`
-	result, err := s.db.Exec(query, cutoff)
+	result, err := s.db.ExecContext(ctx, query, cutoff)
 	if err != nil {
 		return 0, err
 	}
@@ -178,23 +183,21 @@ func (s *PostgresStore) CleanupPublicData(maxAge time.Duration) (int, error) {
 
 // GetStats returns database statistics.
 func (s *PostgresStore) GetStats() (*storage.SystemStats, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	stats := &storage.SystemStats{
 		ServerTime: time.Now(),
 	}
 
-	// Count users
-	if err := s.db.QueryRow("SELECT COUNT(*) FROM users").Scan(&stats.TotalUsers); err != nil {
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&stats.TotalUsers); err != nil {
+		return nil, err
+	}
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM devices").Scan(&stats.TotalDevices); err != nil {
 		return nil, err
 	}
 
-	// Count devices
-	if err := s.db.QueryRow("SELECT COUNT(*) FROM devices").Scan(&stats.TotalDevices); err != nil {
-		return nil, err
-	}
-
-	// DB Size (approximate)
 	var size int64
-	s.db.QueryRow("SELECT pg_database_size(current_database())").Scan(&size)
+	s.db.QueryRowContext(ctx, "SELECT pg_database_size(current_database())").Scan(&size)
 	stats.DBSizeBytes = size
 
 	return stats, nil

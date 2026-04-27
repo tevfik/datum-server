@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"datum-go/internal/cli/styles"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
 )
@@ -26,8 +28,8 @@ func runInteractive(cmd *cobra.Command, args []string) error {
 	loadConfig()
 
 	// Welcome message
-	fmt.Println("\n🎯 Datum IoT Platform - Interactive Mode")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println()
+	fmt.Println(styles.Banner.Render(" 🎯 Datum IoT Platform — Interactive Mode "))
 
 	// Check authentication
 	if token == "" && apiKey == "" {

@@ -72,7 +72,9 @@ func (s *PostgresStore) GetUserDevices(userID string) ([]storage.Device, error) 
 
 // DeleteDevice removes a device if it belongs to the user
 func (s *PostgresStore) DeleteDevice(deviceID, userID string) error {
-	result, err := s.db.Exec("DELETE FROM devices WHERE id = $1 AND user_id = $2", deviceID, userID)
+	ctx, cancel := queryCtx()
+	defer cancel()
+	result, err := s.db.ExecContext(ctx, "DELETE FROM devices WHERE id = $1 AND user_id = $2", deviceID, userID)
 	if err != nil {
 		return err
 	}
@@ -85,14 +87,18 @@ func (s *PostgresStore) DeleteDevice(deviceID, userID string) error {
 
 // ForceDeleteDevice removes a device regardless of user (Admin)
 func (s *PostgresStore) ForceDeleteDevice(deviceID string) error {
-	_, err := s.db.Exec("DELETE FROM devices WHERE id = $1", deviceID)
+	ctx, cancel := queryCtx()
+	defer cancel()
+	_, err := s.db.ExecContext(ctx, "DELETE FROM devices WHERE id = $1", deviceID)
 	return err
 }
 
 // ListAllDevices returns all devices
 func (s *PostgresStore) ListAllDevices() ([]storage.Device, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `SELECT * FROM devices`
-	return scanDevices(s.db, query)
+	return scanDevicesCtx(ctx, s.db, query)
 }
 
 // GetAllDevices is alias for ListAllDevices (Admin)
@@ -102,13 +108,17 @@ func (s *PostgresStore) GetAllDevices() ([]storage.Device, error) {
 
 // UpdateDevice updates status
 func (s *PostgresStore) UpdateDevice(deviceID string, status string) error {
-	_, err := s.db.Exec("UPDATE devices SET status = $1, updated_at = $2 WHERE id = $3", status, time.Now(), deviceID)
+	ctx, cancel := queryCtx()
+	defer cancel()
+	_, err := s.db.ExecContext(ctx, "UPDATE devices SET status = $1, updated_at = $2 WHERE id = $3", status, time.Now(), deviceID)
 	return err
 }
 
 // UpdateDeviceLastSeen updates last seen timestamp
 func (s *PostgresStore) UpdateDeviceLastSeen(deviceID string) error {
-	_, err := s.db.Exec("UPDATE devices SET last_seen = $1 WHERE id = $2", time.Now(), deviceID)
+	ctx, cancel := queryCtx()
+	defer cancel()
+	_, err := s.db.ExecContext(ctx, "UPDATE devices SET last_seen = $1 WHERE id = $2", time.Now(), deviceID)
 	return err
 }
 
@@ -118,15 +128,19 @@ func (s *PostgresStore) UpdateDeviceThingDescription(deviceID string, td map[str
 	if err != nil {
 		return err
 	}
-	_, err = s.db.Exec("UPDATE devices SET thing_description = $1, updated_at = $2 WHERE id = $3", tdJSON, time.Now(), deviceID)
+	ctx, cancel := queryCtx()
+	defer cancel()
+	_, err = s.db.ExecContext(ctx, "UPDATE devices SET thing_description = $1, updated_at = $2 WHERE id = $3", tdJSON, time.Now(), deviceID)
 	return err
 }
 
 // --- Token Operations ---
 
 func (s *PostgresStore) RotateDeviceKey(deviceID string, newToken string, tokenExpiresAt time.Time, gracePeriodDays int) (*storage.Device, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	// Transaction to ensure atomicity
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +175,8 @@ func (s *PostgresStore) RotateDeviceKey(deviceID string, newToken string, tokenE
 }
 
 func (s *PostgresStore) RevokeDeviceKey(deviceID string) (*storage.Device, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `
 		UPDATE devices SET
 			current_token = '',
@@ -173,20 +189,22 @@ func (s *PostgresStore) RevokeDeviceKey(deviceID string) (*storage.Device, error
 		WHERE id = $2
 		RETURNING *
 	`
-	return scanDevice(s.db.QueryRow(query, time.Now(), deviceID))
+	return scanDevice(s.db.QueryRowContext(ctx, query, time.Now(), deviceID))
 }
 
 func (s *PostgresStore) GetDeviceByToken(token string) (*storage.Device, bool, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	// Try current token
 	query := `SELECT * FROM devices WHERE current_token = $1`
-	d, err := scanDevice(s.db.QueryRow(query, token))
+	d, err := scanDevice(s.db.QueryRowContext(ctx, query, token))
 	if err == nil {
 		return d, false, nil
 	}
 
 	// Try previous token with grace period check
 	query = `SELECT * FROM devices WHERE previous_token = $1 AND grace_period_end > $2`
-	d, err = scanDevice(s.db.QueryRow(query, token, time.Now()))
+	d, err = scanDevice(s.db.QueryRowContext(ctx, query, token, time.Now()))
 	if err == nil {
 		return d, true, nil
 	}
@@ -220,6 +238,8 @@ func (s *PostgresStore) GetDeviceTokenInfo(deviceID string) (map[string]interfac
 }
 
 func (s *PostgresStore) InitializeDeviceToken(deviceID, masterSecret, token string, tokenExpiresAt time.Time) (*storage.Device, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `
 		UPDATE devices SET
 			master_secret = $1,
@@ -230,16 +250,18 @@ func (s *PostgresStore) InitializeDeviceToken(deviceID, masterSecret, token stri
 		WHERE id = $5
 		RETURNING *
 	`
-	return scanDevice(s.db.QueryRow(query, masterSecret, token, tokenExpiresAt, time.Now(), deviceID))
+	return scanDevice(s.db.QueryRowContext(ctx, query, masterSecret, token, tokenExpiresAt, time.Now(), deviceID))
 }
 
 func (s *PostgresStore) CleanupExpiredGracePeriods() (int, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `
 		UPDATE devices 
 		SET previous_token = '', grace_period_end = '0001-01-01 00:00:00Z', updated_at = $1
 		WHERE previous_token != '' AND grace_period_end < $1
 	`
-	result, err := s.db.Exec(query, time.Now())
+	result, err := s.db.ExecContext(ctx, query, time.Now())
 	if err != nil {
 		return 0, err
 	}
@@ -365,6 +387,8 @@ func (s *PostgresStore) UpdateDeviceConfig(deviceID string, config map[string]in
 	if err != nil {
 		return err
 	}
-	_, err = s.db.Exec("UPDATE devices SET desired_state = $1, updated_at = $2 WHERE id = $3", configJSON, time.Now(), deviceID)
+	ctx, cancel := queryCtx()
+	defer cancel()
+	_, err = s.db.ExecContext(ctx, "UPDATE devices SET desired_state = $1, updated_at = $2 WHERE id = $3", configJSON, time.Now(), deviceID)
 	return err
 }

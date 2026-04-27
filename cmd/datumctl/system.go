@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"datum-go/internal/cli/styles"
 	"datum-go/internal/cli/utils"
 )
 
@@ -66,11 +67,11 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return utils.PrintJSON(os.Stdout, health)
 	}
 
-	fmt.Printf("\n✅ Server Status\n\n")
-	fmt.Printf("  URL:      %s\n", serverURL)
-	fmt.Printf("  Status:   %s\n", utils.GetString(health, "status"))
-	fmt.Printf("  Version:  %s\n", utils.GetString(health, "version"))
-	fmt.Printf("  Uptime:   %s\n", utils.GetString(health, "uptime"))
+	fmt.Println(styles.Header("✅ Server Status"))
+	fmt.Println(styles.KVPadded("URL", 10, serverURL))
+	fmt.Println(styles.KVPadded("Status", 10, styles.StatusIcon(utils.GetString(health, "status"))+" "+utils.GetString(health, "status")))
+	fmt.Println(styles.KVPadded("Version", 10, utils.GetString(health, "version")))
+	fmt.Println(styles.KVPadded("Uptime", 10, utils.GetString(health, "uptime")))
 	fmt.Println()
 
 	return nil
@@ -79,9 +80,9 @@ func runStatus(cmd *cobra.Command, args []string) error {
 func runConfigShow(cmd *cobra.Command, args []string) {
 	loadConfig()
 
-	fmt.Printf("\n⚙️  Configuration\n\n")
-	fmt.Printf("  Config file: %s\n", getConfigPath())
-	fmt.Printf("  Server:      %s\n", serverURL)
+	fmt.Println(styles.Header("⚙️  Configuration"))
+	fmt.Println(styles.KVPadded("Config file", 13, getConfigPath()))
+	fmt.Println(styles.KVPadded("Server", 13, serverURL))
 
 	if token != "" {
 		fmt.Printf("  Token:       %s...\n", token[:min(20, len(token))])
