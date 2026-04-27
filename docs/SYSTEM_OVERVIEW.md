@@ -10,6 +10,12 @@ Datum Server provides a complete backend solution for IoT applications, handling
 - Real-time command and control
 - User authentication and role-based access control (RBAC)
 - Multi-protocol support (HTTP, MQTT, WebSockets)
+- Lightweight rule engine for data-driven automation
+- Webhook event notifications
+- API versioning (`/api/v1/` prefix)
+- TimescaleDB support for production-scale time-series
+- Configurable data retention policies
+- Comprehensive audit logging
 
 The platform is written in Go, ensuring low latency and high concurrency support.
 

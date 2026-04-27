@@ -66,7 +66,7 @@ func NewHandler(store storage.Provider, emailService *email.EmailSender, publicU
 }
 
 // RegisterRoutes registers all auth routes.
-func (h *Handler) RegisterRoutes(r *gin.Engine, authMiddleware gin.HandlerFunc) {
+func (h *Handler) RegisterRoutes(r gin.IRouter, authMiddleware gin.HandlerFunc) {
 	authGroup := r.Group("/auth")
 	{
 		authGroup.POST("/register", h.Register)

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"datum-go/internal/api"
+	rulesapi "datum-go/internal/api/rules"
 	"datum-go/internal/auth"
 	"datum-go/internal/email"
 	"datum-go/internal/handlers"
@@ -25,8 +26,11 @@ import (
 	"datum-go/internal/metrics"
 	mqtt_internal "datum-go/internal/mqtt"
 	"datum-go/internal/processing"
+	"datum-go/internal/ratelimit"
+	"datum-go/internal/rules"
 	"datum-go/internal/storage"
 	"datum-go/internal/storage/postgres"
+	"datum-go/internal/webhook"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -37,7 +41,7 @@ import (
 var webFS embed.FS
 
 var (
-	Version   = "1.4.1"
+	Version   = "1.7.0"
 	BuildDate = "unknown"
 )
 
@@ -46,6 +50,8 @@ var (
 	emailService       *email.EmailSender
 	telemetryProcessor *processing.TelemetryProcessor
 	mqttBroker         *mqtt_internal.Broker
+	webhookDispatcher  *webhook.Dispatcher
+	ruleEngine         *rules.Engine
 	serverStartTime    time.Time // Track server start time for uptime
 )
 
@@ -289,7 +295,22 @@ func main() {
 	if err := mqttBroker.Start(); err != nil {
 		log.Error().Err(err).Msg("Failed to start MQTT Broker")
 	}
-	// mqttBroker is stopped in the graceful shutdown handler below
+
+	// Initialize Webhook Dispatcher
+	webhookDispatcher = webhook.NewDispatcher()
+
+	// Initialize Rule Engine
+	ruleEngine = rules.NewEngine(webhookDispatcher, func(topic string, payload []byte) error {
+		return mqttBroker.Publish(topic, payload, false)
+	})
+	// Load rules from file if exists
+	if rulesData, err := os.ReadFile(filepath.Join(dataDirPath, "rules.json")); err == nil {
+		if err := ruleEngine.LoadFromJSON(rulesData); err != nil {
+			log.Warn().Err(err).Msg("Failed to load rules from rules.json")
+		} else {
+			log.Info().Int("count", len(ruleEngine.ListRules())).Msg("Rules loaded from rules.json")
+		}
+	}
 
 	// Setup router
 	gin.SetMode(gin.ReleaseMode)
@@ -311,6 +332,21 @@ func main() {
 	r.Use(logger.GinLogger())
 	// Metrics middleware
 	r.Use(metrics.Middleware())
+
+	// Global rate limiting (per-IP)
+	rateLimitReqs := 100
+	rateLimitWindowSec := 60
+	if v := os.Getenv("RATE_LIMIT_REQUESTS"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+			rateLimitReqs = parsed
+		}
+	}
+	if v := os.Getenv("RATE_LIMIT_WINDOW_SECONDS"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+			rateLimitWindowSec = parsed
+		}
+	}
+	r.Use(ratelimit.Middleware(rateLimitReqs, time.Duration(rateLimitWindowSec)*time.Second))
 
 	r.Use(securityHeadersMiddleware())
 	// CORS setup (origins parsed once and cached)
@@ -449,6 +485,16 @@ func main() {
 	// Metrics endpoint
 	api.RegisterMetricsRoutes(r, apiConfig)
 
+	// Versioned API routes (/api/v1/...)
+	api.RegisterV1Routes(r, apiConfig)
+
+	// Rule Engine routes (/admin/rules)
+	rulesHandler := rulesapi.NewHandler(ruleEngine)
+	rulesGroup := r.Group("/admin/rules")
+	rulesGroup.Use(auth.UserAuthMiddleware(store))
+	rulesGroup.Use(auth.AdminMiddleware(store))
+	rulesHandler.RegisterRoutes(rulesGroup)
+
 	// Serve firmware updates (protected)
 	// Devices must provide valid device auth
 	firmwareDir, _ := filepath.Abs("./firmware")
@@ -525,29 +571,45 @@ func main() {
 	<-quit
 	log.Info().Msg("Shutting down server...")
 
-	// The context is used to inform the server it has 5 seconds to finish
-	// the request it is currently handling
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// Phase 1: Stop accepting new HTTP connections (drain in-flight requests)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatal().Err(err).Msg("Server forced to shutdown")
+		log.Error().Err(err).Msg("HTTP server shutdown error")
+	} else {
+		log.Info().Msg("HTTP server stopped")
 	}
 
-	// Stop MQTT Broker
+	// Phase 2: Stop MQTT broker (disconnect clients gracefully)
 	if mqttBroker != nil {
 		log.Info().Msg("Stopping MQTT broker...")
 		mqttBroker.Stop()
+		log.Info().Msg("MQTT broker stopped")
 	}
 
-	// Flush remaining telemetry data
+	// Phase 3: Flush remaining telemetry data
 	if telemetryProcessor != nil {
 		log.Info().Msg("Flushing telemetry processor...")
 		telemetryProcessor.Close()
+		log.Info().Msg("Telemetry processor flushed")
 	}
 
-	// Close storage
+	// Phase 3b: Save rules and stop webhook dispatcher
+	if ruleEngine != nil {
+		if data, err := ruleEngine.ExportJSON(); err == nil {
+			os.WriteFile(filepath.Join(dataDirPath, "rules.json"), data, 0600)
+			log.Info().Msg("Rules saved to rules.json")
+		}
+	}
+	if webhookDispatcher != nil {
+		webhookDispatcher.Close()
+	}
+
+	// Phase 4: Close storage (must be last)
 	if err := store.Close(); err != nil {
 		log.Error().Err(err).Msg("Error closing storage")
+	} else {
+		log.Info().Msg("Storage closed")
 	}
 
 	log.Info().Msg("Server exiting")
@@ -577,8 +639,32 @@ func healthHandler(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, status)
 		return
 	}
-
 	status["storage"] = "connected"
+
+	// Check MQTT broker
+	if mqttBroker != nil {
+		status["mqtt"] = "running"
+		status["mqtt_clients"] = mqttBroker.GetStats().Clients
+	} else {
+		status["mqtt"] = "not_started"
+	}
+
+	// Check telemetry processor
+	if telemetryProcessor != nil {
+		usage := telemetryProcessor.BufferUsage()
+		status["telemetry_buffer_usage"] = fmt.Sprintf("%.1f%%", usage*100)
+		dropped := telemetryProcessor.DroppedCount()
+		if dropped > 0 {
+			status["telemetry_dropped"] = dropped
+		}
+		if usage > 0.9 {
+			status["status"] = "degraded"
+		}
+	}
+
+	// Uptime
+	status["uptime_seconds"] = int(time.Since(serverStartTime).Seconds())
+
 	c.JSON(http.StatusOK, status)
 }
 
@@ -598,6 +684,21 @@ func readinessHandler(c *gin.Context) {
 	if store == nil {
 		ready = false
 		issues = append(issues, "storage not initialized")
+	} else if _, err := store.GetSystemConfig(); err != nil {
+		ready = false
+		issues = append(issues, "storage not responding")
+	}
+
+	// Check MQTT
+	if mqttBroker == nil {
+		ready = false
+		issues = append(issues, "mqtt broker not started")
+	}
+
+	// Check telemetry processor
+	if telemetryProcessor == nil {
+		ready = false
+		issues = append(issues, "telemetry processor not started")
 	}
 
 	if ready {
@@ -643,6 +744,14 @@ func startPeriodicCleanup() {
 			if config != nil && config.PublicDataRetention > 0 {
 				if count, err := store.CleanupPublicData(time.Duration(config.PublicDataRetention) * 24 * time.Hour); err == nil && count > 0 {
 					clog.Info().Int("count", count).Msg("Cleaned public data")
+				}
+			}
+
+			// Purge old data points based on retention policy
+			if config != nil && config.DataRetention > 0 {
+				maxAge := time.Duration(config.DataRetention) * 24 * time.Hour
+				if purged, err := store.PurgeOldDataPoints(maxAge); err == nil && purged > 0 {
+					clog.Info().Int64("count", purged).Msg("Purged old data points")
 				}
 			}
 		}

@@ -5,6 +5,29 @@ All notable changes to Datum IoT Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-04-27
+
+### Added
+- **Lightweight Rule Engine**: JSON-based rule evaluation engine (`internal/rules/`) with conditions (gt, gte, lt, lte, eq, neq, contains) and actions (webhook, log, mqtt). Rules are persisted to `rules.json` on shutdown and auto-loaded on startup. REST API at `/admin/rules`.
+- **Webhook Event Dispatcher**: Async webhook delivery system (`internal/webhook/`) with subscription management, event filtering, and non-blocking queue. Supports device, data, command, alert, and rule events.
+- **Structured Audit Log**: Centralized audit logging (`internal/audit/`) covering all admin operations including user/device CRUD, config changes, data exports, and DB operations.
+- **Global Rate Limiting**: Per-IP rate limiter with configurable limits (`RATE_LIMIT_REQUESTS`, `RATE_LIMIT_WINDOW_SECONDS`) applied to all endpoints. Returns 429 when exceeded.
+- **API Versioning**: All endpoints now available under `/api/v1/` prefix alongside unversioned paths for backward compatibility. Router functions accept `gin.IRouter` for flexible mounting.
+- **TimescaleDB Support**: Migration `000002_timescaledb_support` auto-detects TimescaleDB extension and converts `data_points` to a hypertable with compression (7-day) and retention (365-day) policies. Falls back gracefully to standard PostgreSQL.
+- **Data Retention Purge**: `PurgeOldDataPoints` method on storage Provider, called hourly by periodic cleanup based on configured retention days.
+- **datumctl server-config**: New CLI commands — `server-config get`, `server-config validate` (connectivity checks), `server-config retention <days>`.
+- **OpenAPI 3.0 Updates**: Spec updated to v1.7.0 with health/readiness/liveness endpoints, rule engine CRUD, metrics format parameter, and Rule schema definition.
+
+### Changed
+- **Graceful Shutdown**: 4-phase sequenced shutdown: HTTP drain (10s) → MQTT stop → telemetry flush + rule save → storage close. Previously used single 5s timeout.
+- **Health Check**: `/health` now reports MQTT broker status, client count, telemetry buffer usage, dropped count, and uptime. Returns `degraded` when buffer >90% full.
+- **Readiness Check**: `/ready` now verifies storage responsiveness, MQTT broker, and telemetry processor — not just storage initialization.
+- **Go Module**: go1.24.0 → go1.25.0, golang.org/x/image v0.35.0 → v0.39.0 (3 CVE fixes), x/sync v0.19.0 → v0.20.0, x/text v0.33.0 → v0.36.0.
+- **Server Version**: 1.4.1 → 1.7.0.
+
+### Security
+- **3 Module-Level Vulnerabilities Fixed**: golang.org/x/image upgraded to v0.39.0 resolving GO-2025-3487, GO-2025-3488, GO-2025-3573.
+
 ## [1.7.0] - 2026-04-27
 
 ### Added

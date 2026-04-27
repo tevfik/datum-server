@@ -213,3 +213,16 @@ func (s *PostgresStore) GetSystemLogs(limit int, level string, search string) ([
 func (s *PostgresStore) ClearSystemLogs() error {
 	return nil
 }
+
+// PurgeOldDataPoints removes data points older than the given duration.
+func (s *PostgresStore) PurgeOldDataPoints(olderThan time.Duration) (int64, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
+	cutoff := time.Now().Add(-olderThan)
+	result, err := s.db.ExecContext(ctx, `DELETE FROM data_points WHERE timestamp < $1`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	rows, _ := result.RowsAffected()
+	return rows, nil
+}

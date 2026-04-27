@@ -107,6 +107,9 @@ type Provider interface {
 
 	// Stats
 	GetStats() (*SystemStats, error)
+
+	// Data Retention
+	PurgeOldDataPoints(olderThan time.Duration) (int64, error)
 }
 
 // CollectionInfo represents metadata about a collection

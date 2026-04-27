@@ -562,7 +562,7 @@ func generateProvisioningAPIKey() string {
 }
 
 // RegisterRoutes registers all provisioning-related routes
-func (h *Handler) RegisterRoutes(r *gin.Engine, authMiddleware gin.HandlerFunc, rateLimitMiddleware gin.HandlerFunc) {
+func (h *Handler) RegisterRoutes(r gin.IRouter, authMiddleware gin.HandlerFunc, rateLimitMiddleware gin.HandlerFunc) {
 	// Mobile app endpoints (require JWT auth)
 	devices := r.Group("/dev")
 	devices.Use(authMiddleware)

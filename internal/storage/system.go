@@ -145,3 +145,11 @@ func (s *Storage) UpdateRegistrationConfig(allow bool) error {
 	config.AllowRegister = allow
 	return s.SaveSystemConfig(config)
 }
+
+// PurgeOldDataPoints removes data points older than the given duration.
+// For BuntDB+tstorage, tstorage handles retention internally via WithRetention.
+// This method is a no-op and returns 0 purged.
+func (s *Storage) PurgeOldDataPoints(olderThan time.Duration) (int64, error) {
+	// tstorage handles its own retention policy via WithRetention option.
+	return 0, nil
+}
