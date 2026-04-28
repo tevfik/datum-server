@@ -66,6 +66,15 @@ func getJWTSecret() []byte {
 	return jwtSecret
 }
 
+// GetJWTSecret returns a defensive copy of the active JWT secret. Intended
+// for derived signing keys (e.g. presigned URL HMAC) — never log this value.
+func GetJWTSecret() []byte {
+	src := getJWTSecret()
+	dup := make([]byte, len(src))
+	copy(dup, src)
+	return dup
+}
+
 type Claims struct {
 	UserID string `json:"user_id"`
 	Email  string `json:"email"`

@@ -19,8 +19,10 @@ import (
 
 	"datum-go/internal/api"
 	adminapi "datum-go/internal/api/admin"
+	bucketsapi "datum-go/internal/api/buckets"
 	rulesapi "datum-go/internal/api/rules"
 	"datum-go/internal/auth"
+	"datum-go/internal/buckets"
 	"datum-go/internal/config"
 	"datum-go/internal/email"
 	"datum-go/internal/logger"
@@ -170,6 +172,37 @@ func loadOrGenerateJWTSecret(dataDir string) {
 
 	// 5. Update auth package
 	auth.SetJWTSecret([]byte(secret))
+}
+
+// newBucketBackend constructs the configured object-storage backend. Returns
+// nil only on configuration errors (errors are logged). The presign HMAC key
+// is derived from the active JWT secret so it survives restarts when
+// JWT_SECRET is persisted.
+func newBucketBackend(cfg *config.Config, publicURL string) buckets.Backend {
+	switch strings.ToLower(strings.TrimSpace(cfg.Buckets.Backend)) {
+	case "", "localfs":
+		baseDir := cfg.Buckets.BaseDir
+		if baseDir == "" {
+			baseDir = "./data/buckets"
+		}
+		fs, err := buckets.NewLocalFS(baseDir, publicURL, auth.GetJWTSecret())
+		if err != nil {
+			logger.GetLogger().Error().Err(err).Msg("Failed to init localfs bucket backend")
+			return nil
+		}
+		return fs
+	case "s3":
+		s3, err := buckets.NewS3Backend(cfg.Buckets.Endpoint, cfg.Buckets.Region,
+			cfg.Buckets.AccessKey, cfg.Buckets.SecretKey, cfg.Buckets.BucketPrefix)
+		if err != nil {
+			logger.GetLogger().Error().Err(err).Msg("Failed to init s3 bucket backend")
+			return nil
+		}
+		return s3
+	default:
+		logger.GetLogger().Warn().Str("backend", cfg.Buckets.Backend).Msg("Unknown buckets.backend; disabling")
+		return nil
+	}
 }
 
 func main() {
@@ -603,6 +636,20 @@ func main() {
 	// Registers: /admin/dev/*, /admin/config/*, /admin/logs/*, /admin/firmware
 	adminHandler := adminapi.NewAdminHandler(store, mqttBroker, serverStartTime)
 	adminHandler.RegisterRoutes(r)
+
+	// Object Storage (Buckets) — Phase 3
+	if bucketBackend := newBucketBackend(cfg, publicURL); bucketBackend != nil {
+		bh := bucketsapi.New(bucketBackend, store)
+		bh.Publish = func(topic string, payload []byte) {
+			if mqttBroker != nil {
+				if err := mqttBroker.Publish(topic, payload, false); err != nil {
+					log.Warn().Err(err).Str("topic", topic).Msg("Bucket event publish failed")
+				}
+			}
+		}
+		bh.RegisterRoutes(r)
+		log.Info().Str("backend", bucketBackend.Name()).Msg("Bucket storage initialized")
+	}
 
 	// Swagger UI documentation
 	setupSwagger(r)

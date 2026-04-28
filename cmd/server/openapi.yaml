@@ -183,6 +183,20 @@ components:
           type: string
           description: Correlates with the `X-Request-ID` response header.
 
+    StorageObject:
+      type: object
+      properties:
+        bucket: { type: string }
+        path: { type: string }
+        size: { type: integer, format: int64 }
+        content_type: { type: string }
+        etag: { type: string }
+        last_modified: { type: string, format: date-time }
+        owner_id: { type: string }
+        metadata:
+          type: object
+          additionalProperties: { type: string }
+
     RegisterRequest:
       type: object
       required: [email, password]
@@ -710,6 +724,158 @@ paths:
           description: Plain-text stream
           content:
             text/plain: { schema: { type: string } }
+
+  # ---------- Object Storage (Buckets — Phase 3) ----------
+  /storage:
+    get:
+      summary: List buckets
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Bucket list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  buckets: { type: array, items: { type: string } }
+
+  /storage/{bucket}:
+    parameters:
+      - name: bucket
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      summary: Create (or ensure) a bucket
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Bucket exists }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    delete:
+      summary: Delete an empty bucket
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    get:
+      summary: List objects in a bucket
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: prefix
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 10000 }
+      responses:
+        '200':
+          description: Object list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  objects:
+                    type: array
+                    items: { $ref: '#/components/schemas/StorageObject' }
+
+  /storage/{bucket}/{path}:
+    parameters:
+      - name: bucket
+        in: path
+        required: true
+        schema: { type: string }
+      - name: path
+        in: path
+        required: true
+        schema: { type: string }
+        description: Slash-delimited object key
+    put:
+      summary: Upload an object
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StorageObject' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    get:
+      summary: Download an object (auth or presigned URL)
+      tags: [Storage]
+      parameters:
+        - name: sig
+          in: query
+          schema: { type: string }
+          description: Presigned signature (when present, replaces auth)
+        - name: expires
+          in: query
+          schema: { type: integer }
+          description: Expiry timestamp (unix seconds)
+      responses:
+        '200':
+          description: Object bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+    head:
+      summary: Stat an object
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Headers only }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Delete an object
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+
+  /storage/{bucket}/presign:
+    post:
+      summary: Create a presigned URL
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path: { type: string }
+                method: { type: string, enum: [GET, PUT, DELETE], default: GET }
+                expires_secs: { type: integer, default: 900 }
+      responses:
+        '200':
+          description: URL response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, format: uri }
+                  expires_secs: { type: integer }
 
   /sys/time:
     get:
