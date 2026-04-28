@@ -45,7 +45,11 @@ import (
 var webFS embed.FS
 
 var (
-	Version   = "1.7.0"
+	// Version is overridden at build time via -ldflags. The default is a
+	// "dev" sentinel so a binary built without `make build` (e.g. plain
+	// `go run ./cmd/server`) is obviously unversioned instead of pretending
+	// to be a stale tagged release.
+	Version   = "dev"
 	BuildDate = "unknown"
 )
 

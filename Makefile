@@ -14,6 +14,14 @@ BUILD_DATE       ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 DEFAULT_SERVER_URL ?= http://localhost:8000
 SKIP_WEB         ?= 0
 
+# Export so docker compose's `${VERSION}` / `${BUILD_DATE}` interpolation in
+# docker-compose*.yml picks up the git-derived values automatically — even
+# when the user runs `docker compose up --build` directly without going
+# through `make deploy`.
+export VERSION
+export BUILD_DATE
+export DEFAULT_SERVER_URL
+
 COMPOSE          = docker compose --env-file docker/.env -f docker/docker-compose.yml
 COMPOSE_DEV      = $(COMPOSE) -f docker/docker-compose.dev.yml
 COMPOSE_EXT      = docker compose --env-file docker/.env -f docker/docker-compose.external.yml
@@ -52,8 +60,9 @@ prepare-assets: ## Prepare web assets (skip with SKIP_WEB=1)
 
 build-server: prepare-assets ## Build Go server binary
 	@mkdir -p build/binaries
-	@go build -o $(SERVER_BINARY) ./cmd/server
-	@echo "✅ Server: $(SERVER_BINARY)"
+	@go build -ldflags "-X main.Version=$(VERSION) -X main.BuildDate=$(BUILD_DATE)" \
+		-o $(SERVER_BINARY) ./cmd/server
+	@echo "✅ Server: $(SERVER_BINARY) ($(VERSION))"
 
 build-cli: ## Build datumctl CLI tool
 	@mkdir -p build/binaries

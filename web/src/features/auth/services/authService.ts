@@ -49,8 +49,11 @@ export const authService = {
         await api.delete(`/auth/keys/${id}`);
     },
 
-    changePassword: async (password: string): Promise<void> => {
-        await api.put('/auth/password', { password });
+    changePassword: async (oldPassword: string, newPassword: string): Promise<void> => {
+        await api.put('/auth/password', {
+            old_password: oldPassword,
+            new_password: newPassword,
+        });
     },
 
     forgotPassword: async (email: string): Promise<void> => {

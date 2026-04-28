@@ -1,9 +1,17 @@
 services:
   datum-server:
-    image: datum-server:latest
+    image: datum-server:${VERSION:-latest}
     build:
       context: ..
       dockerfile: docker/Dockerfile
+      args:
+        # Sourced from the env (typically exported by the Makefile from
+        # `git describe --tags --always --dirty`). Falls back to a sentinel
+        # so a misconfigured deploy is obvious instead of silently shipping
+        # the Dockerfile default of `1.0.0`.
+        VERSION: ${VERSION:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+        DEFAULT_SERVER_URL: ${PUBLIC_URL:-http://localhost:8000}
     container_name: datum-server
     restart: unless-stopped
     ports:

@@ -5,7 +5,9 @@ import {
     Activity,
     LogOut,
     Menu,
-    Settings as SettingsIcon
+    Settings as SettingsIcon,
+    BookOpen,
+    ExternalLink
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -76,6 +78,23 @@ export default function SidebarLayout() {
                             {item.label}
                         </NavLink>
                     ))}
+
+                    {/* API Docs (server-rendered, JWT-gated via ?token=) */}
+                    <a
+                        href={`/docs${
+                            typeof window !== "undefined" && localStorage.getItem("datum_token")
+                                ? `?token=${encodeURIComponent(localStorage.getItem("datum_token") || "")}`
+                                : ""
+                        }`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    >
+                        <BookOpen className="h-5 w-5" />
+                        <span className="flex-1">API Docs</span>
+                        <ExternalLink className="h-3.5 w-3.5 opacity-60" />
+                    </a>
                 </nav>
 
                 <div className="border-t p-4 space-y-2">
