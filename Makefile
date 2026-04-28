@@ -1,41 +1,89 @@
-.PHONY: help build run stop clean test bench dev logs shell db-backup db-restore release
+# ==============================================================================
+# Datum IoT Platform — Makefile
+# ==============================================================================
+.DEFAULT_GOAL := help
 
-# Load .env file if it exists (for SKIP_WEB, etc.)
--include .env
+# Load docker/.env for local overrides (SKIP_WEB, etc.)
+-include docker/.env
 export
 
-# Variables
-GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "1.0.0-dev")
-VERSION ?= $(GIT_VERSION)
-BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+# ── Variables ─────────────────────────────────────────────────────────────────
+GIT_VERSION      := $(shell git describe --tags --always --dirty 2>/dev/null || echo "1.0.0-dev")
+VERSION          ?= $(GIT_VERSION)
+BUILD_DATE       ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 DEFAULT_SERVER_URL ?= http://localhost:8000
-SKIP_WEB ?= 0
-COMPOSE=docker compose -f docker/docker-compose.yml
-COMPOSE_DEV=docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml
-SERVER_BINARY=build/binaries/server
-CLI_BINARY=build/binaries/datumctl
+SKIP_WEB         ?= 0
 
+COMPOSE          = docker compose --env-file docker/.env -f docker/docker-compose.yml
+COMPOSE_DEV      = $(COMPOSE) -f docker/docker-compose.dev.yml
+COMPOSE_EXT      = docker compose --env-file docker/.env -f docker/docker-compose.external.yml
+SERVER_BINARY    = build/binaries/server
+CLI_BINARY       = build/binaries/datumctl
+
+# ── Help ──────────────────────────────────────────────────────────────────────
 help: ## Show this help message
-	@echo "Datum IoT Platform - Makefile Commands"
+	@echo "Datum IoT Platform — Makefile"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-# Docker commands
-docker-build: ## Build all Docker images
-	docker compose -f docker/docker-compose.yml build
-
+# ── Build ─────────────────────────────────────────────────────────────────────
 build: build-all ## Build all binaries (Server + CLI + Web)
 
-release: ## Build release Docker image (usage: make release VERSION=1.2.3 DEFAULT_SERVER_URL=http://api.example.com)
+build-web: ## Build Web Dashboard (npm or Docker fallback)
+	@echo "🎨 Building Web Dashboard..."
+	@if command -v npm >/dev/null 2>&1; then \
+		cd web && npm install && npm run build; \
+	else \
+		docker run --rm -u $$(id -u):$$(id -g) -v $$(pwd):/app -w /app/web node:20-alpine sh -c "npm ci && npm run build"; \
+	fi
+	@[ -f web/dist/index.html ] || { echo "❌ web/dist/index.html missing!"; exit 1; }
+	@echo "✅ Web Dashboard built"
+
+prepare-assets: ## Prepare web assets (skip with SKIP_WEB=1)
+	@if [ "$(SKIP_WEB)" = "1" ]; then \
+		echo "⚠️  SKIP_WEB=1 — API-only placeholder"; \
+		rm -rf cmd/server/dist && mkdir -p cmd/server/dist; \
+		echo '<!DOCTYPE html><html><body><h1>API-Only Mode</h1></body></html>' > cmd/server/dist/index.html; \
+	else \
+		$(MAKE) build-web; \
+		rm -rf cmd/server/dist && cp -r web/dist cmd/server/dist; \
+	fi
+
+build-server: prepare-assets ## Build Go server binary
+	@mkdir -p build/binaries
+	@go build -o $(SERVER_BINARY) ./cmd/server
+	@echo "✅ Server: $(SERVER_BINARY)"
+
+build-cli: ## Build datumctl CLI tool
+	@mkdir -p build/binaries
+	@go build -ldflags "-X main.Version=$(VERSION) -X main.DefaultServerURL=$(DEFAULT_SERVER_URL)" \
+		-o $(CLI_BINARY) ./cmd/datumctl
+	@echo "✅ CLI: $(CLI_BINARY)"
+
+build-api-only: ## Build server without web UI
+	@SKIP_WEB=1 $(MAKE) build-server
+
+build-all: build-server build-cli ## Build server + CLI
+
+build-linux: prepare-assets ## Cross-compile Linux AMD64
+	@mkdir -p build/release
+	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datum-server-linux-amd64 ./cmd/server
+	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datumctl-linux-amd64 ./cmd/datumctl
+	@echo "✅ Linux binaries: build/release/"
+
+build-release: build-linux ## Build release binaries
+
+release: ## Build release Docker image (make release VERSION=x.y.z)
 	docker build \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg BUILD_DATE=$(BUILD_DATE) \
 		--build-arg DEFAULT_SERVER_URL=$(DEFAULT_SERVER_URL) \
-		-t datum-server:$(VERSION) \
-		-t datum-server:latest \
+		-t datum-server:$(VERSION) -t datum-server:latest \
 		-f docker/Dockerfile .
 
-run: ## Start all services
+# ── Docker (local full-stack) ────────────────────────────────────────────────
+run: ## Start all services (Traefik + Postgres + Server)
 	$(COMPOSE) up -d
 	@echo "✅ Services started"
 
@@ -45,197 +93,145 @@ stop: ## Stop all services
 restart: ## Restart all services
 	$(COMPOSE) restart
 
-logs: ## Show logs (use SERVICE=datum-server to filter)
-	@if [ -z "$(SERVICE)" ]; then \
-		$(COMPOSE) logs -f; \
-	else \
-		$(COMPOSE) logs -f $(SERVICE); \
-	fi
+logs: ## Show logs (SERVICE=datum-server to filter)
+	@if [ -z "$(SERVICE)" ]; then $(COMPOSE) logs -f; else $(COMPOSE) logs -f $(SERVICE); fi
 
 ps: ## Show running containers
 	$(COMPOSE) ps
 
-# Development commands
-dev: ## Start services in development mode with hot reload
-	$(COMPOSE_DEV) up -d
-	@echo "🔧 Development mode active"
+shell-server: ## Shell into server container
+	$(COMPOSE) exec datum-server sh
 
-dev-logs: ## Show development logs
+# ── Deploy (external Traefik) ────────────────────────────────────────────────
+deploy: ## Deploy to remote server (external Traefik, uses docker/.env)
+	@echo "🚀 Deploying $(VERSION) ($(BUILD_DATE))..."
+	$(COMPOSE_EXT) build --pull --no-cache \
+		--build-arg VERSION="$(VERSION)" \
+		--build-arg BUILD_DATE="$(BUILD_DATE)"
+	$(COMPOSE_EXT) up -d --force-recreate --remove-orphans
+	@echo "✅ Deployed"
+
+deploy-logs: ## Tail logs from external deploy
+	$(COMPOSE_EXT) logs -f
+
+deploy-stop: ## Stop external deployment
+	$(COMPOSE_EXT) down
+
+deploy-ps: ## Show external deployment status
+	$(COMPOSE_EXT) ps
+
+# ── Development ───────────────────────────────────────────────────────────────
+dev: ## Start in dev mode with hot reload
+	$(COMPOSE_DEV) up -d
+	@echo "🔧 Dev mode active"
+
+dev-logs: ## Show dev logs
 	$(COMPOSE_DEV) logs -f
 
-# Database commands
-db-backup: ## Backup database and time-series data
-	@echo "📦 Creating backup..."
-	@mkdir -p backups
-	@tar -czf backups/backup-$$(date +%Y%m%d-%H%M%S).tar.gz data/
-	@echo "✅ Backup created in backups/"
+run-server: build-server ## Build and run server locally (no Docker)
+	@./$(SERVER_BINARY)
 
-db-restore: ## Restore database from backup (use BACKUP=filename)
-	@if [ -z "$(BACKUP)" ]; then \
-		echo "❌ Error: Please specify BACKUP=filename"; \
-		echo "Available backups:"; \
-		ls -1 backups/; \
-		exit 1; \
-	fi
-	@echo "🔄 Restoring from $(BACKUP)..."
-	@$(COMPOSE) down
-	@rm -rf data/
-	@tar -xzf backups/$(BACKUP)
-	@echo "✅ Restore completed"
-
-db-clean: ## Clean all data (WARNING: destroys all data)
-	@echo "⚠️  This will delete all data!"
-	@read -p "Are you sure? [y/N] " -n 1 -r; \
-	echo; \
-	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		$(COMPOSE) down -v; \
-		rm -rf data/; \
-		echo "✅ Data cleaned"; \
-	fi
-
-# Testing commands
+# ── Test ──────────────────────────────────────────────────────────────────────
 test: ## Run all Go tests
-	@echo "🧪 Running Go tests..."
-	@mkdir -p build
 	@go test ./... -v
 
-test-coverage: ## Run tests with coverage
-	@echo "🧪 Running tests with coverage..."
+test-coverage: ## Run tests with coverage report
 	@mkdir -p build
 	@go test ./... -coverprofile=build/coverage.out
 	@go tool cover -html=build/coverage.out -o build/coverage.html
-	@echo "✅ Coverage report: build/coverage.html"
+	@echo "✅ Coverage: build/coverage.html"
 
-test-storage: ## Run storage tests with verbose output
-	@echo "🧪 Running storage tests..."
+coverage-check: ## Fail if coverage < MIN_COVERAGE (default 30%)
+	@MIN_COVERAGE=$${MIN_COVERAGE:-30}; \
+	mkdir -p build; \
+	go test ./... -coverprofile=build/coverage.out > /dev/null; \
+	pct=$$(go tool cover -func=build/coverage.out | tail -1 | awk '{print $$3}' | tr -d '%'); \
+	echo "📊 Coverage: $$pct% (min: $${MIN_COVERAGE}%)"; \
+	awk -v p=$$pct -v t=$$MIN_COVERAGE 'BEGIN{ exit (p+0 < t+0) }'
+
+test-storage: ## Run storage tests
 	@go test ./internal/storage/... -v
 
 test-auth: ## Run auth tests
-	@echo "🧪 Running auth tests..."
 	@go test ./internal/auth/... -v
 
-bench: ## Run Go benchmarks
-	@echo "⚡ Running Go benchmarks..."
-	@go test ./... -bench=. -benchmem
-
-test-load: ## Run HTTP load tests with Locust
-	@echo "⚡ Running HTTP load tests..."
-	@bash tests/run_load_test.sh
-
 test-integration: build-all ## Run integration tests
-	@echo "🧪 Running integration tests..."
 	@SERVER_BINARY=$(SERVER_BINARY) CLI_BINARY=$(CLI_BINARY) bash tests/integration_test.sh
 
-# Build commands
-# Build commands
-# Build commands
-build-web: ## Build Web Dashboard (React) - Auto-detects npm or uses Docker
-	@echo "🎨 Building Web Dashboard..."
-	@if command -v npm >/dev/null 2>&1; then \
-		echo "Found npm locally. Building..."; \
-		cd web && npm install && npm run build; \
-	else \
-		echo "npm not found. Building using Docker (node:20-alpine)..."; \
-		docker run --rm -u $$(id -u):$$(id -g) -v $$(pwd):/app -w /app/web node:20-alpine sh -c "npm ci && npm run build"; \
-	fi
-	@if [ ! -f web/dist/index.html ]; then echo "❌ web/dist/index.html missing! Build failed."; exit 1; fi
-	@echo "✅ Web Dashboard built"
+bench: ## Run Go benchmarks
+	@go test ./... -bench=. -benchmem
 
-prepare-assets: ## Copy web assets to server directory (skip with SKIP_WEB=1)
-	@if [ "$(SKIP_WEB)" = "1" ]; then \
-		echo "⚠️  SKIP_WEB=1: Creating minimal placeholder for API-only build..."; \
-		rm -rf cmd/server/dist; \
-		mkdir -p cmd/server/dist; \
-		echo '<!DOCTYPE html><html><body><h1>API-Only Mode</h1><p>Web UI not included in this build.</p></body></html>' > cmd/server/dist/index.html; \
-	else \
-		$(MAKE) build-web; \
-		echo "📦 Copying web assets..."; \
-		rm -rf cmd/server/dist; \
-		cp -r web/dist cmd/server/dist; \
-	fi
+test-load: ## Run HTTP load tests (Locust)
+	@bash tests/run_load_test.sh
 
-build-server: prepare-assets ## Build Go server binary locally
-	@echo "🔨 Building Go server..."
-	@mkdir -p build/binaries
-	@go build -o $(SERVER_BINARY) ./cmd/server
-	@echo "✅ Binary created: $(SERVER_BINARY)"
+# ── Database ──────────────────────────────────────────────────────────────────
+db-backup: ## Backup data/ directory
+	@mkdir -p backups
+	@tar -czf backups/backup-$$(date +%Y%m%d-%H%M%S).tar.gz data/
+	@echo "✅ Backup created"
 
-build-api-only: ## Build server without web UI (API-only mode)
-	@echo "🔨 Building API-only server..."
-	@SKIP_WEB=1 $(MAKE) build-server
-	@echo "✅ API-only binary created: $(SERVER_BINARY)"
+db-restore: ## Restore backup (BACKUP=filename)
+	@[ -n "$(BACKUP)" ] || { echo "❌ BACKUP= required"; ls -1 backups/ 2>/dev/null; exit 1; }
+	@$(COMPOSE) down
+	@rm -rf data/
+	@tar -xzf backups/$(BACKUP)
+	@echo "✅ Restored from $(BACKUP)"
 
-build-cli: ## Build datumctl CLI tool
-	@echo "🔨 Building datumctl..."
-	@mkdir -p build/binaries
-	@go build -ldflags "-X main.Version=$(VERSION) -X main.DefaultServerURL=$(DEFAULT_SERVER_URL)" -o $(CLI_BINARY) ./cmd/datumctl
-	@echo "✅ CLI tool created: $(CLI_BINARY)"
+db-clean: ## Delete all data (interactive confirm)
+	@echo "⚠️  This will delete all data!"
+	@read -p "Are you sure? [y/N] " -n 1 -r; echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then $(COMPOSE) down -v; rm -rf data/; echo "✅ Cleaned"; fi
 
-build-all: build-server build-cli ## Build server and CLI
-
-# Cross-platform build targets
-build-linux: prepare-assets ## Build Linux binaries (AMD64)
-	@echo "🔨 Building Linux binaries..."
-	@mkdir -p build/release
-	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datum-server-linux-amd64 ./cmd/server
-	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datumctl-linux-amd64 ./cmd/datumctl
-	@echo "✅ Linux binaries created in build/release/"
-
-build-windows: prepare-assets ## Build Windows binaries (AMD64)
-	@echo "🔨 Building Windows binaries..."
-	@mkdir -p build/release
-	@GOOS=windows GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datum-server-windows-amd64.exe ./cmd/server
-	@GOOS=windows GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o build/release/datumctl-windows-amd64.exe ./cmd/datumctl
-	@echo "✅ Windows binaries created in build/release/"
-
-build-release: build-linux build-windows ## Build release binaries for all platforms
-
-run-server: build-server ## Build and run server locally
-	@echo "🚀 Starting server..."
-	@./$(SERVER_BINARY)
-
-
-
-# Code quality
+# ── Code Quality ──────────────────────────────────────────────────────────────
 fmt: ## Format Go code
-	@echo "🔧 Formatting Go code..."
 	@go fmt ./...
 
 lint: ## Lint Go code
-	@echo "🔍 Linting Go code..."
 	@go vet ./...
 
-fmt-python: ## Format Python test scripts
-	@echo "🔧 Formatting Python code..."
-	@cd tests && black *.py 2>/dev/null || echo "⚠️  Black not installed"
+validate-openapi: ## Validate openapi.yaml
+	@python3 scripts/validate_openapi.py && echo "✅ openapi.yaml valid"
 
-# Utility commands
-shell-server: ## Open shell in server container
-	$(COMPOSE) exec datum-server sh
+# ── Utilities ─────────────────────────────────────────────────────────────────
+health: ## Check server health
+	@curl -sf http://localhost:8000/health | python3 -m json.tool || echo "❌ Server not responding"
 
-clean: ## Clean build artifacts and containers
-	$(COMPOSE) down -v
+docker-build: ## Build Docker images (local compose)
+	$(COMPOSE) build
+
+config-check: ## Show effective config from docker/.env
+	@echo "── Storage ──"
+	@grep -E '^(STORAGE_BACKEND|DATABASE_URL)=' docker/.env 2>/dev/null || echo "(not set — defaults to embedded)"
+	@echo ""
+	@echo "── Server ──"
+	@grep -E '^(PORT|SERVER_URL|DOMAIN)=' docker/.env 2>/dev/null
+	@echo ""
+	@echo "── Auth ──"
+	@grep -E '^JWT_' docker/.env 2>/dev/null | sed 's/=.*/=***/'
+
+docs: ## Open API docs in browser
+	@xdg-open http://localhost:8000/docs 2>/dev/null || open http://localhost:8000/docs 2>/dev/null || echo "Open http://localhost:8000/docs"
+
+install-tools: ## Install dev tools
+	@go install golang.org/x/tools/cmd/goimports@latest
+	@pip3 install locust black 2>/dev/null || echo "⚠️  pip3 not found"
+
+clean: ## Clean build artifacts (keeps data)
 	rm -rf build/
-	rm -f datumctl server # Remove binaries if built in root
+	rm -f datumctl server
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	@echo "✅ Cleaned"
 
-install-tools: ## Install development tools
-	@echo "📦 Installing development tools..."
-	@go install golang.org/x/tools/cmd/goimports@latest
-	@pip3 install locust black 2>/dev/null || echo "⚠️  pip3 not found (required for load tests)"
+clean-all: clean ## Clean everything including containers and volumes
+	$(COMPOSE) down -v 2>/dev/null || true
+	@echo "✅ All cleaned"
 
-# Health checks
-health: ## Check service health (Development)
-	@echo "🏥 Checking service health..."
-	@curl -s http://localhost:8000/health | python3 -m json.tool || echo "❌ Server not responding (ensure you are running in dev mode or port 8000 is exposed)"
-
-# Documentation
-validate-openapi: ## Validate openapi.yaml for duplicate paths and YAML errors
-	@python3 scripts/validate_openapi.py && echo "✅ openapi.yaml valid"
-
-docs: ## Open API documentation in browser (Development)
-	@echo "📖 Opening API docs..."
-	@xdg-open http://localhost:8000/docs 2>/dev/null || open http://localhost:8000/docs 2>/dev/null || echo "Open http://localhost:8000/docs in your browser"
-
-.DEFAULT_GOAL := help
+.PHONY: help build build-web prepare-assets build-server build-cli build-api-only build-all \
+	build-linux build-release release \
+	run stop restart logs ps shell-server \
+	deploy deploy-logs deploy-stop deploy-ps \
+	dev dev-logs run-server \
+	test test-coverage coverage-check test-storage test-auth test-integration bench test-load \
+	db-backup db-restore db-clean \
+	fmt lint validate-openapi \
+	health docker-build config-check docs install-tools clean clean-all
