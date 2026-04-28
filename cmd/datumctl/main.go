@@ -48,8 +48,10 @@ func init() {
 	// Load config before command execution
 	cobra.OnInitialize(loadConfig)
 
-	// Disable auto-completion command (not needed for interactive mode)
-	rootCmd.CompletionOptions.DisableDefaultCmd = true
+	// Re-enable cobra's built-in shell completion command. Phase 6 polish:
+	// users can now wire up `datumctl completion bash|zsh|fish|powershell`.
+	// Interactive mode remains the default for new users — see `datumctl i`.
+	rootCmd.CompletionOptions.DisableDefaultCmd = false
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&serverURL, "server", DefaultServerURL, "Datum server URL")

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -10,7 +11,12 @@ import (
 	"datum-go/internal/cli/utils"
 )
 
-var Version = "1.1.0"
+// Build-time variables (overridden via -ldflags "-X main.Version=…").
+var (
+	Version   = "1.1.0"
+	BuildDate = "unknown"
+	Commit    = "unknown"
+)
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
@@ -20,11 +26,21 @@ var statusCmd = &cobra.Command{
 }
 
 var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Show version information",
+	Use:     "version",
+	Aliases: []string{"v"},
+	Short:   "Show version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("datumctl version %s\n", Version)
-		fmt.Println("Datum IoT Platform CLI")
+		if outputJSON {
+			fmt.Printf(
+				"{\"version\":%q,\"build_date\":%q,\"commit\":%q,\"go\":%q,\"os\":%q,\"arch\":%q}\n",
+				Version, BuildDate, Commit, runtime.Version(), runtime.GOOS, runtime.GOARCH,
+			)
+			return
+		}
+		fmt.Printf("datumctl %s\n", Version)
+		fmt.Printf("  build:  %s\n", BuildDate)
+		fmt.Printf("  commit: %s\n", Commit)
+		fmt.Printf("  go:     %s (%s/%s)\n", runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	},
 }
 
