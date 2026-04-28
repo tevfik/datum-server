@@ -2,7 +2,12 @@ package webhook
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"math/rand"
 	"net/http"
 	"sync"
 	"time"
@@ -154,25 +159,90 @@ func (d *Dispatcher) deliver(evt Event) {
 func (d *Dispatcher) send(sub *Subscription, body []byte) {
 	log := logger.GetLogger()
 
-	req, err := http.NewRequest("POST", sub.URL, bytes.NewReader(body))
-	if err != nil {
-		log.Error().Err(err).Str("webhook_id", sub.ID).Msg("webhook: failed to create request")
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Datum-Event", "webhook")
+	// Webhook v2 signing scheme:
+	//   X-Datum-Timestamp: <unix-seconds>
+	//   X-Datum-Signature: sha256=<hex(hmac_sha256(secret, "<ts>.<body>"))>
+	//   X-Datum-Event: webhook
+	//
+	// Replay protection: receivers should reject timestamps older than ~5
+	// minutes. The legacy X-Webhook-Secret header is still emitted for
+	// back-compat with v1 receivers.
+	ts := time.Now().Unix()
+	signature := ""
 	if sub.Secret != "" {
-		req.Header.Set("X-Webhook-Secret", sub.Secret)
+		h := hmac.New(sha256.New, []byte(sub.Secret))
+		fmt.Fprintf(h, "%d.", ts)
+		h.Write(body)
+		signature = "sha256=" + hex.EncodeToString(h.Sum(nil))
 	}
 
-	resp, err := d.client.Do(req)
-	if err != nil {
-		log.Warn().Err(err).Str("webhook_id", sub.ID).Str("url", sub.URL).Msg("webhook: delivery failed")
-		return
+	const maxAttempts = 5
+	// Exponential backoff with jitter: 0s, 1s, 2s, 4s, 8s (+/- 25%).
+	delay := func(attempt int) time.Duration {
+		if attempt == 0 {
+			return 0
+		}
+		base := time.Duration(1<<uint(attempt-1)) * time.Second
+		jitter := time.Duration(rand.Int63n(int64(base) / 2)) //nolint:gosec // jitter only
+		return base - base/4 + jitter
 	}
-	resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
-		log.Warn().Int("status", resp.StatusCode).Str("webhook_id", sub.ID).Msg("webhook: endpoint returned error")
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if d := delay(attempt); d > 0 {
+			time.Sleep(d)
+		}
+		req, err := http.NewRequest("POST", sub.URL, bytes.NewReader(body))
+		if err != nil {
+			log.Error().Err(err).Str("webhook_id", sub.ID).Msg("webhook: failed to create request")
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Datum-Event", "webhook")
+		req.Header.Set("X-Datum-Timestamp", fmt.Sprintf("%d", ts))
+		if signature != "" {
+			req.Header.Set("X-Datum-Signature", signature)
+			req.Header.Set("X-Webhook-Secret", sub.Secret) // back-compat
+		}
+		resp, err := d.client.Do(req)
+		if err != nil {
+			log.Warn().Err(err).
+				Str("webhook_id", sub.ID).
+				Str("url", sub.URL).
+				Int("attempt", attempt+1).
+				Msg("webhook: delivery failed")
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode < 300 {
+			return // success
+		}
+		// 4xx (except 408/429) is non-retryable.
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 &&
+			resp.StatusCode != http.StatusRequestTimeout &&
+			resp.StatusCode != http.StatusTooManyRequests {
+			log.Warn().Int("status", resp.StatusCode).Str("webhook_id", sub.ID).Msg("webhook: non-retryable error")
+			return
+		}
+		log.Warn().Int("status", resp.StatusCode).Int("attempt", attempt+1).Str("webhook_id", sub.ID).Msg("webhook: retryable error")
 	}
+	log.Error().Str("webhook_id", sub.ID).Int("attempts", maxAttempts).Msg("webhook: gave up after retries")
+}
+
+// SignBody returns the signature header value that would be sent for the
+// given (timestamp, body, secret). Exposed for receivers under tests.
+func SignBody(secret string, timestamp int64, body []byte) string {
+	if secret == "" {
+		return ""
+	}
+	h := hmac.New(sha256.New, []byte(secret))
+	fmt.Fprintf(h, "%d.", timestamp)
+	h.Write(body)
+	return "sha256=" + hex.EncodeToString(h.Sum(nil))
+}
+
+// VerifySignature returns true when the supplied signature header matches a
+// freshly computed signature, using a constant-time comparison.
+func VerifySignature(secret string, timestamp int64, body []byte, signatureHeader string) bool {
+	expected := SignBody(secret, timestamp, body)
+	return hmac.Equal([]byte(expected), []byte(signatureHeader))
 }

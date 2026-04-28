@@ -7,8 +7,8 @@
 //   - localfs: stores objects under a directory on the host filesystem.
 //     This is the default and requires no external dependencies.
 //   - s3:     placeholder for an S3 / MinIO-compatible remote backend.
-//             Wired in a follow-up; selecting it today returns an error so
-//             the misconfiguration is visible at startup.
+//     Wired in a follow-up; selecting it today returns an error so
+//     the misconfiguration is visible at startup.
 //
 // The HTTP layer in `internal/api/buckets` exposes a small REST surface
 // on top of any Backend; CLI helpers in `cmd/datumctl/bucket.go` mirror it.
