@@ -17,12 +17,23 @@ import (
 // Config holds all server configuration.
 type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
+	Storage  StorageConfig  `mapstructure:"storage"`
 	Database DatabaseConfig `mapstructure:"database"`
 	Auth     AuthConfig     `mapstructure:"auth"`
 	MQTT     MQTTConfig     `mapstructure:"mqtt"`
 	Email    EmailConfig    `mapstructure:"email"`
 	Logging  LoggingConfig  `mapstructure:"logging"`
 	Data     DataConfig     `mapstructure:"data"`
+	Buckets  BucketsConfig  `mapstructure:"buckets"`
+	Notify   NotifyConfig   `mapstructure:"notify"`
+}
+
+// StorageConfig selects the persistence backend.
+//
+//	Backend: "embedded" (BuntDB + tstorage, default) or "postgres".
+//	        If empty, falls back to embedded unless DATABASE_URL is set.
+type StorageConfig struct {
+	Backend string `mapstructure:"backend"`
 }
 
 type ServerConfig struct {
@@ -75,6 +86,31 @@ type DataConfig struct {
 	QueryMaxLimit           int `mapstructure:"query_max_limit"`
 }
 
+// BucketsConfig configures object storage (Phase 3).
+//
+//	Backend: "localfs" (default) or "s3".
+//	BaseDir: filesystem path used by localfs.
+//	Endpoint, Region, AccessKey, SecretKey, BucketPrefix: S3-compatible config.
+type BucketsConfig struct {
+	Backend      string `mapstructure:"backend"`
+	BaseDir      string `mapstructure:"base_dir"`
+	Endpoint     string `mapstructure:"endpoint"`
+	Region       string `mapstructure:"region"`
+	AccessKey    string `mapstructure:"access_key"`
+	SecretKey    string `mapstructure:"secret_key"`
+	BucketPrefix string `mapstructure:"bucket_prefix"`
+	MaxObjectMB  int    `mapstructure:"max_object_mb"`
+}
+
+// NotifyConfig controls the notification dispatcher (Phase 2).
+type NotifyConfig struct {
+	DefaultChannels []string `mapstructure:"default_channels"` // e.g. [inapp, mqtt, ntfy, webpush]
+	NtfyServerURL   string   `mapstructure:"ntfy_server_url"`  // public URL for ntfy-protocol topics
+	WebPushPublic   string   `mapstructure:"webpush_vapid_public"`
+	WebPushPrivate  string   `mapstructure:"webpush_vapid_private"`
+	WebPushSubject  string   `mapstructure:"webpush_subject"`
+}
+
 // Load reads configuration from file, env, and defaults, returning the
 // merged result. Environment variables take precedence over the config file.
 func Load() (*Config, error) {
@@ -107,6 +143,14 @@ func Load() (*Config, error) {
 	v.SetDefault("data.telemetry_buffer_size", 10000)
 	v.SetDefault("data.query_max_limit", 10000)
 
+	v.SetDefault("storage.backend", "") // empty = auto (postgres if DATABASE_URL else embedded)
+
+	v.SetDefault("buckets.backend", "localfs")
+	v.SetDefault("buckets.base_dir", "./data/buckets")
+	v.SetDefault("buckets.max_object_mb", 50)
+
+	v.SetDefault("notify.default_channels", []string{"inapp", "ntfy"})
+
 	// --- env bindings --- (flat env vars map to nested config)
 	bindings := map[string]string{
 		"server.port":                        "PORT",
@@ -138,6 +182,19 @@ func Load() (*Config, error) {
 		"data.retention_check_hours":         "RETENTION_CHECK_HOURS",
 		"data.telemetry_buffer_size":         "TELEMETRY_BUFFER_SIZE",
 		"data.query_max_limit":               "QUERY_MAX_LIMIT",
+		"storage.backend":                    "STORAGE_BACKEND",
+		"buckets.backend":                    "BUCKETS_BACKEND",
+		"buckets.base_dir":                   "BUCKETS_BASE_DIR",
+		"buckets.endpoint":                   "BUCKETS_S3_ENDPOINT",
+		"buckets.region":                     "BUCKETS_S3_REGION",
+		"buckets.access_key":                 "BUCKETS_S3_ACCESS_KEY",
+		"buckets.secret_key":                 "BUCKETS_S3_SECRET_KEY",
+		"buckets.bucket_prefix":              "BUCKETS_S3_PREFIX",
+		"buckets.max_object_mb":              "BUCKETS_MAX_OBJECT_MB",
+		"notify.ntfy_server_url":             "NTFY_SERVER_URL",
+		"notify.webpush_vapid_public":        "WEBPUSH_VAPID_PUBLIC",
+		"notify.webpush_vapid_private":       "WEBPUSH_VAPID_PRIVATE",
+		"notify.webpush_subject":             "WEBPUSH_SUBJECT",
 	}
 	for key, env := range bindings {
 		if err := v.BindEnv(key, env); err != nil {

@@ -18,10 +18,11 @@ import (
 	"time"
 
 	"datum-go/internal/api"
+	adminapi "datum-go/internal/api/admin"
 	rulesapi "datum-go/internal/api/rules"
 	"datum-go/internal/auth"
+	"datum-go/internal/config"
 	"datum-go/internal/email"
-	"datum-go/internal/handlers"
 	"datum-go/internal/logger"
 	"datum-go/internal/metrics"
 	mqtt_internal "datum-go/internal/mqtt"
@@ -181,6 +182,15 @@ func main() {
 		// fmt.Println("No .env file found or error loading it")
 	}
 
+	// Load central configuration (file + env). Environment variables still
+	// take precedence over the YAML file. Errors are non-fatal: we fall back
+	// to defaults so a missing/invalid file never prevents startup.
+	cfg, cfgErr := config.Load()
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "warning: config load: %v (continuing with defaults)\n", cfgErr)
+		cfg = &config.Config{}
+	}
+
 	// Ensure we log if main exits unexpectedly
 	defer func() {
 		if r := recover(); r != nil {
@@ -247,30 +257,48 @@ func main() {
 	}
 	// Note: CleanupEvery is handled internally by tstorage or ignored if using WithRetention
 
-	// Initialize storage (BuntDB for metadata, tstorage for time-series)
-	// Initialize storage
+	// Initialize storage. Backend selection priority:
+	//   1. STORAGE_BACKEND env var / storage.backend in datum-server.yaml
+	//      ("embedded" | "postgres")
+	//   2. DATABASE_URL set -> postgres (back-compat)
+	//   3. embedded (BuntDB + tstorage) — default, no external deps
 	var err error
 	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL != "" {
-		// Use PostgreSQL
+	backend := strings.ToLower(strings.TrimSpace(cfg.Storage.Backend))
+	if backend == "" {
+		backend = strings.ToLower(strings.TrimSpace(os.Getenv("STORAGE_BACKEND")))
+	}
+	if backend == "" {
+		if dbURL != "" {
+			backend = "postgres"
+		} else {
+			backend = "embedded"
+		}
+	}
+	switch backend {
+	case "postgres", "postgresql", "timescaledb":
+		if dbURL == "" {
+			log.Fatal().Msg("STORAGE_BACKEND=postgres requires DATABASE_URL to be set")
+		}
 		store, err = postgres.New(dbURL)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to initialize PostgreSQL storage")
 		}
-		log.Info().Str("backend", "PostgreSQL").Msg("Storage initialized")
-	} else {
-		// Use BuntDB (Default)
+		log.Info().Str("backend", "postgres").Msg("Storage initialized")
+	case "embedded", "bunt", "buntdb", "tstorage":
 		store, err = storage.New(dataDirPath+"/meta.db", dataDirPath+"/tsdata", retentionConfig.MaxAge)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to initialize BuntDB storage")
+			log.Fatal().Err(err).Msg("Failed to initialize embedded storage")
 		}
 		log.Info().
-			Str("backend", "BuntDB").
+			Str("backend", "embedded").
 			Str("timeseries", "tstorage").
 			Str("data_dir", dataDirPath).
 			Dur("retention", retentionConfig.MaxAge).
 			Dur("public_retention", retentionConfig.PublicMaxAge).
 			Msg("Storage initialized")
+	default:
+		log.Fatal().Str("backend", backend).Msg("Unknown STORAGE_BACKEND (expected 'embedded' or 'postgres')")
 	}
 
 	// Startup cleanup: expired grace periods and provisioning requests
@@ -544,9 +572,9 @@ func main() {
 	// Provisioning Endpoints (using new internal/api package)
 	api.RegisterProvisioningRoutes(r, apiConfig)
 
-	// Legacy Admin Routes (not yet migrated to internal/api)
+	// Legacy Admin Routes (will be folded into a generic /admin namespace later).
 	// Registers: /admin/dev/*, /admin/config/*, /admin/logs/*, /admin/firmware
-	adminHandler := handlers.NewAdminHandler(store, mqttBroker, serverStartTime)
+	adminHandler := adminapi.NewAdminHandler(store, mqttBroker, serverStartTime)
 	adminHandler.RegisterRoutes(r)
 
 	// Swagger UI documentation
