@@ -909,17 +909,29 @@ paths:
 
   /sys/ip:
     get:
-      summary: Get system IP
-      description: Returns the public IP address of the client as seen by the server.
+      summary: Get client public IP
+      description: |
+        Returns the public IP address of the calling client. The server prefers
+        proxy headers (`CF-Connecting-IP`, `True-Client-IP`, `X-Real-IP`,
+        `X-Forwarded-For` left-most entry) over the immediate transport
+        address, so callers behind a reverse proxy still see their real IP.
+
+        - `Accept: application/json` → `{ "ip": "1.2.3.4" }`
+        - default → `text/plain` body containing only the IP
       tags: [System]
       responses:
         '200':
-          description: Client IP address
+          description: Client public IP
           content:
             text/plain:
               schema:
                 type: string
-                example: "127.0.0.1"
+                example: "203.0.113.42"
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ip: { type: string, example: "203.0.113.42" }
 
 
   /sys/status:
@@ -1094,6 +1106,28 @@ paths:
         '200':
           description: Token removed
 
+  /auth/providers:
+    get:
+      summary: List configured OAuth providers
+      description: |
+        Returns the list of OAuth providers enabled on the server (those with
+        `OAUTH_<PROVIDER>_CLIENT_ID` set in the server environment).
+        Empty list means OAuth is disabled.
+
+        Also accessible as `GET /auth/oauth/providers` (alias).
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Provider list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: array
+                    items: { type: string, example: google }
+
   /auth/oauth/{provider}:
     get:
       summary: Initiate OAuth login
@@ -1103,6 +1137,8 @@ paths:
         **Web flow**: Simply redirect the browser here. After auth the callback returns JSON.
 
         **Mobile/PKCE flow**: Pass `code_challenge` (SHA-256 of your random verifier, base64url-encoded) and `redirect_uri` (your app's deep-link URI). After auth the callback redirects to your app with `access_token` and `refresh_token` as query parameters.
+
+        > Special case: `provider=providers` returns the same payload as `GET /auth/providers`.
       tags: [Authentication]
       parameters:
         - name: provider

@@ -64,3 +64,5 @@ docker-data/
 
 # Web build artifacts in server location
 cmd/server/dist/
+sdk/dart/.dart_tool/
+sdk/dart/pubspec.lock

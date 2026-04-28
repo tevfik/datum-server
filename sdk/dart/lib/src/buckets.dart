@@ -27,7 +27,7 @@ class BucketsApi {
       String bucket, String path, Uint8List body, {String? contentType}) async {
     final url = _c.uri('/storage/$bucket/$path');
     final headers = _c.headers(contentType: contentType ?? 'application/octet-stream');
-    final res = await _c.http.put(url, headers: headers, body: body);
+    final res = await _c.httpClient.put(url, headers: headers, body: body);
     if (res.statusCode >= 400) {
       throw Exception('PUT failed (${res.statusCode}): ${res.body}');
     }

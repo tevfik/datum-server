@@ -82,6 +82,8 @@ func (h *Handler) RegisterRoutes(r gin.IRouter, authMiddleware gin.HandlerFunc) 
 
 		// OAuth
 		authGroup.GET("/providers", h.GetOAuthProviders)
+		// /auth/oauth/providers is also routed via OAuthRedirect (handled inline
+		// to avoid Gin route-conflict between /oauth/providers and /oauth/:provider).
 		authGroup.GET("/oauth/:provider", h.OAuthRedirect)
 		authGroup.GET("/oauth/:provider/callback", h.OAuthCallback)
 	}

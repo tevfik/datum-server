@@ -30,6 +30,11 @@ services:
       # format: postgres://user:pass@host:5432/dbname?sslmode=disable
       - DATABASE_URL=${DATABASE_URL}
       - DATA_DIR=./data
+      # OAuth providers (optional — empty values disable the provider)
+      - OAUTH_GOOGLE_CLIENT_ID=${OAUTH_GOOGLE_CLIENT_ID:-}
+      - OAUTH_GOOGLE_CLIENT_SECRET=${OAUTH_GOOGLE_CLIENT_SECRET:-}
+      - OAUTH_GITHUB_CLIENT_ID=${OAUTH_GITHUB_CLIENT_ID:-}
+      - OAUTH_GITHUB_CLIENT_SECRET=${OAUTH_GITHUB_CLIENT_SECRET:-}
     volumes:
       - ${DATA_DIR:-../data}:/root/data
       - ../firmware:/root/firmware

@@ -651,8 +651,8 @@ func main() {
 		log.Info().Str("backend", bucketBackend.Name()).Msg("Bucket storage initialized")
 	}
 
-	// Swagger UI documentation
-	setupSwagger(r)
+	// Swagger UI documentation (auth-gated — JWT or API key required)
+	setupSwagger(r, store)
 
 	log.Info().
 		Str("port", serverPort).

@@ -3,8 +3,10 @@ package system
 
 import (
 	"datum-go/internal/storage"
+	"net"
 	"net/http"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -42,10 +44,56 @@ func (h *Handler) RegisterAdminRoutes(r *gin.RouterGroup) {
 	r.DELETE("/logs", h.ClearLogs)
 }
 
-// GetSystemIP returns the client's public IP.
+// GetSystemIP returns the client's public IP, honoring proxy headers
+// (CF-Connecting-IP, X-Real-IP, X-Forwarded-For) before falling back to the
+// raw remote address. This is what callers expect when they ask "what is my
+// public IP" — the IP a remote service would observe, not the immediate hop.
 // GET /sys/ip
 func (h *Handler) GetSystemIP(c *gin.Context) {
-	c.String(http.StatusOK, c.ClientIP())
+	ip := publicClientIP(c)
+	if accept := c.GetHeader("Accept"); strings.Contains(accept, "application/json") {
+		c.JSON(http.StatusOK, gin.H{"ip": ip})
+		return
+	}
+	c.String(http.StatusOK, ip)
+}
+
+// publicClientIP picks the most likely public client IP from common proxy
+// headers. Headers are checked in order; the first valid public IP wins.
+func publicClientIP(c *gin.Context) string {
+	candidates := []string{
+		c.GetHeader("CF-Connecting-IP"),
+		c.GetHeader("True-Client-IP"),
+		c.GetHeader("X-Real-IP"),
+	}
+	// X-Forwarded-For is comma-separated; the left-most entry is the original client.
+	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
+		for _, p := range strings.Split(xff, ",") {
+			candidates = append(candidates, strings.TrimSpace(p))
+		}
+	}
+	candidates = append(candidates, c.ClientIP())
+
+	var firstValid string
+	for _, raw := range candidates {
+		ip := net.ParseIP(strings.TrimSpace(raw))
+		if ip == nil {
+			continue
+		}
+		if firstValid == "" {
+			firstValid = ip.String()
+		}
+		if !isPrivateIP(ip) {
+			return ip.String()
+		}
+	}
+	return firstValid
+}
+
+// isPrivateIP reports whether ip is in a private/loopback/link-local range.
+func isPrivateIP(ip net.IP) bool {
+	return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() ||
+		ip.IsUnspecified()
 }
 
 // GetSystemInfo returns version and build information.

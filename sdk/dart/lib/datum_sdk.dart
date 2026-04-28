@@ -19,4 +19,7 @@ export 'src/data.dart';
 export 'src/buckets.dart';
 export 'src/notify.dart';
 export 'src/realtime.dart';
+export 'src/db.dart';
+export 'src/ai.dart';
+export 'src/community.dart';
 export 'src/exceptions.dart';

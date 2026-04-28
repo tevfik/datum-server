@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import 'ai.dart';
 import 'auth.dart';
 import 'buckets.dart';
+import 'community.dart';
 import 'data.dart';
+import 'db.dart';
 import 'devices.dart';
 import 'exceptions.dart';
 import 'notify.dart';
@@ -12,20 +15,26 @@ import 'realtime.dart';
 /// Top-level entry point for the Datum platform.
 class DatumClient {
   DatumClient({required this.baseUrl, http.Client? httpClient})
-      : http = httpClient ?? http.Client() {
+      : httpClient = httpClient ?? http.Client() {
     auth = AuthApi(this);
     devices = DevicesApi(this);
     data = DataApi(this);
     buckets = BucketsApi(this);
     notify = NotifyApi(this);
     realtime = RealtimeClient(this);
+    db = DbApi(this);
+    ai = AiApi(this);
+    community = CommunityApi(this);
   }
 
   final String baseUrl;
-  final http.Client http;
+  final http.Client httpClient;
 
   String? token;
+  String? userId;
   String? apiKey;
+
+  bool get isAuthenticated => token != null;
 
   late final AuthApi auth;
   late final DevicesApi devices;
@@ -33,6 +42,9 @@ class DatumClient {
   late final BucketsApi buckets;
   late final NotifyApi notify;
   late final RealtimeClient realtime;
+  late final DbApi db;
+  late final AiApi ai;
+  late final CommunityApi community;
 
   Map<String, String> headers({String? contentType = 'application/json'}) {
     final h = <String, String>{};
@@ -62,7 +74,7 @@ class DatumClient {
     final req = http.Request(method, uri(path, query));
     req.headers.addAll(headers());
     if (body != null) req.body = jsonEncode(body);
-    final streamed = await http.send(req);
+    final streamed = await httpClient.send(req);
     final res = await http.Response.fromStream(streamed);
     if (res.statusCode >= 400) {
       throw DatumException(res.statusCode, res.body);

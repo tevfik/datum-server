@@ -67,8 +67,15 @@ func (h *Handler) GetOAuthProviders(c *gin.Context) {
 // Web apps: omit code_challenge; redirect_uri defaults to /auth/oauth/:provider/callback.
 //
 // Supported providers: google, github (configured via env vars).
+//
+// Special case: GET /auth/oauth/providers returns the list of configured
+// providers — routed here to avoid a Gin static-vs-wildcard route conflict.
 func (h *Handler) OAuthRedirect(c *gin.Context) {
 	provider := c.Param("provider")
+	if provider == "providers" {
+		h.GetOAuthProviders(c)
+		return
+	}
 	cfg, ok := oauthProviders[provider]
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("OAuth provider '%s' not configured", provider)})

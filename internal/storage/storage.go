@@ -6,6 +6,8 @@ import (
 	"datum-go/internal/logger"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +47,16 @@ type Storage struct {
 var _ Provider = (*Storage)(nil)
 
 func New(metaPath, dataPath string, retention time.Duration) (*Storage, error) {
+	// Ensure parent dirs exist for both metadata and time-series storage.
+	// tstorage requires the data dir + WAL subdir to exist; without this,
+	// closing an empty store fails with "open data/tsdata/wal/1: no such file".
+	if err := os.MkdirAll(filepath.Dir(metaPath), 0o755); err != nil {
+		return nil, fmt.Errorf("create meta dir: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(dataPath, "wal"), 0o755); err != nil {
+		return nil, fmt.Errorf("create tsdata wal dir: %w", err)
+	}
+
 	// Open BuntDB for metadata
 	db, err := buntdb.Open(metaPath)
 	if err != nil {
