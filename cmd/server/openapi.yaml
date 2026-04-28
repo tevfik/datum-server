@@ -114,12 +114,74 @@ components:
         default: 10000
         maximum: 10000
 
+  responses:
+    BadRequest:
+      description: Bad Request — malformed JSON, missing required fields, or failed validation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "invalid request body" }
+    Unauthorized:
+      description: Unauthorized — missing, invalid or expired authentication credentials.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "unauthorized" }
+    Forbidden:
+      description: Forbidden — authenticated but lacking permission for this resource.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "forbidden" }
+    NotFound:
+      description: Not Found — resource does not exist or is not accessible to the caller.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "not found" }
+    Conflict:
+      description: Conflict — resource already exists or current state prevents the operation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "already exists" }
+    UnprocessableEntity:
+      description: Unprocessable Entity — semantically invalid input.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "validation failed" }
+    TooManyRequests:
+      description: Too Many Requests — rate limit exceeded. Retry after the period in the `Retry-After` header.
+      headers:
+        Retry-After:
+          description: Seconds until the client may retry.
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "rate limit exceeded" }
+    InternalError:
+      description: Internal Server Error — unexpected server failure. Includes a request ID for log correlation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "internal server error" }
+
   schemas:
     Error:
       type: object
+      required: [error]
       properties:
         error:
           type: string
+          description: Human-readable error message. Stable identifier strings will be added in a future revision.
+        code:
+          type: string
+          description: Optional machine-readable error code (reserved for future use).
+        request_id:
+          type: string
+          description: Correlates with the `X-Request-ID` response header.
 
     RegisterRequest:
       type: object

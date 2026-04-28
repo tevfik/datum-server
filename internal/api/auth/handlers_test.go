@@ -30,7 +30,7 @@ func setupTestEnv(t *testing.T) (*Handler, storage.Provider, func()) {
 	// Initialize system so registration works
 	require.NoError(t, store.InitializeSystem("test", true, 7))
 
-	handler := NewHandler(store, nil, "http://localhost:8090")
+	handler := NewHandler(store, nil, nil, nil, "http://localhost:8090")
 	return handler, store, func() { store.Close() }
 }
 
@@ -147,7 +147,7 @@ func TestRegister_SystemNotInitialized(t *testing.T) {
 	require.NoError(t, err)
 	defer store.Close()
 
-	handler := NewHandler(store, nil, "")
+	handler := NewHandler(store, nil, nil, nil, "")
 
 	r := gin.New()
 	r.POST("/auth/register", handler.Register)

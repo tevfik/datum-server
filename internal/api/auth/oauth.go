@@ -14,6 +14,7 @@ import (
 
 	"datum-go/internal/auth"
 	"datum-go/internal/storage"
+	"datum-go/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
@@ -130,7 +131,7 @@ func (h *Handler) OAuthCallback(c *gin.Context) {
 
 		// Create new user (no password — OAuth-only account)
 		user = &storage.User{
-			ID:          generateID("usr"),
+			ID:          utils.GenerateIDWithBytes("usr", 8),
 			Email:       providerEmail,
 			DisplayName: providerName,
 			Role:        "user",

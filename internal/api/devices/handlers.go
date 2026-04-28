@@ -2,11 +2,9 @@
 package devices
 
 import (
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -14,6 +12,7 @@ import (
 	"datum-go/internal/logger"
 	"datum-go/internal/mqtt"
 	"datum-go/internal/storage"
+	"datum-go/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -94,7 +93,7 @@ func (h *Handler) CreateDevice(c *gin.Context) {
 
 	deviceID := req.ID
 	if deviceID == "" {
-		deviceID = generateID("dev")
+		deviceID = utils.GenerateIDWithBytes("dev", 8)
 	}
 	apiKey, err := auth.GenerateAPIKey()
 	if err != nil {
@@ -419,10 +418,4 @@ func (h *Handler) RotateKey(c *gin.Context) {
 	})
 }
 
-// ============ Helper Functions ============
-
-func generateID(prefix string) string {
-	bytes := make([]byte, 8)
-	rand.Read(bytes)
-	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(bytes))
-}
+// (helper generateID was removed; use utils.GenerateIDWithBytes instead)

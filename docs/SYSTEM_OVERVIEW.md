@@ -82,9 +82,20 @@ graph TD
 - **WebSockets**: For real-time data streaming and logs.
 
 ### 3.2 Storage
-The platform uses a dual-storage approach:
-1.  **Metadata Storage**: BuntDB (in-memory with disk persistence) for fast lookups of users, devices, and keys.
-2.  **Time-Series Storage**: Custom TSStorage engine optimized for high-write-throughput sensor data.
+The platform exposes a single `storage.Provider` interface with two
+interchangeable backends:
+
+1. **BuntDB + tstorage (default, "embedded")** — BuntDB persists metadata
+   (users, devices, sessions, rules, system config) to disk while serving
+   reads from memory; tstorage stores time-series telemetry on disk in a
+   write-optimised columnar layout. Single binary, no external dependencies.
+2. **PostgreSQL + TimescaleDB ("production")** — Metadata in regular SQL
+   tables, telemetry in a TimescaleDB hypertable. Recommended whenever you
+   need horizontal scale, point-in-time recovery, or external SQL access.
+
+Both backends implement the full `Provider` API so all higher-level features
+(rules, webhooks, retention, MQTT auth, etc.) behave identically. See
+`docs/guides/DATABASE_SETUP.md` for selection and tuning.
 
 ## 4. API Design Philosophy
 

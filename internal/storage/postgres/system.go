@@ -203,15 +203,14 @@ func (s *PostgresStore) GetStats() (*storage.SystemStats, error) {
 	return stats, nil
 }
 
-// GetSystemLogs returns system logs (Not implemented for Postgres yet)
-// GetSystemLogs returns system logs
+// GetSystemLogs returns system logs (delegated to in-process logger reader).
 func (s *PostgresStore) GetSystemLogs(limit int, level string, search string) ([]string, error) {
 	return logger.GetRecentLogs(limit, level, search)
 }
 
-// ClearSystemLogs clears system logs (Not implemented)
+// ClearSystemLogs truncates the on-disk log file (if configured).
 func (s *PostgresStore) ClearSystemLogs() error {
-	return nil
+	return logger.ClearLogFile()
 }
 
 // PurgeOldDataPoints removes data points older than the given duration.

@@ -193,8 +193,6 @@ func main() {
 	serverURL := flag.String("server-url", "", "Public server URL (default: http://localhost:8000 or SERVER_URL env var)")
 	dataDir := flag.String("data-dir", "", "Data directory path (default: ./data or DATA_DIR env var)")
 	retentionDays := flag.Int("retention-days", 0, "Data retention in days (default: 7 or RETENTION_MAX_DAYS env var)")
-	// retentionCheckHours is deprecated as retention is handled by storage engine
-	_ = flag.Int("retention-check-hours", 0, "DEPRECATED: Retention check interval in hours")
 	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
 

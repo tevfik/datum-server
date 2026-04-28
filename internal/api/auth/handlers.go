@@ -4,7 +4,6 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -15,6 +14,7 @@ import (
 	"datum-go/internal/logger"
 	"datum-go/internal/notify"
 	"datum-go/internal/storage"
+	"datum-go/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -177,11 +177,7 @@ type userResponse struct {
 
 // ============ Helpers ============
 
-func generateID(prefix string) string {
-	bytes := make([]byte, 8)
-	rand.Read(bytes)
-	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(bytes))
-}
+// (helper generateID was removed; use utils.GenerateIDWithBytes instead)
 
 // ntfyTopicForUser derives a stable, non-guessable ntfy topic from user ID.
 // Uses a consistent prefix so it's re-derivable without DB storage.
@@ -254,7 +250,7 @@ func (h *Handler) Register(c *gin.Context) {
 	}
 
 	user := &storage.User{
-		ID:           generateID("usr"),
+		ID:           utils.GenerateIDWithBytes("usr", 8),
 		Email:        req.Email,
 		PasswordHash: hashedPassword,
 		DisplayName:  req.Name,

@@ -2325,9 +2325,9 @@ func (s *Storage) GetSystemLogs(limit int, level string, search string) ([]strin
 	return logger.GetRecentLogs(limit, level, search)
 }
 
-// ClearSystemLogs clears logs
+// ClearSystemLogs truncates the on-disk log file (if configured).
 func (s *Storage) ClearSystemLogs() error {
-	return nil
+	return logger.ClearLogFile()
 }
 
 // ============ Session Operations (multi-device refresh tokens) ============

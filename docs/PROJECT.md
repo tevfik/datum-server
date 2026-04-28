@@ -7,18 +7,18 @@ This is the standalone Go backend for the Datum IoT platform, extracted from the
 ### Core Components
 - **Go Backend** (`cmd/server/`, `internal/`)
   - HTTP REST API with Gin framework
-  - Real-time SSE streaming
-  - Dual storage: BuntDB (metadata) + TSStorage (time-series)
-  - JWT authentication + API key auth
-  - Rate limiting and admin middleware
+  - Real-time SSE streaming, embedded MQTT broker (mochi), WebSocket binary streams
+  - Pluggable storage: BuntDB+tstorage (default, embedded mode) or PostgreSQL+TimescaleDB (production)
+  - Hybrid auth: JWT + refresh sessions, persistent user API keys (`ak_`), device keys (`sk_`/`dk_`)
+  - Rate limiting, audit logging, rules engine, webhook dispatch, multi-channel notifications
   
 ### Comprehensive Testing
-- **55+ unit tests** (3,282 lines of test code)
-- **Storage tests**: TSStorage, BuntDB, retention, system config
-- **Auth tests**: JWT, API keys, rate limiting
-- **HTTP tests**: All handlers and endpoints
+- **40+ Go unit test files** spanning auth, storage, handlers, MQTT, rules, webhook, processing
+- **Storage tests**: tstorage, BuntDB, PostgreSQL provider, retention, system config
+- **Auth tests**: JWT, API keys, hybrid middleware, WiFi-encryption, rate limiting
+- **HTTP tests**: Per-package handler tests under `internal/api/*`
+- **Integration scripts** (`tests/`): provisioning, load, SSE, MQTT device simulator
 - **Benchmarks**: Storage performance, auth validation
-- **Load tests**: Locust-based HTTP load testing
 
 ### Performance
 - **HTTP**: 633 req/s with 10K concurrent users
@@ -96,23 +96,30 @@ make db-restore        # Restore from backup
 ```
 datum-server/
 ├── cmd/
-│   └── server/           # HTTP server, handlers, main.go
+│   ├── server/          # HTTP server entry point, openapi.yaml
+│   └── datumctl/        # Admin/operator CLI (kubectl-style)
 ├── internal/
-│   ├── auth/            # Authentication, middleware, rate limiting
-│   ├── storage/         # Dual backend: BuntDB+TStorage or PostgreSQL
-│   ├── mqtt/            # Embedded MQTT Broker (mochi-mqtt)
-│   ├── processing/      # Async Telemetry Processor
-│   └── email/           # Email service (SMTP)
-├── docs/                # 12 documentation files
-├── examples/
-│   ├── arduino/         # ESP32 firmware examples
-│   └── micropython/     # MicroPython client examples
-├── tests/               # Load testing scripts (Locust)
-├── scripts/             # Backup, restore, setup scripts
-├── data/                # Database files (generated)
-├── docker-compose.yml   # Docker deployment
-├── Makefile             # Build and test commands
-└── README.md            # Main documentation
+│   ├── api/             # HTTP handlers grouped by resource (auth, devices, data, ...)
+│   ├── auth/            # JWT, API keys, middleware, WiFi-encryption
+│   ├── storage/         # Provider interface + BuntDB+tstorage default backend
+│   │   └── postgres/    # PostgreSQL + TimescaleDB backend
+│   ├── mqtt/            # Embedded MQTT broker (mochi)
+│   ├── processing/      # Async telemetry batcher
+│   ├── notify/          # Notification dispatcher (in-app, ntfy, etc.)
+│   ├── webhook/         # Outbound webhook dispatcher
+│   ├── rules/           # User-defined rule engine
+│   ├── ratelimit/       # Per-IP token bucket
+│   ├── metrics/         # In-memory metrics + Prometheus export
+│   ├── audit/           # Audit log emitter
+│   ├── config/          # Centralised configuration loader
+│   ├── email/           # Resend / SMTP-style email sender
+│   └── logger/          # zerolog setup, broadcaster, file reader
+├── web/                 # React + Vite admin UI
+├── docs/                # Project, guides, references, diagrams
+├── tests/               # Integration scripts (shell + python)
+├── scripts/             # Backup, restore, migration, load test
+├── docker/              # Dockerfile and compose files
+└── Makefile             # Build, test, deploy targets
 ```
 
 ## Migration from Monorepo
@@ -121,9 +128,9 @@ This project was cleanly extracted from the `datum-py` monorepo:
 
 **What was kept:**
 - All Go backend code (cmd/, internal/)
-- All tests (55+ tests, full coverage)
-- All backend documentation (12 files)
-- Device examples (arduino, micropython)
+- The full automated test suite
+- All backend documentation
+- Device examples (arduino, micropython) under `libraries/DatumIoT/`
 - Deployment scripts and Docker files
 - Load testing infrastructure
 
@@ -140,9 +147,17 @@ This project was cleanly extracted from the `datum-py` monorepo:
 3. **Load tests** (`make test-load`): Real-world capacity testing
 
 ### Storage Architecture
-- **BuntDB**: Fast in-memory metadata storage with persistence
-- **TSStorage**: Custom time-series storage optimized for IoT
-- **Retention**: Automatic cleanup of old data
+Two first-class backends share the same `storage.Provider` interface:
+
+- **BuntDB + tstorage (default)** — Single binary, no external dependencies.
+  BuntDB stores metadata (users, devices, sessions, rules, configuration);
+  tstorage stores time-series telemetry. Ideal for edge devices and dev/staging.
+- **PostgreSQL + TimescaleDB** — Production backend. Metadata in regular
+  tables, telemetry in a TimescaleDB hypertable. Recommended for multi-instance
+  deployments. Selected via configuration (see `docs/guides/DATABASE_SETUP.md`).
+
+All higher-level features (rules engine, webhooks, MQTT, retention) work
+identically regardless of which backend is active.
 
 ### Authentication
 - **JWT tokens**: For user authentication

@@ -65,7 +65,6 @@ func NewHandler(store storage.Provider) *Handler {
 func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("/:device_id", h.PostPublicData)
 	r.GET("/:device_id", h.GetPublicData)
-	// r.GET("/:device_id/rec", ...) // Deprecated
 }
 
 // PostPublicData handles public data submission.

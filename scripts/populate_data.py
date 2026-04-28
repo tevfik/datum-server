@@ -7,11 +7,17 @@ import math
 import os
 import sys
 
-# User-specific paths (updated based on previous interaction)
-DATUMCTL = "build/binaries/datumctl"
-SERVER = "https://datum.bezg.in"
-EMAIL = "tevfik.kadioglu@gmail.com"
-PASSWORD = "**" 
+# Configurable via environment (no hardcoded credentials):
+#   DATUMCTL_BIN, DATUM_SERVER, DATUM_EMAIL, DATUM_PASSWORD
+DATUMCTL = os.environ.get("DATUMCTL_BIN", "build/binaries/datumctl")
+SERVER = os.environ.get("DATUM_SERVER", "http://localhost:8000")
+EMAIL = os.environ.get("DATUM_EMAIL", "")
+PASSWORD = os.environ.get("DATUM_PASSWORD", "")
+
+if not EMAIL or not PASSWORD:
+    print("Error: DATUM_EMAIL and DATUM_PASSWORD environment variables are required.")
+    print("Usage: DATUM_EMAIL=user@example.com DATUM_PASSWORD=secret python scripts/populate_data.py")
+    sys.exit(1)
 
 def run_cmd(args):
     # Capture output
