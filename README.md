@@ -96,23 +96,35 @@ Server runs on `http://localhost:8000`
 
 ## �️ CLI Tool (datumctl)
 
-Powerful command-line interface for managing devices and querying data:
+Powerful command-line interface for managing devices and querying data. The
+interactive menu is **auto-derived from the cobra command tree**, so every
+new subcommand or flag is automatically available there with no duplicated
+wiring.
 
 ```bash
 # Build CLI
 make build-cli
 
-# Interactive Mode (Recommended)
-./datumctl interactive
-# Follow the on-screen wizard to login, manage devices, and view system status.
+# Interactive Mode — guided menu walking the full API surface
+./datumctl interactive            # alias: i / menu
 
 # One-off Commands
 ./datumctl login --email admin@example.com
 ./datumctl device list
 ./datumctl device create --name "Living Room Cam" --type camera
+
+# New top-level groups (cover the rest of the API surface):
+./datumctl auth me                                       # current user
+./datumctl auth sessions                                 # list active JWTs
+./datumctl auth push-token list                          # push notification tokens
+./datumctl sys info | sys time | sys ip | sys metrics    # /sys/* endpoints
+./datumctl rules list                                    # admin rule engine
+./datumctl notify publish alerts --message "hello"       # ntfy-protocol
+./datumctl notify subscribe alerts --format sse          # SSE stream
 ```
 
-See [CLI Tutorial](docs/tutorials/CLI.md) for complete CLI documentation.
+See [cmd/datumctl/README.md](cmd/datumctl/README.md) and
+[CLI Tutorial](docs/tutorials/CLI.md) for complete CLI documentation.
 
 ## 📺 Stream Viewer
 

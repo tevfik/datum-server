@@ -73,6 +73,7 @@ section "Auth: register, login, refresh, oauth"
 # /sys/setup. Useful for pristine local instances; on production this returns
 # 409 and we fall through to the regular login/register flow.
 INIT_BODY=$(curl -s "$SERVER_URL/sys/status" || echo '{}')
+SETUP_TOKEN=""
 if [[ "$INIT_BODY" == *'"initialized":false'* ]]; then
     SETUP_PAYLOAD="{\"platform_name\":\"endpoints-test\",\"admin_email\":\"$TEST_EMAIL\",\"admin_password\":\"$TEST_PASSWORD\",\"allow_register\":true}"
     SETUP_CODE=$(curl -s -o /tmp/etest_setup -w '%{http_code}' -X POST \
@@ -80,6 +81,9 @@ if [[ "$INIT_BODY" == *'"initialized":false'* ]]; then
         "$SERVER_URL/sys/setup" 2>/dev/null || echo ERR)
     if [[ "$SETUP_CODE" =~ ^(200|201)$ ]]; then
         ok POST /sys/setup "→ $SETUP_CODE (admin bootstrapped)"
+        if [[ -n "$JQ" ]]; then
+            SETUP_TOKEN=$(jq -r '.token // empty' < /tmp/etest_setup)
+        fi
     else
         skip POST /sys/setup "→ $SETUP_CODE"
     fi
@@ -118,9 +122,19 @@ if [[ "$LOGIN_CODE" == "200" ]]; then
         REFRESH=""
         USER_ID=""
     fi
+elif [[ -n "$SETUP_TOKEN" ]]; then
+    # Setup just bootstrapped the admin and returned a token; reuse it.
+    TOKEN="$SETUP_TOKEN"; REFRESH=""
+    ok POST /auth/login "→ reused setup token"
 else
     skip POST /auth/login "got $LOGIN_CODE — set TEST_EMAIL/TEST_PASSWORD to a valid account or enable public registration"
     TOKEN=""; REFRESH=""
+fi
+
+# Detect role so admin-only sections can be safely skipped.
+USER_ROLE=""
+if [[ -n "$TOKEN" && -n "$JQ" ]]; then
+    USER_ROLE=$(curl -s -H "Authorization: Bearer $TOKEN" "$SERVER_URL/auth/me" | jq -r '.role // empty')
 fi
 
 req GET /auth/providers          200            # public: configured providers list
@@ -195,6 +209,91 @@ section "Public: /pub/:device_id"
 # /pub/:device_id is a per-device public endpoint; using a non-existent ID
 # should yield 404 (not 500/401) — a 404 here means the route exists.
 req GET /pub/__noexist__         404
+
+# ── 4b. Notifications (ntfy-protocol) ────────────────────────────────────────
+section "Notifications"
+if [[ -n "${TOKEN:-}" ]]; then
+    PUB_CODE=$(curl -s -o /tmp/etest_ntfy -w '%{http_code}' -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H 'Content-Type: text/plain' \
+        -H 'Title: e2e' -H 'Priority: high' \
+        --data 'hello from endpoint test' \
+        "$SERVER_URL/notify/e2e_topic" 2>/dev/null || echo ERR)
+    if [[ "$PUB_CODE" == "200" ]]; then
+        ok POST "/notify/e2e_topic" "→ $PUB_CODE"
+    else
+        bad POST "/notify/e2e_topic" "expected 200, got $PUB_CODE"
+    fi
+fi
+
+# ── 4c. Rules engine (admin) ─────────────────────────────────────────────────
+section "Rules"
+if [[ -n "${TOKEN:-}" && "$USER_ROLE" == "admin" ]]; then
+    req GET /admin/rules 200 "" "$TOKEN"
+    RULE_CODE=$(curl -s -o /tmp/etest_rule -w '%{http_code}' -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H 'Content-Type: application/json' \
+        --data '{"name":"e2e-rule","description":"e2e","enabled":true,"trigger":{"type":"data"},"action":{"type":"notify","topic":"alerts"}}' \
+        "$SERVER_URL/admin/rules" 2>/dev/null || echo ERR)
+    if [[ "$RULE_CODE" == "201" ]]; then
+        ok POST /admin/rules "→ $RULE_CODE"
+        if [[ -n "$JQ" ]]; then RULE_ID=$(jq -r .id < /tmp/etest_rule); else RULE_ID=""; fi
+        if [[ -n "$RULE_ID" && "$RULE_ID" != "null" ]]; then
+            req GET    /admin/rules/$RULE_ID            200 "" "$TOKEN"
+            req PUT    /admin/rules/$RULE_ID/disable    200 "" "$TOKEN"
+            req PUT    /admin/rules/$RULE_ID/enable     200 "" "$TOKEN"
+            req DELETE /admin/rules/$RULE_ID            200 "" "$TOKEN"
+        fi
+    else
+        bad POST /admin/rules "expected 201, got $RULE_CODE"
+    fi
+else
+    skip "*" "/admin/rules" "non-admin token (role=$USER_ROLE) — re-run on a fresh DB to bootstrap admin"
+fi
+
+# ── 4d. Push tokens ──────────────────────────────────────────────────────────
+section "Push tokens"
+if [[ -n "${TOKEN:-}" ]]; then
+    req GET /auth/push-tokens 200 "" "$TOKEN"
+    PT_CODE=$(curl -s -o /tmp/etest_pt -w '%{http_code}' -X POST \
+        -H "Authorization: Bearer $TOKEN" \
+        -H 'Content-Type: application/json' \
+        --data '{"platform":"fcm","token":"e2e-test-token"}' \
+        "$SERVER_URL/auth/push-token" 2>/dev/null || echo ERR)
+    if [[ "$PT_CODE" =~ ^(200|201)$ ]]; then
+        ok POST /auth/push-token "→ $PT_CODE"
+        if [[ -n "$JQ" ]]; then PT_ID=$(jq -r .id < /tmp/etest_pt); else PT_ID=""; fi
+        if [[ -n "$PT_ID" && "$PT_ID" != "null" ]]; then
+            req DELETE /auth/push-token/$PT_ID 200 "" "$TOKEN"
+        fi
+    else
+        bad POST /auth/push-token "expected 200/201, got $PT_CODE"
+    fi
+fi
+
+# ── 4e. Password change roundtrip ────────────────────────────────────────────
+section "Password change"
+if [[ -n "${TOKEN:-}" ]]; then
+    NEW_PW="${TEST_PASSWORD}-new"
+    req PUT /auth/password 200 \
+        "{\"old_password\":\"$TEST_PASSWORD\",\"new_password\":\"$NEW_PW\"}" "$TOKEN"
+    # Re-login to restore TOKEN (old token rotated by the password change).
+    NEW_LOGIN=$(curl -s -X POST -H 'Content-Type: application/json' \
+        --data "{\"email\":\"$TEST_EMAIL\",\"password\":\"$NEW_PW\"}" \
+        "$SERVER_URL/auth/login" 2>/dev/null || echo "{}")
+    if [[ -n "$JQ" ]]; then
+        TOKEN=$(echo "$NEW_LOGIN" | jq -r .token)
+    fi
+    req PUT /auth/password 200 \
+        "{\"old_password\":\"$NEW_PW\",\"new_password\":\"$TEST_PASSWORD\"}" "$TOKEN"
+    # Re-login one more time so the cleanup step can use a valid token.
+    NEW_LOGIN=$(curl -s -X POST -H 'Content-Type: application/json' \
+        --data "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}" \
+        "$SERVER_URL/auth/login" 2>/dev/null || echo "{}")
+    if [[ -n "$JQ" ]]; then
+        TOKEN=$(echo "$NEW_LOGIN" | jq -r .token)
+    fi
+fi
 
 # ── 5. Negative tests (auth must reject) ─────────────────────────────────────
 section "Negative: auth rejection"
