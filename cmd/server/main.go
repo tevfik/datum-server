@@ -52,6 +52,7 @@ var (
 	emailService       *email.EmailSender
 	notifier           *notify.NtfyClient
 	dispatcher         *notify.Dispatcher
+	ntfyBroker         *notify.NtfyBroker
 	telemetryProcessor *processing.TelemetryProcessor
 	mqttBroker         *mqtt_internal.Broker
 	webhookDispatcher  *webhook.Dispatcher
@@ -316,11 +317,31 @@ func main() {
 	// Initialize Email Service
 	emailService = email.NewEmailSender(publicURL)
 
-	// Initialize Push Notification Service (ntfy)
+	// Initialize Push Notification Service (external ntfy server, optional)
 	notifier = notify.NewNtfyClient()
 
-	// Dispatcher routes notifications to mobile devices via SSE commands + ntfy fallback
-	dispatcher = notify.NewDispatcher(store, notifier)
+	// Embedded ntfy-protocol broker (in-process pub/sub, ntfy-client compatible)
+	ntfyBroker = notify.NewNtfyBroker()
+
+	// Multi-channel dispatcher: in-app SSE/MQTT command + ntfy + embedded ntfy
+	dispatcher = notify.NewDispatcher()
+	dispatcher.Register(notify.NewInAppChannel(store))
+	if notifier != nil {
+		dispatcher.Register(notify.NewNtfyChannel(notifier))
+	}
+	dispatcher.Register(notify.NewEmbeddedNtfyChannel(ntfyBroker))
+	if wp := notify.NewWebPushChannel(
+		cfg.Notify.WebPushPublic,
+		cfg.Notify.WebPushPrivate,
+		cfg.Notify.WebPushSubject,
+	); wp != nil {
+		dispatcher.Register(wp)
+	}
+	defaults := cfg.Notify.DefaultChannels
+	if len(defaults) == 0 {
+		defaults = []string{"inapp", "ntfy", "ntfy-embedded"}
+	}
+	dispatcher.SetDefaultChannels(defaults)
 
 	// Initialize Telemetry Processor
 	telemetryProcessor = processing.NewTelemetryProcessor(store)
@@ -521,6 +542,12 @@ func main() {
 
 	// Metrics endpoint
 	api.RegisterMetricsRoutes(r, apiConfig)
+
+	// Embedded ntfy-protocol broker — POST /notify/{topic} to publish,
+	// GET /notify/{topic}/{json|sse|raw} to subscribe.
+	r.Any("/notify/*topic", func(c *gin.Context) {
+		ntfyBroker.ServeHTTP("/notify", c.Writer, c.Request)
+	})
 
 	// Versioned API routes (/api/v1/...)
 	api.RegisterV1Routes(r, apiConfig)

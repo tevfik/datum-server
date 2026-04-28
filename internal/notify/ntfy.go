@@ -18,14 +18,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Priority levels correspond to ntfy priority values.
-const (
-	PriorityMin     = "min"
-	PriorityLow     = "low"
-	PriorityDefault = "default"
-	PriorityHigh    = "high"
-	PriorityMax     = "max"
-)
+// Priority levels are defined in dispatcher.go (PriorityMin..PriorityMax).
 
 // NtfyClient sends push notifications to an ntfy server.
 type NtfyClient struct {

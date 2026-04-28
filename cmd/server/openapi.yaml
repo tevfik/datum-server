@@ -618,6 +618,99 @@ paths:
         '200':
           description: API information
 
+  /notify/{topic}:
+    post:
+      summary: Publish a notification message (ntfy-protocol compatible)
+      description: |
+        Publishes a message to the embedded ntfy-protocol broker.
+        Compatible with existing ntfy mobile/desktop clients.
+        Optional headers: `Title`, `Priority` (min|low|default|high|max), `Tags` (comma-separated).
+      tags: [Notifications]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          schema: { type: string }
+        - name: Title
+          in: header
+          required: false
+          schema: { type: string }
+        - name: Priority
+          in: header
+          required: false
+          schema: { type: string, enum: [min, low, default, high, max] }
+        - name: Tags
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          text/plain:
+            schema: { type: string }
+      responses:
+        '200':
+          description: Message published
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:       { type: string }
+                  time:     { type: integer }
+                  event:    { type: string, example: message }
+                  topic:    { type: string }
+                  title:    { type: string }
+                  message:  { type: string }
+                  priority: { type: integer }
+                  tags:     { type: array, items: { type: string } }
+        '413': { description: Message too large (>4 KiB) }
+
+  /notify/{topic}/json:
+    get:
+      summary: Subscribe to a topic (newline-delimited JSON stream)
+      tags: [Notifications]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Long-lived NDJSON stream
+          content:
+            application/x-ndjson: { schema: { type: string } }
+
+  /notify/{topic}/sse:
+    get:
+      summary: Subscribe to a topic (Server-Sent Events)
+      tags: [Notifications]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream: { schema: { type: string } }
+
+  /notify/{topic}/raw:
+    get:
+      summary: Subscribe to a topic (newline-delimited message bodies)
+      tags: [Notifications]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Plain-text stream
+          content:
+            text/plain: { schema: { type: string } }
+
   /sys/time:
     get:
       summary: Get system time
