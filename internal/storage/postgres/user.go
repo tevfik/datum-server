@@ -13,8 +13,8 @@ func (s *PostgresStore) CreateUser(user *storage.User) error {
 	ctx, cancel := queryCtx()
 	defer cancel()
 	query := `
-		INSERT INTO users (id, email, password_hash, role, status, created_at, updated_at, last_login_at, refresh_token)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO users (id, email, password_hash, role, status, display_name, created_at, updated_at, last_login_at, refresh_token)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 	_, err := s.db.ExecContext(ctx, query,
 		user.ID,
@@ -22,6 +22,7 @@ func (s *PostgresStore) CreateUser(user *storage.User) error {
 		user.PasswordHash,
 		user.Role,
 		user.Status,
+		user.DisplayName,
 		user.CreatedAt,
 		user.UpdatedAt,
 		user.LastLoginAt,
@@ -38,7 +39,7 @@ func (s *PostgresStore) GetUserByEmail(email string) (*storage.User, error) {
 	ctx, cancel := queryCtx()
 	defer cancel()
 	query := `
-		SELECT id, email, password_hash, role, status, created_at, updated_at, last_login_at, refresh_token
+		SELECT id, email, password_hash, role, status, display_name, created_at, updated_at, last_login_at, refresh_token
 		FROM users WHERE email = $1
 	`
 	row := s.db.QueryRowContext(ctx, query, email)
@@ -50,7 +51,7 @@ func (s *PostgresStore) GetUserByID(userID string) (*storage.User, error) {
 	ctx, cancel := queryCtx()
 	defer cancel()
 	query := `
-		SELECT id, email, password_hash, role, status, created_at, updated_at, last_login_at, refresh_token
+		SELECT id, email, password_hash, role, status, display_name, created_at, updated_at, last_login_at, refresh_token
 		FROM users WHERE id = $1
 	`
 	row := s.db.QueryRowContext(ctx, query, userID)
@@ -71,7 +72,7 @@ func (s *PostgresStore) ListAllUsers() ([]storage.User, error) {
 	ctx, cancel := queryCtx()
 	defer cancel()
 	query := `
-		SELECT id, email, password_hash, role, status, created_at, updated_at, last_login_at, refresh_token
+		SELECT id, email, password_hash, role, status, display_name, created_at, updated_at, last_login_at, refresh_token
 		FROM users
 	`
 	rows, err := s.db.QueryContext(ctx, query)
@@ -141,10 +142,10 @@ func (s *PostgresStore) DeleteUser(userID string) error {
 func scanUser(row *sql.Row) (*storage.User, error) {
 	var u storage.User
 	var updatedAt, lastLoginAt sql.NullTime
-	var refreshToken sql.NullString
+	var refreshToken, displayName sql.NullString
 
 	err := row.Scan(
-		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.Status,
+		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.Status, &displayName,
 		&u.CreatedAt, &updatedAt, &lastLoginAt, &refreshToken,
 	)
 	if err != nil {
@@ -154,6 +155,9 @@ func scanUser(row *sql.Row) (*storage.User, error) {
 		return nil, err
 	}
 
+	if displayName.Valid {
+		u.DisplayName = displayName.String
+	}
 	if updatedAt.Valid {
 		u.UpdatedAt = updatedAt.Time
 	}
@@ -168,13 +172,16 @@ func scanUser(row *sql.Row) (*storage.User, error) {
 
 func scanUserRow(rows *sql.Rows, u *storage.User) error {
 	var updatedAt, lastLoginAt sql.NullTime
-	var refreshToken sql.NullString
+	var refreshToken, displayName sql.NullString
 	err := rows.Scan(
-		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.Status,
+		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.Status, &displayName,
 		&u.CreatedAt, &updatedAt, &lastLoginAt, &refreshToken,
 	)
 	if err != nil {
 		return err
+	}
+	if displayName.Valid {
+		u.DisplayName = displayName.String
 	}
 	if updatedAt.Valid {
 		u.UpdatedAt = updatedAt.Time

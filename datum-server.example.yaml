@@ -32,6 +32,19 @@ email:
   # resend_api_key: re_xxxxx
   from_address: onboarding@resend.dev
 
+notifications:
+  # ntfy push notifications (self-hostable, https://ntfy.sh)
+  # ntfy_url: https://ntfy.sh         # or your self-hosted instance
+  # ntfy_token: ""                    # only needed for authenticated ntfy servers
+
+oauth:
+  # Google OAuth — https://console.cloud.google.com/
+  # google_client_id: ""
+  # google_client_secret: ""
+  # GitHub OAuth — https://github.com/settings/developers
+  # github_client_id: ""
+  # github_client_secret: ""
+
 logging:
   level: INFO       # DEBUG, INFO, WARN, ERROR, FATAL
   output: console   # console, json, file

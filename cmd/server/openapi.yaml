@@ -2,11 +2,30 @@ openapi: 3.0.3
 info:
   title: Datumpy IoT Platform API
   description: |
-    High-performance IoT data ingestion and device management platform.
+    High-performance IoT data ingestion and device management platform with mobile-ready auth.
 
     ## Authentication
     - **User Auth**: JWT token in `Authorization: Bearer {token}` header
     - **Device Auth**: API key in `Authorization: Bearer {api_key}` header
+    - **OAuth**: Google and GitHub via `GET /auth/oauth/{provider}` (PKCE supported for mobile)
+
+    ## Token Lifecycle
+    - **Access token**: 15-minute JWT — use for all authenticated API calls
+    - **Refresh token**: 30-day rotating token — use `POST /auth/refresh` to get a new pair
+    - **Sessions**: Each login creates a session; list with `GET /auth/sessions`, revoke with `POST /auth/logout`
+
+    ## Push Notifications (ntfy)
+    When `NTFY_URL` is configured, each user has a private ntfy topic returned by `GET /auth/me` as `ntfy_topic`.
+    Subscribe to `{NTFY_URL}/{ntfy_topic}` in the ntfy app or via the ntfy SDK.
+
+    Required env vars:
+    - `NTFY_URL` — ntfy server base URL (e.g. `https://ntfy.sh` or self-hosted)
+    - `NTFY_TOKEN` — optional bearer token for authenticated ntfy servers
+
+    ## OAuth Social Login
+    Supports Google and GitHub. Configure via env vars:
+    - `OAUTH_GOOGLE_CLIENT_ID` / `OAUTH_GOOGLE_CLIENT_SECRET`
+    - `OAUTH_GITHUB_CLIENT_ID` / `OAUTH_GITHUB_CLIENT_SECRET`
 
     ## Quick Start
     - **Register user**: `POST /auth/register`
@@ -49,7 +68,7 @@ info:
     - **Max Body**: 5 MB (configurable via `MAX_REQUEST_BODY_BYTES`)
     - **Query Limit**: 10,000 data points per query (configurable via `QUERY_MAX_LIMIT`)
     - **Batch Limit**: 50,000 data points per ingestion batch (fixed)
-  version: 1.7.0
+  version: 1.8.0
   contact:
     name: API Support
   license:
@@ -165,8 +184,72 @@ components:
       properties:
         token:
           type: string
+          description: JWT access token (valid ~15 minutes)
+        refresh_token:
+          type: string
+          description: Refresh token (valid 30 days); use POST /auth/refresh to rotate
         user_id:
           type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        expires_at:
+          type: string
+          format: date-time
+
+    UserProfile:
+      type: object
+      properties:
+        user_id:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        display_name:
+          type: string
+        status:
+          type: string
+        ntfy_topic:
+          type: string
+          description: ntfy.sh topic to subscribe to for push notifications (only present when NTFY_URL is configured)
+        created_at:
+          type: string
+          format: date-time
+
+    Session:
+      type: object
+      properties:
+        jti:
+          type: string
+          description: JWT ID — unique session identifier
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        user_agent:
+          type: string
+        ip:
+          type: string
+
+    PushToken:
+      type: object
+      properties:
+        id:
+          type: string
+        platform:
+          type: string
+          enum: [ios, android, web, ntfy]
+        token:
+          type: string
+        created_at:
+          type: string
+          format: date-time
 
     DeviceCreateRequest:
       type: object
@@ -533,19 +616,6 @@ paths:
                   initialized:
                     type: boolean
 
-  /sys/metrics:
-    get:
-      summary: Get system metrics
-      description: Returns Prometheus-compatible metrics.
-      tags: [System]
-      responses:
-        '200':
-          description: Metrics text
-          content:
-            text/plain:
-              schema:
-                type: string
-
   /sys/setup:
     post:
       summary: Initialize system
@@ -562,16 +632,6 @@ paths:
         '409':
           description: Already initialized
 
-  /health:
-    get:
-      summary: Health check
-      tags: [System]
-      responses:
-        '200':
-          description: Healthy
-        '503':
-          description: Unhealthy
-
   /healthz:
     get:
       summary: Health check (alias)
@@ -580,23 +640,201 @@ paths:
         '200':
           description: Healthy
 
-  /live:
-    get:
-      summary: Liveness check
-      tags: [System]
+  /auth/refresh:
+    post:
+      summary: Rotate refresh token
+      description: Exchange a valid refresh token for a new access + refresh token pair. The old refresh token is invalidated (rotation). Reuse of a revoked token triggers revocation of all sessions for security.
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
       responses:
         '200':
-          description: Alive
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid or expired refresh token
 
-  /ready:
-    get:
-      summary: Readiness check
-      tags: [System]
+  /auth/logout:
+    post:
+      summary: Logout current session
+      description: Revokes the current session identified by the Bearer token. Other sessions (other devices) remain active.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
       responses:
         '200':
-          description: Ready
-        '503':
-          description: Not ready
+          description: Session revoked
+
+  /auth/sessions:
+    get:
+      summary: List active sessions
+      description: Returns all active login sessions for the authenticated user.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Active sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+
+  /auth/me:
+    get:
+      summary: Get profile
+      description: Returns the authenticated user's profile including ntfy topic for push notifications.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+    put:
+      summary: Update profile
+      description: Update display name for the authenticated user.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name:
+                  type: string
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+
+  /auth/push-token:
+    post:
+      summary: Register push token
+      description: Register a device push token (FCM, APNs, ntfy, or web push) for the authenticated user. Duplicate tokens are silently replaced.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [platform, token]
+              properties:
+                platform:
+                  type: string
+                  enum: [ios, android, web, ntfy]
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Token registered
+
+  /auth/push-token/{id}:
+    delete:
+      summary: Unregister push token
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Token removed
+
+  /auth/oauth/{provider}:
+    get:
+      summary: Initiate OAuth login
+      description: |
+        Redirects to the OAuth provider (google or github) for authentication.
+
+        **Web flow**: Simply redirect the browser here. After auth the callback returns JSON.
+
+        **Mobile/PKCE flow**: Pass `code_challenge` (SHA-256 of your random verifier, base64url-encoded) and `redirect_uri` (your app's deep-link URI). After auth the callback redirects to your app with `access_token` and `refresh_token` as query parameters.
+      tags: [Authentication]
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github]
+        - name: redirect_uri
+          in: query
+          description: Mobile app deep-link URI (PKCE flow only)
+          schema:
+            type: string
+        - name: code_challenge
+          in: query
+          description: PKCE code challenge — SHA-256(code_verifier), base64url-encoded (mobile flow only)
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to OAuth provider
+
+  /auth/oauth/{provider}/callback:
+    get:
+      summary: OAuth callback
+      description: Handles the provider's redirect. Web clients receive a JSON AuthResponse. Mobile clients are redirected to their `redirect_uri` with tokens as query parameters.
+      tags: [Authentication]
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github]
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authentication successful (web flow)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '302':
+          description: Redirect with tokens (mobile/PKCE flow)
 
   /auth/register:
     post:

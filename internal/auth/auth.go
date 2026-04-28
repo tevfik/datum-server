@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -101,9 +102,11 @@ func GenerateToken(userID, email, role string) (string, error) {
 	return token.SignedString(secret)
 }
 
-// GenerateTokenPair creates an access token (15 min) and a refresh token (30 days)
-func GenerateTokenPair(userID, email, role string) (accessToken string, refreshToken string, err error) {
+// GenerateTokenPair creates an access token (15 min) and a refresh token (30 days).
+// Both tokens share the same jti (session ID) so sessions can be tracked and revoked.
+func GenerateTokenPair(userID, email, role string) (accessToken string, refreshToken string, jti string, err error) {
 	secret := getJWTSecret()
+	jti = uuid.New().String()
 
 	// 1. Access Token (Short-lived)
 	accessClaims := Claims{
@@ -111,23 +114,24 @@ func GenerateTokenPair(userID, email, role string) (accessToken string, refreshT
 		Email:  email,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(getAccessExpiryMinutes()) * time.Minute)), // Configurable duration
+			ID:        jti,
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(getAccessExpiryMinutes()) * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
 	accessToken, err = token.SignedString(secret)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	// 2. Refresh Token (Long-lived, Opaque or JWT)
-	// We use a long-lived JWT for simplicity so it carries user info, but we will check it against DB whitelist
+	// 2. Refresh Token (Long-lived, shares the same jti = session ID)
 	refreshClaims := Claims{
 		UserID: userID,
 		Email:  email,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(getRefreshExpiryDays()) * 24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Subject:   "refresh",
@@ -136,10 +140,10 @@ func GenerateTokenPair(userID, email, role string) (accessToken string, refreshT
 	rToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 	refreshToken, err = rToken.SignedString(secret)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	return accessToken, refreshToken, nil
+	return accessToken, refreshToken, jti, nil
 }
 
 // ValidateToken validates a JWT token and returns the claims

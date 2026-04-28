@@ -25,6 +25,7 @@ import (
 	"datum-go/internal/logger"
 	"datum-go/internal/metrics"
 	mqtt_internal "datum-go/internal/mqtt"
+	"datum-go/internal/notify"
 	"datum-go/internal/processing"
 	"datum-go/internal/ratelimit"
 	"datum-go/internal/rules"
@@ -48,6 +49,8 @@ var (
 var (
 	store              storage.Provider
 	emailService       *email.EmailSender
+	notifier           *notify.NtfyClient
+	dispatcher         *notify.Dispatcher
 	telemetryProcessor *processing.TelemetryProcessor
 	mqttBroker         *mqtt_internal.Broker
 	webhookDispatcher  *webhook.Dispatcher
@@ -73,7 +76,7 @@ func securityHeadersMiddleware() gin.HandlerFunc {
 		// Content security policy
 		csp := os.Getenv("CONTENT_SECURITY_POLICY")
 		if csp == "" {
-			csp = "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data:; connect-src 'self' ws: wss:;"
+			csp = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net; connect-src 'self' ws: wss:;"
 		}
 		c.Header("Content-Security-Policy", csp)
 		// Permissions policy
@@ -287,6 +290,12 @@ func main() {
 	// Initialize Email Service
 	emailService = email.NewEmailSender(publicURL)
 
+	// Initialize Push Notification Service (ntfy)
+	notifier = notify.NewNtfyClient()
+
+	// Dispatcher routes notifications to mobile devices via SSE commands + ntfy fallback
+	dispatcher = notify.NewDispatcher(store, notifier)
+
 	// Initialize Telemetry Processor
 	telemetryProcessor = processing.NewTelemetryProcessor(store)
 
@@ -436,6 +445,8 @@ func main() {
 		Processor:    telemetryProcessor,
 		MQTTBroker:   mqttBroker,
 		EmailService: emailService,
+		Notifier:     notifier,
+		Dispatcher:   dispatcher,
 		PublicURL:    publicURL,
 		Version:      Version,
 		BuildDate:    BuildDate,

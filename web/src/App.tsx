@@ -10,6 +10,7 @@ import Settings from "@/features/settings/pages/Settings";
 import Login from "@/features/auth/pages/Login";
 import ForgotPassword from "@/features/auth/pages/ForgotPassword";
 import ResetPassword from "@/features/auth/pages/ResetPassword";
+import OAuthCallback from "@/features/auth/pages/OAuthCallback";
 import { ThemeProvider } from "@/shared/components/theme-provider";
 import { AuthProvider, useAuth } from "@/shared/context/AuthContext";
 
@@ -42,6 +43,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/auth/oauth/callback" element={<OAuthCallback />} />
 
               <Route path="/" element={
                 <ProtectedRoute>

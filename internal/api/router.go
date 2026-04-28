@@ -18,6 +18,7 @@ import (
 	"datum-go/internal/email"
 	"datum-go/internal/metrics"
 	mqtt_internal "datum-go/internal/mqtt"
+	"datum-go/internal/notify"
 	"datum-go/internal/processing"
 	"datum-go/internal/storage"
 
@@ -30,6 +31,8 @@ type Config struct {
 	Processor    *processing.TelemetryProcessor
 	MQTTBroker   *mqtt_internal.Broker
 	EmailService *email.EmailSender
+	Notifier     *notify.NtfyClient
+	Dispatcher   *notify.Dispatcher
 	PublicURL    string
 	Version      string
 	BuildDate    string
@@ -37,7 +40,7 @@ type Config struct {
 
 // RegisterAuthRoutes registers authentication routes.
 func RegisterAuthRoutes(r gin.IRouter, cfg Config) {
-	authHandler := auth.NewHandler(cfg.Store, cfg.EmailService, cfg.PublicURL)
+	authHandler := auth.NewHandler(cfg.Store, cfg.EmailService, cfg.Notifier, cfg.Dispatcher, cfg.PublicURL)
 	authHandler.RegisterRoutes(r, internalauth.UserAuthMiddleware(cfg.Store))
 
 	// Admin User Routes

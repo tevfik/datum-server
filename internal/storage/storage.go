@@ -83,10 +83,11 @@ type User struct {
 	PasswordHash string    `json:"password_hash"`
 	Role         string    `json:"role"`   // "admin", "user"
 	Status       string    `json:"status"` // "active", "suspended", "pending"
+	DisplayName  string    `json:"display_name,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at,omitempty"`
 	LastLoginAt  time.Time `json:"last_login_at,omitempty"`
-	RefreshToken string    `json:"refresh_token,omitempty"` // Active refresh token
+	RefreshToken string    `json:"refresh_token,omitempty"` // Deprecated: use Sessions
 }
 
 type SystemStats struct {
@@ -2327,4 +2328,154 @@ func (s *Storage) GetSystemLogs(limit int, level string, search string) ([]strin
 // ClearSystemLogs clears logs
 func (s *Storage) ClearSystemLogs() error {
 	return nil
+}
+
+// ============ Session Operations (multi-device refresh tokens) ============
+
+func (s *Storage) CreateSession(session *Session) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		data, err := marshalJSON(session)
+		if err != nil {
+			return err
+		}
+		_, _, err = tx.Set("session:"+session.JTI, data, nil)
+		return err
+	})
+}
+
+func (s *Storage) GetSession(jti string) (*Session, error) {
+	var session Session
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		val, err := tx.Get("session:" + jti)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal([]byte(val), &session)
+	})
+	if err != nil {
+		if err == buntdb.ErrNotFound {
+			return nil, fmt.Errorf("session not found")
+		}
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (s *Storage) DeleteSession(jti string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		_, err := tx.Delete("session:" + jti)
+		if err == buntdb.ErrNotFound {
+			return nil
+		}
+		return err
+	})
+}
+
+func (s *Storage) GetUserSessions(userID string) ([]*Session, error) {
+	var sessions []*Session
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		return tx.AscendRange("", "session:", "session:~", func(key, val string) bool {
+			var ses Session
+			if err := json.Unmarshal([]byte(val), &ses); err == nil {
+				if ses.UserID == userID && ses.ExpiresAt.After(time.Now()) {
+					cp := ses
+					sessions = append(sessions, &cp)
+				}
+			}
+			return true
+		})
+	})
+	return sessions, err
+}
+
+func (s *Storage) DeleteAllUserSessions(userID string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		var keys []string
+		tx.AscendRange("", "session:", "session:~", func(key, val string) bool {
+			var ses Session
+			if err := json.Unmarshal([]byte(val), &ses); err == nil && ses.UserID == userID {
+				keys = append(keys, key)
+			}
+			return true
+		})
+		for _, k := range keys {
+			tx.Delete(k)
+		}
+		return nil
+	})
+}
+
+// ============ Push Token Operations ============
+
+func (s *Storage) SavePushToken(pt *PushToken) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		data, err := marshalJSON(pt)
+		if err != nil {
+			return err
+		}
+		_, _, err = tx.Set("push_token:"+pt.ID, data, nil)
+		return err
+	})
+}
+
+func (s *Storage) GetUserPushTokens(userID string) ([]*PushToken, error) {
+	var tokens []*PushToken
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		return tx.AscendRange("", "push_token:", "push_token:~", func(key, val string) bool {
+			var pt PushToken
+			if err := json.Unmarshal([]byte(val), &pt); err == nil && pt.UserID == userID {
+				cp := pt
+				tokens = append(tokens, &cp)
+			}
+			return true
+		})
+	})
+	return tokens, err
+}
+
+func (s *Storage) DeletePushToken(userID, tokenID string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		val, err := tx.Get("push_token:" + tokenID)
+		if err != nil {
+			if err == buntdb.ErrNotFound {
+				return nil
+			}
+			return err
+		}
+		var pt PushToken
+		if err := json.Unmarshal([]byte(val), &pt); err != nil {
+			return err
+		}
+		if pt.UserID != userID {
+			return fmt.Errorf("unauthorized")
+		}
+		_, err = tx.Delete("push_token:" + tokenID)
+		if err == buntdb.ErrNotFound {
+			return nil
+		}
+		return err
+	})
+}
+
+// ============ Profile ============
+
+func (s *Storage) UpdateUserProfile(userID, displayName string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		val, err := tx.Get("user:" + userID)
+		if err != nil {
+			return err
+		}
+		var user User
+		if err := json.Unmarshal([]byte(val), &user); err != nil {
+			return err
+		}
+		user.DisplayName = displayName
+		user.UpdatedAt = time.Now()
+		data, err := marshalJSON(user)
+		if err != nil {
+			return err
+		}
+		_, _, err = tx.Set("user:"+userID, data, nil)
+		return err
+	})
 }

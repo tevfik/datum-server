@@ -2,6 +2,25 @@ package storage
 
 import "time"
 
+// Session represents an active user login session keyed by a refresh token's JTI.
+type Session struct {
+	JTI       string    `json:"jti"`
+	UserID    string    `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+	UserAgent string    `json:"user_agent,omitempty"`
+	IP        string    `json:"ip,omitempty"`
+}
+
+// PushToken represents a registered push notification token for a user's device.
+type PushToken struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Platform  string    `json:"platform"` // "fcm" | "apns"
+	Token     string    `json:"token"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // Provider defines the interface for storage operations.
 // This allows swapping the underlying implementation (e.g., BuntDB -> PostgreSQL)
 // without changing the application logic.
@@ -82,6 +101,21 @@ type Provider interface {
 	GetUserAPIKeys(userID string) ([]APIKey, error)
 	DeleteUserAPIKey(userID, keyID string) error
 	GetUserByUserAPIKey(apiKey string) (*User, error)
+
+	// Session Operations (multi-device refresh token tracking)
+	CreateSession(session *Session) error
+	GetSession(jti string) (*Session, error)
+	DeleteSession(jti string) error
+	GetUserSessions(userID string) ([]*Session, error)
+	DeleteAllUserSessions(userID string) error
+
+	// Push Token Operations
+	SavePushToken(pt *PushToken) error
+	GetUserPushTokens(userID string) ([]*PushToken, error)
+	DeletePushToken(userID, tokenID string) error
+
+	// Profile
+	UpdateUserProfile(userID, displayName string) error
 
 	// System Operations
 	GetSystemConfig() (*SystemConfig, error)

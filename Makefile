@@ -231,6 +231,9 @@ health: ## Check service health (Development)
 	@curl -s http://localhost:8000/health | python3 -m json.tool || echo "❌ Server not responding (ensure you are running in dev mode or port 8000 is exposed)"
 
 # Documentation
+validate-openapi: ## Validate openapi.yaml for duplicate paths and YAML errors
+	@python3 scripts/validate_openapi.py && echo "✅ openapi.yaml valid"
+
 docs: ## Open API documentation in browser (Development)
 	@echo "📖 Opening API docs..."
 	@xdg-open http://localhost:8000/docs 2>/dev/null || open http://localhost:8000/docs 2>/dev/null || echo "Open http://localhost:8000/docs in your browser"

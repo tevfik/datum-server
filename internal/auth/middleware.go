@@ -66,6 +66,7 @@ func UserAuthMiddleware(store storage.Provider) gin.HandlerFunc {
 			c.Set("user_id", claims.UserID)
 			c.Set("email", claims.Email)
 			c.Set("role", claims.Role)
+			c.Set("session_jti", claims.ID) // session / JTI for logout & session mgmt
 			c.Set("auth_method", "jwt")
 			c.Next()
 		}
@@ -180,4 +181,15 @@ func GetUserRole(c *gin.Context) (string, error) {
 		return "", fmt.Errorf("role not found in context")
 	}
 	return role.(string), nil
+}
+
+// GetSessionJTI extracts the session JTI (JWT ID) from context.
+// Returns empty string if auth was via API key (no session JTI).
+func GetSessionJTI(c *gin.Context) string {
+	if jti, exists := c.Get("session_jti"); exists {
+		if s, ok := jti.(string); ok {
+			return s
+		}
+	}
+	return ""
 }

@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS push_tokens;
+DROP TABLE IF EXISTS sessions;
+ALTER TABLE users DROP COLUMN IF EXISTS display_name;

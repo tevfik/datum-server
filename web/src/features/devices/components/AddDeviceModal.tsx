@@ -23,7 +23,7 @@ export interface AddDeviceModalProps {
 export function AddDeviceModal({ open: externalOpen, onOpenChange: externalOnOpenChange }: AddDeviceModalProps = {}) {
     const [internalOpen, setInternalOpen] = useState(false);
     const [name, setName] = useState('');
-    const [type, setType] = useState('generic');
+    const [type, setType] = useState('sensor');
     const [uid, setUid] = useState('');
     const [createdDevice, setCreatedDevice] = useState<{ id: string, api_key: string } | null>(null);
 
@@ -59,7 +59,7 @@ export function AddDeviceModal({ open: externalOpen, onOpenChange: externalOnOpe
         setOpen(false);
         setCreatedDevice(null);
         setName('');
-        setType('generic');
+        setType('sensor');
         setUid('');
     };
 
@@ -107,14 +107,22 @@ export function AddDeviceModal({ open: externalOpen, onOpenChange: externalOnOpe
                             <Label htmlFor="type" className="text-right">
                                 Type
                             </Label>
-                            <Input
+                            <select
                                 id="type"
                                 value={type}
                                 onChange={(e) => setType(e.target.value)}
-                                className="col-span-3"
-                                placeholder="sensor, camera, actutator"
+                                className="col-span-3 h-9 rounded-md border border-input bg-background px-3 text-sm"
                                 required
-                            />
+                            >
+                                <option value="sensor">Sensor</option>
+                                <option value="actuator">Actuator</option>
+                                <option value="camera">Camera</option>
+                                <option value="gateway">Gateway</option>
+                                <option value="mobile">Mobile (Phone/Tablet)</option>
+                                <option value="weather">Weather Station</option>
+                                <option value="energy">Energy Meter</option>
+                                <option value="generic">Generic</option>
+                            </select>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="uid" className="text-right">

@@ -21,6 +21,7 @@ import { MqttTab } from '@/features/settings/components/MqttTab';
 import { SystemTab } from '@/features/settings/components/SystemTab';
 import { HttpTab } from '@/features/settings/components/HttpTab';
 import { CollectionsTab } from '@/features/settings/components/CollectionsTab';
+import { ProfileTab } from '@/features/settings/components/ProfileTab';
 import { SortableHeader } from '@/components/ui/sortable-header';
 
 // Subcomponent for Admin Tab to keep main file clean-ish
@@ -263,7 +264,7 @@ function AdminSettings() {
 
 export default function Settings() {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('api-keys');
+    const [activeTab, setActiveTab] = useState('profile');
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newKeyName, setNewKeyName] = useState('');
     const [createdKeyData, setCreatedKeyData] = useState<{ key: string, name: string } | null>(null);
@@ -346,6 +347,12 @@ export default function Settings() {
                     onClick={() => setActiveTab('general')}
                 >
                     General
+                </button>
+                <button
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'profile' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                    onClick={() => setActiveTab('profile')}
+                >
+                    Profile & Sessions
                 </button>
                 <button
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'api-keys' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
@@ -456,6 +463,10 @@ export default function Settings() {
                         )}
                     </CardContent>
                 </Card>
+            )}
+
+            {activeTab === 'profile' && (
+                <ProfileTab />
             )}
 
             {activeTab === 'admin' && user?.role === 'admin' && (
