@@ -19,7 +19,10 @@ import (
 
 	"datum-go/internal/api"
 	adminapi "datum-go/internal/api/admin"
+	analyticsapi "datum-go/internal/api/analytics"
 	bucketsapi "datum-go/internal/api/buckets"
+	mcpapi "datum-go/internal/api/mcp"
+	quotaapi "datum-go/internal/api/quota"
 	rulesapi "datum-go/internal/api/rules"
 	"datum-go/internal/auth"
 	"datum-go/internal/buckets"
@@ -30,6 +33,7 @@ import (
 	mqtt_internal "datum-go/internal/mqtt"
 	"datum-go/internal/notify"
 	"datum-go/internal/processing"
+	"datum-go/internal/quota"
 	"datum-go/internal/ratelimit"
 	"datum-go/internal/rules"
 	"datum-go/internal/storage"
@@ -595,6 +599,36 @@ func main() {
 	rulesGroup.Use(auth.UserAuthMiddleware(store))
 	rulesGroup.Use(auth.AdminMiddleware(store))
 	rulesHandler.RegisterRoutes(rulesGroup)
+
+	// MCP server (/mcp) — exposes user data to any MCP client (gleann,
+	// Claude Desktop, Cursor, future ekiyo Asistan). Auth: regular user
+	// auth (JWT or ak_ user API key). See docs/P1_GLEANN_INTEGRATION.md.
+	quotaMgr := quota.New()
+	mcpServer := mcpapi.NewServer(store, Version, quotaMgr)
+	r.GET("/.well-known/mcp.json", mcpServer.WellKnown(publicURL))
+	mcpGroup := r.Group("/mcp")
+	mcpGroup.Use(auth.UserAuthMiddleware(store))
+	mcpServer.RegisterRoutes(mcpGroup)
+
+	// Quota / plan endpoints.
+	quotaH := quotaapi.New(quotaMgr)
+	authQuotaGroup := r.Group("/auth")
+	authQuotaGroup.Use(auth.UserAuthMiddleware(store))
+	quotaH.RegisterUserRoutes(authQuotaGroup)
+	adminQuotaGroup := r.Group("/admin")
+	adminQuotaGroup.Use(auth.UserAuthMiddleware(store))
+	adminQuotaGroup.Use(auth.AdminMiddleware(store))
+	quotaH.RegisterAdminRoutes(adminQuotaGroup)
+
+	// Analytics ingestion — clients POST events here.
+	analyticsH := analyticsapi.New(store, quotaMgr)
+	analyticsGroup := r.Group("/analytics")
+	analyticsGroup.Use(auth.UserAuthMiddleware(store))
+	analyticsH.RegisterUserRoutes(analyticsGroup)
+	analyticsAdminGroup := r.Group("/admin")
+	analyticsAdminGroup.Use(auth.UserAuthMiddleware(store))
+	analyticsAdminGroup.Use(auth.AdminMiddleware(store))
+	analyticsH.RegisterAdminRoutes(analyticsAdminGroup)
 
 	// Serve firmware updates (protected)
 	// Devices must provide valid device auth

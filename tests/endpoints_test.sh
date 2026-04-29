@@ -302,6 +302,30 @@ req GET /db/notes                  401
 req GET /admin/users               401
 req GET /admin/sys/config          401
 
+# ── 5b. New surfaces: MCP, quota, analytics ─────────────────────────────────────────────
+section "MCP discovery"
+req GET /.well-known/mcp.json        200
+
+section "Quota / analytics (auth)"
+req GET /auth/me/quota               200 "" "$TOKEN"
+req POST /analytics/events           202 \
+    '{"events":[{"name":"endpoint_test","props":{"x":1}}]}' "$TOKEN"
+req GET /analytics/events            200 "" "$TOKEN"
+
+section "MCP (JSON-RPC)"
+# initialize
+INIT_CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+    -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+    --data '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
+    "$SERVER_URL/mcp" 2>/dev/null || echo ERR)
+[[ "$INIT_CODE" == "200" ]] && ok POST /mcp "→ $INIT_CODE initialize" || bad POST /mcp "→ $INIT_CODE initialize"
+# tools/call whoami
+WHOAMI_CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+    -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+    --data '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"whoami","arguments":{}}}' \
+    "$SERVER_URL/mcp" 2>/dev/null || echo ERR)
+[[ "$WHOAMI_CODE" == "200" ]] && ok POST /mcp "→ $WHOAMI_CODE whoami" || bad POST /mcp "→ $WHOAMI_CODE whoami"
+
 # ── 6. Cleanup (best-effort) ─────────────────────────────────────────────────
 section "Cleanup"
 if [[ -n "$TOKEN" ]]; then
