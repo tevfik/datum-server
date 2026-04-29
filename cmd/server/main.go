@@ -22,6 +22,7 @@ import (
 	analyticsapi "datum-go/internal/api/analytics"
 	bucketsapi "datum-go/internal/api/buckets"
 	mcpapi "datum-go/internal/api/mcp"
+	packsapi "datum-go/internal/api/packs"
 	quotaapi "datum-go/internal/api/quota"
 	rulesapi "datum-go/internal/api/rules"
 	"datum-go/internal/auth"
@@ -629,6 +630,14 @@ func main() {
 	analyticsAdminGroup.Use(auth.UserAuthMiddleware(store))
 	analyticsAdminGroup.Use(auth.AdminMiddleware(store))
 	analyticsH.RegisterAdminRoutes(analyticsAdminGroup)
+
+	// Knowledge Packs gateway (/packs/*) — proxies to gleann's /api/packs
+	// surface, adding auth + per-user caching. Pack content lives in app
+	// repos (e.g. ekiyo/packs/crops-tr) and is mounted into gleann via
+	// GLEANN_PACKS_DIR. See docs/PACKS.md.
+	packsGroup := r.Group("")
+	packsGroup.Use(auth.UserAuthMiddleware(store))
+	packsapi.New().RegisterRoutes(packsGroup)
 
 	// Serve firmware updates (protected)
 	// Devices must provide valid device auth

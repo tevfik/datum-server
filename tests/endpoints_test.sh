@@ -312,6 +312,17 @@ req POST /analytics/events           202 \
     '{"events":[{"name":"endpoint_test","props":{"x":1}}]}' "$TOKEN"
 req GET /analytics/events            200 "" "$TOKEN"
 
+section "Packs gateway (auth)"
+# Without gleann running upstream we accept either 200 (gleann reachable) or
+# 502 (bad gateway). What we want to verify is that auth + routing work.
+PACKS_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+    -H "Authorization: Bearer $TOKEN" "$SERVER_URL/packs" 2>/dev/null || echo ERR)
+case "$PACKS_CODE" in
+    200|502) ok GET /packs "$PACKS_CODE" "auth+routing OK" ;;
+    *)       bad GET /packs "$PACKS_CODE" "expected 200 or 502" ;;
+esac
+req GET /packs                       401
+
 section "MCP (JSON-RPC)"
 # initialize
 INIT_CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
