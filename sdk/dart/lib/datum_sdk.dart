@@ -13,12 +13,15 @@
 library datum_sdk;
 
 export 'src/client.dart';
+export 'src/admin.dart';
 export 'src/auth.dart';
 export 'src/devices.dart';
 export 'src/data.dart';
 export 'src/buckets.dart';
 export 'src/notify.dart';
 export 'src/realtime.dart';
+export 'src/rules.dart';
+export 'src/sys.dart';
 export 'src/db.dart';
 export 'src/ai.dart';
 export 'src/community.dart';

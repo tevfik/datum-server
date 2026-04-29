@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'ai.dart';
+import 'admin.dart';
 import 'auth.dart';
 import 'buckets.dart';
 import 'community.dart';
@@ -11,6 +12,8 @@ import 'devices.dart';
 import 'exceptions.dart';
 import 'notify.dart';
 import 'realtime.dart';
+import 'rules.dart';
+import 'sys.dart';
 
 /// Top-level entry point for the Datum platform.
 class DatumClient {
@@ -25,6 +28,9 @@ class DatumClient {
     db = DbApi(this);
     ai = AiApi(this);
     community = CommunityApi(this);
+    sys = SysApi(this);
+    admin = AdminApi(this);
+    rules = RulesApi(this);
   }
 
   final String baseUrl;
@@ -45,6 +51,9 @@ class DatumClient {
   late final DbApi db;
   late final AiApi ai;
   late final CommunityApi community;
+  late final SysApi sys;
+  late final AdminApi admin;
+  late final RulesApi rules;
 
   Map<String, String> headers({String? contentType = 'application/json'}) {
     final h = <String, String>{};
