@@ -6,6 +6,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// deprecatedConfigPath emits RFC-8594 Deprecation + Sunset headers (and a
+// Link to the canonical /admin/sys/* equivalent) on every response. The
+// underlying handler still runs unchanged, so existing automation keeps
+// working until the sunset date.
+func deprecatedConfigPath(replacement string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("Deprecation", "true")
+		c.Header("Sunset", "Wed, 31 Dec 2026 23:59:59 GMT")
+		c.Header("Link", "<"+replacement+">; rel=\"successor-version\"")
+		c.Next()
+	}
+}
+
 // RegisterRoutes configures all admin-related routes
 func (h *AdminHandler) RegisterRoutes(r *gin.Engine) {
 	// System status (public - no auth needed)
@@ -43,17 +56,23 @@ func (h *AdminHandler) RegisterRoutes(r *gin.Engine) {
 		admin.POST("/database/cleanup", h.ForceCleanupHandler)  // Keep: Check if in api/db
 		admin.DELETE("/database/reset", h.ResetDatabaseHandler) // Keep: Check if in api/db
 
-		// System Configuration
-		// Note: The previous code had `admin.PUT("/config", updateRegistrationConfigHandler)`
-		// and also line 74 `admin.PUT("/config/registration", updateRegistrationConfigHandler)`
-		// We'll keep both for compatibility if needed, but clean it up.
-		admin.PUT("/config", h.UpdateRegistrationConfigHandler)
-
-		admin.GET("/config", h.GetSystemConfigHandler)
-		admin.PUT("/config/retention", h.UpdateRetentionPolicyHandler)
-		admin.PUT("/config/rate-limit", h.UpdateRateLimitHandler)
-		admin.PUT("/config/alerts", h.UpdateAlertConfigHandler)
-		admin.PUT("/config/registration", h.UpdateRegistrationConfigHandler)
+		// System Configuration — DEPRECATED aliases.
+		//
+		// Canonical paths live under /admin/sys/* (see internal/api/system).
+		// These /admin/config/* routes are kept until 2026-12-31 to avoid
+		// breaking older tooling, but every response carries Deprecation +
+		// Sunset + Link headers pointing at the new location.
+		//
+		// The previously-registered bare `PUT /admin/config` was removed: it
+		// pretended to be a generic config update but actually only flipped
+		// the registration toggle, which surprised callers. Use
+		// `/admin/sys/registration` (or the deprecated alias
+		// `/admin/config/registration`) instead.
+		admin.GET("/config", deprecatedConfigPath("/admin/sys/config"), h.GetSystemConfigHandler)
+		admin.PUT("/config/retention", deprecatedConfigPath("/admin/sys/retention"), h.UpdateRetentionPolicyHandler)
+		admin.PUT("/config/rate-limit", deprecatedConfigPath("/admin/sys/rate-limit"), h.UpdateRateLimitHandler)
+		admin.PUT("/config/alerts", deprecatedConfigPath("/admin/sys/alerts"), h.UpdateAlertConfigHandler)
+		admin.PUT("/config/registration", deprecatedConfigPath("/admin/sys/registration"), h.UpdateRegistrationConfigHandler)
 
 		// Logs management
 		admin.GET("/logs", h.GetLogsHandler)

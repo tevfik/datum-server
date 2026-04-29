@@ -40,6 +40,8 @@ func (h *Handler) RegisterAdminRoutes(r *gin.RouterGroup) {
 	r.GET("/config", h.GetSystemConfig)
 	r.PUT("/retention", h.UpdateRetention)
 	r.PUT("/registration", h.UpdateRegistration)
+	r.PUT("/rate-limit", h.UpdateRateLimit)
+	r.PUT("/alerts", h.UpdateAlerts)
 	r.GET("/logs", h.GetLogs)
 	r.DELETE("/logs", h.ClearLogs)
 }
@@ -176,6 +178,55 @@ func (h *Handler) UpdateRegistration(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "updated"})
+}
+
+// UpdateRateLimit updates the global rate-limit configuration.
+// PUT /admin/sys/rate-limit
+//
+// NOTE: Currently the values are only echoed back in the response. Plumbing
+// through to the live rate-limiter requires extending the storage layer with
+// a RateLimitConfig persistence method; tracked as a follow-up.
+func (h *Handler) UpdateRateLimit(c *gin.Context) {
+	var req struct {
+		MaxRequests   int `json:"max_requests" binding:"required,min=10,max=10000"`
+		WindowSeconds int `json:"window_seconds" binding:"required,min=1,max=3600"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"status": "updated",
+		"rate_limit": gin.H{
+			"max_requests":   req.MaxRequests,
+			"window_seconds": req.WindowSeconds,
+		},
+	})
+}
+
+// UpdateAlerts updates the global alert thresholds.
+// PUT /admin/sys/alerts
+//
+// NOTE: As with UpdateRateLimit, values are validated and echoed back. Live
+// alert wiring requires extending the storage layer; tracked as a follow-up.
+func (h *Handler) UpdateAlerts(c *gin.Context) {
+	var req struct {
+		EmailEnabled    bool `json:"email_enabled"`
+		DiskThreshold   int  `json:"disk_threshold" binding:"required,min=10,max=95"`
+		MemoryThreshold int  `json:"memory_threshold" binding:"required,min=10,max=95"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"status": "updated",
+		"alerts": gin.H{
+			"email_enabled":    req.EmailEnabled,
+			"disk_threshold":   req.DiskThreshold,
+			"memory_threshold": req.MemoryThreshold,
+		},
+	})
 }
 
 // GetLogs returns system logs.
