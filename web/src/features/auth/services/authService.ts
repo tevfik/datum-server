@@ -101,4 +101,10 @@ export const authService = {
     deletePushToken: async (id: string): Promise<void> => {
         await api.delete(`/auth/push-token/${id}`);
     },
+
+    /** Permanently delete the current user's account. Server revokes all
+     * sessions before removing the user record. */
+    deleteAccount: async (): Promise<void> => {
+        await api.delete('/auth/user');
+    },
 };
