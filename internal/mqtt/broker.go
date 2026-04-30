@@ -42,13 +42,17 @@ func NewBroker(store storage.Provider, processor *processing.TelemetryProcessor)
 
 // Start initializes listeners and starts the broker
 func (b *Broker) Start() error {
+	allowInsecure := os.Getenv("MQTT_ALLOW_INSECURE") == "true"
+
 	// TCP Listener
-	tcp := listeners.NewTCP(listeners.Config{
-		ID:      "t1",
-		Address: ":1883",
-	})
-	if err := b.server.AddListener(tcp); err != nil {
-		return err
+	if allowInsecure {
+		tcp := listeners.NewTCP(listeners.Config{
+			ID:      "t1",
+			Address: ":1883",
+		})
+		if err := b.server.AddListener(tcp); err != nil {
+			return err
+		}
 	}
 
 	// TLS Listener (optional: enabled when MQTT_TLS_CERT and MQTT_TLS_KEY are set)
@@ -77,12 +81,14 @@ func (b *Broker) Start() error {
 	}
 
 	// WebSocket Listener
-	ws := listeners.NewWebsocket(listeners.Config{
-		ID:      "ws1",
-		Address: ":1884",
-	})
-	if err := b.server.AddListener(ws); err != nil {
-		return err
+	if allowInsecure {
+		ws := listeners.NewWebsocket(listeners.Config{
+			ID:      "ws1",
+			Address: ":1884",
+		})
+		if err := b.server.AddListener(ws); err != nil {
+			return err
+		}
 	}
 
 	// Auth Hook
@@ -308,11 +314,21 @@ func (h *AuthHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) boo
 		// Expecting User API Key
 		if strings.HasPrefix(token, "ak_") {
 			user, err := h.store.GetUserByUserAPIKey(token)
-			if err != nil {
+			if err != nil || user == nil {
 				return false
 			}
-			// Allow valid users (Role check moved to ACL)
-			if user != nil {
+
+			// Security Fix: Prevent MQTT Identity Spoofing
+			// Verify that the ClientID belongs to the authenticated user
+			parts := strings.Split(clientID, "_")
+			var claimedUserID string
+			if strings.HasPrefix(clientID, "datum_web_") && len(parts) >= 4 {
+				claimedUserID = parts[3]
+			} else if strings.HasPrefix(clientID, "admin_dashboard_") && len(parts) >= 3 {
+				claimedUserID = parts[2]
+			}
+
+			if claimedUserID != "" && claimedUserID == user.ID {
 				return true
 			}
 		}

@@ -104,17 +104,40 @@ func (h *Handler) maybePresignThenAuth(method string) gin.HandlerFunc {
 
 // ---------- bucket-level handlers ----------
 
+func getBucketName(c *gin.Context) string {
+	bucket := c.Param("bucket")
+	if owner, exists := c.Get("user_id"); exists {
+		if ownerID, ok := owner.(string); ok && ownerID != "" {
+			return ownerID + "-" + bucket
+		}
+	}
+	return bucket
+}
+
 func (h *Handler) listBuckets(c *gin.Context) {
 	names, err := h.Backend.ListBuckets(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"buckets": names})
+	
+	owner, _ := c.Get("user_id")
+	ownerID, _ := owner.(string)
+	prefix := ownerID + "-"
+	
+	var userBuckets []string
+	for _, n := range names {
+		if strings.HasPrefix(n, prefix) {
+			userBuckets = append(userBuckets, strings.TrimPrefix(n, prefix))
+		}
+	}
+	
+	c.JSON(http.StatusOK, gin.H{"buckets": userBuckets})
 }
 
 func (h *Handler) ensureBucket(c *gin.Context) {
-	if err := h.Backend.EnsureBucket(c.Request.Context(), c.Param("bucket")); err != nil {
+	bucketName := getBucketName(c)
+	if err := h.Backend.EnsureBucket(c.Request.Context(), bucketName); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -123,7 +146,8 @@ func (h *Handler) ensureBucket(c *gin.Context) {
 }
 
 func (h *Handler) deleteBucket(c *gin.Context) {
-	if err := h.Backend.DeleteBucket(c.Request.Context(), c.Param("bucket")); err != nil {
+	bucketName := getBucketName(c)
+	if err := h.Backend.DeleteBucket(c.Request.Context(), bucketName); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -138,7 +162,8 @@ func (h *Handler) listObjects(c *gin.Context) {
 			limit = n
 		}
 	}
-	objs, err := h.Backend.List(c.Request.Context(), c.Param("bucket"), c.Query("prefix"), limit)
+	bucketName := getBucketName(c)
+	objs, err := h.Backend.List(c.Request.Context(), bucketName, c.Query("prefix"), limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -149,12 +174,12 @@ func (h *Handler) listObjects(c *gin.Context) {
 // ---------- object-level handlers ----------
 
 func (h *Handler) putObject(c *gin.Context) {
-	bucket := c.Param("bucket")
+	bucketName := getBucketName(c)
 	path := strings.TrimPrefix(c.Param("path"), "/")
 	owner, _ := c.Get("user_id")
 	ownerID, _ := owner.(string)
 	defer c.Request.Body.Close()
-	obj, err := h.Backend.Put(c.Request.Context(), bucket, path, c.Request.Body, buckets.PutOptions{
+	obj, err := h.Backend.Put(c.Request.Context(), bucketName, path, c.Request.Body, buckets.PutOptions{
 		ContentType: c.ContentType(),
 		OwnerID:     ownerID,
 	})
@@ -162,14 +187,14 @@ func (h *Handler) putObject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	h.emit("bucket/"+bucket+"/object/put", []byte(path))
+	h.emit("bucket/"+c.Param("bucket")+"/object/put", []byte(path))
 	c.JSON(http.StatusCreated, obj)
 }
 
 func (h *Handler) getObject(c *gin.Context) {
-	bucket := c.Param("bucket")
+	bucketName := getBucketName(c)
 	path := strings.TrimPrefix(c.Param("path"), "/")
-	rc, obj, err := h.Backend.Get(c.Request.Context(), bucket, path)
+	rc, obj, err := h.Backend.Get(c.Request.Context(), bucketName, path)
 	if err != nil {
 		if errors.Is(err, buckets.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -194,7 +219,8 @@ func (h *Handler) getObject(c *gin.Context) {
 }
 
 func (h *Handler) statObject(c *gin.Context) {
-	obj, err := h.Backend.Stat(c.Request.Context(), c.Param("bucket"), strings.TrimPrefix(c.Param("path"), "/"))
+	bucketName := getBucketName(c)
+	obj, err := h.Backend.Stat(c.Request.Context(), bucketName, strings.TrimPrefix(c.Param("path"), "/"))
 	if err != nil {
 		if errors.Is(err, buckets.ErrNotFound) {
 			c.Status(http.StatusNotFound)
@@ -214,7 +240,8 @@ func (h *Handler) statObject(c *gin.Context) {
 }
 
 func (h *Handler) deleteObject(c *gin.Context) {
-	if err := h.Backend.Delete(c.Request.Context(), c.Param("bucket"), strings.TrimPrefix(c.Param("path"), "/")); err != nil {
+	bucketName := getBucketName(c)
+	if err := h.Backend.Delete(c.Request.Context(), bucketName, strings.TrimPrefix(c.Param("path"), "/")); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -241,8 +268,9 @@ func (h *Handler) presign(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	bucketName := getBucketName(c)
 	exp := time.Duration(req.ExpiresSecs) * time.Second
-	urlStr, err := h.Backend.Presign(c.Request.Context(), c.Param("bucket"), req.Path, buckets.PresignOptions{
+	urlStr, err := h.Backend.Presign(c.Request.Context(), bucketName, req.Path, buckets.PresignOptions{
 		Method:  req.Method,
 		Expires: exp,
 	})

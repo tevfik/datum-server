@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -2193,6 +2194,16 @@ func (s *Storage) CreateDocument(userID, collection string, doc map[string]inter
 		}
 
 		_, _, err = tx.Set(key, string(data), nil)
+		if err == nil {
+			statKey := fmt.Sprintf("stat:collections:%s:%s", userID, collection)
+			val, statErr := tx.Get(statKey)
+			count := 0
+			if statErr == nil {
+				count, _ = strconv.Atoi(val)
+			}
+			count++
+			tx.Set(statKey, strconv.Itoa(count), nil)
+		}
 		return err
 	})
 }
@@ -2271,49 +2282,45 @@ func (s *Storage) DeleteDocument(userID, collection, docID string) error {
 	return s.db.Update(func(tx *buntdb.Tx) error {
 		key := fmt.Sprintf("doc:%s:%s:%s", userID, collection, docID)
 		_, err := tx.Delete(key)
+		if err == nil {
+			statKey := fmt.Sprintf("stat:collections:%s:%s", userID, collection)
+			val, statErr := tx.Get(statKey)
+			if statErr == nil {
+				count, _ := strconv.Atoi(val)
+				if count > 1 {
+					tx.Set(statKey, strconv.Itoa(count-1), nil)
+				} else {
+					tx.Delete(statKey)
+				}
+			}
+		}
 		return err
 	})
 }
 
 // ListAllCollections returns all unique collections across all users
 func (s *Storage) ListAllCollections() ([]CollectionInfo, error) {
-	collectionMap := make(map[string]map[string]int) // userID -> collection -> count
+	var result []CollectionInfo
 
 	err := s.db.View(func(tx *buntdb.Tx) error {
-		// Iterate over all keys with prefix "doc:"
-		tx.AscendKeys("doc:*", func(key, value string) bool {
-			// Key format: doc:{user_id}:{collection}:{doc_id}
+		tx.AscendKeys("stat:collections:*", func(key, value string) bool {
 			parts := strings.SplitN(key, ":", 4)
 			if len(parts) >= 4 {
-				userID := parts[1]
-				collection := parts[2]
-
-				if collectionMap[userID] == nil {
-					collectionMap[userID] = make(map[string]int)
-				}
-				collectionMap[userID][collection]++
+				userID := parts[2]
+				collection := parts[3]
+				count, _ := strconv.Atoi(value)
+				result = append(result, CollectionInfo{
+					UserID:     userID,
+					Collection: collection,
+					DocCount:   count,
+				})
 			}
 			return true
 		})
 		return nil
 	})
 
-	if err != nil {
-		return nil, err
-	}
-
-	var result []CollectionInfo
-	for userID, collections := range collectionMap {
-		for collName, count := range collections {
-			result = append(result, CollectionInfo{
-				UserID:     userID,
-				Collection: collName,
-				DocCount:   count,
-			})
-		}
-	}
-
-	return result, nil
+	return result, err
 }
 
 // CleanupPublicData currently acts as a placeholder or soft-limit enforcer.

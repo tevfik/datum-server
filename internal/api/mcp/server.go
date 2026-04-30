@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -183,8 +184,21 @@ func (s *Server) handleRPC(c *gin.Context) {
 		}
 		out, err := tool.Run(c, p.Arguments)
 		if err != nil {
-			writeRPC(c, req.ID, nil, &rpcError{Code: errInternalError, Message: err.Error()})
-			s.audit(c, p.Name, p.Arguments, "error:"+err.Error())
+			// Security Fix: Prevent internal details from leaking via MCP
+			errMsg := err.Error()
+			isSafe := strings.Contains(errMsg, "missing required argument") ||
+				strings.Contains(errMsg, "must be a string") ||
+				strings.Contains(errMsg, "must be a number") ||
+				strings.Contains(errMsg, "device not found") ||
+				strings.Contains(errMsg, "unauthenticated")
+
+			publicMsg := "Internal tool execution error. Please check server logs."
+			if isSafe {
+				publicMsg = errMsg
+			}
+
+			writeRPC(c, req.ID, nil, &rpcError{Code: errInternalError, Message: publicMsg})
+			s.audit(c, p.Name, p.Arguments, "error:"+errMsg)
 			return
 		}
 		// MCP "tool result" wraps content in a typed array. We return JSON.

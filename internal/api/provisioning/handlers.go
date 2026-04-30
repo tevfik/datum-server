@@ -122,6 +122,21 @@ func (h *Handler) RegisterDeviceHandler(c *gin.Context) {
 	// Check if UID is already registered
 	registered, existingDeviceID, _ := h.Store.IsDeviceUIDRegistered(deviceUID)
 	if registered {
+		// Security Fix: Prevent Device Takeover (BOLA)
+		// Verify that the current user actually owns the device before allowing re-registration
+		existingDevice, err := h.Store.GetDevice(existingDeviceID)
+		if err == nil && existingDevice.UserID != userID {
+			logger.GetLogger().Warn().
+				Str("event", "device_takeover_attempt").
+				Str("device_uid", deviceUID).
+				Str("attempted_by", userID).
+				Str("owner_id", existingDevice.UserID).
+				Msg("Blocked unauthorized device takeover attempt")
+
+			c.JSON(http.StatusForbidden, gin.H{"error": "This device is already registered to another user"})
+			return
+		}
+
 		// Device already registered - delete old registration to allow re-onboarding
 		logger.GetLogger().Info().
 			Str("device_uid", deviceUID).
