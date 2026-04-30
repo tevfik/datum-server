@@ -53,7 +53,7 @@ func (s *PostgresStore) GetUserByUserAPIKey(apiKey string) (*storage.User, error
 	ctx, cancel := queryCtx()
 	defer cancel()
 	query := `
-		SELECT u.id, u.email, u.password_hash, u.role, u.status, u.created_at, u.updated_at, u.last_login_at
+		SELECT u.id, u.email, u.password_hash, u.role, u.status, u.display_name, u.created_at, u.updated_at, u.last_login_at, u.refresh_token
 		FROM users u
 		JOIN user_api_keys k ON u.id = k.user_id
 		WHERE k.key_value = $1
