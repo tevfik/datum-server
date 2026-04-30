@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"datum-go/internal/api/provisioning"
 	"datum-go/internal/storage"
 	"encoding/json"
 	"net/http"
@@ -39,10 +40,17 @@ func TestProvisioningEndToEndFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	router := gin.New()
-	RegisterProvisioningRoutes(router, func(c *gin.Context) {
+	provHandler := provisioning.NewHandler(store, provisioning.Config{
+		ServerURL: "http://localhost:8080",
+	})
+	mockAuth := func(c *gin.Context) {
 		c.Set("user_id", userID)
 		c.Next()
-	}) // Mock auth middleware for simplicity
+	}
+	mockRateLimit := func(c *gin.Context) {
+		c.Next()
+	}
+	provHandler.RegisterRoutes(router, mockAuth, mockRateLimit)
 
 	// 2. User Registers Device (Mobile App)
 	// POST /dev/register
@@ -60,7 +68,7 @@ func TestProvisioningEndToEndFlow(t *testing.T) {
 	router.ServeHTTP(wReg, reqReg)
 
 	require.Equal(t, http.StatusCreated, wReg.Code)
-	var regResp RegisterDeviceResponse
+	var regResp provisioning.RegisterDeviceResponse
 	json.Unmarshal(wReg.Body.Bytes(), &regResp)
 	assert.NotEmpty(t, regResp.RequestID)
 	assert.Equal(t, "active", regResp.Status)

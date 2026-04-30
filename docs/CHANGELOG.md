@@ -5,6 +5,93 @@ All notable changes to Datum IoT Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-04-27
+
+### Added
+- **Lightweight Rule Engine**: JSON-based rule evaluation engine (`internal/rules/`) with conditions (gt, gte, lt, lte, eq, neq, contains) and actions (webhook, log, mqtt). Rules are persisted to `rules.json` on shutdown and auto-loaded on startup. REST API at `/admin/rules`.
+- **Webhook Event Dispatcher**: Async webhook delivery system (`internal/webhook/`) with subscription management, event filtering, and non-blocking queue. Supports device, data, command, alert, and rule events.
+- **Structured Audit Log**: Centralized audit logging (`internal/audit/`) covering all admin operations including user/device CRUD, config changes, data exports, and DB operations.
+- **Global Rate Limiting**: Per-IP rate limiter with configurable limits (`RATE_LIMIT_REQUESTS`, `RATE_LIMIT_WINDOW_SECONDS`) applied to all endpoints. Returns 429 when exceeded.
+- **API Versioning**: All endpoints now available under `/api/v1/` prefix alongside unversioned paths for backward compatibility. Router functions accept `gin.IRouter` for flexible mounting.
+- **TimescaleDB Support**: Migration `000002_timescaledb_support` auto-detects TimescaleDB extension and converts `data_points` to a hypertable with compression (7-day) and retention (365-day) policies. Falls back gracefully to standard PostgreSQL.
+- **Data Retention Purge**: `PurgeOldDataPoints` method on storage Provider, called hourly by periodic cleanup based on configured retention days.
+- **datumctl server-config**: New CLI commands — `server-config get`, `server-config validate` (connectivity checks), `server-config retention <days>`.
+- **OpenAPI 3.0 Updates**: Spec updated to v1.7.0 with health/readiness/liveness endpoints, rule engine CRUD, metrics format parameter, and Rule schema definition.
+
+### Changed
+- **Graceful Shutdown**: 4-phase sequenced shutdown: HTTP drain (10s) → MQTT stop → telemetry flush + rule save → storage close. Previously used single 5s timeout.
+- **Health Check**: `/health` now reports MQTT broker status, client count, telemetry buffer usage, dropped count, and uptime. Returns `degraded` when buffer >90% full.
+- **Readiness Check**: `/ready` now verifies storage responsiveness, MQTT broker, and telemetry processor — not just storage initialization.
+- **Go Module**: go1.24.0 → go1.25.0, golang.org/x/image v0.35.0 → v0.39.0 (3 CVE fixes), x/sync v0.19.0 → v0.20.0, x/text v0.33.0 → v0.36.0.
+- **Server Version**: 1.4.1 → 1.7.0.
+
+### Security
+- **3 Module-Level Vulnerabilities Fixed**: golang.org/x/image upgraded to v0.39.0 resolving GO-2025-3487, GO-2025-3488, GO-2025-3573.
+
+## [1.7.0] - 2026-04-27
+
+### Added
+- **MQTT ACL Cache Invalidation**: Device create/delete/provisioning operations now immediately invalidate the MQTT ACL cache for affected users, preventing stale access control.
+- **Admin Data Access Audit Trail**: Zerolog audit events are emitted when an admin accesses another user's device data, logging admin ID, device ID, device owner, and client IP.
+- **PostgreSQL Migration Framework**: Schema management now uses golang-migrate with versioned SQL migration files under `internal/storage/postgres/migrations/`. Falls back to legacy schema.sql for compatibility.
+- **YAML Configuration File**: Server supports `datum-server.yaml` config file (see `datum-server.example.yaml`). All 30 environment variables are mapped to structured config with viper. File → env var → default priority chain.
+- **Centralized Config Package**: `internal/config/` provides a typed `Config` struct with all server settings, replacing scattered `os.Getenv()` calls.
+- **datumctl Lipgloss Styling**: CLI output upgraded with charmbracelet/lipgloss for styled boxes, colored key-value pairs, status indicators, and a branded interactive mode banner.
+- **CLI Style Module**: `internal/cli/styles/` provides shared lipgloss styles (colors, boxes, text formatters, KV helpers, status icons) for consistent CLI output.
+- **Stream Goroutine Limits**: Video streaming bounded to 50 clients per stream and 500 total clients globally, preventing unbounded goroutine growth.
+- **Comprehensive API Tests**: 50+ new handler tests across 8 packages (auth, commands, data, db, devices, keys, public, system) using httptest + real BuntDB storage. Coverage: 19.5% → 24.4%.
+- **Metrics Wire-up**: `IncrementDataPoints`, `IncrementCommands`, and `IncrementDropped` counters are now called from their respective handlers (previously dead code).
+
+### Changed
+- **Go Toolchain**: go1.24.11 → go1.24.13 (security patches for TLS vulnerabilities).
+- **lib/pq**: v1.10.9 → v1.12.3 (security fix).
+- **quic-go**: v0.54.0 → v0.59.0 (HTTP/3 DoS fix).
+- **go.uber.mock**: v0.5.0 → v0.5.2.
+- **PG Query Timeouts**: All 42+ PostgreSQL query functions now use `context.WithTimeout(10s)` via a shared `queryCtx()` helper, standardizing timeout behavior across 8 source files.
+- **Test Race Safety**: `TestHighVolumeTransactions` and `TestBuntDBMemoryUsage` use `testing.Short()` guard to reduce device count from 10000/5000 to 500 under race detector.
+- **README Coverage Badge**: Fixed from false 95% claim to actual 24.4%.
+
+### Removed
+- **Dead Code**: `mustSubFS` function removed from `cmd/server/main.go` (was unused after previous embed safeguard fix).
+
+## [1.6.0] - 2026-03-28
+
+### Added
+- **Request ID Middleware**: All API responses include an `X-Request-ID` header (UUID v4) for request correlation and debugging. Clients can provide their own value.
+- **Request Body Limit**: Configurable `MAX_REQUEST_BODY_BYTES` (default: 5MB) to prevent oversized payloads.
+- **MQTT TLS**: Optional native TLS listener on port 8883 via `MQTT_TLS_CERT` / `MQTT_TLS_KEY` environment variables.
+- **Telemetry Drop Metrics**: `DroppedCount()` and `BufferUsage()` methods on telemetry processor; `points_dropped` in metrics endpoint.
+- **ACL Cache**: MQTT device ownership lookups cached for 60 seconds, reducing database load.
+- **Stream Cleanup**: Automatic cleanup of stale video streams (no clients + no frames for 5 minutes), checked every 2 minutes.
+- **Audit Logging**: Key rotation events now log SHA256 hash of old key, device ID, user ID, and client IP.
+- **Configurable CSP**: Override Content-Security-Policy header via `CONTENT_SECURITY_POLICY` env var.
+- **Configurable Query Limit**: `QUERY_MAX_LIMIT` env var (default: 10000) for data history queries.
+- **Configurable Telemetry Buffer**: `TELEMETRY_BUFFER_SIZE` env var (default: 10000) for burst absorption tuning.
+- **System Config Cache**: Public config endpoint cached for 5 minutes with double-checked locking.
+
+### Changed
+- **Rate Limiter**: Refactored from single mutex to 32-shard design for better concurrency under high load.
+- **Telemetry Buffer**: Default reduced from 50000 to 10000 (configurable via `TELEMETRY_BUFFER_SIZE`).
+- **SSE Polling Interval**: Increased from 2s to 3s to reduce server-side CPU usage. Devices receive commands slightly slower.
+- **WebSocket Buffers**: Read buffer increased to 4KB, write buffer reduced from 1MB to 4KB for more efficient memory usage.
+- **WebSocket Origin Check**: Now strictly enforces `CORS_ALLOWED_ORIGINS` whitelist (default `*` allows all, no change for most deployments).
+- **CSP Header**: Removed `unsafe-inline` from `script-src`, added `connect-src 'self' ws: wss:` and `Permissions-Policy` header.
+- **Sort Algorithm**: Replaced O(n²) bubble sort with `sort.Slice` in data history handler.
+- **JSON Serialization**: Uses `sync.Pool` buffer reuse in storage layer to reduce GC pressure.
+- **Batch Cap**: Data ingestion capped at 50,000 points per batch to prevent memory exhaustion.
+- **PostgreSQL Queries**: All queries now use context with 10-second timeout to prevent hanging connections.
+
+### Fixed
+- **Auth Error Handling**: All device/data handlers now return 401 on `GetUserID` failure instead of proceeding with empty user ID.
+- **Password Reset Token**: Token is consumed (deleted) before password update, enforcing single-use semantics.
+- **Forgot Password Timing**: Constant-time response (minimum 200ms) to prevent email enumeration via timing attacks.
+- **Graceful Shutdown**: Telemetry processor buffer is flushed before storage is closed.
+
+### Migration Notes
+- **Telemetry Buffer**: If your deployment relied on the old 50K buffer for burst absorption, set `TELEMETRY_BUFFER_SIZE=50000` to restore previous behavior.
+- **WebSocket Origins**: If you have `CORS_ALLOWED_ORIGINS` set to specific domains, ensure all WebSocket client origins are included.
+- **SSE Polling**: Devices now poll every 3s instead of 2s. If sub-3-second command latency is critical, consider using the `/cmd/poll` long-polling endpoint instead.
+
 ## [1.5.1] - 2026-01-20
 
 ### Fixed
@@ -133,8 +220,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - FIRMWARE.md - Arduino/ESP32 firmware examples
 - SSE_COMMANDS.md - Server-Sent Events documentation
 - FINAL_PERFORMANCE_REPORT.md - Performance benchmarks
-- TSTORAGE_TEST_RESULTS.md - Time-series storage tests
-- BUNTDB_TEST_RESULTS.md - Metadata storage tests
+
 
 ### Examples
 - Arduino/ESP32 device firmware

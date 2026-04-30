@@ -7,6 +7,8 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+
+	"datum-go/internal/cli/utils"
 )
 
 var keyCmd = &cobra.Command{
@@ -67,7 +69,7 @@ func runKeyList(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	keysInterface, ok := result["keys"]
@@ -89,10 +91,10 @@ func runKeyList(cmd *cobra.Command, args []string) error {
 		if !ok {
 			continue
 		}
-		id := getString(k, "id")
-		name := getString(k, "name")
-		keyMasked := getString(k, "key")
-		created := getString(k, "created_at")
+		id := utils.GetString(k, "id")
+		name := utils.GetString(k, "name")
+		keyMasked := utils.GetString(k, "key")
+		created := utils.GetString(k, "created_at")
 
 		if t, err := time.Parse(time.RFC3339, created); err == nil {
 			created = t.Local().Format("2006-01-02 15:04:05")
@@ -123,13 +125,13 @@ func runKeyCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	fmt.Printf("\n✅ API Key Created!\n\n")
-	fmt.Printf("  ID:   %s\n", getString(result, "id"))
-	fmt.Printf("  Name: %s\n", getString(result, "name"))
-	fmt.Printf("\n  🔑 Key: %s\n", getString(result, "key"))
+	fmt.Printf("  ID:   %s\n", utils.GetString(result, "id"))
+	fmt.Printf("  Name: %s\n", utils.GetString(result, "name"))
+	fmt.Printf("\n  🔑 Key: %s\n", utils.GetString(result, "key"))
 	fmt.Printf("  ⚠️  Save this key now! It won't be shown again.\n\n")
 
 	return nil

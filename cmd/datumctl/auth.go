@@ -165,6 +165,11 @@ func getConfigPath() string {
 		return configFile
 	}
 
+	// Support env var
+	if envPath := os.Getenv("DATUMCTL_CONFIG"); envPath != "" {
+		return envPath
+	}
+
 	// If running in Docker container with mounted data volume, use it for persistence
 	if _, err := os.Stat("/root/data"); err == nil {
 		return "/root/data/.datumctl.yaml"
@@ -177,6 +182,8 @@ func getConfigPath() string {
 func loadConfig() {
 	if configFile != "" {
 		viper.SetConfigFile(configFile)
+	} else if envPath := os.Getenv("DATUMCTL_CONFIG"); envPath != "" {
+		viper.SetConfigFile(envPath)
 	} else {
 		// Search in /root/data first (for Docker persistence)
 		if _, err := os.Stat("/root/data"); err == nil {

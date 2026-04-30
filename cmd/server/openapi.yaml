@@ -2,11 +2,30 @@ openapi: 3.0.3
 info:
   title: Datumpy IoT Platform API
   description: |
-    High-performance IoT data ingestion and device management platform.
+    High-performance IoT data ingestion and device management platform with mobile-ready auth.
 
     ## Authentication
     - **User Auth**: JWT token in `Authorization: Bearer {token}` header
     - **Device Auth**: API key in `Authorization: Bearer {api_key}` header
+    - **OAuth**: Google and GitHub via `GET /auth/oauth/{provider}` (PKCE supported for mobile)
+
+    ## Token Lifecycle
+    - **Access token**: 15-minute JWT — use for all authenticated API calls
+    - **Refresh token**: 30-day rotating token — use `POST /auth/refresh` to get a new pair
+    - **Sessions**: Each login creates a session; list with `GET /auth/sessions`, revoke with `POST /auth/logout`
+
+    ## Push Notifications (ntfy)
+    When `NTFY_URL` is configured, each user has a private ntfy topic returned by `GET /auth/me` as `ntfy_topic`.
+    Subscribe to `{NTFY_URL}/{ntfy_topic}` in the ntfy app or via the ntfy SDK.
+
+    Required env vars:
+    - `NTFY_URL` — ntfy server base URL (e.g. `https://ntfy.sh` or self-hosted)
+    - `NTFY_TOKEN` — optional bearer token for authenticated ntfy servers
+
+    ## OAuth Social Login
+    Supports Google and GitHub. Configure via env vars:
+    - `OAUTH_GOOGLE_CLIENT_ID` / `OAUTH_GOOGLE_CLIENT_SECRET`
+    - `OAUTH_GITHUB_CLIENT_ID` / `OAUTH_GITHUB_CLIENT_SECRET`
 
     ## Quick Start
     - **Register user**: `POST /auth/register`
@@ -29,7 +48,27 @@ info:
     - **Data (Pub)**: `dev/{device_id}/data`
     - **Commands (Sub)**: `dev/{device_id}/cmd`
     - **Firmware (Sub)**: `dev/{device_id}/fw`
-  version: 1.1.0
+
+    ## Common Headers
+    All responses include an `X-Request-ID` header (UUID v4) for request correlation. Provide your own or the server generates one.
+
+    ## API Versioning
+    All endpoints are available under both root paths and `/api/v1/` prefix.
+    Example: `POST /auth/login` is also available at `POST /api/v1/auth/login`.
+
+    ## Rate Limiting
+    All endpoints are rate-limited per IP (default: 100 requests/60 seconds).
+    When exceeded, the server returns `429 Too Many Requests`.
+
+    ## Rule Engine
+    Configure data-driven rules via `POST /admin/rules`. Rules evaluate incoming
+    telemetry and can trigger webhooks, MQTT messages, or log entries.
+
+    ## Request Limits
+    - **Max Body**: 5 MB (configurable via `MAX_REQUEST_BODY_BYTES`)
+    - **Query Limit**: 10,000 data points per query (configurable via `QUERY_MAX_LIMIT`)
+    - **Batch Limit**: 50,000 data points per ingestion batch (fixed)
+  version: 1.8.0
   contact:
     name: API Support
   license:
@@ -38,8 +77,12 @@ info:
 servers:
   - url: https://datum.bezg.in
     description: Production Server
+  - url: https://datum.bezg.in/api/v1
+    description: Production Server (API v1)
   - url: http://localhost:8000
     description: Local development
+  - url: http://localhost:8000/api/v1
+    description: Local development (API v1)
 
 components:
   securitySchemes:
@@ -53,12 +96,106 @@ components:
       scheme: bearer
       description: Device Authentication. Accepts Device API Key (starts with `sk_`) OR Dynamic Device Token (starts with `dk_`).
 
+  headers:
+    X-Request-ID:
+      description: Unique request identifier (UUID v4). The server generates one if the client does not provide it. Useful for log correlation and debugging.
+      schema:
+        type: string
+        format: uuid
+
+  parameters:
+    QueryLimit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of data points to return. Server-side maximum is configurable via `QUERY_MAX_LIMIT` (default 10000).
+      schema:
+        type: integer
+        default: 10000
+        maximum: 10000
+
+  responses:
+    BadRequest:
+      description: Bad Request — malformed JSON, missing required fields, or failed validation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "invalid request body" }
+    Unauthorized:
+      description: Unauthorized — missing, invalid or expired authentication credentials.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "unauthorized" }
+    Forbidden:
+      description: Forbidden — authenticated but lacking permission for this resource.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "forbidden" }
+    NotFound:
+      description: Not Found — resource does not exist or is not accessible to the caller.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "not found" }
+    Conflict:
+      description: Conflict — resource already exists or current state prevents the operation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "already exists" }
+    UnprocessableEntity:
+      description: Unprocessable Entity — semantically invalid input.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "validation failed" }
+    TooManyRequests:
+      description: Too Many Requests — rate limit exceeded. Retry after the period in the `Retry-After` header.
+      headers:
+        Retry-After:
+          description: Seconds until the client may retry.
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "rate limit exceeded" }
+    InternalError:
+      description: Internal Server Error — unexpected server failure. Includes a request ID for log correlation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "internal server error" }
+
   schemas:
     Error:
       type: object
+      required: [error]
       properties:
         error:
           type: string
+          description: Human-readable error message. Stable identifier strings will be added in a future revision.
+        code:
+          type: string
+          description: Optional machine-readable error code (reserved for future use).
+        request_id:
+          type: string
+          description: Correlates with the `X-Request-ID` response header.
+
+    StorageObject:
+      type: object
+      properties:
+        bucket: { type: string }
+        path: { type: string }
+        size: { type: integer, format: int64 }
+        content_type: { type: string }
+        etag: { type: string }
+        last_modified: { type: string, format: date-time }
+        owner_id: { type: string }
+        metadata:
+          type: object
+          additionalProperties: { type: string }
 
     RegisterRequest:
       type: object
@@ -123,8 +260,72 @@ components:
       properties:
         token:
           type: string
+          description: JWT access token (valid ~15 minutes)
+        refresh_token:
+          type: string
+          description: Refresh token (valid 30 days); use POST /auth/refresh to rotate
         user_id:
           type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        expires_at:
+          type: string
+          format: date-time
+
+    UserProfile:
+      type: object
+      properties:
+        user_id:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        display_name:
+          type: string
+        status:
+          type: string
+        ntfy_topic:
+          type: string
+          description: ntfy.sh topic to subscribe to for push notifications (only present when NTFY_URL is configured)
+        created_at:
+          type: string
+          format: date-time
+
+    Session:
+      type: object
+      properties:
+        jti:
+          type: string
+          description: JWT ID — unique session identifier
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        user_agent:
+          type: string
+        ip:
+          type: string
+
+    PushToken:
+      type: object
+      properties:
+        id:
+          type: string
+        platform:
+          type: string
+          enum: [ios, android, web, ntfy]
+        token:
+          type: string
+        created_at:
+          type: string
+          format: date-time
 
     DeviceCreateRequest:
       type: object
@@ -378,6 +579,107 @@ components:
         request_id:
           type: string
 
+    Rule:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique rule identifier
+        name:
+          type: string
+          description: Human-readable rule name
+        description:
+          type: string
+        device_id:
+          type: string
+          description: Target device (empty for all devices)
+        conditions:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              operator:
+                type: string
+                enum: [gt, gte, lt, lte, eq, neq, contains]
+              value: {}
+        actions:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [webhook, log, mqtt]
+              config:
+                type: object
+        enabled:
+          type: boolean
+        fire_count:
+          type: integer
+      required:
+        - name
+        - conditions
+        - actions
+
+    PackManifest:
+      type: object
+      description: Knowledge pack manifest as declared in pack.yaml.
+      properties:
+        id:
+          type: string
+          description: Unique pack identifier (e.g. `crops-tr`)
+        version:
+          type: string
+          description: Semantic version string
+        schema_version:
+          type: integer
+          description: Pack schema version (bumped on breaking manifest changes)
+        locale:
+          type: string
+          description: BCP 47 language tag (e.g. `tr`)
+        title:
+          type: string
+          description: Human-readable display name
+        description:
+          type: string
+        tier:
+          type: string
+          enum: [free, premium]
+          description: Access tier controlling gateway authorization
+        content_files:
+          type: array
+          items:
+            type: string
+          description: YAML data file names relative to pack directory
+        etag:
+          type: string
+          description: SHA-256[:12] content hash — changes whenever the pack changes
+        search:
+          type: object
+          properties:
+            fields:
+              type: array
+              items:
+                type: string
+              description: Item fields used for substring search
+            semantic:
+              type: boolean
+              description: Whether semantic (vector) search is available
+        app_hints:
+          type: array
+          items:
+            type: object
+            properties:
+              app:
+                type: string
+              required:
+                type: boolean
+              auto_load:
+                type: boolean
+          description: Per-app metadata hints
+
 paths:
   /:
     get:
@@ -386,6 +688,251 @@ paths:
       responses:
         '200':
           description: API information
+
+  /notify/{topic}:
+    post:
+      summary: Publish a notification message (ntfy-protocol compatible)
+      description: |
+        Publishes a message to the embedded ntfy-protocol broker.
+        Compatible with existing ntfy mobile/desktop clients.
+        Optional headers: `Title`, `Priority` (min|low|default|high|max), `Tags` (comma-separated).
+      tags: [Notifications]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          schema: { type: string }
+        - name: Title
+          in: header
+          required: false
+          schema: { type: string }
+        - name: Priority
+          in: header
+          required: false
+          schema: { type: string, enum: [min, low, default, high, max] }
+        - name: Tags
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          text/plain:
+            schema: { type: string }
+      responses:
+        '200':
+          description: Message published
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:       { type: string }
+                  time:     { type: integer }
+                  event:    { type: string, example: message }
+                  topic:    { type: string }
+                  title:    { type: string }
+                  message:  { type: string }
+                  priority: { type: integer }
+                  tags:     { type: array, items: { type: string } }
+        '413': { description: Message too large (>4 KiB) }
+
+  /notify/{topic}/json:
+    get:
+      summary: Subscribe to a topic (newline-delimited JSON stream)
+      tags: [Notifications]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Long-lived NDJSON stream
+          content:
+            application/x-ndjson: { schema: { type: string } }
+
+  /notify/{topic}/sse:
+    get:
+      summary: Subscribe to a topic (Server-Sent Events)
+      tags: [Notifications]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream: { schema: { type: string } }
+
+  /notify/{topic}/raw:
+    get:
+      summary: Subscribe to a topic (newline-delimited message bodies)
+      tags: [Notifications]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Plain-text stream
+          content:
+            text/plain: { schema: { type: string } }
+
+  # ---------- Object Storage (Buckets — Phase 3) ----------
+  /storage:
+    get:
+      summary: List buckets
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Bucket list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  buckets: { type: array, items: { type: string } }
+
+  /storage/{bucket}:
+    parameters:
+      - name: bucket
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      summary: Create (or ensure) a bucket
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Bucket exists }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    delete:
+      summary: Delete an empty bucket
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    get:
+      summary: List objects in a bucket
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: prefix
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 10000 }
+      responses:
+        '200':
+          description: Object list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  objects:
+                    type: array
+                    items: { $ref: '#/components/schemas/StorageObject' }
+
+  /storage/{bucket}/{path}:
+    parameters:
+      - name: bucket
+        in: path
+        required: true
+        schema: { type: string }
+      - name: path
+        in: path
+        required: true
+        schema: { type: string }
+        description: Slash-delimited object key
+    put:
+      summary: Upload an object
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StorageObject' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    get:
+      summary: Download an object (auth or presigned URL)
+      tags: [Storage]
+      parameters:
+        - name: sig
+          in: query
+          schema: { type: string }
+          description: Presigned signature (when present, replaces auth)
+        - name: expires
+          in: query
+          schema: { type: integer }
+          description: Expiry timestamp (unix seconds)
+      responses:
+        '200':
+          description: Object bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+    head:
+      summary: Stat an object
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Headers only }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Delete an object
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Deleted }
+
+  /storage/{bucket}/presign:
+    post:
+      summary: Create a presigned URL
+      tags: [Storage]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path: { type: string }
+                method: { type: string, enum: [GET, PUT, DELETE], default: GET }
+                expires_secs: { type: integer, default: 900 }
+      responses:
+        '200':
+          description: URL response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, format: uri }
+                  expires_secs: { type: integer }
 
   /sys/time:
     get:
@@ -419,17 +966,29 @@ paths:
 
   /sys/ip:
     get:
-      summary: Get system IP
-      description: Returns the public IP address of the client as seen by the server.
+      summary: Get client public IP
+      description: |
+        Returns the public IP address of the calling client. The server prefers
+        proxy headers (`CF-Connecting-IP`, `True-Client-IP`, `X-Real-IP`,
+        `X-Forwarded-For` left-most entry) over the immediate transport
+        address, so callers behind a reverse proxy still see their real IP.
+
+        - `Accept: application/json` → `{ "ip": "1.2.3.4" }`
+        - default → `text/plain` body containing only the IP
       tags: [System]
       responses:
         '200':
-          description: Client IP address
+          description: Client public IP
           content:
             text/plain:
               schema:
                 type: string
-                example: "127.0.0.1"
+                example: "203.0.113.42"
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ip: { type: string, example: "203.0.113.42" }
 
 
   /sys/status:
@@ -463,16 +1022,6 @@ paths:
         '409':
           description: Already initialized
 
-  /health:
-    get:
-      summary: Health check
-      tags: [System]
-      responses:
-        '200':
-          description: Healthy
-        '503':
-          description: Unhealthy
-
   /healthz:
     get:
       summary: Health check (alias)
@@ -481,23 +1030,240 @@ paths:
         '200':
           description: Healthy
 
-  /live:
-    get:
-      summary: Liveness check
-      tags: [System]
+  /auth/refresh:
+    post:
+      summary: Rotate refresh token
+      description: Exchange a valid refresh token for a new access + refresh token pair. The old refresh token is invalidated (rotation). Reuse of a revoked token triggers revocation of all sessions for security.
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
       responses:
         '200':
-          description: Alive
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid or expired refresh token
 
-  /ready:
-    get:
-      summary: Readiness check
-      tags: [System]
+  /auth/logout:
+    post:
+      summary: Logout current session
+      description: Revokes the current session identified by the Bearer token. Other sessions (other devices) remain active.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
       responses:
         '200':
-          description: Ready
-        '503':
-          description: Not ready
+          description: Session revoked
+
+  /auth/sessions:
+    get:
+      summary: List active sessions
+      description: Returns all active login sessions for the authenticated user.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Active sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+
+  /auth/me:
+    get:
+      summary: Get profile
+      description: Returns the authenticated user's profile including ntfy topic for push notifications.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+    put:
+      summary: Update profile
+      description: Update display name for the authenticated user.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name:
+                  type: string
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+
+  /auth/push-tokens:
+    get:
+      summary: List push tokens for the current user
+      description: |
+        Returns the push tokens registered by the authenticated user.
+        Note: this endpoint uses the plural form (`push-tokens`) while
+        register/delete use the singular `push-token` for backwards
+        compatibility.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of registered tokens
+
+  /auth/push-token:
+    post:
+      summary: Register push token
+      description: Register a device push token (FCM, APNs, ntfy, or web push) for the authenticated user. Duplicate tokens are silently replaced.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [platform, token]
+              properties:
+                platform:
+                  type: string
+                  enum: [fcm, apns, ntfy]
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Token registered
+
+  /auth/push-token/{id}:
+    delete:
+      summary: Unregister push token
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Token removed
+
+  /auth/providers:
+    get:
+      summary: List configured OAuth providers
+      description: |
+        Returns the list of OAuth providers enabled on the server (those with
+        `OAUTH_<PROVIDER>_CLIENT_ID` set in the server environment).
+        Empty list means OAuth is disabled.
+
+        Also accessible as `GET /auth/oauth/providers` (alias).
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Provider list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: array
+                    items: { type: string, example: google }
+
+  /auth/oauth/{provider}:
+    get:
+      summary: Initiate OAuth login
+      description: |
+        Redirects to the OAuth provider (google or github) for authentication.
+
+        **Web flow**: Simply redirect the browser here. After auth the callback returns JSON.
+
+        **Mobile/PKCE flow**: Pass `code_challenge` (SHA-256 of your random verifier, base64url-encoded) and `redirect_uri` (your app's deep-link URI). After auth the callback redirects to your app with `access_token` and `refresh_token` as query parameters.
+
+        > Special case: `provider=providers` returns the same payload as `GET /auth/providers`.
+      tags: [Authentication]
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github]
+        - name: redirect_uri
+          in: query
+          description: Mobile app deep-link URI (PKCE flow only)
+          schema:
+            type: string
+        - name: code_challenge
+          in: query
+          description: PKCE code challenge — SHA-256(code_verifier), base64url-encoded (mobile flow only)
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to OAuth provider
+
+  /auth/oauth/{provider}/callback:
+    get:
+      summary: OAuth callback
+      description: Handles the provider's redirect. Web clients receive a JSON AuthResponse. Mobile clients are redirected to their `redirect_uri` with tokens as query parameters.
+      tags: [Authentication]
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github]
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authentication successful (web flow)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '302':
+          description: Redirect with tokens (mobile/PKCE flow)
 
   /auth/register:
     post:
@@ -818,12 +1584,10 @@ paths:
   /dev/{device_id}:
     get:
       summary: Get device details
-      description: Returns device details, including Thing Description.
       tags: [Devices]
       security:
         - BearerAuth: []
       parameters:
-        - name: device_id
         - name: device_id
           in: path
           required: true
@@ -848,8 +1612,34 @@ paths:
           schema:
             type: string
       responses:
-        '204':
+        '200':
           description: Device deleted
+
+  /dev/{device_id}/thing-description:
+    put:
+      summary: Update Thing Description (WoT)
+      tags: [Devices]
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Thing Description updated
+
+
 
   /dev/{device_id}/config:
     patch:
@@ -1075,6 +1865,65 @@ paths:
                     type: integer
                   height:
                     type: integer
+  /data/{device_id}:
+    post:
+      summary: Ingest Telemetry Data
+      tags: [Data]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataPayload'
+      responses:
+        '200':
+          description: Data accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string}
+                  commands_pending: {type: boolean}
+
+    get:
+      summary: Get Device Data (User Auth)
+      tags: [Data]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema: {type: integer}
+        - name: start
+          in: query
+          schema: {type: string}
+        - name: stop
+          in: query
+          schema: {type: string}
+      responses:
+        '200':
+          description: Telemetry data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/DataPayload'}}
+
   /dev/{device_id}/data:
     post:
       summary: Send data (device)
@@ -1125,10 +1974,11 @@ paths:
             type: string
         - name: limit
           in: query
-          description: Maximum number of data points to return (triggers history mode)
+          description: Maximum number of data points to return (triggers history mode). Server-side maximum is configurable via QUERY_MAX_LIMIT env var (default 10000).
           schema:
             type: integer
             default: 100
+            maximum: 10000
         - name: range
           in: query
           description: Duration backwards from now (e.g., 1h, 24h, 7d, 30d)
@@ -1266,10 +2116,11 @@ paths:
             type: string
         - name: limit
           in: query
-          description: Maximum number of data points to return (triggers history mode)
+          description: Maximum number of data points to return (triggers history mode). Server-side maximum is configurable via QUERY_MAX_LIMIT env var (default 10000).
           schema:
             type: integer
             default: 100
+            maximum: 10000
       responses:
         '200':
           description: Latest data OR list of historical data
@@ -1627,6 +2478,27 @@ paths:
                           type: integer
 
   /admin/db/{user_id}/{collection}:
+    delete:
+      summary: Drop database collection
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: collection
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Collection dropped
+
+
     get:
       summary: List user documents (Admin)
       tags: [Admin]
@@ -1826,7 +2698,7 @@ paths:
               schema:
                 type: object
 
-  /admin/config/retention:
+  /admin/sys/retention:
     put:
       summary: Update data retention policy
       tags: [Admin]
@@ -1842,7 +2714,7 @@ paths:
         '200':
           description: Retention updated
 
-  /admin/config/rate-limit:
+  /admin/sys/rate-limit:
     put:
       summary: Update rate limit settings
       tags: [Admin]
@@ -1858,7 +2730,7 @@ paths:
         '200':
           description: Rate limit updated
 
-  /admin/config/alerts:
+  /admin/sys/alerts:
     put:
       summary: Update alert settings
       tags: [Admin]
@@ -1874,7 +2746,7 @@ paths:
         '200':
           description: Alerts updated
 
-  /admin/config/registration:
+  /admin/sys/registration:
     put:
       summary: Update registration settings
       tags: [Admin]
@@ -1889,6 +2761,76 @@ paths:
       responses:
         '200':
           description: Registration updated
+
+  # Deprecated aliases — emit RFC 8594 Deprecation/Sunset/Link headers
+  # pointing at /admin/sys/* successors. Sunset: 2026-12-31.
+  /admin/config/retention:
+    put:
+      deprecated: true
+      summary: '[DEPRECATED] Use PUT /admin/sys/retention'
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRetentionRequest'
+      responses:
+        '200':
+          description: Retention updated (deprecated path)
+
+  /admin/config/rate-limit:
+    put:
+      deprecated: true
+      summary: '[DEPRECATED] Use PUT /admin/sys/rate-limit'
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRateLimitRequest'
+      responses:
+        '200':
+          description: Rate limit updated (deprecated path)
+
+  /admin/config/alerts:
+    put:
+      deprecated: true
+      summary: '[DEPRECATED] Use PUT /admin/sys/alerts'
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAlertConfigRequest'
+      responses:
+        '200':
+          description: Alerts updated (deprecated path)
+
+  /admin/config/registration:
+    put:
+      deprecated: true
+      summary: '[DEPRECATED] Use PUT /admin/sys/registration'
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRegistrationRequest'
+      responses:
+        '200':
+          description: Registration updated (deprecated path)
 
   /admin/mqtt/stats:
     get:
@@ -2115,3 +3057,369 @@ paths:
                     type: string
                   arch:
                     type: string
+
+  # --- Health & Readiness ---
+  /health:
+    get:
+      summary: Health check
+      description: Returns service health status including storage, MQTT, and telemetry processor state.
+      tags: [System]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                  storage:
+                    type: string
+                  mqtt:
+                    type: string
+                  mqtt_clients:
+                    type: integer
+                  telemetry_buffer_usage:
+                    type: string
+                  uptime_seconds:
+                    type: integer
+                  version:
+                    type: string
+        '503':
+          description: Service is unhealthy or degraded
+
+  /ready:
+    get:
+      summary: Readiness check
+      description: Returns whether the service is ready to handle requests.
+      tags: [System]
+      responses:
+        '200':
+          description: Service is ready
+        '503':
+          description: Service is not ready
+
+  /live:
+    get:
+      summary: Liveness check
+      tags: [System]
+      responses:
+        '200':
+          description: Service is alive
+
+  # --- Rule Engine ---
+  /admin/rules:
+    get:
+      summary: List all rules
+      tags: [Rules]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Rule'
+    post:
+      summary: Create a new rule
+      tags: [Rules]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Rule'
+      responses:
+        '201':
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+
+  /admin/rules/{rule_id}:
+    get:
+      summary: Get rule by ID
+      tags: [Rules]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: rule_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rule details
+        '404':
+          description: Rule not found
+    delete:
+      summary: Delete a rule
+      tags: [Rules]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: rule_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rule deleted
+
+  /admin/rules/{rule_id}/enable:
+    put:
+      summary: Enable a rule
+      tags: [Rules]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: rule_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rule enabled
+
+  /admin/rules/{rule_id}/disable:
+    put:
+      summary: Disable a rule
+      tags: [Rules]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: rule_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rule disabled
+
+  # --- Knowledge Packs (gateway to gleann) ---
+  /packs:
+    get:
+      summary: List knowledge packs
+      description: |
+        Returns all packs available in the connected gleann instance.
+        Use `?app=ekiyo` to retrieve only packs relevant to a specific app.
+        Responses are cached on the server for 5 minutes; use `If-None-Match`
+        with the returned `ETag` to avoid unnecessary data transfer.
+      tags: [Packs]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter packs by app hint (e.g. `ekiyo`)
+      responses:
+        '200':
+          description: Pack list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  packs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PackManifest'
+                  count:
+                    type: integer
+        '401':
+          description: Unauthorized
+        '502':
+          description: Upstream gleann unreachable
+
+  /packs/{id}:
+    get:
+      summary: Get pack manifest
+      tags: [Packs]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Pack identifier (e.g. `crops-tr`)
+      responses:
+        '200':
+          description: Pack manifest
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackManifest'
+        '304':
+          description: Not modified (ETag matched)
+        '401':
+          description: Unauthorized
+        '404':
+          description: Pack not found
+        '502':
+          description: Upstream gleann unreachable
+
+  /packs/{id}/data:
+    get:
+      summary: Get full pack contents
+      description: |
+        Returns the manifest and the full items array.
+        Supports conditional requests via `If-None-Match` / `ETag` so
+        offline-first clients only re-download when the pack has changed.
+      tags: [Packs]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Pack identifier
+      responses:
+        '200':
+          description: Manifest + items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  manifest:
+                    $ref: '#/components/schemas/PackManifest'
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+        '304':
+          description: Not modified (ETag matched)
+        '401':
+          description: Unauthorized
+        '404':
+          description: Pack not found
+        '502':
+          description: Upstream gleann unreachable
+
+  /packs/{id}/items/{slug}:
+    get:
+      summary: Get a single item by slug
+      tags: [Packs]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Pack identifier
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Item slug (e.g. `pepper_capia`)
+      responses:
+        '200':
+          description: Item object
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '304':
+          description: Not modified (ETag matched)
+        '401':
+          description: Unauthorized
+        '404':
+          description: Pack or item not found
+        '502':
+          description: Upstream gleann unreachable
+
+  /packs/{id}/search:
+    get:
+      summary: Search pack items
+      description: Case-insensitive substring search across `search.fields` declared in `pack.yaml`.
+      tags: [Packs]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Pack identifier
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: n
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: Maximum number of results
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                  count:
+                    type: integer
+                  query:
+                    type: string
+        '401':
+          description: Unauthorized
+        '404':
+          description: Pack not found
+        '502':
+          description: Upstream gleann unreachable
+
+  # --- Metrics (Prometheus) ---
+  /sys/metrics:
+    get:
+      summary: Get application metrics
+      description: |
+        Returns metrics in JSON or Prometheus text format.
+        Use `?format=prometheus` for Prometheus scraping.
+      tags: [System]
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, prometheus]
+      responses:
+        '200':
+          description: Metrics response

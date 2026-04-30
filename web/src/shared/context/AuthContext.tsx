@@ -74,6 +74,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const logout = () => {
+        // Best-effort: tell the server to revoke the JWT (jti) so a stolen
+        // token can't be replayed. We don't await — the local cleanup below
+        // must always run, even on offline / 401 / network failure.
+        void (async () => {
+            try {
+                const { api } = await import('@/services/api');
+                await api.post('/auth/logout');
+            } catch {
+                // Network/server failure is fine; server-side jti revocation
+                // is a defense-in-depth measure on top of local clearing.
+            }
+        })();
+
         ['datum_token', 'datum_refresh_token', 'datum_user', 'datum_token_expiry'].forEach(key => {
             localStorage.removeItem(key);
             sessionStorage.removeItem(key);

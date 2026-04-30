@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+
+	"datum-go/internal/cli/utils"
 )
 
 var (
@@ -51,7 +54,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 
 	// Check if already initialized
 	client := NewAPIClient(serverURL, "", "")
-	resp, err := client.Get("/system/status")
+	resp, err := client.Get("/sys/status")
 	if err != nil {
 		fmt.Printf("⚠️  Cannot connect to server at %s\n", serverURL)
 
@@ -65,7 +68,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 
 		serverURL = newURL
 		client = NewAPIClient(serverURL, "", "")
-		resp, err = client.Get("/system/status")
+		resp, err = client.Get("/sys/status")
 		if err != nil {
 			return fmt.Errorf("still cannot connect to server: %w", err)
 		}
@@ -144,7 +147,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 		"data_retention": setupDataRetention,
 	}
 
-	resp, err = client.Post("/system/setup", payload)
+	resp, err = client.Post("/sys/setup", payload)
 	if err != nil {
 		return fmt.Errorf("setup failed: %w", err)
 	}
@@ -154,8 +157,13 @@ func runSetup(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Auto-save token if present
+	if tokenStr, ok := response["token"].(string); ok {
+		saveToken(tokenStr, "")
+	}
+
 	if outputJSON {
-		return printJSON(response)
+		return utils.PrintJSON(os.Stdout, response)
 	}
 
 	// Show success
@@ -167,9 +175,6 @@ func runSetup(cmd *cobra.Command, args []string) error {
 
 	if tokenStr, ok := response["token"].(string); ok {
 		fmt.Printf("\n🔑 Your access token:\n%s\n", tokenStr)
-
-		// Auto-save token
-		saveToken(tokenStr, "")
 		fmt.Println("\n✅ Token saved to ~/.datumctl.yaml")
 		fmt.Println("You are now logged in!")
 	}

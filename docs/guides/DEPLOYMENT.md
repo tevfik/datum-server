@@ -310,6 +310,13 @@ LOG_LEVEL=INFO
 GIN_MODE=release
 # Public URL for device provisioning and email links
 SERVER_URL=https://datum.example.com
+# Request limits (optional, shown with defaults)
+# MAX_REQUEST_BODY_BYTES=5242880
+# QUERY_MAX_LIMIT=10000
+# TELEMETRY_BUFFER_SIZE=10000
+# MQTT TLS (optional)
+# MQTT_TLS_CERT=/etc/datum/certs/mqtt.crt
+# MQTT_TLS_KEY=/etc/datum/certs/mqtt.key
 ```
 
 ### Service Management
@@ -789,6 +796,8 @@ server {
 sudo ufw allow 22/tcp    # SSH
 sudo ufw allow 80/tcp    # HTTP
 sudo ufw allow 443/tcp   # HTTPS
+sudo ufw allow 1883/tcp  # MQTT (if exposed)
+sudo ufw allow 8883/tcp  # MQTT TLS (if enabled)
 sudo ufw enable
 
 # iptables
@@ -796,6 +805,44 @@ sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
 sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
 sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
 ```
+
+### MQTT TLS Configuration
+
+The built-in MQTT broker supports optional native TLS on port 8883, in addition to the unencrypted port 1883.
+
+**Option A: Direct TLS (no reverse proxy)**
+
+Set the following environment variables:
+```bash
+MQTT_TLS_CERT=/etc/datum/certs/mqtt.crt
+MQTT_TLS_KEY=/etc/datum/certs/mqtt.key
+```
+
+With Docker, mount the certificates:
+```yaml
+services:
+  datum-server:
+    volumes:
+      - ./certs:/etc/datum/certs:ro
+    environment:
+      - MQTT_TLS_CERT=/etc/datum/certs/mqtt.crt
+      - MQTT_TLS_KEY=/etc/datum/certs/mqtt.key
+    ports:
+      - "8883:8883"  # MQTTS
+      - "1883:1883"  # MQTT (unencrypted, keep for internal traffic)
+```
+
+**Option B: Traefik-terminated TLS**
+
+See the Docker Compose section above — Traefik handles TLS termination for both HTTP and MQTT traffic.
+
+### Request Limits
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MAX_REQUEST_BODY_BYTES` | `5242880` (5 MB) | Maximum HTTP request body size. Requests exceeding this return 413. |
+| `QUERY_MAX_LIMIT` | `10000` | Maximum data points returned per history query. |
+| `TELEMETRY_BUFFER_SIZE` | `10000` | Async ingestion buffer. Increase for high-throughput deployments (was 50000 in v1.5). |
 
 ## 📊 Monitoring
 

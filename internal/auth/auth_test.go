@@ -57,11 +57,12 @@ func TestGenerateTokenPair(t *testing.T) {
 	email := "pair@example.com"
 	role := "admin"
 
-	accessToken, refreshToken, err := GenerateTokenPair(userID, email, role)
+	accessToken, refreshToken, jti, err := GenerateTokenPair(userID, email, role)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 	assert.NotEmpty(t, refreshToken)
+	assert.NotEmpty(t, jti)
 
 	// Validate Access Token
 	aClaims, err := ValidateToken(accessToken)

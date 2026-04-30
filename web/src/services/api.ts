@@ -10,9 +10,31 @@ export const api = axios.create({
     },
 });
 
+// Helper to get token from available storage
+const getStoredToken = (key: string): string | null => {
+    return localStorage.getItem(key) || sessionStorage.getItem(key);
+};
+
+// Helper to set token to the correct storage (based on where refresh token exists)
+const setStoredToken = (key: string, value: string) => {
+    if (localStorage.getItem('datum_refresh_token')) {
+        localStorage.setItem(key, value);
+    } else {
+        sessionStorage.setItem(key, value);
+    }
+};
+
+// Helper to clear tokens
+const clearTokens = () => {
+    ['datum_token', 'datum_refresh_token', 'datum_user'].forEach(key => {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+    });
+};
+
 // Request interceptor to add token
 api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('datum_token');
+    const token = getStoredToken('datum_token');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
@@ -44,9 +66,7 @@ api.interceptors.response.use(
         if (error.response?.status === 401 && !originalRequest._retry) {
             // Check if this was already a refresh request to avoid infinite loops
             if (originalRequest.url?.includes('/auth/refresh')) {
-                localStorage.removeItem('datum_token');
-                localStorage.removeItem('datum_refresh_token');
-                localStorage.removeItem('datum_user');
+                clearTokens();
                 window.location.href = '/login';
                 return Promise.reject(error);
             }
@@ -65,7 +85,7 @@ api.interceptors.response.use(
             originalRequest._retry = true;
             isRefreshing = true;
 
-            const refreshToken = localStorage.getItem('datum_refresh_token');
+            const refreshToken = getStoredToken('datum_refresh_token');
 
             if (refreshToken) {
                 try {
@@ -77,9 +97,9 @@ api.interceptors.response.use(
 
                     const { token, refresh_token: newRefreshToken } = response.data;
 
-                    localStorage.setItem('datum_token', token);
+                    setStoredToken('datum_token', token);
                     if (newRefreshToken) {
-                        localStorage.setItem('datum_refresh_token', newRefreshToken);
+                        setStoredToken('datum_refresh_token', newRefreshToken);
                     }
 
                     // Update headers and retry
@@ -93,9 +113,7 @@ api.interceptors.response.use(
                     processQueue(refreshError, null);
                     // Refresh failed - logout
                     console.error("Session expired", refreshError);
-                    localStorage.removeItem('datum_token');
-                    localStorage.removeItem('datum_refresh_token');
-                    localStorage.removeItem('datum_user');
+                    clearTokens();
                     window.location.href = '/login';
                     return Promise.reject(refreshError);
                 } finally {
@@ -103,7 +121,7 @@ api.interceptors.response.use(
                 }
             } else {
                 // No refresh token - logout
-                localStorage.removeItem('datum_token');
+                clearTokens();
                 // Only redirect if not already on login
                 if (!window.location.pathname.includes('/login')) {
                     window.location.href = '/login';

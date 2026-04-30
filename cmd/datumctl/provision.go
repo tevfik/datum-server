@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
+
+	"datum-go/internal/cli/utils"
 )
 
 var provisionCmd = &cobra.Command{
@@ -73,7 +76,7 @@ Typically called by a mobile app after discovering a device via WiFi AP.`,
 		}
 
 		if outputJSON {
-			return printJSON(result)
+			return utils.PrintJSON(os.Stdout, result)
 		}
 
 		fmt.Println("✅ Device registered successfully")
@@ -113,7 +116,7 @@ var provisionListCmd = &cobra.Command{
 		}
 
 		if outputJSON {
-			return printJSON(result)
+			return utils.PrintJSON(os.Stdout, result)
 		}
 
 		requests, ok := result["requests"].([]interface{})
@@ -162,7 +165,7 @@ var provisionStatusCmd = &cobra.Command{
 		}
 
 		if outputJSON {
-			return printJSON(result)
+			return utils.PrintJSON(os.Stdout, result)
 		}
 
 		fmt.Println("\n📋 Provisioning Request Details")
@@ -206,7 +209,7 @@ var provisionCancelCmd = &cobra.Command{
 		}
 
 		if outputJSON {
-			return printJSON(result)
+			return utils.PrintJSON(os.Stdout, result)
 		}
 
 		fmt.Printf("✅ Provisioning request %s cancelled successfully\n", requestID)

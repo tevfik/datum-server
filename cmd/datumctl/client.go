@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,7 +37,12 @@ func NewAPIClient(baseURL, token, apiKey string) *APIClient {
 		Token:        token,
 		RefreshToken: refreshToken,
 		APIKey:       apiKey,
-		HTTPClient:   &http.Client{Timeout: 30 * time.Second},
+		HTTPClient: &http.Client{
+			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+			},
+		},
 	}
 }
 
@@ -186,6 +192,12 @@ func (c *APIClient) Delete(path string, body interface{}) (*http.Response, error
 	return c.Request("DELETE", path, body)
 }
 
+// APIError represents a structured error response from the server
+type APIError struct {
+	Error   string `json:"error"`
+	Message string `json:"message"` // Support both error and message fields
+}
+
 // ParseResponse reads and parses JSON response
 func ParseResponse(resp *http.Response, target interface{}) error {
 	defer resp.Body.Close()
@@ -196,6 +208,19 @@ func ParseResponse(resp *http.Response, target interface{}) error {
 	}
 
 	if resp.StatusCode >= 400 {
+		// Try to parse as structured API error
+		var apiErr APIError
+		if jsonErr := json.Unmarshal(body, &apiErr); jsonErr == nil {
+			msg := apiErr.Error
+			if msg == "" {
+				msg = apiErr.Message
+			}
+			if msg != "" {
+				return fmt.Errorf("API error (%d): %s", resp.StatusCode, msg)
+			}
+		}
+
+		// Fallback to raw body if not JSON or empty
 		return fmt.Errorf("API error (%d): %s", resp.StatusCode, string(body))
 	}
 

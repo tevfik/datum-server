@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Datumpy, please report it responsibly:
+If you discover a security vulnerability in Datum, please report it responsibly:
 
 **DO NOT** open a public GitHub issue for security vulnerabilities.
 
@@ -20,6 +20,7 @@ We will respond within 48 hours and work with you to understand and resolve the 
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 1.5.x   | :white_check_mark: |
 | 1.0.x   | :white_check_mark: |
 | < 1.0   | :x:                |
 
@@ -38,7 +39,7 @@ We will respond within 48 hours and work with you to understand and resolve the 
 2. **Use HTTPS/TLS**
    - Deploy behind a reverse proxy (nginx, Traefik, Caddy)
    - Enable HTTPS with valid SSL certificates
-   - Uncomment Strict-Transport-Security header in code
+   - Enable HSTS by setting `ENABLE_HSTS=true` in your environment
 
 3. **Database Security**
    - Keep data directory outside web root
@@ -73,12 +74,31 @@ We will respond within 48 hours and work with you to understand and resolve the 
 
 ### Security Headers
 
-The following security headers are automatically set:
+The following security headers are automatically set on all responses:
 - `X-Frame-Options: DENY`
 - `X-Content-Type-Options: nosniff`
 - `X-XSS-Protection: 1; mode=block`
 - `Referrer-Policy: strict-origin-when-cross-origin`
-- `Content-Security-Policy: default-src 'self'`
+- `Content-Security-Policy: default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data:; connect-src 'self' ws: wss:;`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- `X-Request-ID: <uuid>` — Unique per-request ID for tracing and debugging
+
+**Custom CSP**: Override the default Content-Security-Policy by setting the `CONTENT_SECURITY_POLICY` environment variable.
+
+### MQTT TLS
+
+For direct TLS encryption on MQTT connections (without a reverse proxy):
+
+1. Generate or obtain TLS certificates.
+2. Set `MQTT_TLS_CERT` and `MQTT_TLS_KEY` environment variables to the certificate and key file paths.
+3. The broker will listen on port **8883** (MQTTS) in addition to the unencrypted port 1883.
+
+```bash
+MQTT_TLS_CERT=/etc/datum/certs/mqtt.crt
+MQTT_TLS_KEY=/etc/datum/certs/mqtt.key
+```
+
+> **Note**: For Traefik-terminated TLS, see the [Deployment Guide](DEPLOYMENT.md). Direct TLS is useful when MQTT clients connect directly without a proxy.
 
 ### Dependencies
 
@@ -116,6 +136,6 @@ go get -u && go mod tidy
 
 ## Contact
 
-For security concerns: [your-email@example.com]
+For security concerns: See [SECURITY.yml](../../.github/SECURITY.md) or use GitHub Security Advisories
 
 For general issues: GitHub Issues

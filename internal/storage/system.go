@@ -54,6 +54,7 @@ func (s *Storage) SaveSystemConfig(config *SystemConfig) error {
 }
 
 // IsSystemInitialized checks if the system has been set up
+// IsSystemInitialized checks if the system has been set up
 func (s *Storage) IsSystemInitialized() bool {
 	config, err := s.GetSystemConfig()
 	if err != nil {
@@ -143,4 +144,12 @@ func (s *Storage) UpdateRegistrationConfig(allow bool) error {
 	}
 	config.AllowRegister = allow
 	return s.SaveSystemConfig(config)
+}
+
+// PurgeOldDataPoints removes data points older than the given duration.
+// For BuntDB+tstorage, tstorage handles retention internally via WithRetention.
+// This method is a no-op and returns 0 purged.
+func (s *Storage) PurgeOldDataPoints(olderThan time.Duration) (int64, error) {
+	// tstorage handles its own retention policy via WithRetention option.
+	return 0, nil
 }

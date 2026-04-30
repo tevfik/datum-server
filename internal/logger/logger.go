@@ -55,7 +55,19 @@ func InitLogger(logPath string) {
 	switch logOutput {
 	case "json":
 		// Pure JSON to stdout - ideal for Docker/Kubernetes
-		logWriter = multiLevelWriter{os.Stdout}
+		// Also write to file if path provided (for UI logs)
+		if logPath != "" {
+			file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to open log file")
+				logWriter = multiLevelWriter{os.Stdout}
+			} else {
+				// Write JSON to both stdout and file
+				logWriter = zerolog.MultiLevelWriter(os.Stdout, file)
+			}
+		} else {
+			logWriter = multiLevelWriter{os.Stdout}
+		}
 
 	case "file":
 		// JSON to file (legacy behavior with console fallback)

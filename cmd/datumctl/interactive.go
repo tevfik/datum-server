@@ -1,896 +1,361 @@
+// Package main — interactive menu.
+//
+// The interactive menu is auto-generated from the cobra command tree so it
+// always stays in lock-step with the regular CLI surface: every new
+// subcommand or flag automatically becomes available in the menu without
+// any duplicated wiring.
 package main
 
 import (
 	"fmt"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
+	"datum-go/internal/cli/styles"
 )
 
 var interactiveCmd = &cobra.Command{
 	Use:     "interactive",
 	Aliases: []string{"i", "menu"},
-	Short:   "Interactive menu mode",
-	Long: `Launch interactive menu to explore and execute commands.
+	Short:   "Interactive menu (auto-derived from the command tree)",
+	Long: `Launch a guided menu that walks the full datumctl command tree.
 
-No need to remember command names or flags - just select from menus!`,
+The menu is generated dynamically from the registered cobra commands, so it
+always reflects the complete CLI surface with no duplicated wiring.
+
+Each leaf command prompts for its positional arguments and lets you opt-in
+to any flags before executing.`,
 	RunE: runInteractive,
 }
 
-func init() {
-	rootCmd.AddCommand(interactiveCmd)
+func init() { rootCmd.AddCommand(interactiveCmd) }
+
+// interactiveHidden lists commands that should not appear in the menu (the
+// menu itself, completion helper, etc.).
+var interactiveHidden = map[string]bool{
+	"interactive": true,
+	"completion":  true,
+	"help":        true,
 }
 
 func runInteractive(cmd *cobra.Command, args []string) error {
 	loadConfig()
 
-	// Welcome message
-	fmt.Println("\n🎯 Datum IoT Platform - Interactive Mode")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
-	// Check authentication
+	fmt.Println()
+	fmt.Println(styles.Banner.Render(" 🎯 Datum IoT Platform — Interactive Mode "))
 	if token == "" && apiKey == "" {
-		fmt.Println("\n⚠️  Not authenticated. Please login first.")
-		if err := promptLogin(); err != nil {
-			return err
-		}
+		fmt.Println("\n⚠️  Not authenticated. Use the “login” or “setup” entry below.")
 	} else {
 		fmt.Printf("\n✅ Connected to: %s\n", serverURL)
 	}
 
-	// Main menu loop
+	return commandLoop(rootCmd)
+}
+
+// commandLoop renders an interactive menu of subcommands of `parent`. It
+// keeps prompting until the user picks Back / Exit.
+func commandLoop(parent *cobra.Command) error {
 	for {
-		action, err := showMainMenu()
-		if err != nil {
-			return err
-		}
-
-		switch action {
-		// Resource Management
-		case "Device Management":
-			if err := deviceMenu(); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
-		case "User Management":
-			// Renamed from Admin Management (subset) or new wrapper?
-			// Let's use adminMenu but maybe rename it later.
-			// Or better, let's look at `User Management` vs `Admin Management`.
-			// The original `adminMenu` had user list, create, etc.
-			// I'll reuse `adminMenu` for now but ideally split it.
-			if err := adminMenu(); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
-
-		// Data & Control
-		case "Data Queries":
-			if err := dataMenu(); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
-		case "Command & Control":
-			if err := commandMenu(); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
-		case "Provisioning":
-			if err := provisionMenu(); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
-		case "Document Database":
-			if err := dbMenu(); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
-
-		// System & Admin
-		case "System Status":
-			fmt.Println("\n> datumctl status")
-			if err := runStatus(nil, nil); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
-
-		case "MQTT Management":
-			if err := mqttMenu(); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
-
-		case "Admin Utils":
-			// System specific parts of old admin menu?
-			// Since we routed "User Management" to adminMenu, let's route this to adminMenu too?
-			// Actually, `adminMenu` contains everything.
-			// I should probably refactor `adminMenu` to be `userMenu` and `systemMenu`.
-			// For now, let's just loop back to `adminMenu` for simplicity to avoid breaking `interactive.go` logic completely in one step.
-			if err := adminMenu(); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
-
-		case "Configuration":
-			fmt.Println("\n> datumctl config show")
-			runConfigShow(nil, nil)
-
-		// Account
-		case "Login / Switch User":
-			if err := promptLogin(); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
-		case "Register User":
-			fmt.Println("\n> datumctl register")
-			if err := runRegister(nil, nil); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
-		case "Logout":
-			fmt.Println("\n> datumctl logout")
-			if err := runLogout(nil, nil); err != nil {
-				fmt.Printf("\n❌ Error: %v\n", err)
-			}
-			// Reset global variables
-			token = ""
-			apiKey = ""
-
-		// Other
-		case "Show Version":
-			fmt.Println("\nDatum IoT Platform CLI")
-			fmt.Printf("Version: %s\n", Version)
-		case fmt.Sprintf("Toggle Curl Output (Current: %v)", showCurl), "Toggle Curl Output (Current: true)", "Toggle Curl Output (Current: false)":
-			showCurl = !showCurl
-			fmt.Printf("\n🔄 Curl output toggled: %v\n", showCurl)
-		case "Exit":
-			fmt.Println("\n👋 Goodbye!")
+		opts, mapping := buildMenuOptions(parent)
+		if len(opts) == 0 {
 			return nil
 		}
 
+		nav := "← Back"
+		if parent == rootCmd {
+			nav = "🚪 Exit"
+		}
+		opts = append(opts, nav)
+
+		title := parent.CommandPath() + " — choose action"
+		if parent == rootCmd {
+			title = "Main menu"
+		}
+
+		var choice string
+		if err := survey.AskOne(&survey.Select{
+			Message:  title,
+			Options:  opts,
+			PageSize: 20,
+		}, &choice); err != nil {
+			return err
+		}
+
+		if choice == nav {
+			if parent == rootCmd {
+				fmt.Println("\n👋 Goodbye!")
+			}
+			return nil
+		}
+
+		sel := mapping[choice]
+		if sel == nil {
+			continue
+		}
+
+		var err error
+		if sel.HasAvailableSubCommands() {
+			err = commandLoop(sel)
+		} else {
+			err = runCommandInteractive(sel)
+		}
+		if err != nil {
+			fmt.Printf("\n❌ %v\n", err)
+		}
 		fmt.Println()
 	}
 }
 
-func showMainMenu() (string, error) {
-	var action string
-	prompt := &survey.Select{
-		Message: "\nWhat would you like to do?",
-		Options: []string{
-			"── Resource Management ──",
-			"Device Management",
-			"User Management",
-			"── Data & Control ──",
-			"Data Queries",
-			"Command & Control",
-			"Provisioning",
-			"Document Database",
-			"── System & Admin ──",
-			"System Status",
-			"MQTT Management",
-			"Admin Utils",
-			"Configuration",
-			"── Account ──",
-			"Login / Switch User",
-			"Register User",
-			"Logout",
-			"── Other ──",
-			"Show Version",
-			fmt.Sprintf("Toggle Curl Output (Current: %v)", showCurl),
-			"Exit",
-		},
-		PageSize: 15,
+// buildMenuOptions returns the labelled options for parent's visible
+// subcommands plus a label→command map. Folders (commands with children)
+// are marked with 📁; leaves with ▶.
+func buildMenuOptions(parent *cobra.Command) ([]string, map[string]*cobra.Command) {
+	mapping := map[string]*cobra.Command{}
+	subs := make([]*cobra.Command, 0, len(parent.Commands()))
+	for _, c := range parent.Commands() {
+		if c.Hidden || interactiveHidden[c.Name()] || !c.IsAvailableCommand() {
+			continue
+		}
+		subs = append(subs, c)
+	}
+	sort.Slice(subs, func(i, j int) bool {
+		// Folders first, then alphabetical.
+		fi := subs[i].HasAvailableSubCommands()
+		fj := subs[j].HasAvailableSubCommands()
+		if fi != fj {
+			return fi
+		}
+		return subs[i].Name() < subs[j].Name()
+	})
+	opts := make([]string, 0, len(subs))
+	for _, c := range subs {
+		marker := "▶"
+		if c.HasAvailableSubCommands() {
+			marker = "📁"
+		}
+		short := c.Short
+		if short == "" {
+			short = "(no description)"
+		}
+		label := fmt.Sprintf("%s %-22s — %s", marker, c.Name(), short)
+		opts = append(opts, label)
+		mapping[label] = c
+	}
+	return opts, mapping
+}
+
+// argRe matches both <required> and [optional] placeholders in a Use string.
+var argRe = regexp.MustCompile(`<([^>]+)>|\[([^\]]+)\]`)
+
+type argSpec struct {
+	Name     string
+	Required bool
+	Variadic bool
+}
+
+func parsePositionalArgs(use string) []argSpec {
+	matches := argRe.FindAllStringSubmatch(use, -1)
+	specs := make([]argSpec, 0, len(matches))
+	for _, m := range matches {
+		name := m[1]
+		req := name != ""
+		if !req {
+			name = m[2]
+		}
+		variadic := strings.HasSuffix(name, "...")
+		name = strings.TrimSuffix(name, "...")
+		specs = append(specs, argSpec{Name: name, Required: req, Variadic: variadic})
+	}
+	return specs
+}
+
+// runCommandInteractive prompts for positional args + selected flags then
+// dispatches to the leaf cobra command.
+func runCommandInteractive(cmd *cobra.Command) error {
+	fmt.Printf("\n📌 %s\n", cmd.CommandPath())
+	if d := strings.TrimSpace(cmd.Long); d != "" {
+		fmt.Println(d)
+	} else if cmd.Short != "" {
+		fmt.Println(cmd.Short)
 	}
 
-	// Filter out separator lines if selected
-	for {
-		if err := survey.AskOne(prompt, &action); err != nil {
-			return "", err
+	// Reset every defined local flag back to its declared default so values
+	// from a previous invocation in the same menu session do not leak.
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		_ = f.Value.Set(f.DefValue)
+		f.Changed = false
+	})
+
+	// Positional args.
+	specs := parsePositionalArgs(cmd.Use)
+	var posArgs []string
+	for _, s := range specs {
+		v, err := promptPositional(s)
+		if err != nil {
+			return err
 		}
-		if !strings.HasPrefix(action, "──") {
+		if v == "" && !s.Required {
 			break
 		}
-	}
-
-	return action, nil
-}
-
-func deviceMenu() error {
-	var action string
-	prompt := &survey.Select{
-		Message: "Device Management:",
-		Options: []string{
-			"List all devices",
-			"Get device details",
-			"Create new device",
-			"Delete device",
-			"Token info",
-			"Rotate key",
-			"Revoke key (emergency)",
-			"← Back to main menu",
-		},
-	}
-
-	if err := survey.AskOne(prompt, &action); err != nil {
-		return err
-	}
-
-	switch action {
-	case "List all devices":
-		fmt.Println("\n> datumctl device list")
-		if err := runDeviceList(nil, nil); err != nil {
-			if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "cannot unmarshal object") {
-				fmt.Println("\n📱 No devices found. Create your first device!")
-				return nil
+		if s.Variadic {
+			for _, p := range strings.Fields(v) {
+				posArgs = append(posArgs, p)
 			}
+			continue
+		}
+		posArgs = append(posArgs, v)
+	}
+
+	// Flags — multi-select then prompt for each picked.
+	var flags []*pflag.Flag
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if !f.Hidden {
+			flags = append(flags, f)
+		}
+	})
+	if len(flags) > 0 {
+		labels := make([]string, 0, len(flags))
+		labelToFlag := map[string]*pflag.Flag{}
+		for _, f := range flags {
+			label := fmt.Sprintf("--%s  (%s, default %q)  %s", f.Name, f.Value.Type(), f.DefValue, f.Usage)
+			labels = append(labels, label)
+			labelToFlag[label] = f
+		}
+		var picked []string
+		if err := survey.AskOne(&survey.MultiSelect{
+			Message:  "Set any flags? (space to toggle, enter to continue):",
+			Options:  labels,
+			PageSize: 12,
+		}, &picked); err != nil {
 			return err
 		}
-		return nil
-
-	case "Get device details":
-		var deviceID string
-		if err := survey.AskOne(&survey.Input{
-			Message: "Enter device ID:",
-		}, &deviceID); err != nil {
-			return err
+		for _, lbl := range picked {
+			if err := promptAndSetFlag(labelToFlag[lbl]); err != nil {
+				return err
+			}
 		}
-		fmt.Printf("\n> datumctl device get %s\n", deviceID)
-		return runDeviceGet(nil, []string{deviceID})
+	}
 
-	case "Create new device":
-		return promptCreateDevice()
-
-	case "Delete device":
-		var deviceID string
-		if err := survey.AskOne(&survey.Input{
-			Message: "Enter device ID to delete:",
-		}, &deviceID); err != nil {
-			return err
+	// Validate against cmd.Args (e.g. ExactArgs(2)).
+	if cmd.Args != nil {
+		if err := cmd.Args(cmd, posArgs); err != nil {
+			return fmt.Errorf("argument validation failed: %w", err)
 		}
-
-		var confirm bool
-		if err := survey.AskOne(&survey.Confirm{
-			Message: fmt.Sprintf("Delete device '%s'?", deviceID),
-		}, &confirm); err != nil {
-			return err
-		}
-
-		if confirm {
-			forceDelete = true
-			fmt.Printf("\n> datumctl device delete %s --force\n", deviceID)
-			return runDeviceDelete(nil, []string{deviceID})
-		}
-		fmt.Println("Cancelled")
-
-	case "Token info":
-		var deviceID string
-		if err := survey.AskOne(&survey.Input{
-			Message: "Enter device ID:",
-		}, &deviceID); err != nil {
-			return err
-		}
-		fmt.Printf("\n> datumctl device token-info %s\n", deviceID)
-		return runDeviceTokenInfo(nil, []string{deviceID})
-
-	case "Rotate key":
-		var deviceID string
-		if err := survey.AskOne(&survey.Input{
-			Message: "Enter device ID:",
-		}, &deviceID); err != nil {
-			return err
-		}
-
-		var graceDays int
-		if err := survey.AskOne(&survey.Input{
-			Message: "Grace period (days, default 7):",
-			Default: "7",
-		}, &graceDays); err != nil {
-			graceDays = 7
-		}
-
-		var notify bool
-		if err := survey.AskOne(&survey.Confirm{
-			Message: "Notify device via command channel?",
-			Default: true,
-		}, &notify); err != nil {
-			return err
-		}
-
-		gracePeriodDays = graceDays
-		notifyDevice = notify
-		fmt.Printf("\n> datumctl device rotate-key %s --grace-days %d\n", deviceID, graceDays)
-		return runDeviceRotateKey(nil, []string{deviceID})
-
-	case "Revoke key (emergency)":
-		var deviceID string
-		if err := survey.AskOne(&survey.Input{
-			Message: "Enter device ID:",
-		}, &deviceID); err != nil {
-			return err
-		}
-
-		fmt.Println("\n⚠️  WARNING: This will immediately invalidate all keys for this device!")
-		fmt.Println("The device will be unable to authenticate until re-provisioned.")
-
-		var confirm bool
-		if err := survey.AskOne(&survey.Confirm{
-			Message: fmt.Sprintf("REVOKE all keys for '%s'?", deviceID),
-			Default: false,
-		}, &confirm); err != nil {
-			return err
-		}
-
-		if confirm {
-			forceDelete = true
-			fmt.Printf("\n> datumctl device revoke-key %s --force\n", deviceID)
-			return runDeviceRevokeKey(nil, []string{deviceID})
-		}
-		fmt.Println("Cancelled")
-
-	case "─── Key Management ───":
-		// Separator, do nothing
-		return deviceMenu()
 	}
 
-	return nil
-}
-
-func promptCreateDevice() error {
-	var name string
-	if err := survey.AskOne(&survey.Input{
-		Message: "Device name:",
-	}, &name, survey.WithValidator(survey.Required)); err != nil {
-		return err
+	// Confirm + show invocation.
+	invocation := cmd.CommandPath()
+	if len(posArgs) > 0 {
+		invocation += " " + strings.Join(posArgs, " ")
 	}
-
-	var id string
-	survey.AskOne(&survey.Input{
-		Message: "Device ID (leave empty for auto-generate):",
-	}, &id)
-
-	var deviceTypeInput string
-	survey.AskOne(&survey.Input{
-		Message: "Device type (e.g., sensor, temperature, humidity, pressure, motion):",
-		Default: "sensor",
-	}, &deviceTypeInput)
-
-	deviceName = name
-	cmdStr := fmt.Sprintf("datumctl device create --name %q --type %q", name, deviceTypeInput)
-	if id != "" {
-		cmdStr += fmt.Sprintf(" --id %q", id)
-	}
-	fmt.Printf("\n> %s\n", cmdStr)
-
-	deviceID = id
-	deviceType = deviceTypeInput
-
-	return runDeviceCreate(nil, nil)
-}
-
-func dataMenu() error {
-	var action string
-	prompt := &survey.Select{
-		Message: "Data Queries:",
-		Options: []string{
-			"Get device data",
-			"Post data",
-			"Get statistics",
-			"← Back to main menu",
-		},
-	}
-
-	if err := survey.AskOne(prompt, &action); err != nil {
-		return err
-	}
-
-	switch action {
-	case "Get device data":
-		return promptGetData()
-
-	case "Post data":
-		return promptPostData()
-
-	case "Get statistics":
-		return promptDataStats()
-	}
-
-	return nil
-}
-
-func promptGetData() error {
-	var device string
-	if err := survey.AskOne(&survey.Input{
-		Message: "Device ID:",
-		Help:    "Enter a valid device ID. Use 'List all devices' first to see available devices.",
-	}, &device, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	if device == "" {
-		fmt.Println("\n⚠️  No device ID provided. Returning to menu.")
-		return nil
-	}
-
-	var timeRange string
-	if err := survey.AskOne(&survey.Select{
-		Message: "Time range:",
-		Options: []string{"Last 1 hour", "Last 6 hours", "Last 24 hours", "Last 7 days", "Custom"},
-		Default: "Last 1 hour",
-	}, &timeRange); err != nil {
-		return err
-	}
-
-	var lastTime string
-	switch timeRange {
-	case "Last 1 hour":
-		lastTime = "1h"
-	case "Last 6 hours":
-		lastTime = "6h"
-	case "Last 24 hours":
-		lastTime = "24h"
-	case "Last 7 days":
-		lastTime = "168h"
-	case "Custom":
-		survey.AskOne(&survey.Input{
-			Message: "Duration (e.g., 30m, 2h, 3d):",
-		}, &lastTime)
-	}
-
-	var limitInput string
-	survey.AskOne(&survey.Input{
-		Message: "Limit (max results):",
-		Default: "100",
-	}, &limitInput)
-
-	dataDevice = device
-	dataLast = lastTime
-	fmt.Sscanf(limitInput, "%d", &dataLimit)
-
-	fmt.Printf("\n> datumctl data get --device %s --last %s --limit %d\n", device, lastTime, dataLimit)
-
-	return runDataGet(nil, nil)
-}
-
-func promptPostData() error {
-	var device string
-	survey.AskOne(&survey.Input{
-		Message: "Device ID (or leave empty to use API key):",
-	}, &device)
-
-	var jsonData string
-	if err := survey.AskOne(&survey.Input{
-		Message: "JSON data:",
-		Help:    `Example: {"temperature": 25.5, "humidity": 60}`,
-	}, &jsonData, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	dataDevice = device
-	dataJSON = jsonData
-
-	cmdStr := fmt.Sprintf("datumctl data post --data %q", jsonData)
-	if device != "" {
-		cmdStr += fmt.Sprintf(" --device %s", device)
-	}
-	fmt.Printf("\n> %s\n", cmdStr)
-
-	return runDataPost(nil, nil)
-}
-
-func promptDataStats() error {
-	var device string
-	if err := survey.AskOne(&survey.Input{
-		Message: "Device ID:",
-		Help:    "Enter a valid device ID. Use 'List all devices' first to see available devices.",
-	}, &device, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	if device == "" {
-		fmt.Println("\n⚠️  No device ID provided. Returning to menu.")
-		return nil
-	}
-
-	var timeRange string
-	if err := survey.AskOne(&survey.Select{
-		Message: "Time range for statistics:",
-		Options: []string{"1h", "6h", "24h", "7d", "30d"},
-		Default: "24h",
-	}, &timeRange); err != nil {
-		fmt.Printf("\n> datumctl data stats --device %s --last %s\n", device, timeRange)
-
-		return err
-	}
-
-	dataDevice = device
-	dataLast = timeRange
-
-	return runDataStats(nil, nil)
-}
-
-func commandMenu() error {
-	var action string
-	prompt := &survey.Select{
-		Message: "Command & Control:",
-		Options: []string{
-			"Send command",
-			"List commands",
-			"Get command details",
-			"← Back to main menu",
-		},
-	}
-
-	if err := survey.AskOne(prompt, &action); err != nil {
-		return err
-	}
-
-	switch action {
-	case "Send command":
-		return promptSendCommand()
-	case "List commands":
-		return promptListCommands()
-	case "Get command details":
-		return promptGetCommand()
-	}
-	return nil
-}
-
-func promptSendCommand() error {
-	var device string
-	if err := survey.AskOne(&survey.Input{
-		Message: "Device ID:",
-	}, &device, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	var cmdAction string
-	if err := survey.AskOne(&survey.Input{
-		Message: "Command Action (e.g., reboot, update-config):",
-	}, &cmdAction, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	var addParams bool
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		invocation += fmt.Sprintf(" --%s=%s", f.Name, f.Value.String())
+	})
+	confirm := true
 	if err := survey.AskOne(&survey.Confirm{
-		Message: "Add parameters?",
-		Default: false,
-	}, &addParams); err != nil {
-		return err
-	}
-
-	var params []string
-	if addParams {
-		var paramStr string
-		if err := survey.AskOne(&survey.Input{
-			Message: "Parameters (key=value, comma separated):",
-			Help:    "Example: interval=60,mode=auto",
-		}, &paramStr); err != nil {
-			return err
-		}
-		if paramStr != "" {
-			params = strings.Split(paramStr, ",")
-		}
-	}
-
-	commandParams = params
-	fmt.Printf("\n> datumctl command send %s %s", device, cmdAction)
-	for _, p := range params {
-		fmt.Printf(" --param %s", p)
-	}
-	fmt.Println()
-
-	return runCommandSend(nil, []string{device, cmdAction})
-}
-
-func promptListCommands() error {
-	var device string
-	if err := survey.AskOne(&survey.Input{
-		Message: "Device ID:",
-	}, &device, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	fmt.Printf("\n> datumctl command list %s\n", device)
-	return runCommandList(nil, []string{device})
-}
-
-func promptGetCommand() error {
-	var device string
-	if err := survey.AskOne(&survey.Input{
-		Message: "Device ID:",
-	}, &device, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	var cmdID string
-	if err := survey.AskOne(&survey.Input{
-		Message: "Command ID:",
-	}, &cmdID, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	fmt.Printf("\n> datumctl command get %s %s\n", device, cmdID)
-	return runCommandGet(nil, []string{device, cmdID})
-}
-
-func provisionMenu() error {
-	var action string
-	prompt := &survey.Select{
-		Message: "Provisioning:",
-		Options: []string{
-			"Register device (WiFi AP)",
-			"List requests",
-			"Check status",
-			"Cancel request",
-			"← Back to main menu",
-		},
-	}
-
-	if err := survey.AskOne(prompt, &action); err != nil {
-		return err
-	}
-
-	switch action {
-	case "Register device (WiFi AP)":
-		return promptProvisionRegister()
-	case "List requests":
-		fmt.Println("\n> datumctl provision list")
-		return provisionListCmd.RunE(nil, nil)
-	case "Check status":
-		return promptProvisionStatus()
-	case "Cancel request":
-		return promptProvisionCancel()
-	}
-	return nil
-}
-
-func promptProvisionStatus() error {
-	var reqID string
-	if err := survey.AskOne(&survey.Input{
-		Message: "Provisioning Request ID:",
-	}, &reqID, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	fmt.Printf("\n> datumctl provision status %s\n", reqID)
-	return provisionStatusCmd.RunE(nil, []string{reqID})
-}
-
-func promptProvisionCancel() error {
-	var reqID string
-	if err := survey.AskOne(&survey.Input{
-		Message: "Provisioning Request ID:",
-	}, &reqID, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	var confirm bool
-	if err := survey.AskOne(&survey.Confirm{
-		Message: fmt.Sprintf("Cancel request '%s'?", reqID),
+		Message: fmt.Sprintf("Run: %s ?", invocation),
+		Default: true,
 	}, &confirm); err != nil {
 		return err
 	}
-
-	if confirm {
-		fmt.Printf("\n> datumctl provision cancel %s\n", reqID)
-		return provisionCancelCmd.RunE(nil, []string{reqID})
+	if !confirm {
+		return nil
 	}
-	fmt.Println("Cancelled")
-	return nil
+	fmt.Printf("\n> %s\n\n", invocation)
+
+	switch {
+	case cmd.RunE != nil:
+		return cmd.RunE(cmd, posArgs)
+	case cmd.Run != nil:
+		cmd.Run(cmd, posArgs)
+		return nil
+	default:
+		return fmt.Errorf("command %s has no executable handler", cmd.Name())
+	}
 }
 
-func promptProvisionRegister() error {
-	var uid string
-	if err := survey.AskOne(&survey.Input{
-		Message: "Device UID (MAC address):",
-	}, &uid, survey.WithValidator(survey.Required)); err != nil {
-		return err
+func promptPositional(s argSpec) (string, error) {
+	tail := " (optional, blank to skip)"
+	if s.Required {
+		tail = " (required)"
 	}
-
-	var name string
-	if err := survey.AskOne(&survey.Input{
-		Message: "Device Name:",
-	}, &name, survey.WithValidator(survey.Required)); err != nil {
-		return err
+	if s.Variadic {
+		tail += " (space-separated)"
 	}
-
-	var devType string
-	survey.AskOne(&survey.Input{
-		Message: "Device Type:",
-		Default: "sensor",
-	}, &devType)
-
-	var ssid string
-	survey.AskOne(&survey.Input{
-		Message: "WiFi SSID:",
-	}, &ssid)
-
-	var pass string
-	if ssid != "" {
-		survey.AskOne(&survey.Password{
-			Message: "WiFi Password:",
-		}, &pass)
+	q := &survey.Input{Message: s.Name + tail + ":"}
+	var v string
+	var err error
+	if s.Required {
+		err = survey.AskOne(q, &v, survey.WithValidator(survey.Required))
+	} else {
+		err = survey.AskOne(q, &v)
 	}
-
-	provisionUID = uid
-	provisionName = name
-	provisionType = devType
-	provisionWiFiSSID = ssid
-	provisionWiFiPass = pass
-
-	cmdStr := fmt.Sprintf("datumctl provision register --uid %q --name %q --type %q", uid, name, devType)
-	if ssid != "" {
-		cmdStr += fmt.Sprintf(" --wifi-ssid %q", ssid)
-	}
-	if pass != "" {
-		cmdStr += fmt.Sprintf(" --wifi-pass %q", pass)
-	}
-	fmt.Printf("\n> %s\n", cmdStr)
-
-	return provisionRegisterCmd.RunE(nil, nil)
+	return strings.TrimSpace(v), err
 }
 
-func promptLogin() error {
-	var email string
-	if err := survey.AskOne(&survey.Input{
-		Message: "Email:",
-	}, &email, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	var password string
-	if err := survey.AskOne(&survey.Password{
-		Message: "Password:",
-	}, &password, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	loginEmail = email
-	loginPassword = password
-
-	return runLogin(nil, nil)
-}
-
-func adminMenu() error {
-	var action string
-	prompt := &survey.Select{
-		Message: "Admin Management:",
-		Options: []string{
-			"List users",
-			"Create user",
-			"Update user role/status",
-			"Delete user",
-			"Reset user password",
-			"System statistics",
-			"System config",
-			"Toggle Registration",
-			"Reset system (Dangerous)",
-			"← Back to main menu",
-		},
-	}
-
-	if err := survey.AskOne(prompt, &action); err != nil {
-		return err
-	}
-
-	// Reset admin flags to avoid carrying over values
-	adminEmail = ""
-	adminPassword = ""
-	adminRole = ""
-	adminNewPassword = ""
-	adminForceDelete = false
-	adminForceReset = false
-
-	switch action {
-	case "List users":
-		fmt.Println("\n> datumctl admin list-users")
-		return runListUsers(nil, nil)
-
-	case "Create user":
-		return runCreateUser(nil, nil)
-
-	case "Update user role/status":
-		return promptAdminUpdateUser()
-
-	case "Delete user":
-		return promptAdminDeleteUser()
-
-	case "Reset user password":
-		return promptAdminResetPassword()
-
-	case "System statistics":
-		fmt.Println("\n> datumctl admin stats")
-		return runAdminStats(nil, nil)
-
-	case "System config":
-		fmt.Println("\n> datumctl admin get-config")
-		return runAdminConfig(nil, nil)
-
-	case "Toggle Registration":
-		return promptToggleRegistration()
-
-	case "Reset system (Dangerous)":
-		return runResetSystem(nil, nil)
-	}
-
-	return nil
-}
-
-func promptAdminUpdateUser() error {
-	var identifier string
-	if err := survey.AskOne(&survey.Input{
-		Message: "User Email or ID:",
-	}, &identifier, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	var action string
-	if err := survey.AskOne(&survey.Select{
-		Message: "What to update?",
-		Options: []string{"Role (Admin/User)", "Status (Active/Suspended)", "Both"},
-	}, &action); err != nil {
-		return err
-	}
-
-	var role string
-	if action == "Role (Admin/User)" || action == "Both" {
-		if err := survey.AskOne(&survey.Select{
-			Message: "New Role:",
-			Options: []string{"user", "admin"},
-		}, &role); err != nil {
+func promptAndSetFlag(f *pflag.Flag) error {
+	msg := fmt.Sprintf("--%s (%s) — %s", f.Name, f.Value.Type(), f.Usage)
+	switch f.Value.Type() {
+	case "bool":
+		def, _ := strconv.ParseBool(f.DefValue)
+		var b bool
+		if err := survey.AskOne(&survey.Confirm{Message: msg, Default: def}, &b); err != nil {
 			return err
 		}
-		adminRole = role
-	}
-
-	var status string
-	if action == "Status (Active/Suspended)" || action == "Both" {
-		if err := survey.AskOne(&survey.Select{
-			Message: "New Status:",
-			Options: []string{"active", "suspended"},
-		}, &status); err != nil {
+		return f.Value.Set(strconv.FormatBool(b))
+	case "stringSlice", "stringArray":
+		var s string
+		def := strings.TrimSuffix(strings.TrimPrefix(f.DefValue, "["), "]")
+		if err := survey.AskOne(&survey.Input{Message: msg + " (comma-separated)", Default: def}, &s); err != nil {
 			return err
 		}
-		adminStatus = status
+		if s == "" {
+			return nil
+		}
+		// Reset slice/array before appending fresh entries.
+		_ = f.Value.Set("")
+		f.Changed = false
+		for _, p := range strings.Split(s, ",") {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			if err := f.Value.Set(p); err != nil {
+				return err
+			}
+		}
+		return nil
+	default:
+		// Heuristic: hide secrets behind a Password prompt.
+		if isSecretFlag(f.Name) {
+			var s string
+			if err := survey.AskOne(&survey.Password{Message: msg}, &s); err != nil {
+				return err
+			}
+			if s == "" {
+				return nil
+			}
+			return f.Value.Set(s)
+		}
+		var s string
+		if err := survey.AskOne(&survey.Input{Message: msg, Default: f.DefValue}, &s); err != nil {
+			return err
+		}
+		if s == "" || s == f.DefValue {
+			return nil
+		}
+		return f.Value.Set(s)
 	}
-
-	cmdStr := fmt.Sprintf("datumctl admin update-user %s", identifier)
-	if role != "" {
-		cmdStr += fmt.Sprintf(" --role %s", role)
-	}
-	if status != "" {
-		cmdStr += fmt.Sprintf(" --status %s", status)
-	}
-	fmt.Printf("\n> %s\n", cmdStr)
-
-	return runUpdateUser(nil, []string{identifier})
 }
 
-func promptAdminDeleteUser() error {
-	var email string
-	if err := survey.AskOne(&survey.Input{
-		Message: "User Email to delete:",
-	}, &email, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	fmt.Printf("\n> datumctl admin delete-user %s\n", email)
-	return runDeleteUser(nil, []string{email})
-}
-
-func promptAdminResetPassword() error {
-	var email string
-	if err := survey.AskOne(&survey.Input{
-		Message: "User Email/Username:",
-	}, &email, survey.WithValidator(survey.Required)); err != nil {
-		return err
-	}
-
-	return runResetPassword(nil, []string{email})
-}
-
-func promptToggleRegistration() error {
-	var enable bool
-	if err := survey.AskOne(&survey.Confirm{
-		Message: "Enable public user registration?",
-		Default: false,
-	}, &enable); err != nil {
-		return err
-	}
-
-	arg := "false"
-	if enable {
-		arg = "true"
-	}
-	fmt.Printf("\n> datumctl admin toggle-registration %s\n", arg)
-	return runToggleRegistration(nil, []string{arg})
+func isSecretFlag(name string) bool {
+	n := strings.ToLower(name)
+	return strings.Contains(n, "password") || strings.Contains(n, "secret") ||
+		strings.Contains(n, "token") || strings.Contains(n, "api-key")
 }

@@ -521,7 +521,11 @@ func TestHighVolumeTransactions(t *testing.T) {
 	err := storage.CreateUser(user)
 	require.NoError(t, err)
 
+	// Reduce volume under race detector to avoid timeout
 	numDevices := 10000
+	if testing.Short() {
+		numDevices = 500
+	}
 	start := time.Now()
 
 	// Sequential device creation
@@ -579,6 +583,9 @@ func TestBuntDBMemoryUsage(t *testing.T) {
 
 	// Create many devices
 	numDevices := 5000
+	if testing.Short() {
+		numDevices = 500
+	}
 	for i := 0; i < numDevices; i++ {
 		device := &Device{
 			ID:        fmt.Sprintf("device_%d", i),
@@ -593,7 +600,8 @@ func TestBuntDBMemoryUsage(t *testing.T) {
 	}
 
 	// Perform many lookups
-	for i := 0; i < 10000; i++ {
+	numLookups := numDevices * 2
+	for i := 0; i < numLookups; i++ {
 		deviceIdx := rand.Intn(numDevices)
 		storage.GetDevice(fmt.Sprintf("device_%d", deviceIdx))
 		storage.GetDeviceByAPIKey(fmt.Sprintf("key_%d", deviceIdx))
@@ -609,7 +617,7 @@ func TestBuntDBMemoryUsage(t *testing.T) {
 
 	t.Logf("BuntDB Memory Usage:")
 	t.Logf("  Devices Created: %d", numDevices)
-	t.Logf("  Lookups Performed: %d", 10000)
+	t.Logf("  Lookups Performed: %d", numLookups)
 	t.Logf("  Memory Used: %.2f MB", float64(memUsed)/(1024*1024))
 	t.Logf("  Memory Per Device: %.2f KB", memPerDevice/1024)
 }

@@ -66,6 +66,7 @@ func UserAuthMiddleware(store storage.Provider) gin.HandlerFunc {
 			c.Set("user_id", claims.UserID)
 			c.Set("email", claims.Email)
 			c.Set("role", claims.Role)
+			c.Set("session_jti", claims.ID) // session / JTI for logout & session mgmt
 			c.Set("auth_method", "jwt")
 			c.Next()
 		}
@@ -101,46 +102,6 @@ func HybridAuthMiddleware(store storage.Provider) gin.HandlerFunc {
 
 		// User Auth Fallback (JWT or ak_)
 		UserAuthMiddleware(store)(c)
-	}
-}
-
-// AuthMiddleware validates JWT tokens (Legacy/Simple)
-func AuthMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			// Fallback: check query parameter (useful for WebSockets and MJPEG streams)
-			tokenParam := c.Query("token")
-			if tokenParam != "" {
-				authHeader = "Bearer " + tokenParam
-			} else {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
-				c.Abort()
-				return
-			}
-		}
-
-		// Extract token from "Bearer <token>"
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format"})
-			c.Abort()
-			return
-		}
-
-		token := parts[1]
-		claims, err := ValidateToken(token)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			c.Abort()
-			return
-		}
-
-		// Store user info in context
-		c.Set("user_id", claims.UserID)
-		c.Set("email", claims.Email)
-		c.Set("role", claims.Role)
-		c.Next()
 	}
 }
 
@@ -220,4 +181,15 @@ func GetUserRole(c *gin.Context) (string, error) {
 		return "", fmt.Errorf("role not found in context")
 	}
 	return role.(string), nil
+}
+
+// GetSessionJTI extracts the session JTI (JWT ID) from context.
+// Returns empty string if auth was via API key (no session JTI).
+func GetSessionJTI(c *gin.Context) string {
+	if jti, exists := c.Get("session_jti"); exists {
+		if s, ok := jti.(string); ok {
+			return s
+		}
+	}
+	return ""
 }

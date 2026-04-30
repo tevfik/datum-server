@@ -2,11 +2,14 @@ package mqtt
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"datum-go/internal/processing"
@@ -22,6 +25,7 @@ type Broker struct {
 	server    *mqtt.Server
 	store     storage.Provider
 	processor *processing.TelemetryProcessor
+	authHook  *AuthHook
 }
 
 // NewBroker creates a new MQTT broker instance
@@ -38,26 +42,58 @@ func NewBroker(store storage.Provider, processor *processing.TelemetryProcessor)
 
 // Start initializes listeners and starts the broker
 func (b *Broker) Start() error {
+	allowInsecure := os.Getenv("MQTT_ALLOW_INSECURE") == "true"
+
 	// TCP Listener
-	tcp := listeners.NewTCP(listeners.Config{
-		ID:      "t1",
-		Address: ":1883",
-	})
-	if err := b.server.AddListener(tcp); err != nil {
-		return err
+	if allowInsecure {
+		tcp := listeners.NewTCP(listeners.Config{
+			ID:      "t1",
+			Address: ":1883",
+		})
+		if err := b.server.AddListener(tcp); err != nil {
+			return err
+		}
+	}
+
+	// TLS Listener (optional: enabled when MQTT_TLS_CERT and MQTT_TLS_KEY are set)
+	certFile := os.Getenv("MQTT_TLS_CERT")
+	keyFile := os.Getenv("MQTT_TLS_KEY")
+	if certFile != "" && keyFile != "" {
+		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+		if err != nil {
+			log.Printf("Warning: Failed to load MQTT TLS cert/key: %v (TLS disabled)", err)
+		} else {
+			tlsConfig := &tls.Config{
+				Certificates: []tls.Certificate{cert},
+				MinVersion:   tls.VersionTLS12,
+			}
+			tlsTCP := listeners.NewTCP(listeners.Config{
+				ID:        "tls1",
+				Address:   ":8883",
+				TLSConfig: tlsConfig,
+			})
+			if err := b.server.AddListener(tlsTCP); err != nil {
+				log.Printf("Warning: Failed to add MQTT TLS listener: %v", err)
+			} else {
+				log.Println("MQTT TLS listener enabled on :8883")
+			}
+		}
 	}
 
 	// WebSocket Listener
-	ws := listeners.NewWebsocket(listeners.Config{
-		ID:      "ws1",
-		Address: ":1884",
-	})
-	if err := b.server.AddListener(ws); err != nil {
-		return err
+	if allowInsecure {
+		ws := listeners.NewWebsocket(listeners.Config{
+			ID:      "ws1",
+			Address: ":1884",
+		})
+		if err := b.server.AddListener(ws); err != nil {
+			return err
+		}
 	}
 
 	// Auth Hook
-	if err := b.server.AddHook(newAuthHook(b.store), nil); err != nil {
+	b.authHook = newAuthHook(b.store)
+	if err := b.server.AddHook(b.authHook, nil); err != nil {
 		return err
 	}
 
@@ -80,6 +116,21 @@ func (b *Broker) Start() error {
 // Stop gracefully shuts down the broker
 func (b *Broker) Stop() {
 	b.server.Close()
+}
+
+// InvalidateACLCache removes the cached device-ownership list for a
+// specific user, forcing the next MQTT ACL check to re-query the DB.
+func (b *Broker) InvalidateACLCache(userID string) {
+	if h := b.authHook; h != nil {
+		h.aclCache.invalidate(userID)
+	}
+}
+
+// InvalidateACLCacheAll clears the entire ACL cache.
+func (b *Broker) InvalidateACLCacheAll() {
+	if h := b.authHook; h != nil {
+		h.aclCache.invalidateAll()
+	}
 }
 
 // PublishCommand sends a command payload to a specific device
@@ -154,11 +205,85 @@ func (b *Broker) GetStats() BrokerStats {
 
 type AuthHook struct {
 	mqtt.HookBase
-	store storage.Provider
+	store    storage.Provider
+	aclCache *aclCache
+}
+
+// aclCache caches user-to-device ownership lookups with a TTL.
+type aclCache struct {
+	mu      sync.RWMutex
+	entries map[string]*aclCacheEntry
+	ttl     time.Duration
+}
+
+type aclCacheEntry struct {
+	deviceIDs map[string]bool
+	expiresAt time.Time
+}
+
+func newACLCache(ttl time.Duration) *aclCache {
+	c := &aclCache{
+		entries: make(map[string]*aclCacheEntry),
+		ttl:     ttl,
+	}
+	// Background cleanup every 5 minutes
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			c.mu.Lock()
+			now := time.Now()
+			for k, v := range c.entries {
+				if now.After(v.expiresAt) {
+					delete(c.entries, k)
+				}
+			}
+			c.mu.Unlock()
+		}
+	}()
+	return c
+}
+
+func (c *aclCache) get(userID string) (map[string]bool, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	entry, ok := c.entries[userID]
+	if !ok || time.Now().After(entry.expiresAt) {
+		return nil, false
+	}
+	return entry.deviceIDs, true
+}
+
+func (c *aclCache) set(userID string, deviceIDs map[string]bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[userID] = &aclCacheEntry{
+		deviceIDs: deviceIDs,
+		expiresAt: time.Now().Add(c.ttl),
+	}
+}
+
+// invalidate removes a specific user's cached ACL entry so the next
+// ACL check fetches fresh device ownership from the database.
+func (c *aclCache) invalidate(userID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.entries, userID)
+}
+
+// invalidateAll clears the entire ACL cache. Useful when a bulk
+// operation (e.g. device transfer) may affect multiple users.
+func (c *aclCache) invalidateAll() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries = make(map[string]*aclCacheEntry)
 }
 
 func newAuthHook(store storage.Provider) *AuthHook {
-	return &AuthHook{store: store}
+	return &AuthHook{
+		store:    store,
+		aclCache: newACLCache(60 * time.Second),
+	}
 }
 
 func (h *AuthHook) ID() string {
@@ -189,11 +314,21 @@ func (h *AuthHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) boo
 		// Expecting User API Key
 		if strings.HasPrefix(token, "ak_") {
 			user, err := h.store.GetUserByUserAPIKey(token)
-			if err != nil {
+			if err != nil || user == nil {
 				return false
 			}
-			// Allow valid users (Role check moved to ACL)
-			if user != nil {
+
+			// Security Fix: Prevent MQTT Identity Spoofing
+			// Verify that the ClientID belongs to the authenticated user
+			parts := strings.Split(clientID, "_")
+			var claimedUserID string
+			if strings.HasPrefix(clientID, "datum_web_") && len(parts) >= 4 {
+				claimedUserID = parts[3]
+			} else if strings.HasPrefix(clientID, "admin_dashboard_") && len(parts) >= 3 {
+				claimedUserID = parts[2]
+			}
+
+			if claimedUserID != "" && claimedUserID == user.ID {
 				return true
 			}
 		}
@@ -249,13 +384,21 @@ func (h *AuthHook) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
 					targetDeviceID = topicParts[1]
 				}
 
-				// Verify ownership
-				// Optimization: GetUserDevices is fast (in-memory BuntDB)
-				devices, err := h.store.GetUserDevices(userID)
-				if err == nil {
-					for _, d := range devices {
-						if d.ID == targetDeviceID {
-							return true // Allowed
+				// Verify ownership (cached)
+				if deviceIDs, ok := h.aclCache.get(userID); ok {
+					if deviceIDs[targetDeviceID] {
+						return true
+					}
+				} else {
+					devices, err := h.store.GetUserDevices(userID)
+					if err == nil {
+						idMap := make(map[string]bool, len(devices))
+						for _, d := range devices {
+							idMap[d.ID] = true
+						}
+						h.aclCache.set(userID, idMap)
+						if idMap[targetDeviceID] {
+							return true
 						}
 					}
 				}

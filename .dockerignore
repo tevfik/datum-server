@@ -8,3 +8,4 @@ docs/
 examples/
 .env
 *.log
+web/node_modules

@@ -1,15 +1,32 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
-	_ "embed"
+	"embed"
 	"fmt"
+	"io/fs"
+	"log"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	migratepg "github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	_ "github.com/lib/pq" // PostgreSQL Driver
 )
+
+// defaultQueryTimeout is the maximum time a single query may take.
+const defaultQueryTimeout = 10 * time.Second
+
+// queryCtx returns a context with the default query timeout.
+func queryCtx() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), defaultQueryTimeout)
+}
+
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 //go:embed schema.sql
 var schemaSQL string
@@ -71,11 +88,45 @@ func getEnvInt(key string, defaultVal int) int {
 	return i
 }
 
-// initSchema executes the embedded schema.sql
+// initSchema runs database migrations. On a fresh database it applies all
+// migrations sequentially; on an existing one it brings the schema up to
+// the latest version. If migrations fail (e.g. dirty state), it falls back
+// to the legacy embedded schema.sql for backward compatibility.
 func (s *PostgresStore) initSchema() error {
-	_, err := s.db.Exec(schemaSQL)
+	// Try golang-migrate first
+	if err := s.runMigrations(); err != nil {
+		log.Printf("Warning: migrations failed (%v), falling back to schema.sql", err)
+		if _, execErr := s.db.Exec(schemaSQL); execErr != nil {
+			return fmt.Errorf("fallback schema.sql failed: %w", execErr)
+		}
+	}
+	return nil
+}
+
+// runMigrations applies pending migrate-style migrations from the embedded FS.
+func (s *PostgresStore) runMigrations() error {
+	subFS, err := fs.Sub(migrationsFS, "migrations")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open migrations sub-FS: %w", err)
+	}
+
+	sourceDriver, err := iofs.New(subFS, ".")
+	if err != nil {
+		return fmt.Errorf("iofs source: %w", err)
+	}
+
+	dbDriver, err := migratepg.WithInstance(s.db, &migratepg.Config{})
+	if err != nil {
+		return fmt.Errorf("migrate db driver: %w", err)
+	}
+
+	m, err := migrate.NewWithInstance("iofs", sourceDriver, "postgres", dbDriver)
+	if err != nil {
+		return fmt.Errorf("migrate instance: %w", err)
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("migrate up: %w", err)
 	}
 	return nil
 }

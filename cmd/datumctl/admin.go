@@ -8,6 +8,8 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+
+	"datum-go/internal/cli/utils"
 )
 
 var (
@@ -193,7 +195,7 @@ func runResetPassword(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(response)
+		return utils.PrintJSON(os.Stdout, response)
 	}
 
 	fmt.Printf("✅ Password reset successfully\n")
@@ -303,7 +305,7 @@ func runCreateUser(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(response)
+		return utils.PrintJSON(os.Stdout, response)
 	}
 
 	fmt.Printf("✅ User created successfully\n")
@@ -337,7 +339,7 @@ func runListUsers(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(response)
+		return utils.PrintJSON(os.Stdout, response)
 	}
 
 	users, ok := response["users"].([]interface{})
@@ -353,10 +355,10 @@ func runListUsers(cmd *cobra.Command, args []string) error {
 	for _, u := range users {
 		user := u.(map[string]interface{})
 		table.Append(
-			getString(user, "email"),
-			getString(user, "role"),
-			getString(user, "status"),
-			getString(user, "created_at"),
+			utils.GetString(user, "email"),
+			utils.GetString(user, "role"),
+			utils.GetString(user, "status"),
+			utils.GetString(user, "created_at"),
 		)
 	}
 	table.Render()
@@ -392,7 +394,7 @@ func runDeleteUser(cmd *cobra.Command, args []string) error {
 
 	// If identifier looks like an email, try to resolve it to an ID first
 	userID := email
-	if identifierContainsEmail(email) {
+	if utils.IdentifierContainsEmail(email) {
 		// List users to find the ID
 		resp, err := client.Get("/admin/users")
 		if err != nil {
@@ -408,8 +410,8 @@ func runDeleteUser(cmd *cobra.Command, args []string) error {
 		if users, ok := response["users"].([]interface{}); ok {
 			for _, u := range users {
 				user := u.(map[string]interface{})
-				if getString(user, "email") == email {
-					userID = getString(user, "id")
+				if utils.GetString(user, "email") == email {
+					userID = utils.GetString(user, "id")
 					found = true
 					break
 				}
@@ -432,7 +434,7 @@ func runDeleteUser(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(response)
+		return utils.PrintJSON(os.Stdout, response)
 	}
 
 	fmt.Printf("✅ User deleted: %s\n", email)
@@ -487,7 +489,7 @@ func runResetSystem(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(response)
+		return utils.PrintJSON(os.Stdout, response)
 	}
 
 	fmt.Printf("\n✅ System reset successfully\n")
@@ -516,7 +518,7 @@ func runAdminStats(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(stats)
+		return utils.PrintJSON(os.Stdout, stats)
 	}
 
 	// Print formatted stats
@@ -572,7 +574,7 @@ func runAdminConfig(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(config)
+		return utils.PrintJSON(os.Stdout, config)
 	}
 
 	// Print formatted config
@@ -632,7 +634,7 @@ func runToggleRegistration(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(response)
+		return utils.PrintJSON(os.Stdout, response)
 	}
 
 	status := "Disabled"

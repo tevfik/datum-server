@@ -1,5 +1,10 @@
 # Datum IoT Server
 
+![Build Status](https://img.shields.io/github/actions/workflow/status/tevfik/datum-server/ci.yml?branch=main)
+![Go Report Card](https://goreportcard.com/badge/github.com/tevfik/datum-server)
+![Test Coverage](https://img.shields.io/badge/coverage-24%25-yellow.svg)
+![License](https://img.shields.io/github/license/tevfik/datum-server)
+
 High-performance IoT data collection and management platform built with Go.
 
 ## 🚀 Features
@@ -47,22 +52,24 @@ See [docs/performance/FINAL_PERFORMANCE_REPORT.md](docs/performance/FINAL_PERFOR
 
 ### Advanced Components (Undocumented)
 
-- **MQTT Broker**: Integrated MQTT v5 broker running on ports 1883 (TCP) and 1884 (WS).
+- **MQTT Broker**: Integrated MQTT v5 broker running on ports 1883 (TCP), 1884 (WS), and 8883 (TLS, optional). Includes ACL cache with automatic invalidation on device ownership changes.
 - **Telemetry Processor**: Asynchronous high-throughput data ingestion pipeline (`internal/processing`).
-- **PostgreSQL Support**: Optional backend controllable via `DATABASE_URL`.
+- **PostgreSQL Support**: Optional backend controllable via `DATABASE_URL`, with versioned schema migrations (golang-migrate).
+- **Configuration**: YAML config file support via `datum-server.yaml` (see `datum-server.example.yaml`). All settings can also be set via environment variables.
+- **Stream Management**: Bounded video streaming with per-stream (50) and global (500) client limits to prevent resource exhaustion.
 
 ## 🛠️ Quick Start
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.24+
 - Docker & Docker Compose (optional)
 
 ### Local Development
 
 ```bash
 # Clone repository
-git clone <repository-url>
+git clone https://github.com/tevfik/datum-server.git
 cd datum-server
 
 # Install dependencies
@@ -89,23 +96,35 @@ Server runs on `http://localhost:8000`
 
 ## �️ CLI Tool (datumctl)
 
-Powerful command-line interface for managing devices and querying data:
+Powerful command-line interface for managing devices and querying data. The
+interactive menu is **auto-derived from the cobra command tree**, so every
+new subcommand or flag is automatically available there with no duplicated
+wiring.
 
 ```bash
 # Build CLI
 make build-cli
 
-# Interactive Mode (Recommended)
-./datumctl interactive
-# Follow the on-screen wizard to login, manage devices, and view system status.
+# Interactive Mode — guided menu walking the full API surface
+./datumctl interactive            # alias: i / menu
 
 # One-off Commands
 ./datumctl login --email admin@example.com
 ./datumctl device list
 ./datumctl device create --name "Living Room Cam" --type camera
+
+# New top-level groups (cover the rest of the API surface):
+./datumctl auth me                                       # current user
+./datumctl auth sessions                                 # list active JWTs
+./datumctl auth push-token list                          # push notification tokens
+./datumctl sys info | sys time | sys ip | sys metrics    # /sys/* endpoints
+./datumctl rules list                                    # admin rule engine
+./datumctl notify publish alerts --message "hello"       # ntfy-protocol
+./datumctl notify subscribe alerts --format sse          # SSE stream
 ```
 
-See [CLI Tutorial](docs/tutorials/CLI.md) for complete CLI documentation.
+See [cmd/datumctl/README.md](cmd/datumctl/README.md) and
+[CLI Tutorial](docs/tutorials/CLI.md) for complete CLI documentation.
 
 ## 📺 Stream Viewer
 
@@ -233,8 +252,6 @@ See [Testing Guide](docs/guides/TESTING.md) for comprehensive testing documentat
 | Document | Description |
 |----------|-------------|
 | [Performance Report](docs/performance/FINAL_PERFORMANCE_REPORT.md) | Load testing results |
-| [TSStorage Benchmarks](docs/performance/TSTORAGE_TEST_RESULTS.md) | Time-series storage benchmarks |
-| [BuntDB Benchmarks](docs/performance/BUNTDB_TEST_RESULTS.md) | Metadata storage benchmarks |
 
 ### Visual Documentation
 | Document | Description |
@@ -278,9 +295,18 @@ DATABASE_URL=postgres://user:pass@localhost:5432/datum?sslmode=disable
 # Comma-separated list of allowed origins for WebSocket streams.
 # Defaults to "*" (allow all) if empty.
 CORS_ALLOWED_ORIGINS=https://myapp.com,https://admin.myapp.com
+# Override the default Content-Security-Policy header
+# CONTENT_SECURITY_POLICY=default-src 'self'; script-src 'self'; ...
+
+# Request Limits
+MAX_REQUEST_BODY_BYTES=5242880     # Max HTTP body size (default: 5MB)
+QUERY_MAX_LIMIT=10000              # Max data points per query (default: 10000)
+TELEMETRY_BUFFER_SIZE=10000        # Async ingestion buffer (default: 10000)
 
 # MQTT
-# MQTT ports are currently fixed at 1883 (TCP) and 1884 (WS)
+# TCP: 1883, WebSocket: 1884, TLS: 8883 (when MQTT_TLS_CERT/KEY are set)
+# MQTT_TLS_CERT=/path/to/cert.pem
+# MQTT_TLS_KEY=/path/to/key.pem
 ```
 
 

@@ -11,20 +11,38 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"datum-go/internal/api"
+	adminapi "datum-go/internal/api/admin"
+	analyticsapi "datum-go/internal/api/analytics"
+	bucketsapi "datum-go/internal/api/buckets"
+	mcpapi "datum-go/internal/api/mcp"
+	packsapi "datum-go/internal/api/packs"
+	quotaapi "datum-go/internal/api/quota"
+	rulesapi "datum-go/internal/api/rules"
 	"datum-go/internal/auth"
+	"datum-go/internal/buckets"
+	"datum-go/internal/config"
 	"datum-go/internal/email"
-	"datum-go/internal/handlers"
 	"datum-go/internal/logger"
+	"datum-go/internal/metrics"
 	mqtt_internal "datum-go/internal/mqtt"
+	"datum-go/internal/notify"
 	"datum-go/internal/processing"
+	"datum-go/internal/quota"
+	"datum-go/internal/ratelimit"
+	"datum-go/internal/rules"
 	"datum-go/internal/storage"
 	"datum-go/internal/storage/postgres"
+	"datum-go/internal/webhook"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
 
@@ -32,15 +50,24 @@ import (
 var webFS embed.FS
 
 var (
-	Version   = "1.4.1"
+	// Version is overridden at build time via -ldflags. The default is a
+	// "dev" sentinel so a binary built without `make build` (e.g. plain
+	// `go run ./cmd/server`) is obviously unversioned instead of pretending
+	// to be a stale tagged release.
+	Version   = "dev"
 	BuildDate = "unknown"
 )
 
 var (
 	store              storage.Provider
 	emailService       *email.EmailSender
+	notifier           *notify.NtfyClient
+	dispatcher         *notify.Dispatcher
+	ntfyBroker         *notify.NtfyBroker
 	telemetryProcessor *processing.TelemetryProcessor
 	mqttBroker         *mqtt_internal.Broker
+	webhookDispatcher  *webhook.Dispatcher
+	ruleEngine         *rules.Engine
 	serverStartTime    time.Time // Track server start time for uptime
 )
 
@@ -53,13 +80,137 @@ func securityHeadersMiddleware() gin.HandlerFunc {
 		c.Header("X-Content-Type-Options", "nosniff")
 		// Enable XSS protection
 		c.Header("X-XSS-Protection", "1; mode=block")
-		// Strict transport security (HTTPS only - uncomment in production with HTTPS)
-		// c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		// Strict transport security (enabled by default, disable with ENABLE_HSTS=false)
+		if os.Getenv("ENABLE_HSTS") != "false" {
+			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 		// Referrer policy
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
-		// Content security policy (basic)
-		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data:;")
+		// Content security policy
+		csp := os.Getenv("CONTENT_SECURITY_POLICY")
+		if csp == "" {
+			csp = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net; connect-src 'self' ws: wss:;"
+		}
+		c.Header("Content-Security-Policy", csp)
+		// Permissions policy
+		c.Header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		c.Next()
+	}
+}
+
+// requestIDMiddleware adds a unique request ID to each request context and response header.
+func requestIDMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		requestID := c.GetHeader("X-Request-ID")
+		if requestID == "" {
+			requestID = uuid.New().String()
+		}
+		c.Set("request_id", requestID)
+		c.Header("X-Request-ID", requestID)
+		c.Next()
+	}
+}
+
+// requestBodyLimitMiddleware limits the maximum request body size.
+func requestBodyLimitMiddleware() gin.HandlerFunc {
+	// Default 5MB, configurable via MAX_REQUEST_BODY_BYTES
+	maxBytes := int64(5 * 1024 * 1024)
+	if v := os.Getenv("MAX_REQUEST_BODY_BYTES"); v != "" {
+		if parsed, err := strconv.ParseInt(v, 10, 64); err == nil && parsed > 0 {
+			maxBytes = parsed
+		}
+	}
+	return func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBytes)
+		c.Next()
+	}
+}
+
+// requestTimeoutMiddleware adds a deadline to non-streaming requests.
+func requestTimeoutMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		path := c.Request.URL.Path
+		// Skip timeout for streaming, SSE, and WebSocket endpoints
+		if strings.Contains(path, "/stream/") ||
+			strings.Contains(path, "/cmd/stream") ||
+			strings.Contains(path, "/cmd/poll") ||
+			strings.Contains(path, "/logs/stream") {
+			c.Next()
+			return
+		}
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+		defer cancel()
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	}
+}
+
+// loadOrGenerateJWTSecret manages JWT secret persistence
+func loadOrGenerateJWTSecret(dataDir string) {
+	// 1. Check environment variable (highest priority)
+	if os.Getenv("JWT_SECRET") != "" {
+		return // internal/auth already handles this
+	}
+
+	// 2. Check for persistent secret file
+	secretFile := filepath.Join(dataDir, ".jwt_secret")
+
+	if content, err := os.ReadFile(secretFile); err == nil {
+		if len(content) >= 32 {
+			auth.SetJWTSecret(content)
+			return
+		}
+	}
+
+	// 3. Generate new secret
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		log := logger.GetLogger()
+		log.Fatal().Err(err).Msg("Critical: Failed to generate random bytes for JWT secret")
+		return
+	}
+	secret := hex.EncodeToString(bytes)
+
+	log := logger.GetLogger()
+	// 4. Save to file
+	if err := os.WriteFile(secretFile, []byte(secret), 0600); err != nil {
+		log.Warn().Err(err).Str("file", secretFile).Msg("Failed to persist JWT secret")
+	} else {
+		log.Info().Str("file", secretFile).Msg("Persisted new JWT secret")
+	}
+
+	// 5. Update auth package
+	auth.SetJWTSecret([]byte(secret))
+}
+
+// newBucketBackend constructs the configured object-storage backend. Returns
+// nil only on configuration errors (errors are logged). The presign HMAC key
+// is derived from the active JWT secret so it survives restarts when
+// JWT_SECRET is persisted.
+func newBucketBackend(cfg *config.Config, publicURL string) buckets.Backend {
+	switch strings.ToLower(strings.TrimSpace(cfg.Buckets.Backend)) {
+	case "", "localfs":
+		baseDir := cfg.Buckets.BaseDir
+		if baseDir == "" {
+			baseDir = "./data/buckets"
+		}
+		fs, err := buckets.NewLocalFS(baseDir, publicURL, auth.GetJWTSecret())
+		if err != nil {
+			logger.GetLogger().Error().Err(err).Msg("Failed to init localfs bucket backend")
+			return nil
+		}
+		return fs
+	case "s3":
+		s3, err := buckets.NewS3Backend(cfg.Buckets.Endpoint, cfg.Buckets.Region,
+			cfg.Buckets.AccessKey, cfg.Buckets.SecretKey, cfg.Buckets.BucketPrefix)
+		if err != nil {
+			logger.GetLogger().Error().Err(err).Msg("Failed to init s3 bucket backend")
+			return nil
+		}
+		return s3
+	default:
+		logger.GetLogger().Warn().Str("backend", cfg.Buckets.Backend).Msg("Unknown buckets.backend; disabling")
+		return nil
 	}
 }
 
@@ -74,12 +225,20 @@ func main() {
 		// fmt.Println("No .env file found or error loading it")
 	}
 
+	// Load central configuration (file + env). Environment variables still
+	// take precedence over the YAML file. Errors are non-fatal: we fall back
+	// to defaults so a missing/invalid file never prevents startup.
+	cfg, cfgErr := config.Load()
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "warning: config load: %v (continuing with defaults)\n", cfgErr)
+		cfg = &config.Config{}
+	}
+
 	// Ensure we log if main exits unexpectedly
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(os.Stderr, "PANIC: %v\n", r)
 		}
-		fmt.Fprintf(os.Stderr, "DEBUG: Main function exiting\n")
 	}()
 
 	// Command-line flags
@@ -87,8 +246,6 @@ func main() {
 	serverURL := flag.String("server-url", "", "Public server URL (default: http://localhost:8000 or SERVER_URL env var)")
 	dataDir := flag.String("data-dir", "", "Data directory path (default: ./data or DATA_DIR env var)")
 	retentionDays := flag.Int("retention-days", 0, "Data retention in days (default: 7 or RETENTION_MAX_DAYS env var)")
-	// retentionCheckHours is deprecated as retention is handled by storage engine
-	_ = flag.Int("retention-check-hours", 0, "DEPRECATED: Retention check interval in hours")
 	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
 
@@ -117,7 +274,6 @@ func main() {
 			publicURL = "http://localhost:" + serverPort
 		}
 	}
-	SetProvisioningServerURL(publicURL)
 
 	// Get data directory (priority: flag > env > default)
 	dataDirPath := *dataDir
@@ -129,17 +285,13 @@ func main() {
 	}
 
 	// Initialize structured logging
-	// Log file path: data/server.log
-	logFile := "server.log"
-	// Basic path join if filepath not imported, valid for linux
-	if strings.HasSuffix(dataDirPath, "/") {
-		logFile = dataDirPath + "server.log"
-	} else {
-		logFile = dataDirPath + "/server.log"
-	}
+	logFile := filepath.Join(dataDirPath, "server.log")
 
 	logger.InitLogger(logFile)
 	log := logger.GetLogger()
+
+	// Handle JWT Secret persistence
+	loadOrGenerateJWTSecret(dataDirPath)
 
 	// Configure retention (priority: flag > env > default)
 	retentionConfig := storage.GetRetentionConfigFromEnv()
@@ -148,30 +300,48 @@ func main() {
 	}
 	// Note: CleanupEvery is handled internally by tstorage or ignored if using WithRetention
 
-	// Initialize storage (BuntDB for metadata, tstorage for time-series)
-	// Initialize storage
+	// Initialize storage. Backend selection priority:
+	//   1. STORAGE_BACKEND env var / storage.backend in datum-server.yaml
+	//      ("embedded" | "postgres")
+	//   2. DATABASE_URL set -> postgres (back-compat)
+	//   3. embedded (BuntDB + tstorage) — default, no external deps
 	var err error
 	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL != "" {
-		// Use PostgreSQL
+	backend := strings.ToLower(strings.TrimSpace(cfg.Storage.Backend))
+	if backend == "" {
+		backend = strings.ToLower(strings.TrimSpace(os.Getenv("STORAGE_BACKEND")))
+	}
+	if backend == "" {
+		if dbURL != "" {
+			backend = "postgres"
+		} else {
+			backend = "embedded"
+		}
+	}
+	switch backend {
+	case "postgres", "postgresql", "timescaledb":
+		if dbURL == "" {
+			log.Fatal().Msg("STORAGE_BACKEND=postgres requires DATABASE_URL to be set")
+		}
 		store, err = postgres.New(dbURL)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to initialize PostgreSQL storage")
 		}
-		log.Info().Str("backend", "PostgreSQL").Msg("Storage initialized")
-	} else {
-		// Use BuntDB (Default)
+		log.Info().Str("backend", "postgres").Msg("Storage initialized")
+	case "embedded", "bunt", "buntdb", "tstorage":
 		store, err = storage.New(dataDirPath+"/meta.db", dataDirPath+"/tsdata", retentionConfig.MaxAge)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to initialize BuntDB storage")
+			log.Fatal().Err(err).Msg("Failed to initialize embedded storage")
 		}
 		log.Info().
-			Str("backend", "BuntDB").
+			Str("backend", "embedded").
 			Str("timeseries", "tstorage").
 			Str("data_dir", dataDirPath).
 			Dur("retention", retentionConfig.MaxAge).
 			Dur("public_retention", retentionConfig.PublicMaxAge).
 			Msg("Storage initialized")
+	default:
+		log.Fatal().Str("backend", backend).Msg("Unknown STORAGE_BACKEND (expected 'embedded' or 'postgres')")
 	}
 
 	// Startup cleanup: expired grace periods and provisioning requests
@@ -189,6 +359,32 @@ func main() {
 	// Initialize Email Service
 	emailService = email.NewEmailSender(publicURL)
 
+	// Initialize Push Notification Service (external ntfy server, optional)
+	notifier = notify.NewNtfyClient()
+
+	// Embedded ntfy-protocol broker (in-process pub/sub, ntfy-client compatible)
+	ntfyBroker = notify.NewNtfyBroker()
+
+	// Multi-channel dispatcher: in-app SSE/MQTT command + ntfy + embedded ntfy
+	dispatcher = notify.NewDispatcher()
+	dispatcher.Register(notify.NewInAppChannel(store))
+	if notifier != nil {
+		dispatcher.Register(notify.NewNtfyChannel(notifier))
+	}
+	dispatcher.Register(notify.NewEmbeddedNtfyChannel(ntfyBroker))
+	if wp := notify.NewWebPushChannel(
+		cfg.Notify.WebPushPublic,
+		cfg.Notify.WebPushPrivate,
+		cfg.Notify.WebPushSubject,
+	); wp != nil {
+		dispatcher.Register(wp)
+	}
+	defaults := cfg.Notify.DefaultChannels
+	if len(defaults) == 0 {
+		defaults = []string{"inapp", "ntfy", "ntfy-embedded"}
+	}
+	dispatcher.SetDefaultChannels(defaults)
+
 	// Initialize Telemetry Processor
 	telemetryProcessor = processing.NewTelemetryProcessor(store)
 
@@ -196,13 +392,23 @@ func main() {
 	mqttBroker = mqtt_internal.NewBroker(store, telemetryProcessor)
 	if err := mqttBroker.Start(); err != nil {
 		log.Error().Err(err).Msg("Failed to start MQTT Broker")
-	} else {
-		// Ensure Broker closes on shutdown
-		defer mqttBroker.Stop()
 	}
 
-	// Set global PublicURL for handlers that need it (e.g. web fallback)
-	GlobalPublicURL = publicURL
+	// Initialize Webhook Dispatcher
+	webhookDispatcher = webhook.NewDispatcher()
+
+	// Initialize Rule Engine
+	ruleEngine = rules.NewEngine(webhookDispatcher, func(topic string, payload []byte) error {
+		return mqttBroker.Publish(topic, payload, false)
+	})
+	// Load rules from file if exists
+	if rulesData, err := os.ReadFile(filepath.Join(dataDirPath, "rules.json")); err == nil {
+		if err := ruleEngine.LoadFromJSON(rulesData); err != nil {
+			log.Warn().Err(err).Msg("Failed to load rules from rules.json")
+		} else {
+			log.Info().Int("count", len(ruleEngine.ListRules())).Msg("Rules loaded from rules.json")
+		}
+	}
 
 	// Setup router
 	gin.SetMode(gin.ReleaseMode)
@@ -214,18 +420,63 @@ func main() {
 
 	// Middleware setup
 	r.Use(gin.Recovery())
+	// Request ID for tracing
+	r.Use(requestIDMiddleware())
+	// Request body size limit
+	r.Use(requestBodyLimitMiddleware())
+	// Request timeout for non-streaming endpoints
+	r.Use(requestTimeoutMiddleware())
 	// Use our custom structured logger for requests which filters noisy endpoints
 	r.Use(logger.GinLogger())
 	// Metrics middleware
-	r.Use(metricsMiddleware())
+	r.Use(metrics.Middleware())
+
+	// Global rate limiting (per-IP)
+	rateLimitReqs := 100
+	rateLimitWindowSec := 60
+	if v := os.Getenv("RATE_LIMIT_REQUESTS"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+			rateLimitReqs = parsed
+		}
+	}
+	if v := os.Getenv("RATE_LIMIT_WINDOW_SECONDS"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+			rateLimitWindowSec = parsed
+		}
+	}
+	r.Use(ratelimit.Middleware(rateLimitReqs, time.Duration(rateLimitWindowSec)*time.Second))
 
 	r.Use(securityHeadersMiddleware())
-	// CORS setup
+	// CORS setup (origins parsed once and cached)
+	var corsAllowedOrigins []string
+	var corsAllowAll bool
+	{
+		raw := os.Getenv("CORS_ALLOWED_ORIGINS")
+		if raw == "" || raw == "*" {
+			corsAllowAll = true
+		} else {
+			for _, o := range strings.Split(raw, ",") {
+				if trimmed := strings.TrimSpace(o); trimmed != "" {
+					corsAllowedOrigins = append(corsAllowedOrigins, trimmed)
+				}
+			}
+		}
+	}
 	r.Use(func(c *gin.Context) {
-		// Basic CORS for development
-		// In production, configure stricter rules
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		origin := c.Request.Header.Get("Origin")
+
+		if corsAllowAll {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		} else {
+			for _, allowed := range corsAllowedOrigins {
+				if allowed == origin {
+					c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+					c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+					break
+				}
+			}
+		}
+
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 
@@ -238,8 +489,12 @@ func main() {
 	})
 
 	// Static Assets
-	// Serve /assets from embedded "dist/assets"
-	r.StaticFS("/assets", http.FS(mustSubFS(webFS, "dist/assets")))
+	// Serve /assets from embedded "dist/assets" (gracefully skip if dist not built)
+	if sub, err := fs.Sub(webFS, "dist/assets"); err == nil {
+		r.StaticFS("/assets", http.FS(sub))
+	} else {
+		log.Warn().Msg("Web assets (dist/assets) not found in embed — UI will not be served")
+	}
 
 	// SPA Fallback / Root Handler
 	// If no route matches, check if it's an API call or UI
@@ -273,133 +528,141 @@ func main() {
 
 	// Root handler (Explicit /)
 	r.GET("/", rootHandler)
+	// Define API Config for all route registers
+	apiConfig := api.Config{
+		Store:        store,
+		Processor:    telemetryProcessor,
+		MQTTBroker:   mqttBroker,
+		EmailService: emailService,
+		Notifier:     notifier,
+		Dispatcher:   dispatcher,
+		PublicURL:    publicURL,
+		Version:      Version,
+		BuildDate:    BuildDate,
+	}
+
 	r.GET("/health", healthHandler)
 	r.GET("/healthz", healthHandler)
 	r.GET("/live", livenessHandler)
 	r.GET("/ready", readinessHandler)
-	// System routes
-	r.GET("/sys/time", getSystemTimeHandler)
-	// Also map /sys/time for backward compatibility if desired, or just clean cut
-	// r.GET("/sys/time", getSystemTimeHandler)
-	r.GET("/sys/ip", getSystemIPHandler)
+	// System routes (using new internal/api package)
+	api.RegisterSystemRoutes(r, apiConfig)
 
-	// Auth routes
-	authGroup := r.Group("/auth")
-	{
-		authGroup.POST("/register", registerHandler)
-		authGroup.POST("/login", loginHandler)
-		authGroup.POST("/refresh", refreshTokenHandler)
-		// Password Reset
-		authGroup.POST("/forgot-password", forgotPasswordHandler)
-		authGroup.POST("/reset-password", completeResetPasswordHandler)
-	}
+	// Auth routes (using new internal/api package)
+	api.RegisterAuthRoutes(r, apiConfig)
 
-	// Password Reset Web Page (for deep linking fallback)
-	r.GET("/reset-password", resetPasswordWebHandler)
+	// User API Key routes (using new internal/api package)
+	api.RegisterKeyRoutes(r, apiConfig)
 
-	// Authenticated user routes (password change, self-deletion)
-	authProtectedGroup := r.Group("/auth")
-	authProtectedGroup.Use(auth.UserAuthMiddleware(store))
-	{
-		authProtectedGroup.PUT("/password", changePasswordHandler)
-		authProtectedGroup.DELETE("/user", deleteSelfHandler)
+	// Database Routes (using new internal/api package)
+	// Registers /db (User) and /admin/db (Admin)
+	api.RegisterDBRoutes(r, apiConfig)
 
-		// User API Key Management
-		authProtectedGroup.POST("/keys", createKeyHandler)
-		authProtectedGroup.GET("/keys", listKeysHandler)
-		authProtectedGroup.DELETE("/keys/:id", deleteKeyHandler)
+	// Public Routes (using new internal/api package)
+	api.RegisterPublicRoutes(r, apiConfig)
 
-		// Generic Database API (Collections)
-		RegisterDBRoutes(authProtectedGroup, store)
-	}
+	// Admin routes
 
-	// Device management routes (require user auth)
-	devGroup := r.Group("/dev")
-	devGroup.Use(auth.UserAuthMiddleware(store))
-	{
-		// Management
-		devGroup.POST("", createDeviceHandler)
-		devGroup.GET("", listDevicesHandler)
-		devGroup.DELETE("/:device_id", deleteDeviceHandler)
+	// Command routes (using new internal/api package)
+	api.RegisterCommandRoutes(r, apiConfig)
 
-		// Configuration (Remote Config/Shadow)
-		devGroup.PATCH("/:device_id/config", updateDeviceConfigHandler)
+	// Stream and SSE routes (using new internal/api package)
+	api.RegisterStreamRoutes(r, apiConfig)
+	api.RegisterSSERoutes(r, apiConfig)
 
-		// Commands (User sends to device)
-		devGroup.POST("/:device_id/cmd", sendCommandHandler)
-		devGroup.GET("/:device_id/cmd", listCommandsHandler) // History of commands sent
-	}
+	// Device routes (using new internal/api package)
+	api.RegisterDeviceRoutes(r, apiConfig)
 
-	// Device-side routes (Device Auth)
-	devAuthGroup := r.Group("/dev")
-	devAuthGroup.Use(auth.DeviceAuthMiddleware())
-	{
-		// Data Ingestion
-		devAuthGroup.POST("/:device_id/data", postDataHandler)
+	// Data routes (using new internal/api package)
+	api.RegisterDataRoutes(r, apiConfig)
 
-		// Command Polling (Device gets pending commands)
-		// Consolidating all polling to single GET /cmd endpoint
-		devAuthGroup.GET("/:device_id/cmd/pending", pollCommandsHandler)
+	// Specialized/Hybrid Routes (using new internal/api package)
+	api.RegisterSpecializedRoutes(r, apiConfig)
 
-		// Legacy polling support aliases (can be deprecated later)
-		devAuthGroup.GET("/:device_id/cmd/stream", sseCommandsHandler) // SSE long polling
-		devAuthGroup.GET("/:device_id/cmd/poll", webhookPollHandler)   // HTTP long polling
+	// MQTT admin routes (using new internal/api package)
+	api.RegisterMQTTRoutes(r, apiConfig)
 
-		// Command Ack
-		devAuthGroup.POST("/:device_id/cmd/:command_id/ack", ackCommandHandler)
+	// Metrics endpoint
+	api.RegisterMetricsRoutes(r, apiConfig)
 
-		// Video streaming upload (device uploads frames)
-		devAuthGroup.POST("/:device_id/stream/frame", uploadFrameHandler)
+	// Embedded ntfy-protocol broker — POST /notify/{topic} to publish,
+	// GET /notify/{topic}/{json|sse|raw} to subscribe.
+	r.Any("/notify/*topic", func(c *gin.Context) {
+		ntfyBroker.ServeHTTP("/notify", c.Writer, c.Request)
+	})
 
-	}
+	// Versioned API routes (/api/v1/...)
+	api.RegisterV1Routes(r, apiConfig)
 
-	// Specialized route for Thing Description (supports both User and Device Auth)
-	// Must be registered outside of Auth Groups to avoid conflict and allow hybrid auth
-	r.PUT("/dev/:device_id/thing-description", auth.HybridAuthMiddleware(store), updateDeviceThingDescriptionHandler)
+	// Rule Engine routes (/admin/rules)
+	rulesHandler := rulesapi.NewHandler(ruleEngine)
+	rulesGroup := r.Group("/admin/rules")
+	rulesGroup.Use(auth.UserAuthMiddleware(store))
+	rulesGroup.Use(auth.AdminMiddleware(store))
+	rulesHandler.RegisterRoutes(rulesGroup)
 
-	// Hybrid Auth Routes (User OR Device can access)
-	hybridGroup := r.Group("/dev")
-	hybridGroup.Use(auth.HybridAuthMiddleware(store))
-	{
-		hybridGroup.GET("/:device_id", getDeviceHandler)
-		hybridGroup.GET("/:device_id/data", getDataHandler)
+	// MCP server (/mcp) — exposes user data to any MCP client (gleann,
+	// Claude Desktop, Cursor, future ekiyo Asistan). Auth: regular user
+	// auth (JWT or ak_ user API key). See docs/P1_GLEANN_INTEGRATION.md.
+	quotaMgr := quota.New()
+	mcpServer := mcpapi.NewServer(store, Version, quotaMgr)
+	r.GET("/.well-known/mcp.json", mcpServer.WellKnown(publicURL))
+	mcpGroup := r.Group("/mcp")
+	mcpGroup.Use(auth.UserAuthMiddleware(store))
+	mcpServer.RegisterRoutes(mcpGroup)
 
-		// Video streaming routes
-		hybridGroup.GET("/:device_id/stream/mjpeg", mjpegStreamHandler)       // MJPEG over HTTP
-		hybridGroup.GET("/:device_id/stream/snapshot", streamSnapshotHandler) // Current frame snapshot
-		hybridGroup.GET("/:device_id/stream/ws", websocketStreamHandler)      // WebSocket binary stream
-		hybridGroup.GET("/:device_id/stream/info", streamInfoHandler)         // Stream metadata
-	}
+	// Quota / plan endpoints.
+	quotaH := quotaapi.New(quotaMgr)
+	authQuotaGroup := r.Group("/auth")
+	authQuotaGroup.Use(auth.UserAuthMiddleware(store))
+	quotaH.RegisterUserRoutes(authQuotaGroup)
+	adminQuotaGroup := r.Group("/admin")
+	adminQuotaGroup.Use(auth.UserAuthMiddleware(store))
+	adminQuotaGroup.Use(auth.AdminMiddleware(store))
+	quotaH.RegisterAdminRoutes(adminQuotaGroup)
 
-	// Public routes (No Auth)
-	pubGroup := r.Group("/pub")
-	{
-		pubGroup.POST("/:device_id", postPublicDataHandler)
-		pubGroup.GET("/:device_id", getPublicDataHandler)
-		// pubGroup.GET("/:device_id/rec", getPublicDataHistoryHandler) // DEPRECATED: merged into /pub/:device_id
-	}
+	// Analytics ingestion — clients POST events here.
+	analyticsH := analyticsapi.New(store, quotaMgr)
+	analyticsGroup := r.Group("/analytics")
+	analyticsGroup.Use(auth.UserAuthMiddleware(store))
+	analyticsH.RegisterUserRoutes(analyticsGroup)
+	analyticsAdminGroup := r.Group("/admin")
+	analyticsAdminGroup.Use(auth.UserAuthMiddleware(store))
+	analyticsAdminGroup.Use(auth.AdminMiddleware(store))
+	analyticsH.RegisterAdminRoutes(analyticsAdminGroup)
+
+	// Knowledge Packs gateway (/packs/*) — proxies to gleann's /api/packs
+	// surface, adding auth + per-user caching. Pack content lives in app
+	// repos (e.g. ekiyo/packs/crops-tr) and is mounted into gleann via
+	// GLEANN_PACKS_DIR. See docs/PACKS.md.
+	packsGroup := r.Group("")
+	packsGroup.Use(auth.UserAuthMiddleware(store))
+	packsapi.New().RegisterRoutes(packsGroup)
 
 	// Serve firmware updates (protected)
-	// Devices must provide ?token=<API_KEY> query parameter
-	// This replaces public static serving
-	// Serve firmware updates (protected)
-	// Devices must provide ?token=<API_KEY> query parameter
-	// This replaces public static serving
+	// Devices must provide valid device auth
+	firmwareDir, _ := filepath.Abs("./firmware")
 	r.GET("/dev/fw/:filename", auth.DeviceAuthMiddleware(), func(c *gin.Context) {
 		filename := c.Param("filename")
-		// Prevent directory traversal
+		// Only allow alphanumeric, dash, underscore, dot
 		if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filename"})
 			return
 		}
 
-		filePath := "./firmware/" + filename
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		// Use filepath.Join with absolute base and verify the resolved path stays within firmwareDir
+		filePath := filepath.Join(firmwareDir, filepath.Base(filename))
+		resolved, err := filepath.EvalSymlinks(filePath)
+		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Firmware not found"})
 			return
 		}
+		if !strings.HasPrefix(resolved, firmwareDir) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filename"})
+			return
+		}
 
-		c.File(filePath)
+		c.File(resolved)
 	})
 
 	// Public command access (for demo purposes)
@@ -408,32 +671,41 @@ func main() {
 	// Auth routes
 	// setupAuthRoutes(r, store) // Assuming this is a new call, but not explicitly in the original file.
 	// Admin routes
-	adminHandler := handlers.NewAdminHandler(store, mqttBroker, serverStartTime)
-	adminHandler.RegisterRoutes(r)
-
-	// Admin DB Collection Management routes
-	dbAdminHandler := NewDBAdminHandler(store)
-	dbAdminHandler.RegisterRoutes(r)
-
-	// System Info routes (Version, Build Date)
-	sysInfoHandler := NewSystemInfoHandler()
-	sysInfoHandler.RegisterRoutes(r)
-
-	// Legacy setup call removed
-	// setupAdminRoutes(r, store)
+	// Legacy admin handlers removed (migrated to internal/api)
 
 	// API Key routes
 	// setupKeyRoutes(r, store) // Assuming this is a new call, but not explicitly in the original file.
 
-	// Provisioning routes (Mobile App & Device Activation)
-	RegisterProvisioningRoutes(r, auth.UserAuthMiddleware(store))
+	// Provisioning Endpoints (using new internal/api package)
+	api.RegisterProvisioningRoutes(r, apiConfig)
 
-	// Swagger UI documentation
-	setupSwagger(r)
+	// Legacy Admin Routes (will be folded into a generic /admin namespace later).
+	// Registers: /admin/dev/*, /admin/config/*, /admin/logs/*, /admin/firmware
+	adminHandler := adminapi.NewAdminHandler(store, mqttBroker, serverStartTime)
+	adminHandler.RegisterRoutes(r)
+
+	// Object Storage (Buckets) — Phase 3
+	if bucketBackend := newBucketBackend(cfg, publicURL); bucketBackend != nil {
+		bh := bucketsapi.New(bucketBackend, store)
+		bh.Publish = func(topic string, payload []byte) {
+			if mqttBroker != nil {
+				if err := mqttBroker.Publish(topic, payload, false); err != nil {
+					log.Warn().Err(err).Str("topic", topic).Msg("Bucket event publish failed")
+				}
+			}
+		}
+		bh.RegisterRoutes(r)
+		log.Info().Str("backend", bucketBackend.Name()).Msg("Bucket storage initialized")
+	}
+
+	// Swagger UI documentation (auth-gated — JWT or API key required)
+	setupSwagger(r, store)
 
 	log.Info().
 		Str("port", serverPort).
 		Str("public_url", publicURL).
+		Str("version", Version).
+		Str("build_date", BuildDate).
 		Str("endpoints", "/auth, /dev, /dev/data, /pub, /prov").
 		Str("docs", publicURL+"/docs").
 		Msg("🚀 Datum IoT Platform starting")
@@ -457,34 +729,52 @@ func main() {
 	<-quit
 	log.Info().Msg("Shutting down server...")
 
-	// The context is used to inform the server it has 5 seconds to finish
-	// the request it is currently handling
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// Phase 1: Stop accepting new HTTP connections (drain in-flight requests)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatal().Err(err).Msg("Server forced to shutdown")
+		log.Error().Err(err).Msg("HTTP server shutdown error")
+	} else {
+		log.Info().Msg("HTTP server stopped")
 	}
 
-	// Close storage
+	// Phase 2: Stop MQTT broker (disconnect clients gracefully)
+	if mqttBroker != nil {
+		log.Info().Msg("Stopping MQTT broker...")
+		mqttBroker.Stop()
+		log.Info().Msg("MQTT broker stopped")
+	}
+
+	// Phase 3: Flush remaining telemetry data
+	if telemetryProcessor != nil {
+		log.Info().Msg("Flushing telemetry processor...")
+		telemetryProcessor.Close()
+		log.Info().Msg("Telemetry processor flushed")
+	}
+
+	// Phase 3b: Save rules and stop webhook dispatcher
+	if ruleEngine != nil {
+		if data, err := ruleEngine.ExportJSON(); err == nil {
+			os.WriteFile(filepath.Join(dataDirPath, "rules.json"), data, 0600)
+			log.Info().Msg("Rules saved to rules.json")
+		}
+	}
+	if webhookDispatcher != nil {
+		webhookDispatcher.Close()
+	}
+
+	// Phase 4: Close storage (must be last)
 	if err := store.Close(); err != nil {
 		log.Error().Err(err).Msg("Error closing storage")
+	} else {
+		log.Info().Msg("Storage closed")
 	}
 
 	log.Info().Msg("Server exiting")
 }
 
-// Helper to get sub-fs without error return (panics on error, safe for init)
-func mustSubFS(f fs.FS, dir string) fs.FS {
-	sub, err := fs.Sub(f, dir)
-	if err != nil {
-		panic(err)
-	}
-	return sub
-}
-
 // Health check handlers
 func healthHandler(c *gin.Context) {
-	// Basic health check
 	status := gin.H{
 		"status":    "healthy",
 		"timestamp": time.Now().Unix(),
@@ -492,7 +782,6 @@ func healthHandler(c *gin.Context) {
 		"version":   Version,
 	}
 
-	// Check storage connection
 	if store == nil {
 		status["status"] = "unhealthy"
 		status["storage"] = "disconnected"
@@ -500,7 +789,40 @@ func healthHandler(c *gin.Context) {
 		return
 	}
 
+	// Verify storage is actually responsive with a lightweight query
+	if _, err := store.GetSystemConfig(); err != nil {
+		status["status"] = "degraded"
+		status["storage"] = "error"
+		status["storage_error"] = err.Error()
+		c.JSON(http.StatusServiceUnavailable, status)
+		return
+	}
 	status["storage"] = "connected"
+
+	// Check MQTT broker
+	if mqttBroker != nil {
+		status["mqtt"] = "running"
+		status["mqtt_clients"] = mqttBroker.GetStats().Clients
+	} else {
+		status["mqtt"] = "not_started"
+	}
+
+	// Check telemetry processor
+	if telemetryProcessor != nil {
+		usage := telemetryProcessor.BufferUsage()
+		status["telemetry_buffer_usage"] = fmt.Sprintf("%.1f%%", usage*100)
+		dropped := telemetryProcessor.DroppedCount()
+		if dropped > 0 {
+			status["telemetry_dropped"] = dropped
+		}
+		if usage > 0.9 {
+			status["status"] = "degraded"
+		}
+	}
+
+	// Uptime
+	status["uptime_seconds"] = int(time.Since(serverStartTime).Seconds())
+
 	c.JSON(http.StatusOK, status)
 }
 
@@ -520,6 +842,21 @@ func readinessHandler(c *gin.Context) {
 	if store == nil {
 		ready = false
 		issues = append(issues, "storage not initialized")
+	} else if _, err := store.GetSystemConfig(); err != nil {
+		ready = false
+		issues = append(issues, "storage not responding")
+	}
+
+	// Check MQTT
+	if mqttBroker == nil {
+		ready = false
+		issues = append(issues, "mqtt broker not started")
+	}
+
+	// Check telemetry processor
+	if telemetryProcessor == nil {
+		ready = false
+		issues = append(issues, "telemetry processor not started")
 	}
 
 	if ready {
@@ -536,38 +873,43 @@ func readinessHandler(c *gin.Context) {
 
 // Utility functions
 
-func generateID(prefix string) string {
-	bytes := make([]byte, 6)
-	rand.Read(bytes)
-	return prefix + "_" + hex.EncodeToString(bytes)
-}
-
 // startPeriodicCleanup runs background cleanup tasks periodically
 func startPeriodicCleanup() {
 	log := logger.GetLogger()
 	ticker := time.NewTicker(1 * time.Hour) // Run every hour
 	go func() {
 		for range ticker.C {
+			opID := uuid.New().String()[:8]
+			clog := log.With().Str("op", "periodic-cleanup").Str("op_id", opID).Logger()
+
 			// Cleanup expired grace periods (old tokens after grace period)
 			if count, err := store.CleanupExpiredGracePeriods(); err == nil && count > 0 {
-				log.Info().Int("count", count).Msg("Periodic cleanup: expired grace periods")
+				clog.Info().Int("count", count).Msg("Cleaned expired grace periods")
 			}
 
 			// Cleanup expired provisioning requests (Soft Delete)
 			if count, err := store.CleanupExpiredProvisioningRequests(); err == nil && count > 0 {
-				log.Info().Int("count", count).Msg("Periodic cleanup: expired provisioning requests")
+				clog.Info().Int("count", count).Msg("Cleaned expired provisioning requests")
 			}
 
 			// Purge old provisioning requests (Hard Delete > 7 days old)
 			if count, err := store.PurgeProvisioningRequests(7 * 24 * time.Hour); err == nil && count > 0 {
-				log.Info().Int("count", count).Msg("Periodic cleanup: purged old provisioning requests")
+				clog.Info().Int("count", count).Msg("Purged old provisioning requests")
 			}
 
 			// Cleanup Public Data (Soft/Hard check)
 			config, _ := store.GetSystemConfig()
 			if config != nil && config.PublicDataRetention > 0 {
 				if count, err := store.CleanupPublicData(time.Duration(config.PublicDataRetention) * 24 * time.Hour); err == nil && count > 0 {
-					log.Info().Int("count", count).Msg("Periodic cleanup: public data")
+					clog.Info().Int("count", count).Msg("Cleaned public data")
+				}
+			}
+
+			// Purge old data points based on retention policy
+			if config != nil && config.DataRetention > 0 {
+				maxAge := time.Duration(config.DataRetention) * 24 * time.Hour
+				if purged, err := store.PurgeOldDataPoints(maxAge); err == nil && purged > 0 {
+					clog.Info().Int64("count", purged).Msg("Purged old data points")
 				}
 			}
 		}
@@ -601,10 +943,4 @@ func rootHandler(c *gin.Context) {
 		return
 	}
 	c.Data(http.StatusOK, "text/html; charset=utf-8", content)
-}
-
-func getSystemIPHandler(c *gin.Context) {
-	// Returns the client's public IP as seen by the server
-	// Gin's ClientIP() handles X-Forwarded-For and X-Real-IP headers
-	c.String(http.StatusOK, c.ClientIP())
 }

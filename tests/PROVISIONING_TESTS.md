@@ -347,4 +347,4 @@ When adding new provisioning features:
 - [WiFi Provisioning Documentation](../docs/PROVISIONING.md)
 - [API Documentation](../docs/API.md)
 - [Security Audit](../docs/SECURITY_AUDIT.md)
-- [Test Coverage Report](../docs/TEST_COVERAGE.md)
+

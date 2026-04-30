@@ -38,8 +38,6 @@ Technical reference documentation:
 Performance benchmarks and test results:
 
 - **[Performance Report](performance/FINAL_PERFORMANCE_REPORT.md)** - Comprehensive performance analysis
-- **[BuntDB Test Results](performance/BUNTDB_TEST_RESULTS.md)** - Metadata storage benchmarks
-- **[TSStorage Test Results](performance/TSTORAGE_TEST_RESULTS.md)** - Time-series storage benchmarks
 
 ## 📊 Diagrams
 
@@ -50,7 +48,7 @@ Visual documentation and architecture diagrams:
 ## Quick Links
 
 ### Getting Started
-1. [Quick Start Guide](../QUICKSTART.md) - Get up and running in 5 minutes
+1. [Quick Start Guide](tutorials/QUICK_START.md) - Get up and running in 5 minutes
 2. [Registration Guide](guides/REGISTRATION.md) - Setup your first admin user
 3. [CLI Tutorial](tutorials/CLI.md) - Learn the command-line tools
 
@@ -76,7 +74,7 @@ Visual documentation and architecture diagrams:
 
 ### Project Root Documentation
 - [README.md](../README.md) - Project overview
-- [QUICKSTART.md](../QUICKSTART.md) - Fast setup guide
+- [QUICKSTART.md](tutorials/QUICK_START.md) - Fast setup guide
 - [PROJECT.md](../PROJECT.md) - Project structure and architecture
 
 ### Need Help?
@@ -113,9 +111,7 @@ docs/
 │   ├── STORAGE.md                    # Storage architecture
 │   └── TSTORAGE.md                   # Time-series storage
 └── performance/                       # Benchmarks & reports
-    ├── BUNTDB_TEST_RESULTS.md        # BuntDB benchmarks
-    ├── FINAL_PERFORMANCE_REPORT.md   # Overall performance
-    └── TSTORAGE_TEST_RESULTS.md      # TSStorage benchmarks
+    └── FINAL_PERFORMANCE_REPORT.md   # Overall performance
 ```
 
 ---

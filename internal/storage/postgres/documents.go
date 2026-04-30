@@ -12,7 +12,6 @@ import (
 
 // CreateDocument adds a new document to a collection
 func (s *PostgresStore) CreateDocument(userID, collection string, doc map[string]interface{}) (string, error) {
-	// Generate ID if not present
 	var docID string
 	if id, ok := doc["_id"].(string); ok && id != "" {
 		docID = id
@@ -21,8 +20,6 @@ func (s *PostgresStore) CreateDocument(userID, collection string, doc map[string
 	} else {
 		docID = uuid.New().String()
 	}
-
-	// Ensure ID is in document
 	doc["_id"] = docID
 
 	jsonData, err := json.Marshal(doc)
@@ -30,7 +27,9 @@ func (s *PostgresStore) CreateDocument(userID, collection string, doc map[string
 		return "", err
 	}
 
-	_, err = s.db.Exec(`
+	ctx, cancel := queryCtx()
+	defer cancel()
+	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO documents (id, user_id, collection, data, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $5)
 	`, docID, userID, collection, jsonData, time.Now())
@@ -38,13 +37,14 @@ func (s *PostgresStore) CreateDocument(userID, collection string, doc map[string
 	if err != nil {
 		return "", fmt.Errorf("failed to create document: %w", err)
 	}
-
 	return docID, nil
 }
 
 // ListDocuments retrieves all documents in a collection
 func (s *PostgresStore) ListDocuments(userID, collection string) ([]map[string]interface{}, error) {
-	rows, err := s.db.Query(`
+	ctx, cancel := queryCtx()
+	defer cancel()
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT data FROM documents
 		WHERE user_id = $1 AND collection = $2
 		ORDER BY created_at DESC
@@ -60,10 +60,9 @@ func (s *PostgresStore) ListDocuments(userID, collection string) ([]map[string]i
 		if err := rows.Scan(&jsonData); err != nil {
 			return nil, err
 		}
-
 		var doc map[string]interface{}
 		if err := json.Unmarshal(jsonData, &doc); err != nil {
-			continue // Skip malformed
+			continue
 		}
 		docs = append(docs, doc)
 	}
@@ -72,8 +71,10 @@ func (s *PostgresStore) ListDocuments(userID, collection string) ([]map[string]i
 
 // GetDocument retrieves a specific document
 func (s *PostgresStore) GetDocument(userID, collection, docID string) (map[string]interface{}, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	var jsonData []byte
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT data FROM documents
 		WHERE user_id = $1 AND collection = $2 AND id = $3
 	`, userID, collection, docID).Scan(&jsonData)
@@ -94,7 +95,6 @@ func (s *PostgresStore) GetDocument(userID, collection, docID string) (map[strin
 
 // UpdateDocument updates an existing document
 func (s *PostgresStore) UpdateDocument(userID, collection, docID string, doc map[string]interface{}) error {
-	// Ensure ID consistency
 	doc["_id"] = docID
 
 	jsonData, err := json.Marshal(doc)
@@ -102,7 +102,9 @@ func (s *PostgresStore) UpdateDocument(userID, collection, docID string, doc map
 		return err
 	}
 
-	result, err := s.db.Exec(`
+	ctx, cancel := queryCtx()
+	defer cancel()
+	result, err := s.db.ExecContext(ctx, `
 		UPDATE documents
 		SET data = $1, updated_at = $2
 		WHERE user_id = $3 AND collection = $4 AND id = $5
@@ -119,13 +121,14 @@ func (s *PostgresStore) UpdateDocument(userID, collection, docID string, doc map
 	if rows == 0 {
 		return fmt.Errorf("document not found")
 	}
-
 	return nil
 }
 
 // DeleteDocument removes a document
 func (s *PostgresStore) DeleteDocument(userID, collection, docID string) error {
-	result, err := s.db.Exec(`
+	ctx, cancel := queryCtx()
+	defer cancel()
+	result, err := s.db.ExecContext(ctx, `
 		DELETE FROM documents
 		WHERE user_id = $1 AND collection = $2 AND id = $3
 	`, userID, collection, docID)
@@ -141,14 +144,14 @@ func (s *PostgresStore) DeleteDocument(userID, collection, docID string) error {
 	if rows == 0 {
 		return fmt.Errorf("document not found")
 	}
-
 	return nil
 }
 
 // ListAllCollections returns validation counts for all collections by user
 func (s *PostgresStore) ListAllCollections() ([]storage.CollectionInfo, error) {
-	// We need to group by user_id and collection, counting documents
-	rows, err := s.db.Query(`
+	ctx, cancel := queryCtx()
+	defer cancel()
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT user_id, collection, COUNT(*) as count
 		FROM documents
 		GROUP BY user_id, collection

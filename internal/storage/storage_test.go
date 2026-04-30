@@ -350,7 +350,6 @@ func TestConcurrentDeviceCreation(t *testing.T) {
 	defer cleanup()
 
 	numDevices := 1000
-	concurrency := 10
 
 	var wg sync.WaitGroup
 	errors := make(chan error, numDevices)
@@ -377,9 +376,7 @@ func TestConcurrentDeviceCreation(t *testing.T) {
 			}
 		}(i)
 
-		if i%concurrency == 0 {
-			time.Sleep(1 * time.Millisecond)
-		}
+		// time.Sleep removed for max throughput
 	}
 
 	wg.Wait()
@@ -422,7 +419,6 @@ func TestConcurrentDataPointInsertion(t *testing.T) {
 	require.NoError(t, err)
 
 	numInserts := 10000
-	concurrency := 100
 
 	var wg sync.WaitGroup
 	errors := make(chan error, numInserts)
@@ -449,9 +445,7 @@ func TestConcurrentDataPointInsertion(t *testing.T) {
 			}
 		}(i)
 
-		if i%concurrency == 0 {
-			time.Sleep(1 * time.Millisecond)
-		}
+		// time.Sleep removed for max throughput
 	}
 
 	wg.Wait()
@@ -505,7 +499,6 @@ func TestHighVolumeDataQuery(t *testing.T) {
 		}
 		err = storage.StoreData(dataPoint)
 		require.NoError(t, err)
-		time.Sleep(1 * time.Millisecond)
 	}
 
 	// Query data using GetDataHistory
@@ -642,7 +635,6 @@ func BenchmarkDataPointQuery(b *testing.B) {
 			},
 		}
 		storage.StoreData(dataPoint)
-		time.Sleep(1 * time.Millisecond)
 	}
 
 	b.ResetTimer()
@@ -729,7 +721,7 @@ func TestMaximumLoadStress(t *testing.T) {
 
 	// Massive concurrent writes
 	totalInserts := 50000
-	concurrency := 500
+
 	var wg sync.WaitGroup
 	errors := make(chan error, totalInserts)
 
@@ -757,9 +749,7 @@ func TestMaximumLoadStress(t *testing.T) {
 			}
 		}(i)
 
-		if i%concurrency == 0 {
-			time.Sleep(1 * time.Millisecond)
-		}
+		// time.Sleep removed for max throughput
 	}
 
 	wg.Wait()

@@ -1,15 +1,42 @@
 package storage
 
 import (
+	"bytes"
 	"crypto/rand"
+	"datum-go/internal/logger"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nakabonne/tstorage"
 	"github.com/tidwall/buntdb"
 )
+
+// jsonBufPool reduces allocations in hot-path JSON encoding.
+var jsonBufPool = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
+
+// marshalJSON encodes v to JSON using a pooled buffer, returning the result as a string.
+func marshalJSON(v interface{}) (string, error) {
+	buf := jsonBufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer jsonBufPool.Put(buf)
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return "", err
+	}
+	// Encoder adds a trailing newline; trim it for BuntDB key consistency
+	return strings.TrimSuffix(buf.String(), "\n"), nil
+}
 
 // Storage handles both metadata (BuntDB) and time-series data (tstorage)
 type Storage struct {
@@ -21,6 +48,16 @@ type Storage struct {
 var _ Provider = (*Storage)(nil)
 
 func New(metaPath, dataPath string, retention time.Duration) (*Storage, error) {
+	// Ensure parent dirs exist for both metadata and time-series storage.
+	// tstorage requires the data dir + WAL subdir to exist; without this,
+	// closing an empty store fails with "open data/tsdata/wal/1: no such file".
+	if err := os.MkdirAll(filepath.Dir(metaPath), 0o755); err != nil {
+		return nil, fmt.Errorf("create meta dir: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(dataPath, "wal"), 0o755); err != nil {
+		return nil, fmt.Errorf("create tsdata wal dir: %w", err)
+	}
+
 	// Open BuntDB for metadata
 	db, err := buntdb.Open(metaPath)
 	if err != nil {
@@ -38,13 +75,13 @@ func New(metaPath, dataPath string, retention time.Duration) (*Storage, error) {
 		db.Close()
 		return nil, fmt.Errorf("tstorage: %w", err)
 	}
-	fmt.Printf("DEBUG: tstorage initialized at %s\n", dataPath)
+	logger.GetLogger().Debug().Str("path", dataPath).Msg("tstorage initialized")
 
 	return &Storage{db: db, ts: ts}, nil
 }
 
 func (s *Storage) Close() error {
-	fmt.Println("DEBUG: Closing tstorage...")
+	logger.GetLogger().Debug().Msg("Closing tstorage")
 	if err := s.ts.Close(); err != nil {
 		return err
 	}
@@ -59,10 +96,68 @@ type User struct {
 	PasswordHash string    `json:"password_hash"`
 	Role         string    `json:"role"`   // "admin", "user"
 	Status       string    `json:"status"` // "active", "suspended", "pending"
+	DisplayName  string    `json:"display_name,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at,omitempty"`
 	LastLoginAt  time.Time `json:"last_login_at,omitempty"`
-	RefreshToken string    `json:"refresh_token,omitempty"` // Active refresh token
+	RefreshToken string    `json:"refresh_token,omitempty"` // Deprecated: use Sessions
+}
+
+type SystemStats struct {
+	TotalUsers          int64             `json:"total_users"`
+	TotalDevices        int64             `json:"total_devices"`
+	DBSizeBytes         int64             `json:"db_size_bytes"`
+	ServerTime          time.Time         `json:"server_time"`
+	ServerUptimeSeconds float64           `json:"server_uptime_seconds"`
+	EnvVars             map[string]string `json:"env_vars"`
+}
+
+func (s *Storage) GetStats() (*SystemStats, error) {
+	stats := &SystemStats{
+		ServerTime: time.Now(),
+		// Uptime could be calculated if we stored start time. System handler might handle uptime logic?
+		// AdminService expects db_size_bytes. BuntDB doesn't easily give size.
+		// For now, return basic counts.
+	}
+
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		// Count users
+		var userCount int64
+		tx.Ascend("user:email", func(key, value string) bool {
+			userCount++
+			return true
+		})
+		stats.TotalUsers = userCount
+
+		// Count devices
+		var deviceCount int64
+		tx.Ascend("device:uid", func(key, value string) bool {
+			deviceCount++
+			return true
+		})
+		// Actually device:uid index might not cover all devices if UID is optional.
+		// Iterate all devices?
+		// Better: Iterate key defined by CreateDevice pattern.
+		// BuntDB scan is slow if many keys.
+		// Let's assume user count is enough for now or iterate properly.
+		// Correct way: use index.
+		// Device CreateDevice uses: device:%s.
+		// We don't have a global index for devices unless we made one.
+		// CreateDevice makes: user:%s:devices.
+		// We can sum these? No.
+		// CreateDevice makes: apikey:%s.
+		// Iterate apikey index.
+		deviceCount = 0
+		tx.Ascend("apikey", func(key, value string) bool {
+			deviceCount++
+			return true
+		})
+		stats.TotalDevices = deviceCount
+
+		return nil
+	})
+
+	return stats, err
 }
 
 func (s *Storage) CreateUser(user *User) error {
@@ -420,10 +515,15 @@ func (s *Storage) StoreData(point *DataPoint) error {
 	})
 }
 
-// StoreDataBatch stores multiple data points in a single batch operation
+// StoreDataBatch stores multiple data points in a single batch operation.
+// Maximum batch size is capped to prevent memory exhaustion.
 func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 	if len(points) == 0 {
 		return nil
+	}
+	const maxBatchSize = 50000
+	if len(points) > maxBatchSize {
+		return fmt.Errorf("batch size %d exceeds maximum of %d", len(points), maxBatchSize)
 	}
 
 	// 1. Group by device for efficient metadata updates
@@ -458,8 +558,8 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 				}
 			}
 			if changed {
-				mJSON, _ := json.Marshal(currentMetrics)
-				tx.Set(metricsKey, string(mJSON), nil)
+				mStr, _ := marshalJSON(currentMetrics)
+				tx.Set(metricsKey, mStr, nil)
 			}
 
 			// 2. Update Shadow
@@ -477,8 +577,8 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 			shadowData["timestamp"] = point.Timestamp.Unix()
 			shadowData["_last_updated"] = time.Now().Format(time.RFC3339)
 
-			newJSON, _ := json.Marshal(shadowData)
-			if _, _, err = tx.Set(shadowKey, string(newJSON), nil); err != nil {
+			newStr, _ := marshalJSON(shadowData)
+			if _, _, err = tx.Set(shadowKey, newStr, nil); err != nil {
 				return err
 			}
 
@@ -490,8 +590,8 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 					if ip, ok := point.Data["public_ip"].(string); ok && ip != "" {
 						device.PublicIP = ip
 					}
-					dJSON, _ := json.Marshal(device)
-					tx.Set(deviceKey, string(dJSON), nil)
+					dStr, _ := marshalJSON(device)
+					tx.Set(deviceKey, dStr, nil)
 				}
 			}
 		}
@@ -504,7 +604,7 @@ func (s *Storage) StoreDataBatch(points []*DataPoint) error {
 	var rows []tstorage.Row
 	for _, point := range points {
 		ts := point.Timestamp.UnixNano()
-		fmt.Printf("DEBUG: StoreDataBatch - Device: %s, Time: %v, Data: %v\n", point.DeviceID, point.Timestamp, point.Data)
+		logger.GetLogger().Debug().Str("device", point.DeviceID).Time("time", point.Timestamp).Msg("StoreDataBatch")
 		for key, val := range point.Data {
 			var floatVal float64
 			switch v := val.(type) {
@@ -575,7 +675,7 @@ func (s *Storage) GetLatestData(deviceID string) (*DataPoint, error) {
 
 // GetDataHistoryWithRange retrieves historical data with time range filtering
 func (s *Storage) GetDataHistoryWithRange(deviceID string, start, end time.Time, limit int) ([]DataPoint, error) {
-	fmt.Printf("DEBUG: GetDataHistoryWithRange - Device: %s, Start: %v, End: %v\n", deviceID, start, end)
+	logger.GetLogger().Debug().Str("device", deviceID).Time("start", start).Time("end", end).Msg("GetDataHistoryWithRange")
 	// Collect all timestamps and their values
 	tsMap := make(map[int64]map[string]float64)
 
@@ -594,7 +694,7 @@ func (s *Storage) GetDataHistoryWithRange(deviceID string, start, end time.Time,
 		metrics = []string{"temperature", "humidity", "pressure", "battery", "battery_voltage", "value"}
 	}
 
-	fmt.Printf("DEBUG: GetDataHistoryWithRange - Device: %s, Metrics: %v\n", deviceID, metrics)
+	logger.GetLogger().Debug().Str("device", deviceID).Strs("metrics", metrics).Msg("GetDataHistoryWithRange metrics")
 
 	for _, metric := range metrics {
 		metricName := fmt.Sprintf("%s.%s", deviceID, metric)
@@ -647,7 +747,7 @@ func (s *Storage) GetDataHistoryWithRange(deviceID string, start, end time.Time,
 
 // GetDataHistory retrieves historical data points for a device
 func (s *Storage) GetDataHistory(deviceID string, limit int) ([]DataPoint, error) {
-	fmt.Printf("DEBUG: GetDataHistory - Device: %s, Limit: %d\n", deviceID, limit)
+	logger.GetLogger().Debug().Str("device", deviceID).Int("limit", limit).Msg("GetDataHistory")
 	end := time.Now()
 	start := end.Add(-7 * 24 * time.Hour) // Last 7 days
 
@@ -672,7 +772,7 @@ func (s *Storage) GetDataHistory(deviceID string, limit int) ([]DataPoint, error
 		metrics = []string{"temperature", "humidity", "pressure", "battery", "battery_voltage", "value"}
 	}
 
-	fmt.Printf("DEBUG: GetDataHistory - Device: %s, Metrics: %v\n", deviceID, metrics)
+	logger.GetLogger().Debug().Str("device", deviceID).Strs("metrics", metrics).Msg("GetDataHistory metrics")
 
 	for _, metric := range metrics {
 		metricName := fmt.Sprintf("%s.%s", deviceID, metric)
@@ -2094,6 +2194,16 @@ func (s *Storage) CreateDocument(userID, collection string, doc map[string]inter
 		}
 
 		_, _, err = tx.Set(key, string(data), nil)
+		if err == nil {
+			statKey := fmt.Sprintf("stat:collections:%s:%s", userID, collection)
+			val, statErr := tx.Get(statKey)
+			count := 0
+			if statErr == nil {
+				count, _ = strconv.Atoi(val)
+			}
+			count++
+			tx.Set(statKey, strconv.Itoa(count), nil)
+		}
 		return err
 	})
 }
@@ -2172,49 +2282,45 @@ func (s *Storage) DeleteDocument(userID, collection, docID string) error {
 	return s.db.Update(func(tx *buntdb.Tx) error {
 		key := fmt.Sprintf("doc:%s:%s:%s", userID, collection, docID)
 		_, err := tx.Delete(key)
+		if err == nil {
+			statKey := fmt.Sprintf("stat:collections:%s:%s", userID, collection)
+			val, statErr := tx.Get(statKey)
+			if statErr == nil {
+				count, _ := strconv.Atoi(val)
+				if count > 1 {
+					tx.Set(statKey, strconv.Itoa(count-1), nil)
+				} else {
+					tx.Delete(statKey)
+				}
+			}
+		}
 		return err
 	})
 }
 
 // ListAllCollections returns all unique collections across all users
 func (s *Storage) ListAllCollections() ([]CollectionInfo, error) {
-	collectionMap := make(map[string]map[string]int) // userID -> collection -> count
+	var result []CollectionInfo
 
 	err := s.db.View(func(tx *buntdb.Tx) error {
-		// Iterate over all keys with prefix "doc:"
-		tx.AscendKeys("doc:*", func(key, value string) bool {
-			// Key format: doc:{user_id}:{collection}:{doc_id}
+		tx.AscendKeys("stat:collections:*", func(key, value string) bool {
 			parts := strings.SplitN(key, ":", 4)
 			if len(parts) >= 4 {
-				userID := parts[1]
-				collection := parts[2]
-
-				if collectionMap[userID] == nil {
-					collectionMap[userID] = make(map[string]int)
-				}
-				collectionMap[userID][collection]++
+				userID := parts[2]
+				collection := parts[3]
+				count, _ := strconv.Atoi(value)
+				result = append(result, CollectionInfo{
+					UserID:     userID,
+					Collection: collection,
+					DocCount:   count,
+				})
 			}
 			return true
 		})
 		return nil
 	})
 
-	if err != nil {
-		return nil, err
-	}
-
-	var result []CollectionInfo
-	for userID, collections := range collectionMap {
-		for collName, count := range collections {
-			result = append(result, CollectionInfo{
-				UserID:     userID,
-				Collection: collName,
-				DocCount:   count,
-			})
-		}
-	}
-
-	return result, nil
+	return result, err
 }
 
 // CleanupPublicData currently acts as a placeholder or soft-limit enforcer.
@@ -2225,4 +2331,170 @@ func (s *Storage) CleanupPublicData(maxAge time.Duration) (int, error) {
 	// Future optimization: If tstorage adds delete support, implement here.
 	// For now, no physical cleanup beyond global retention.
 	return 0, nil
+}
+
+// UpdateRetentionPolicy updates retention policy
+func (s *Storage) UpdateRetentionPolicy(days int, checkIntervalHours int) error {
+	return s.UpdateDataRetention(days)
+}
+
+// GetSystemLogs returns system logs
+// GetSystemLogs returns system logs
+func (s *Storage) GetSystemLogs(limit int, level string, search string) ([]string, error) {
+	return logger.GetRecentLogs(limit, level, search)
+}
+
+// ClearSystemLogs truncates the on-disk log file (if configured).
+func (s *Storage) ClearSystemLogs() error {
+	return logger.ClearLogFile()
+}
+
+// ============ Session Operations (multi-device refresh tokens) ============
+
+func (s *Storage) CreateSession(session *Session) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		data, err := marshalJSON(session)
+		if err != nil {
+			return err
+		}
+		_, _, err = tx.Set("session:"+session.JTI, data, nil)
+		return err
+	})
+}
+
+func (s *Storage) GetSession(jti string) (*Session, error) {
+	var session Session
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		val, err := tx.Get("session:" + jti)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal([]byte(val), &session)
+	})
+	if err != nil {
+		if err == buntdb.ErrNotFound {
+			return nil, fmt.Errorf("session not found")
+		}
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (s *Storage) DeleteSession(jti string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		_, err := tx.Delete("session:" + jti)
+		if err == buntdb.ErrNotFound {
+			return nil
+		}
+		return err
+	})
+}
+
+func (s *Storage) GetUserSessions(userID string) ([]*Session, error) {
+	var sessions []*Session
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		return tx.AscendRange("", "session:", "session:~", func(key, val string) bool {
+			var ses Session
+			if err := json.Unmarshal([]byte(val), &ses); err == nil {
+				if ses.UserID == userID && ses.ExpiresAt.After(time.Now()) {
+					cp := ses
+					sessions = append(sessions, &cp)
+				}
+			}
+			return true
+		})
+	})
+	return sessions, err
+}
+
+func (s *Storage) DeleteAllUserSessions(userID string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		var keys []string
+		tx.AscendRange("", "session:", "session:~", func(key, val string) bool {
+			var ses Session
+			if err := json.Unmarshal([]byte(val), &ses); err == nil && ses.UserID == userID {
+				keys = append(keys, key)
+			}
+			return true
+		})
+		for _, k := range keys {
+			tx.Delete(k)
+		}
+		return nil
+	})
+}
+
+// ============ Push Token Operations ============
+
+func (s *Storage) SavePushToken(pt *PushToken) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		data, err := marshalJSON(pt)
+		if err != nil {
+			return err
+		}
+		_, _, err = tx.Set("push_token:"+pt.ID, data, nil)
+		return err
+	})
+}
+
+func (s *Storage) GetUserPushTokens(userID string) ([]*PushToken, error) {
+	var tokens []*PushToken
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		return tx.AscendRange("", "push_token:", "push_token:~", func(key, val string) bool {
+			var pt PushToken
+			if err := json.Unmarshal([]byte(val), &pt); err == nil && pt.UserID == userID {
+				cp := pt
+				tokens = append(tokens, &cp)
+			}
+			return true
+		})
+	})
+	return tokens, err
+}
+
+func (s *Storage) DeletePushToken(userID, tokenID string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		val, err := tx.Get("push_token:" + tokenID)
+		if err != nil {
+			if err == buntdb.ErrNotFound {
+				return nil
+			}
+			return err
+		}
+		var pt PushToken
+		if err := json.Unmarshal([]byte(val), &pt); err != nil {
+			return err
+		}
+		if pt.UserID != userID {
+			return fmt.Errorf("unauthorized")
+		}
+		_, err = tx.Delete("push_token:" + tokenID)
+		if err == buntdb.ErrNotFound {
+			return nil
+		}
+		return err
+	})
+}
+
+// ============ Profile ============
+
+func (s *Storage) UpdateUserProfile(userID, displayName string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		val, err := tx.Get("user:" + userID)
+		if err != nil {
+			return err
+		}
+		var user User
+		if err := json.Unmarshal([]byte(val), &user); err != nil {
+			return err
+		}
+		user.DisplayName = displayName
+		user.UpdatedAt = time.Now()
+		data, err := marshalJSON(user)
+		if err != nil {
+			return err
+		}
+		_, _, err = tx.Set("user:"+userID, data, nil)
+		return err
+	})
 }

@@ -1,5 +1,21 @@
 # API Reference
 
+## Common Headers
+
+All API responses include the following headers:
+
+| Header | Description |
+|--------|-------------|
+| `X-Request-ID` | Unique request identifier (UUID v4). Clients can provide their own value; otherwise the server generates one. Useful for log correlation and debugging. |
+
+## Request Limits
+
+| Limit | Default | Env Var | Description |
+|-------|---------|---------|-------------|
+| Max Body Size | 5 MB | `MAX_REQUEST_BODY_BYTES` | Maximum HTTP request body size. Requests exceeding this are rejected with 413. |
+| Query Limit | 10,000 | `QUERY_MAX_LIMIT` | Maximum data points returned per history query. |
+| Batch Size | 50,000 | *(fixed)* | Maximum data points per ingestion batch. Batches exceeding this are rejected with 400. |
+
 ## Authentication
 
 ### Register
@@ -171,8 +187,7 @@ GET /dev/{device_id}/data/history?start=1766439614000&stop=1h&int=1m
 | `start` | Unix timestamp (ms) | `1766439614000` |
 | `stop` | Duration | `1h`, `15m` |
 | `last` | Quick range from now | `24h`, `7d` |
-| `int` | Aggregation interval | `1m`, `1h`, `1d` |
-
+| `int` | Aggregation interval | `1m`, `1h`, `1d` || `limit` | Max results (default: 10000, configurable via `QUERY_MAX_LIMIT`) | `5000` |
 ---
 
 ## Device Commands

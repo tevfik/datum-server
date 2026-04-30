@@ -1,9 +1,17 @@
 services:
   datum-server:
-    image: datum-server:latest
+    image: datum-server:${VERSION:-latest}
     build:
       context: ..
       dockerfile: docker/Dockerfile
+      args:
+        # Sourced from the env (typically exported by the Makefile from
+        # `git describe --tags --always --dirty`). Falls back to a sentinel
+        # so a misconfigured deploy is obvious instead of silently shipping
+        # the Dockerfile default of `1.0.0`.
+        VERSION: ${VERSION:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+        DEFAULT_SERVER_URL: ${PUBLIC_URL:-http://localhost:8000}
     container_name: datum-server
     restart: unless-stopped
     ports:
@@ -14,13 +22,14 @@ services:
     environment:
       - PORT=${PORT:-8000}
       - JWT_SECRET=${JWT_SECRET}
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-embedded}
       - RETENTION_MAX_DAYS=${RETENTION_MAX_DAYS:-7}
       - RETENTION_CHECK_HOURS=${RETENTION_CHECK_HOURS:-1}
       - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-100}
       - RATE_LIMIT_WINDOW_SECONDS=${RATE_LIMIT_WINDOW_SECONDS:-60}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FORMAT=${LOG_FORMAT:-json}
-      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-*}
       - SERVER_URL=https://${DOMAIN:-datum.localhost}
       - RESEND_API_KEY=${RESEND_API_KEY}
       - EMAIL_FROM=${EMAIL_FROM}
@@ -29,6 +38,11 @@ services:
       # format: postgres://user:pass@host:5432/dbname?sslmode=disable
       - DATABASE_URL=${DATABASE_URL}
       - DATA_DIR=./data
+      # OAuth providers (optional — empty values disable the provider)
+      - OAUTH_GOOGLE_CLIENT_ID=${OAUTH_GOOGLE_CLIENT_ID:-}
+      - OAUTH_GOOGLE_CLIENT_SECRET=${OAUTH_GOOGLE_CLIENT_SECRET:-}
+      - OAUTH_GITHUB_CLIENT_ID=${OAUTH_GITHUB_CLIENT_ID:-}
+      - OAUTH_GITHUB_CLIENT_SECRET=${OAUTH_GITHUB_CLIENT_SECRET:-}
     volumes:
       - ${DATA_DIR:-../data}:/root/data
       - ../firmware:/root/firmware

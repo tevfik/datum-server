@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -23,6 +24,9 @@ func AdminMiddleware(store storage.Provider) gin.HandlerFunc {
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
 			return jwtSecret, nil
 		})
 
@@ -71,18 +75,4 @@ func AdminMiddleware(store storage.Provider) gin.HandlerFunc {
 		c.Set("user_role", user.Role)
 		c.Next()
 	}
-}
-
-// GetUserFromToken extracts user info from JWT token and checks status
-func CheckUserStatus(store storage.Provider, userID string) error {
-	user, err := store.GetUserByID(userID)
-	if err != nil {
-		return err
-	}
-
-	if user.Status == "suspended" {
-		return jwt.ErrTokenInvalidClaims
-	}
-
-	return nil
 }

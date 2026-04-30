@@ -36,10 +36,14 @@ services:
 
   # Go API Server (Main backend)
   datum-server:
-    image: datum-server:latest
+    image: datum-server:${VERSION:-latest}
     build:
       context: ..
       dockerfile: docker/Dockerfile
+      args:
+        VERSION: ${VERSION:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+        DEFAULT_SERVER_URL: ${PUBLIC_URL:-http://localhost:8000}
     container_name: datum-server
     volumes:
       - ${DATA_DIR:-./data}:/root/data
@@ -63,6 +67,11 @@ services:
       # Constructs connection string from postgres service variables
       - DATABASE_URL=postgres://${POSTGRES_USER:-datum}:${POSTGRES_PASSWORD:-datum_secret}@postgres:5432/${POSTGRES_DB:-datum}?sslmode=disable
       - DATA_DIR=./data
+      # OAuth providers (optional — empty values disable the provider)
+      - OAUTH_GOOGLE_CLIENT_ID=${OAUTH_GOOGLE_CLIENT_ID:-}
+      - OAUTH_GOOGLE_CLIENT_SECRET=${OAUTH_GOOGLE_CLIENT_SECRET:-}
+      - OAUTH_GITHUB_CLIENT_ID=${OAUTH_GITHUB_CLIENT_ID:-}
+      - OAUTH_GITHUB_CLIENT_SECRET=${OAUTH_GITHUB_CLIENT_SECRET:-}
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:8000/health" ]
       interval: 30s

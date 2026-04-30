@@ -3,7 +3,9 @@ package main
 import (
 	_ "embed"
 	"net/http"
-	"os"
+
+	"datum-go/internal/auth"
+	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -11,60 +13,49 @@ import (
 //go:embed openapi.yaml
 var openAPISpec string
 
-// Swagger UI HTML template
+// Scalar API reference HTML — token is forwarded as `?token=` so the
+// embedded OpenAPI fetch survives the SPA's auth wall.
 const swaggerUIHTML = `<!DOCTYPE html>
 <html>
 <head>
     <title>Datum API Documentation</title>
-    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
-    <style>
-        body { margin: 0; padding: 0; }
-        .swagger-ui .topbar { display: none; }
-    </style>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
 </head>
 <body>
-    <div id="swagger-ui"></div>
-    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
     <script>
-        SwaggerUIBundle({
-            url: '/docs/openapi.yaml',
-            dom_id: '#swagger-ui',
-            presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
-            layout: "BaseLayout",
-            deepLinking: true,
-            showExtensions: true,
-            showCommonExtensions: true
-        });
+      // Propagate ?token=… to the spec fetch so the protected route accepts it.
+      (function () {
+        var qs = window.location.search;
+        var spec = '/docs/openapi.yaml' + (qs || '');
+        var s = document.getElementById('api-reference');
+        if (s) s.setAttribute('data-url', spec);
+      })();
     </script>
+    <script id="api-reference" data-url="/docs/openapi.yaml"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 </body>
 </html>`
 
-// setupSwagger adds API documentation endpoints
-func setupSwagger(r *gin.Engine) {
-	var docs *gin.RouterGroup
+// setupSwagger registers documentation endpoints behind authentication.
+//
+// Both `/docs` and `/docs/openapi.yaml` require a valid JWT or API key. The
+// token may be provided either via `Authorization: Bearer …` header or via
+// `?token=…` query parameter (so a SPA can deep-link from a logged-in
+// session). Anonymous access is no longer permitted.
+func setupSwagger(r *gin.Engine, store storage.Provider) {
+	docs := r.Group("/")
+	docs.Use(auth.UserAuthMiddleware(store))
 
-	// Check if Basic Auth credentials are configured
-	user := os.Getenv("DOCS_USER")
-	pass := os.Getenv("DOCS_PASS")
-
-	if user != "" && pass != "" {
-		docs = r.Group("/", gin.BasicAuth(gin.Accounts{user: pass}))
-	} else {
-		docs = r.Group("/")
-	}
-
-	// Swagger UI
 	docs.GET("/docs", func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(swaggerUIHTML))
 	})
-
-	// OpenAPI spec
 	docs.GET("/docs/openapi.yaml", func(c *gin.Context) {
 		c.Data(http.StatusOK, "application/x-yaml", []byte(openAPISpec))
 	})
 
-	// Redirect /swagger to /docs
-	r.GET("/swagger", func(c *gin.Context) {
+	// Legacy redirect — also auth-gated.
+	r.GET("/swagger", auth.UserAuthMiddleware(store), func(c *gin.Context) {
 		c.Redirect(http.StatusMovedPermanently, "/docs")
 	})
 }

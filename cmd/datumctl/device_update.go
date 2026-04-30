@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
+
+	"datum-go/internal/cli/utils"
 )
 
 var (
@@ -68,7 +71,7 @@ func runUpdateDevice(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(result)
+		return utils.PrintJSON(os.Stdout, result)
 	}
 
 	fmt.Printf("\n✅ Device %s updated successfully\n", deviceID)

@@ -2,11 +2,21 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"runtime"
 
 	"github.com/spf13/cobra"
+
+	"datum-go/internal/cli/styles"
+	"datum-go/internal/cli/utils"
 )
 
-var Version = "1.1.0"
+// Build-time variables (overridden via -ldflags "-X main.Version=…").
+var (
+	Version   = "1.1.0"
+	BuildDate = "unknown"
+	Commit    = "unknown"
+)
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
@@ -16,11 +26,21 @@ var statusCmd = &cobra.Command{
 }
 
 var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Show version information",
+	Use:     "version",
+	Aliases: []string{"v"},
+	Short:   "Show version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("datumctl version %s\n", Version)
-		fmt.Println("Datum IoT Platform CLI")
+		if outputJSON {
+			fmt.Printf(
+				"{\"version\":%q,\"build_date\":%q,\"commit\":%q,\"go\":%q,\"os\":%q,\"arch\":%q}\n",
+				Version, BuildDate, Commit, runtime.Version(), runtime.GOOS, runtime.GOARCH,
+			)
+			return
+		}
+		fmt.Printf("datumctl %s\n", Version)
+		fmt.Printf("  build:  %s\n", BuildDate)
+		fmt.Printf("  commit: %s\n", Commit)
+		fmt.Printf("  go:     %s (%s/%s)\n", runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	},
 }
 
@@ -60,14 +80,14 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return printJSON(health)
+		return utils.PrintJSON(os.Stdout, health)
 	}
 
-	fmt.Printf("\n✅ Server Status\n\n")
-	fmt.Printf("  URL:      %s\n", serverURL)
-	fmt.Printf("  Status:   %s\n", getString(health, "status"))
-	fmt.Printf("  Version:  %s\n", getString(health, "version"))
-	fmt.Printf("  Uptime:   %s\n", getString(health, "uptime"))
+	fmt.Println(styles.Header("✅ Server Status"))
+	fmt.Println(styles.KVPadded("URL", 10, serverURL))
+	fmt.Println(styles.KVPadded("Status", 10, styles.StatusIcon(utils.GetString(health, "status"))+" "+utils.GetString(health, "status")))
+	fmt.Println(styles.KVPadded("Version", 10, utils.GetString(health, "version")))
+	fmt.Println(styles.KVPadded("Uptime", 10, utils.GetString(health, "uptime")))
 	fmt.Println()
 
 	return nil
@@ -76,9 +96,9 @@ func runStatus(cmd *cobra.Command, args []string) error {
 func runConfigShow(cmd *cobra.Command, args []string) {
 	loadConfig()
 
-	fmt.Printf("\n⚙️  Configuration\n\n")
-	fmt.Printf("  Config file: %s\n", getConfigPath())
-	fmt.Printf("  Server:      %s\n", serverURL)
+	fmt.Println(styles.Header("⚙️  Configuration"))
+	fmt.Println(styles.KVPadded("Config file", 13, getConfigPath()))
+	fmt.Println(styles.KVPadded("Server", 13, serverURL))
 
 	if token != "" {
 		fmt.Printf("  Token:       %s...\n", token[:min(20, len(token))])

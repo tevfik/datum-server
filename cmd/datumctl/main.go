@@ -19,6 +19,7 @@ var (
 	configFile string
 	verbose    bool
 	showCurl   bool
+	insecure   bool
 )
 
 var rootCmd = &cobra.Command{
@@ -47,8 +48,10 @@ func init() {
 	// Load config before command execution
 	cobra.OnInitialize(loadConfig)
 
-	// Disable auto-completion command (not needed for interactive mode)
-	rootCmd.CompletionOptions.DisableDefaultCmd = true
+	// Re-enable cobra's built-in shell completion command. Phase 6 polish:
+	// users can now wire up `datumctl completion bash|zsh|fish|powershell`.
+	// Interactive mode remains the default for new users — see `datumctl i`.
+	rootCmd.CompletionOptions.DisableDefaultCmd = false
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&serverURL, "server", DefaultServerURL, "Datum server URL")
@@ -58,6 +61,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Config file (default: $HOME/.datumctl.yaml or /root/data/.datumctl.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&showCurl, "curl", false, "Print equivalent curl command")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
+	rootCmd.PersistentFlags().BoolVarP(&insecure, "insecure", "k", false, "Skip SSL certificate verification")
 }
 
 func main() {

@@ -102,6 +102,50 @@ datumctl data get --device temp-sensor-01 --last 1h
 
 ## Commands
 
+### Interactive Menu (Recommended)
+
+```bash
+datumctl interactive    # alias: i / menu
+```
+
+The menu is **auto-derived from the cobra command tree**: every subcommand
+and flag registered in `cmd/datumctl/*.go` is automatically discoverable
+through the menu, with no duplicated wiring. When you select a leaf
+command the wizard:
+
+1. Prompts for each positional argument parsed from the command's `Use`
+   line (`<required>` and `[optional]` placeholders).
+2. Lets you multi-select which flags to override.
+3. Prompts for each picked flag with the right widget (Confirm for booleans,
+   Password for `*password|secret|token|api-key` flags, comma-separated
+   input for slices, plain Input otherwise).
+4. Echoes the equivalent `datumctl …` command line and asks to confirm
+   before executing.
+
+This means every API endpoint that has a CLI command is reachable from the
+menu — including the new groups documented below.
+
+### Top-level command groups
+
+| Group        | Endpoints covered                                             |
+|--------------|---------------------------------------------------------------|
+| `auth`       | `/auth/{me,sessions,providers,refresh,password,forgot-password,reset-password,user,push-token,push-tokens}` |
+| `sys`        | `/sys/{info,time,ip,status,metrics}`                          |
+| `rules`      | `/admin/rules*` (list / get / create / delete / enable / disable) |
+| `notify`     | `/notify/{topic}` publish + subscribe (json/sse/raw)          |
+| `device`     | `/dev*` device CRUD + key rotation                            |
+| `data`       | `/dev/{id}/data*` push & query                                |
+| `command`    | `/dev/{id}/cmd*` device commands                              |
+| `db`         | `/db/{collection}*` document store                            |
+| `bucket`     | `/storage/{bucket}*` object storage                           |
+| `mqtt`       | `/admin/mqtt/*` broker stats and publish                      |
+| `provision`  | `/dev/prov*` and `/prov/*` AP-based provisioning              |
+| `admin`      | `/admin/*` user / system management                           |
+| `key`        | `/auth/keys*` user API keys                                   |
+| `logs`       | `/admin/logs` server log inspection                           |
+| `setup`      | `/sys/setup` one-time bootstrap                               |
+| `login` / `logout` / `register` | top-level shortcuts for the most common auth verbs |
+
 ### Global Flags
 
 ```bash

@@ -21,6 +21,7 @@ import { MqttTab } from '@/features/settings/components/MqttTab';
 import { SystemTab } from '@/features/settings/components/SystemTab';
 import { HttpTab } from '@/features/settings/components/HttpTab';
 import { CollectionsTab } from '@/features/settings/components/CollectionsTab';
+import { ProfileTab } from '@/features/settings/components/ProfileTab';
 import { SortableHeader } from '@/components/ui/sortable-header';
 
 // Subcomponent for Admin Tab to keep main file clean-ish
@@ -263,7 +264,7 @@ function AdminSettings() {
 
 export default function Settings() {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('api-keys');
+    const [activeTab, setActiveTab] = useState('profile');
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newKeyName, setNewKeyName] = useState('');
     const [createdKeyData, setCreatedKeyData] = useState<{ key: string, name: string } | null>(null);
@@ -312,26 +313,34 @@ export default function Settings() {
         // Could add a toast here
     };
 
+    const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const passwordMutation = useMutation({
-        mutationFn: authService.changePassword,
+        mutationFn: ({ oldPassword, newPassword }: { oldPassword: string; newPassword: string }) =>
+            authService.changePassword(oldPassword, newPassword),
         onSuccess: () => {
-            alert("Password updated successfully");
+            alert('Password updated successfully. Other sessions have been signed out.');
+            setOldPassword('');
             setNewPassword('');
         },
-        onError: () => {
-            alert("Failed to update password");
-        }
+        onError: (err: any) => {
+            const msg = err?.response?.data?.error || 'Failed to update password';
+            alert(msg);
+        },
     });
 
     const handleChangePassword = (e: React.FormEvent) => {
         e.preventDefault();
-        if (newPassword.length < 8) {
-            alert("Password must be at least 8 characters");
+        if (!oldPassword) {
+            alert('Please enter your current password');
             return;
         }
-        if (window.confirm("Are you sure you want to change your password?")) {
-            passwordMutation.mutate(newPassword);
+        if (newPassword.length < 8) {
+            alert('New password must be at least 8 characters');
+            return;
+        }
+        if (window.confirm('Are you sure you want to change your password?')) {
+            passwordMutation.mutate({ oldPassword, newPassword });
         }
     };
 
@@ -346,6 +355,12 @@ export default function Settings() {
                     onClick={() => setActiveTab('general')}
                 >
                     General
+                </button>
+                <button
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'profile' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                    onClick={() => setActiveTab('profile')}
+                >
+                    Profile & Sessions
                 </button>
                 <button
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'api-keys' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
@@ -458,6 +473,10 @@ export default function Settings() {
                 </Card>
             )}
 
+            {activeTab === 'profile' && (
+                <ProfileTab />
+            )}
+
             {activeTab === 'admin' && user?.role === 'admin' && (
                 <AdminSettings />
             )}
@@ -479,32 +498,49 @@ export default function Settings() {
             )}
 
             {activeTab === 'general' && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>General Settings</CardTitle>
-                        <CardDescription>Application preferences and security.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-medium">Change Password</h3>
-                            <form onSubmit={handleChangePassword} className="space-y-4 max-w-sm">
-                                <div className="space-y-2">
-                                    <label htmlFor="new-password">New Password</label>
-                                    <Input
-                                        id="new-password"
-                                        type="password"
-                                        value={newPassword}
-                                        onChange={(e) => setNewPassword(e.target.value)}
-                                        placeholder="Min. 8 characters"
-                                    />
-                                </div>
-                                <Button type="submit" disabled={!newPassword || passwordMutation.isPending}>
-                                    {passwordMutation.isPending ? 'Updating...' : 'Update Password'}
-                                </Button>
-                            </form>
-                        </div>
-                    </CardContent>
-                </Card>
+                <div className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>General Settings</CardTitle>
+                            <CardDescription>Application preferences and security.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-medium">Change Password</h3>
+                                <form onSubmit={handleChangePassword} className="space-y-4 max-w-sm">
+                                    <div className="space-y-2">
+                                        <label htmlFor="old-password">Current Password</label>
+                                        <Input
+                                            id="old-password"
+                                            type="password"
+                                            value={oldPassword}
+                                            onChange={(e) => setOldPassword(e.target.value)}
+                                            placeholder="Your current password"
+                                            autoComplete="current-password"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label htmlFor="new-password">New Password</label>
+                                        <Input
+                                            id="new-password"
+                                            type="password"
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            placeholder="Min. 8 characters"
+                                            autoComplete="new-password"
+                                        />
+                                    </div>
+                                    <Button type="submit" disabled={!oldPassword || !newPassword || passwordMutation.isPending}>
+                                        {passwordMutation.isPending ? 'Updating...' : 'Update Password'}
+                                    </Button>
+                                </form>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <SessionsCard />
+                    <DangerZoneCard />
+                </div>
             )}
 
             {/* Create Key Modal (Custom) */}
@@ -565,5 +601,126 @@ export default function Settings() {
                 </div>
             )}
         </div>
+    );
+}
+
+// ── Active Sessions ──────────────────────────────────────────────────────────
+
+function SessionsCard() {
+    const queryClient = useQueryClient();
+    const { data: sessions = [], isLoading } = useQuery({
+        queryKey: ['auth-sessions'],
+        queryFn: authService.getSessions,
+    });
+
+    const revokeMutation = useMutation({
+        mutationFn: authService.revokeSession,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['auth-sessions'] }),
+        onError: (err: any) =>
+            alert(err?.response?.data?.error || 'Failed to revoke session'),
+    });
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Active Sessions</CardTitle>
+                <CardDescription>
+                    Devices and browsers signed into your account. Revoke any you don't recognize.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading…</p>
+                ) : sessions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No active sessions.</p>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Device</TableHead>
+                                <TableHead>IP</TableHead>
+                                <TableHead>Created</TableHead>
+                                <TableHead>Expires</TableHead>
+                                <TableHead className="text-right">Action</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {sessions.map((s) => (
+                                <TableRow key={s.jti}>
+                                    <TableCell className="max-w-xs truncate" title={s.user_agent}>
+                                        {s.user_agent || '—'}
+                                    </TableCell>
+                                    <TableCell>{s.ip || '—'}</TableCell>
+                                    <TableCell>
+                                        {s.created_at ? format(new Date(s.created_at), 'PP p') : '—'}
+                                    </TableCell>
+                                    <TableCell>
+                                        {s.expires_at ? format(new Date(s.expires_at), 'PP p') : '—'}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => {
+                                                if (window.confirm('Revoke this session?')) {
+                                                    revokeMutation.mutate(s.jti);
+                                                }
+                                            }}
+                                            disabled={revokeMutation.isPending}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+// ── Danger Zone (delete account) ─────────────────────────────────────────────
+
+function DangerZoneCard() {
+    const { logout } = useAuth();
+    const deleteMutation = useMutation({
+        mutationFn: authService.deleteAccount,
+        onSuccess: () => {
+            alert('Your account has been deleted. Goodbye.');
+            logout();
+        },
+        onError: (err: any) =>
+            alert(err?.response?.data?.error || 'Failed to delete account'),
+    });
+
+    const handleDelete = () => {
+        const confirm1 = window.prompt(
+            'This permanently deletes your account, sessions, and personal data.\n\nType DELETE to confirm:',
+        );
+        if (confirm1 !== 'DELETE') return;
+        if (!window.confirm('Last chance — delete account permanently?')) return;
+        deleteMutation.mutate();
+    };
+
+    return (
+        <Card className="border-destructive/50">
+            <CardHeader>
+                <CardTitle className="text-destructive">Danger Zone</CardTitle>
+                <CardDescription>
+                    Permanently delete your account and all associated data. This cannot be undone.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button
+                    variant="destructive"
+                    onClick={handleDelete}
+                    disabled={deleteMutation.isPending}
+                >
+                    {deleteMutation.isPending ? 'Deleting…' : 'Delete My Account'}
+                </Button>
+            </CardContent>
+        </Card>
     );
 }

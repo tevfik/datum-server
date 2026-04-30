@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -10,16 +11,18 @@ import (
 
 // CreateProvisioningRequest creates a new request
 func (s *PostgresStore) CreateProvisioningRequest(req *storage.ProvisioningRequest) error {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	// Check if UID is already registered
 	var exists bool
-	s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM devices WHERE device_uid = $1)", req.DeviceUID).Scan(&exists)
+	s.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM devices WHERE device_uid = $1)", req.DeviceUID).Scan(&exists)
 	if exists {
 		return fmt.Errorf("device with UID '%s' is already registered", req.DeviceUID)
 	}
 
 	// Check if pending request exists
 	var pendingID string
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT id FROM provisioning_requests 
 		WHERE device_uid = $1 AND status = 'pending' AND expires_at > $2
 	`, req.DeviceUID, time.Now()).Scan(&pendingID)
@@ -35,7 +38,7 @@ func (s *PostgresStore) CreateProvisioningRequest(req *storage.ProvisioningReque
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 		)
 	`
-	_, err = s.db.Exec(query,
+	_, err = s.db.ExecContext(ctx, query,
 		req.ID, req.DeviceUID, req.UserID, req.DeviceName, req.DeviceType, req.Status,
 		req.ServerURL, req.WiFiSSID, req.WiFiPass, req.ExpiresAt, req.CreatedAt,
 	)
@@ -47,20 +50,26 @@ func (s *PostgresStore) CreateProvisioningRequest(req *storage.ProvisioningReque
 
 // GetProvisioningRequestByUID retrieves request by UID
 func (s *PostgresStore) GetProvisioningRequestByUID(deviceUID string) (*storage.ProvisioningRequest, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `SELECT * FROM provisioning_requests WHERE device_uid = $1`
-	return scanProvisioningRequest(s.db.QueryRow(query, deviceUID))
+	return scanProvisioningRequest(s.db.QueryRowContext(ctx, query, deviceUID))
 }
 
 // GetProvisioningRequest retrieve by ID
 func (s *PostgresStore) GetProvisioningRequest(reqID string) (*storage.ProvisioningRequest, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `SELECT * FROM provisioning_requests WHERE id = $1`
-	return scanProvisioningRequest(s.db.QueryRow(query, reqID))
+	return scanProvisioningRequest(s.db.QueryRowContext(ctx, query, reqID))
 }
 
 // GetUserProvisioningRequests lists for user
 func (s *PostgresStore) GetUserProvisioningRequests(userID string) ([]storage.ProvisioningRequest, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	query := `SELECT * FROM provisioning_requests WHERE user_id = $1`
-	return scanProvisioningRequests(s.db, query, userID)
+	return scanProvisioningRequestsCtx(ctx, s.db, query, userID)
 }
 
 // CompleteProvisioningRequest marks complete and creates device
@@ -164,13 +173,16 @@ func (s *PostgresStore) CompleteProvisioningRequest(reqID string) (*storage.Devi
 }
 
 func (s *PostgresStore) CancelProvisioningRequest(reqID string) error {
-	_, err := s.db.Exec("UPDATE provisioning_requests SET status = 'cancelled' WHERE id = $1", reqID)
+	ctx, cancel := queryCtx()
+	defer cancel()
+	_, err := s.db.ExecContext(ctx, "UPDATE provisioning_requests SET status = 'cancelled' WHERE id = $1", reqID)
 	return err
 }
 
 func (s *PostgresStore) CleanupExpiredProvisioningRequests() (int, error) {
-	// SOFT DELETE: Update status to 'expired'
-	res, err := s.db.Exec("UPDATE provisioning_requests SET status = 'expired' WHERE status = 'pending' AND expires_at < $1", time.Now())
+	ctx, cancel := queryCtx()
+	defer cancel()
+	res, err := s.db.ExecContext(ctx, "UPDATE provisioning_requests SET status = 'expired' WHERE status = 'pending' AND expires_at < $1", time.Now())
 	if err != nil {
 		return 0, err
 	}
@@ -179,10 +191,10 @@ func (s *PostgresStore) CleanupExpiredProvisioningRequests() (int, error) {
 }
 
 func (s *PostgresStore) PurgeProvisioningRequests(maxAge time.Duration) (int, error) {
-	// HARD DELETE: Remove old requests to prevent table bloat
-	// Delete requests that are 'expired' or 'cancelled' and older than maxAge
+	ctx, cancel := queryCtx()
+	defer cancel()
 	cutoff := time.Now().Add(-maxAge)
-	res, err := s.db.Exec("DELETE FROM provisioning_requests WHERE (status = 'expired' OR status = 'cancelled' OR status = 'completed') AND created_at < $1", cutoff)
+	res, err := s.db.ExecContext(ctx, "DELETE FROM provisioning_requests WHERE (status = 'expired' OR status = 'cancelled' OR status = 'completed') AND created_at < $1", cutoff)
 	if err != nil {
 		return 0, err
 	}
@@ -193,8 +205,10 @@ func (s *PostgresStore) PurgeProvisioningRequests(maxAge time.Duration) (int, er
 // --- Device UID helpers (Interface compliance) ---
 
 func (s *PostgresStore) IsDeviceUIDRegistered(deviceUID string) (bool, string, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
 	var deviceID string
-	err := s.db.QueryRow("SELECT id FROM devices WHERE device_uid = $1", deviceUID).Scan(&deviceID)
+	err := s.db.QueryRowContext(ctx, "SELECT id FROM devices WHERE device_uid = $1", deviceUID).Scan(&deviceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, "", nil
@@ -248,6 +262,24 @@ func scanProvisioningRequest(scanner Scannable) (*storage.ProvisioningRequest, e
 
 func scanProvisioningRequests(db *sql.DB, query string, args ...interface{}) ([]storage.ProvisioningRequest, error) {
 	rows, dbErr := db.Query(query, args...)
+	if dbErr != nil {
+		return nil, dbErr
+	}
+	defer rows.Close()
+
+	var reqs []storage.ProvisioningRequest
+	for rows.Next() {
+		r, err := scanProvisioningRequest(rows)
+		if err != nil {
+			return nil, err
+		}
+		reqs = append(reqs, *r)
+	}
+	return reqs, nil
+}
+
+func scanProvisioningRequestsCtx(ctx context.Context, db *sql.DB, query string, args ...interface{}) ([]storage.ProvisioningRequest, error) {
+	rows, dbErr := db.QueryContext(ctx, query, args...)
 	if dbErr != nil {
 		return nil, dbErr
 	}

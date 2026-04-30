@@ -38,6 +38,493 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/notify/{topic}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish a notification message (ntfy-protocol compatible)
+         * @description Publishes a message to the embedded ntfy-protocol broker.
+         *     Compatible with existing ntfy mobile/desktop clients.
+         *     Optional headers: `Title`, `Priority` (min|low|default|high|max), `Tags` (comma-separated).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    Title?: string;
+                    Priority?: "min" | "low" | "default" | "high" | "max";
+                    Tags?: string;
+                };
+                path: {
+                    topic: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "text/plain": string;
+                };
+            };
+            responses: {
+                /** @description Message published */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id?: string;
+                            time?: number;
+                            /** @example message */
+                            event?: string;
+                            topic?: string;
+                            title?: string;
+                            message?: string;
+                            priority?: number;
+                            tags?: string[];
+                        };
+                    };
+                };
+                /** @description Message too large (>4 KiB) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notify/{topic}/json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Subscribe to a topic (newline-delimited JSON stream) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    topic: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Long-lived NDJSON stream */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/x-ndjson": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notify/{topic}/sse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Subscribe to a topic (Server-Sent Events) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    topic: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description SSE stream */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notify/{topic}/raw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Subscribe to a topic (newline-delimited message bodies) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    topic: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Plain-text stream */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List buckets */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Bucket list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            buckets?: string[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storage/{bucket}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket: string;
+            };
+            cookie?: never;
+        };
+        /** List objects in a bucket */
+        get: {
+            parameters: {
+                query?: {
+                    prefix?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    bucket: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Object list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            count?: number;
+                            objects?: components["schemas"]["StorageObject"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create (or ensure) a bucket */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    bucket: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Bucket exists */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                400: components["responses"]["BadRequest"];
+            };
+        };
+        /** Delete an empty bucket */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    bucket: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                400: components["responses"]["BadRequest"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storage/{bucket}/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bucket: string;
+                /** @description Slash-delimited object key */
+                path: string;
+            };
+            cookie?: never;
+        };
+        /** Download an object (auth or presigned URL) */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Presigned signature (when present, replaces auth) */
+                    sig?: string;
+                    /** @description Expiry timestamp (unix seconds) */
+                    expires?: number;
+                };
+                header?: never;
+                path: {
+                    bucket: string;
+                    /** @description Slash-delimited object key */
+                    path: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Object bytes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/octet-stream": string;
+                    };
+                };
+                404: components["responses"]["NotFound"];
+            };
+        };
+        /** Upload an object */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    bucket: string;
+                    /** @description Slash-delimited object key */
+                    path: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StorageObject"];
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+            };
+        };
+        post?: never;
+        /** Delete an object */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    bucket: string;
+                    /** @description Slash-delimited object key */
+                    path: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        /** Stat an object */
+        head: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    bucket: string;
+                    /** @description Slash-delimited object key */
+                    path: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Headers only */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                404: components["responses"]["NotFound"];
+            };
+        };
+        patch?: never;
+        trace?: never;
+    };
+    "/storage/{bucket}/presign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a presigned URL */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    bucket: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        path: string;
+                        /**
+                         * @default GET
+                         * @enum {string}
+                         */
+                        method?: "GET" | "PUT" | "DELETE";
+                        /** @default 900 */
+                        expires_secs?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description URL response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uri */
+                            url?: string;
+                            expires_secs?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sys/time": {
         parameters: {
             query?: never;
@@ -103,8 +590,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get system IP
-         * @description Returns the public IP address of the client as seen by the server.
+         * Get client public IP
+         * @description Returns the public IP address of the calling client. The server prefers
+         *     proxy headers (`CF-Connecting-IP`, `True-Client-IP`, `X-Real-IP`,
+         *     `X-Forwarded-For` left-most entry) over the immediate transport
+         *     address, so callers behind a reverse proxy still see their real IP.
+         *
+         *     - `Accept: application/json` → `{ "ip": "1.2.3.4" }`
+         *     - default → `text/plain` body containing only the IP
          */
         get: {
             parameters: {
@@ -115,13 +608,17 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Client IP address */
+                /** @description Client public IP */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "text/plain": string;
+                        "application/json": {
+                            /** @example 203.0.113.42 */
+                            ip?: string;
+                        };
                     };
                 };
             };
@@ -217,47 +714,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Health check */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Healthy */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unhealthy */
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -292,14 +748,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/live": {
+    "/auth/refresh": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Liveness check */
+        get?: never;
+        put?: never;
+        /**
+         * Rotate refresh token
+         * @description Exchange a valid refresh token for a new access + refresh token pair. The old refresh token is invalidated (rotation). Reuse of a revoked token triggers revocation of all sessions for security.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        refresh_token: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description New token pair */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuthResponse"];
+                    };
+                };
+                /** @description Invalid or expired refresh token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Logout current session
+         * @description Revokes the current session identified by the Bearer token. Other sessions (other devices) remain active.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Session revoked */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active sessions
+         * @description Returns all active login sessions for the authenticated user.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -309,7 +857,119 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Alive */
+                /** @description Active sessions */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            sessions?: components["schemas"]["Session"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get profile
+         * @description Returns the authenticated user's profile including ntfy topic for push notifications.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User profile */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserProfile"];
+                    };
+                };
+            };
+        };
+        /**
+         * Update profile
+         * @description Update display name for the authenticated user.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        display_name?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Profile updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserProfile"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/push-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List push tokens for the current user
+         * @description Returns the push tokens registered by the authenticated user.
+         *     Note: this endpoint uses the plural form (`push-tokens`) while
+         *     register/delete use the singular `push-token` for backwards
+         *     compatibility.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of registered tokens */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -326,14 +986,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/ready": {
+    "/auth/push-token": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Readiness check */
+        get?: never;
+        put?: never;
+        /**
+         * Register push token
+         * @description Register a device push token (FCM, APNs, ntfy, or web push) for the authenticated user. Duplicate tokens are silently replaced.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        platform: "fcm" | "apns" | "ntfy";
+                        token: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Token registered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/push-token/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unregister push token */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Token removed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List configured OAuth providers
+         * @description Returns the list of OAuth providers enabled on the server (those with
+         *     `OAUTH_<PROVIDER>_CLIENT_ID` set in the server environment).
+         *     Empty list means OAuth is disabled.
+         *
+         *     Also accessible as `GET /auth/oauth/providers` (alias).
+         */
         get: {
             parameters: {
                 query?: never;
@@ -343,15 +1091,113 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Ready */
+                /** @description Provider list */
                 200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            providers?: string[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oauth/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Initiate OAuth login
+         * @description Redirects to the OAuth provider (google or github) for authentication.
+         *
+         *     **Web flow**: Simply redirect the browser here. After auth the callback returns JSON.
+         *
+         *     **Mobile/PKCE flow**: Pass `code_challenge` (SHA-256 of your random verifier, base64url-encoded) and `redirect_uri` (your app's deep-link URI). After auth the callback redirects to your app with `access_token` and `refresh_token` as query parameters.
+         *
+         *     > Special case: `provider=providers` returns the same payload as `GET /auth/providers`.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Mobile app deep-link URI (PKCE flow only) */
+                    redirect_uri?: string;
+                    /** @description PKCE code challenge — SHA-256(code_verifier), base64url-encoded (mobile flow only) */
+                    code_challenge?: string;
+                };
+                header?: never;
+                path: {
+                    provider: "google" | "github";
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Redirect to OAuth provider */
+                302: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Not ready */
-                503: {
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oauth/{provider}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * OAuth callback
+         * @description Handles the provider's redirect. Web clients receive a JSON AuthResponse. Mobile clients are redirected to their `redirect_uri` with tokens as query parameters.
+         */
+        get: {
+            parameters: {
+                query: {
+                    code: string;
+                    state: string;
+                };
+                header?: never;
+                path: {
+                    provider: "google" | "github";
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Authentication successful (web flow) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuthResponse"];
+                    };
+                };
+                /** @description Redirect with tokens (mobile/PKCE flow) */
+                302: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1060,10 +1906,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get device details
-         * @description Returns device details, including Thing Description.
-         */
+        /** Get device details */
         get: {
             parameters: {
                 query?: never;
@@ -1101,7 +1944,7 @@ export interface paths {
             requestBody?: never;
             responses: {
                 /** @description Device deleted */
-                204: {
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1112,6 +1955,100 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/dev/{device_id}/thing-description": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Thing Description (WoT) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    device_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            responses: {
+                /** @description Thing Description updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dev/{device_id}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update device configuration (Remote Config)
+         * @description Sets the desired configuration for the device. The server will sync this to the device via MQTT.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    device_id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Configuration object (free JSON) */
+            requestBody: {
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            responses: {
+                /** @description Configuration updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example updated */
+                            status?: string;
+                            config?: Record<string, never>;
+                        };
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/dev/{device_id}/cmd": {
@@ -1459,6 +2396,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/data/{device_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Device Data (User Auth) */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    start?: string;
+                    stop?: string;
+                };
+                header?: never;
+                path: {
+                    device_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Telemetry data */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data?: components["schemas"]["DataPayload"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Ingest Telemetry Data */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    device_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DataPayload"];
+                };
+            };
+            responses: {
+                /** @description Data accepted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            status?: string;
+                            commands_pending?: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dev/{device_id}/data": {
         parameters: {
             query?: never;
@@ -1487,7 +2497,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    /** @description Maximum number of data points to return (triggers history mode) */
+                    /** @description Maximum number of data points to return (triggers history mode). Server-side maximum is configurable via QUERY_MAX_LIMIT env var (default 10000). */
                     limit?: number;
                     /** @description Duration backwards from now (e.g., 1h, 24h, 7d, 30d) */
                     range?: string;
@@ -1590,7 +2600,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    /** @description Maximum number of data points to return (triggers history mode) */
+                    /** @description Maximum number of data points to return (triggers history mode). Server-side maximum is configurable via QUERY_MAX_LIMIT env var (default 10000). */
                     limit?: number;
                 };
                 header?: never;
@@ -2346,7 +3356,28 @@ export interface paths {
                 };
             };
         };
-        delete?: never;
+        /** Drop database collection */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    user_id: string;
+                    collection: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Collection dropped */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -2556,7 +3587,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/config/retention": {
+    "/admin/sys/retention": {
         parameters: {
             query?: never;
             header?: never;
@@ -2594,7 +3625,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/config/rate-limit": {
+    "/admin/sys/rate-limit": {
         parameters: {
             query?: never;
             header?: never;
@@ -2632,7 +3663,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/config/alerts": {
+    "/admin/sys/alerts": {
         parameters: {
             query?: never;
             header?: never;
@@ -2670,7 +3701,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/config/registration": {
+    "/admin/sys/registration": {
         parameters: {
             query?: never;
             header?: never;
@@ -2693,6 +3724,170 @@ export interface paths {
             };
             responses: {
                 /** @description Registration updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/config/retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * [DEPRECATED] Use PUT /admin/sys/retention
+         * @deprecated
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateRetentionRequest"];
+                };
+            };
+            responses: {
+                /** @description Retention updated (deprecated path) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/config/rate-limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * [DEPRECATED] Use PUT /admin/sys/rate-limit
+         * @deprecated
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateRateLimitRequest"];
+                };
+            };
+            responses: {
+                /** @description Rate limit updated (deprecated path) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/config/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * [DEPRECATED] Use PUT /admin/sys/alerts
+         * @deprecated
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateAlertConfigRequest"];
+                };
+            };
+            responses: {
+                /** @description Alerts updated (deprecated path) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/config/registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * [DEPRECATED] Use PUT /admin/sys/registration
+         * @deprecated
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateRegistrationRequest"];
+                };
+            };
+            responses: {
+                /** @description Registration updated (deprecated path) */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3047,12 +4242,401 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health check
+         * @description Returns service health status including storage, MQTT, and telemetry processor state.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Service is healthy */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            status?: "healthy" | "degraded" | "unhealthy";
+                            storage?: string;
+                            mqtt?: string;
+                            mqtt_clients?: number;
+                            telemetry_buffer_usage?: string;
+                            uptime_seconds?: number;
+                            version?: string;
+                        };
+                    };
+                };
+                /** @description Service is unhealthy or degraded */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness check
+         * @description Returns whether the service is ready to handle requests.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Service is ready */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Service is not ready */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Liveness check */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Service is alive */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all rules */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of rules */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            rules?: components["schemas"]["Rule"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a new rule */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["Rule"];
+                };
+            };
+            responses: {
+                /** @description Rule created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Rule"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get rule by ID */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    rule_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rule details */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rule not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete a rule */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    rule_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rule deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/rules/{rule_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Enable a rule */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    rule_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rule enabled */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/rules/{rule_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Disable a rule */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    rule_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rule disabled */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sys/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get application metrics
+         * @description Returns metrics in JSON or Prometheus text format.
+         *     Use `?format=prometheus` for Prometheus scraping.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    format?: "json" | "prometheus";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Metrics response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         Error: {
-            error?: string;
+            /** @description Human-readable error message. Stable identifier strings will be added in a future revision. */
+            error: string;
+            /** @description Optional machine-readable error code (reserved for future use). */
+            code?: string;
+            /** @description Correlates with the `X-Request-ID` response header. */
+            request_id?: string;
+        };
+        StorageObject: {
+            bucket?: string;
+            path?: string;
+            /** Format: int64 */
+            size?: number;
+            content_type?: string;
+            etag?: string;
+            /** Format: date-time */
+            last_modified?: string;
+            owner_id?: string;
+            metadata?: {
+                [key: string]: string;
+            };
         };
         RegisterRequest: {
             /** Format: email */
@@ -3082,8 +4666,46 @@ export interface components {
             new_password: string;
         };
         AuthResponse: {
+            /** @description JWT access token (valid ~15 minutes) */
             token?: string;
+            /** @description Refresh token (valid 30 days); use POST /auth/refresh to rotate */
+            refresh_token?: string;
             user_id?: string;
+            email?: string;
+            /** @enum {string} */
+            role?: "user" | "admin";
+            /** Format: date-time */
+            expires_at?: string;
+        };
+        UserProfile: {
+            user_id?: string;
+            email?: string;
+            /** @enum {string} */
+            role?: "user" | "admin";
+            display_name?: string;
+            status?: string;
+            /** @description ntfy.sh topic to subscribe to for push notifications (only present when NTFY_URL is configured) */
+            ntfy_topic?: string;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        Session: {
+            /** @description JWT ID — unique session identifier */
+            jti?: string;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            expires_at?: string;
+            user_agent?: string;
+            ip?: string;
+        };
+        PushToken: {
+            id?: string;
+            /** @enum {string} */
+            platform?: "ios" | "android" | "web" | "ntfy";
+            token?: string;
+            /** Format: date-time */
+            created_at?: string;
         };
         DeviceCreateRequest: {
             name: string;
@@ -3102,6 +4724,14 @@ export interface components {
             created_at?: string;
             /** @description Web of Things (WoT) Thing Description */
             thing_description?: {
+                [key: string]: unknown;
+            };
+            /** @description Last reported state (Read Only) */
+            shadow_state?: {
+                [key: string]: unknown;
+            };
+            /** @description Desired configuration (Remote Config) */
+            desired_state?: {
                 [key: string]: unknown;
             };
         };
@@ -3127,6 +4757,12 @@ export interface components {
             device_uid: string;
             device_name: string;
             device_type?: string;
+            /**
+             * @description Authentication security mode
+             * @default static
+             * @enum {string}
+             */
+            auth_mode: "static" | "rotating";
             wifi_ssid?: string;
             wifi_pass?: string;
         };
@@ -3134,12 +4770,14 @@ export interface components {
             request_id?: string;
             device_uid?: string;
             device_id?: string;
+            /** @description Returned only for static auth mode */
+            api_key?: string;
+            /** @description Returned only for rotating auth mode */
+            master_secret?: string;
             status?: string;
             activate_url?: string;
             /** Format: date-time */
             expires_at?: string;
-            /** @description Temporary provisioning key */
-            api_key?: string;
         };
         DeviceActivateRequest: {
             device_uid: string;
@@ -3205,11 +4843,154 @@ export interface components {
             has_pending?: boolean;
             request_id?: string;
         };
+        Rule: {
+            /** @description Unique rule identifier */
+            id?: string;
+            /** @description Human-readable rule name */
+            name: string;
+            description?: string;
+            /** @description Target device (empty for all devices) */
+            device_id?: string;
+            conditions: {
+                field?: string;
+                /** @enum {string} */
+                operator?: "gt" | "gte" | "lt" | "lte" | "eq" | "neq" | "contains";
+                value?: unknown;
+            }[];
+            actions: {
+                /** @enum {string} */
+                type?: "webhook" | "log" | "mqtt";
+                config?: Record<string, never>;
+            }[];
+            enabled?: boolean;
+            fire_count?: number;
+        };
     };
-    responses: never;
-    parameters: never;
+    responses: {
+        /** @description Bad Request — malformed JSON, missing required fields, or failed validation. */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": "invalid request body"
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Unauthorized — missing, invalid or expired authentication credentials. */
+        Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": "unauthorized"
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Forbidden — authenticated but lacking permission for this resource. */
+        Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": "forbidden"
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Not Found — resource does not exist or is not accessible to the caller. */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": "not found"
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Conflict — resource already exists or current state prevents the operation. */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": "already exists"
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Unprocessable Entity — semantically invalid input. */
+        UnprocessableEntity: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": "validation failed"
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Too Many Requests — rate limit exceeded. Retry after the period in the `Retry-After` header. */
+        TooManyRequests: {
+            headers: {
+                /** @description Seconds until the client may retry. */
+                "Retry-After"?: number;
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": "rate limit exceeded"
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Internal Server Error — unexpected server failure. Includes a request ID for log correlation. */
+        InternalError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": "internal server error"
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+    };
+    parameters: {
+        /** @description Maximum number of data points to return. Server-side maximum is configurable via `QUERY_MAX_LIMIT` (default 10000). */
+        QueryLimit: number;
+    };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description Unique request identifier (UUID v4). The server generates one if the client does not provide it. Useful for log correlation and debugging. */
+        "X-Request-ID": string;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
