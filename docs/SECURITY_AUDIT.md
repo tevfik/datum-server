@@ -354,479 +354,61 @@ datumctl device token-info <device_id>
 - Architecture: [docs/diagrams/API_KEY_SECURITY.md](./diagrams/API_KEY_SECURITY.md)
 - Includes flow diagrams, usage examples, and firmware code
 
----
-
-### Industry Standard Approaches
-
-#### 🏆 **1. AWS IoT Core Model** (Most Secure)
-```
-Device Identity: X.509 Client Certificates (long-lived, 10-15 years)
-Access Control: Certificate-based mutual TLS
-Rotation: Automated certificate rotation with overlap period
-Revocation: Certificate Revocation List (CRL) + OCSP
-```
-**Pros**: Military-grade security, mutual authentication  
-**Cons**: Complex setup, requires TLS infrastructure, certificate management overhead
-
----
-
-#### 🏆 **2. Azure IoT Hub Model** (Industry Standard for IoT)
-```
-Device Credentials: Shared Access Signatures (SAS) Tokens
-Token Lifetime: Configurable (typically 7 days to 1 year)
-Renewal: Device requests new token before expiry
-Revocation: Token blacklist + device disable
-```
-
-**Implementation Pattern**:
-```go
-type Device struct {
-    DeviceID    string
-    MasterKey   string    // Long-lived, stored securely on device
-    SASToken    string    // Short-lived, auto-renewed
-    TokenExpiry time.Time // 7-90 days typical
-}
-
-// Device authentication flow
-1. Device uses SAS token for API calls
-2. Server checks token expiry
-3. If near expiry, device generates new token from MasterKey
-4. Old token valid during grace period
-```
-
-**Pros**: Balance of security and practicality, standard in IoT industry  
-**Cons**: Requires token refresh logic in device firmware
-
----
-
-#### 🏆 **3. Google Cloud IoT Model** (JWT-based)
-```
-Device Identity: JWT signed with device private key
-Access Token: Short-lived (1 hour typical)
-Renewal: Device signs new JWT periodically
-Revocation: Disable device in registry
-```
-
----
-
-#### 🏆 **4. Simple Rotating API Keys** (Common for SMB/Prototyping)
-```
-API Key: Long-lived but rotatable (30-365 days)
-Rotation: Manual or automatic with grace period
-Revocation: Key blacklist
-```
-
-**Implementation Pattern**:
-```go
-type Device struct {
-    APIKey         string
-    PreviousAPIKey string    // Grace period
-    KeyExpiresAt   time.Time // Warning threshold
-    KeyRotatedAt   time.Time
-}
-
-// Grace period: both keys valid for 7 days
-if apiKey == device.APIKey || 
-   (apiKey == device.PreviousAPIKey && withinGracePeriod) {
-    // Authenticated
-}
-```
-
-**Pros**: Simple, works with constrained devices  
-**Cons**: Less secure than token-based approaches
-
----
-
-### **Recommended Implementation for Datum**
-
-Based on system architecture (embedded devices, command channel available):
-
-#### **Phase 1: API Key Rotation with Grace Period** (2-3 hours)
-```go
-type Device struct {
-    APIKey         string    `json:"api_key"`
-    PreviousAPIKey string    `json:"previous_api_key"`
-    KeyRotatedAt   time.Time `json:"key_rotated_at"`
-    KeyExpiresAt   time.Time `json:"key_expires_at"` // Warning, not hard limit
-}
-
-// Admin endpoint
-POST /admin/dev/:device_id/rotate-key
-{
-  "grace_period_days": 7,  // Both keys valid for 7 days
-  "notify_device": true    // Send new key via command channel
-}
-
-Response:
-{
-  "new_key": "dk_def456...",
-  "old_key_expires": "2026-01-07T00:00:00Z",
-  "command_sent": true
-}
-```
-
-**Rotation Flow**:
-1. Admin triggers rotation via API
-2. Server generates new key, keeps old key valid
-3. Server sends new key to device via command channel
-4. Device updates key in firmware
-5. Device ACKs command
-6. After grace period, old key auto-expires
-
----
-
-#### **Phase 2: Automatic Key Expiry Warnings** (1-2 hours)
-```go
-// Add monitoring job
-func checkKeyExpiryWarnings() {
-    devices := getDevicesWithKeysExpiringIn(30) // 30 days
-    
-    for _, device := range devices {
-        // Send warning via command channel
-        sendCommand(device.ID, "key_expiry_warning", {
-            "days_remaining": daysUntil(device.KeyExpiresAt),
-            "action_required": "Request key rotation from admin"
-        })
-        
-        // Notify device owner via email
-        notifyOwner(device.UserID, "Device key expiring soon")
-    }
-}
-```
-
----
-
-#### **Phase 3: (Optional) SAS Token Model** (4-6 hours)
-Similar to Azure IoT Hub:
-```go
-type Device struct {
-    DeviceID     string
-    MasterSecret string    // Stored on device, never transmitted
-    AccessToken  string    // Short-lived (7-30 days)
-    TokenExpiry  time.Time
-}
-
-// Device generates token from master secret
-token := generateSAS(deviceID, masterSecret, expiryTime)
-
-// Server validates token
-if validateSAS(token, device.MasterSecret) && !isExpired(token) {
-    // Authenticated
-}
-```
-
----
-
-### Industry Comparison
-
-| Approach | Security | Complexity | Best For |
-|----------|----------|------------|----------|
-| **X.509 Certificates** | ⭐⭐⭐⭐⭐ | High | Critical infrastructure, medical devices |
-| **SAS Tokens (Azure)** | ⭐⭐⭐⭐ | Medium | General IoT, cloud-connected devices |
-| **JWT (Google)** | ⭐⭐⭐⭐ | Medium | Devices with crypto capabilities |
-| **Rotating API Keys** | ⭐⭐⭐ | Low | Prototyping, simple devices, SMB |
-| **Static API Keys** | ⭐⭐ | Very Low | ❌ Not recommended for production |
-
----
-
-### **Recommended Priority for Datum**
-
-**Immediate (Pre-Production)**:
-- ✅ Implement API Key Rotation with Grace Period (Phase 1)
-- ✅ Add key revocation list for compromised credentials
-
-**Short-term (Post-Launch)**:
-- 📊 Add key expiry warnings and monitoring (Phase 2)
-- 📈 Collect metrics on key rotation usage
-
-**Long-term (Enterprise Features)**:
-- 🔒 Consider SAS token model for high-value deployments (Phase 3)
-- 🔒 Optional X.509 support for regulated industries
-
-**Priority**: HIGH (Phase 1 required for production)  
-**Effort**: 2-3 hours for Phase 1, industry-standard solution
-
----
-
-## 10. Error Information Disclosure ✅
-- Hex-encoded for safe transmission
+> **Note:** API Key Lifecycle management (rotation, revocation, SAS-style
+> tokens with grace period) was fully implemented in December 2025.
+> See `docs/diagrams/API_KEY_SECURITY.md` for the current architecture.
 
 ---
 
 ## 9. Error Information Disclosure ✅
 
-### Error Messages Review
-```go
-// Good: Generic error, no internal details
-c.JSON(http.StatusNotFound, gin.H{
-    "error": "provisioning request not found"
-})
-
-// Good: Helpful without exposing system internals
-c.JSON(http.StatusGone, gin.H{
-    "error": "provisioning request has expired",
-    "message": "Please create a new provisioning request via mobile app",
-})
-
-// Good: Clear status without exposing user data
-c.JSON(http.StatusConflict, gin.H{
-    "error": "device already registered",
-    "device_id": existingDeviceID, // ⚠️ Could leak info
-})
-```
-
-**Status**: ✅ **SECURE**
-
-**Implementation**: Device ID is no longer exposed in conflict errors:
-
-```go
-if registered {
-    c.JSON(http.StatusConflict, gin.H{
-        "error": "device already registered",
-        // device_id removed to prevent enumeration
-    })
-    return
-}
-```
-
-**Mitigation**:
-- No device ID leakage in error responses
-- Generic errors prevent information disclosure
-- Enumeration attacks mitigated
-
-**Status**: IMPLEMENTED ✅
+- Generic errors returned to clients; no internal details exposed.
+- Device ID removed from conflict error responses to prevent enumeration.
+- Constant-time response on forgot-password to prevent timing attacks.
 
 ---
 
 ## 10. Concurrency & Race Conditions ✅
 
-### Database Transactions
-```go
-func (s *Storage) CreateProvisioningRequest(req *ProvisioningRequest) error {
-    // Multiple checks before creation
-    // ⚠️ Potential TOCTOU (Time-of-check to Time-of-use) race
-    
-    registered, _, _ := s.IsDeviceUIDRegistered(req.DeviceUID)
-    if registered {
-        return fmt.Errorf("device UID already registered")
-    }
-    
-    existingReq, _ := s.GetProvisioningRequestByUID(req.DeviceUID)
-    if existingReq != nil && existingReq.Status == "pending" {
-        return fmt.Errorf("device already has pending provisioning request")
-    }
-    
-    // ... later: s.db.Update() creates the request
-}
-```
-
-**Status**: ✅ **SECURE**
-
-### Implementation
-All duplicate checks and request creation are performed atomically within a single BuntDB transaction:
-
-```go
-func (s *Storage) CreateProvisioningRequest(req *ProvisioningRequest) error {
-    return s.db.Update(func(tx *buntdb.Tx) error {
-        // All checks inside transaction
-        // 1. Check for existing UID registration
-        // 2. Check for pending requests
-        // 3. Create request atomically
-        
-        // BuntDB provides serializable isolation
-        return nil
-    })
-}
-```
-
-**Mitigation**:
-- No TOCTOU race condition possible
-- Atomic operations prevent duplicate requests
-- Transaction isolation ensures consistency
-
-**Status**: VERIFIED SECURE ✅
+- All provisioning duplicate checks and creation performed atomically inside a single BuntDB transaction.
+- No TOCTOU race condition possible.
 
 ---
 
-## 11. Missing Security Headers 🔧
+## 11. Security Headers ✅
 
-### Current State
-No security headers explicitly configured in Gin router.
-
-### Recommended Headers
-```go
-func securityHeadersMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Prevent clickjacking
-        c.Header("X-Frame-Options", "DENY")
-        
-        // Prevent MIME sniffing
-        c.Header("X-Content-Type-Options", "nosniff")
-        
-        // XSS protection
-        c.Header("X-XSS-Protection", "1; mode=block")
-        
-        // HTTPS only (if using TLS)
-        c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-        
-        // Content Security Policy
-        c.Header("Content-Security-Policy", "default-src 'self'")
-        
-        c.Next()
-    }
-}
-
-// Apply globally
-r.Use(securityHeadersMiddleware())
-```
-
-**Priority**: LOW  
-**Effort**: 30 minutes
+Applied globally: `X-Frame-Options`, `X-Content-Type-Options`, `X-XSS-Protection`,
+`Strict-Transport-Security`, `Content-Security-Policy`, `Permissions-Policy`.
 
 ---
 
-## 12. Logging & Monitoring 🔧
+## 12. Logging & Monitoring ✅
 
-### Current Logging
-Basic request logging via Gin, but no provisioning-specific audit trail.
-
-### Recommended Additions
-```go
-// Log security-relevant events
-func registerDeviceHandler(c *gin.Context) {
-    // ... existing code ...
-    
-    // Log provisioning events
-    logger.Info("provisioning_registration",
-        "user_id", userID,
-        "device_uid", deviceUID,
-        "request_id", requestID,
-        "ip", c.ClientIP(),
-    )
-    
-    // ... rest of handler
-}
-
-// Monitor for abuse patterns
-// - Multiple requests from same IP
-// - Multiple requests for same UID
-// - High activation failure rate
-```
-
-**Priority**: MEDIUM  
-**Effort**: 1-2 hours
-
-### Implementation Status: ✅ COMPLETED
-
-Comprehensive audit logging has been implemented for all provisioning operations:
-
-```go
-// Provisioning registration
-logger.GetLogger().Info().
-    Str("event", "provisioning_registration").
-    Str("user_id", userID).
-    Str("device_uid", deviceUID).
-    Str("request_id", requestID).
-    Str("ip", c.ClientIP()).
-    Msg("Provisioning request created")
-
-// Device activation
-logger.GetLogger().Info().
-    Str("event", "device_activation").
-    Str("device_id", device.ID).
-    Str("device_uid", deviceUID).
-    Str("firmware", req.FirmwareVersion).
-    Msg("Device activated successfully")
-
-// Unauthorized attempts
-logger.GetLogger().Warn().
-    Str("event", "provisioning_cancel_forbidden").
-    Str("user_id", userID).
-    Str("ip", c.ClientIP()).
-    Msg("Unauthorized provisioning cancel attempt")
-```
-
-**Logged Events**:
-- Provisioning registrations (success/failure)
-- Device activations with firmware info
-- Request cancellations
-- Unauthorized access attempts
-- IP addresses for all operations
-
-**Status**: IMPLEMENTED ✅
+Comprehensive zerolog audit events for:
+- Provisioning registrations and activations
+- Request cancellations and unauthorized attempts
+- Client IP addresses on all operations
 
 ---
 
-## Summary of Findings
+## Summary
 
-| Category | Status | Priority | Effort |
-|----------|--------|----------|--------|
-| Authentication | ✅ Secure | - | - |
-| Authorization | ✅ Secure | - | - |
-| Rate Limiting | ✅ Applied | - | ✅ Done |
-| Expiration | ✅ Secure | - | - |
-| Duplicate Prevention | ✅ Secure | - | - |
-| Ownership Validation | ✅ Secure | - | - |
-| Input Validation | ✅ Adequate | - | - |
-| WiFi Credentials | ✅ Encrypted | - | ✅ Done |
-| API Key Generation | ✅ Secure | - | - |
-| **API Key Lifecycle** | ✅ **Rotation Active** | - | ✅ Done |
-| Error Handling | ✅ Secure | - | ✅ Done |
-| Race Conditions | ✅ Secure | - | ✅ Done |
-| Security Headers | ✅ Applied | - | ✅ Done |
-| Logging | ✅ Comprehensive | - | ✅ Done |
+| Category | Status |
+|----------|--------|
+| Authentication | ✅ Secure |
+| Authorization | ✅ Secure |
+| Rate Limiting | ✅ Applied |
+| Expiration | ✅ Secure |
+| Duplicate Prevention | ✅ Secure |
+| Ownership Validation | ✅ Secure |
+| Input Validation | ✅ Adequate |
+| WiFi Credentials | ✅ Encrypted (AES-256-GCM) |
+| API Key Generation | ✅ Secure (crypto/rand) |
+| API Key Lifecycle | ✅ Rotation + Revocation Active |
+| Error Handling | ✅ No information disclosure |
+| Race Conditions | ✅ Atomic transactions |
+| Security Headers | ✅ Applied |
+| Logging | ✅ Comprehensive |
 
----
+**Overall Risk**: LOW — System is production-ready.
 
-## Recommended Action Plan
-
-### Completed ✅
-1. ✅ **Apply rate limiting** to provisioning endpoints - DONE
-2. ✅ **Fix race condition** in CreateProvisioningRequest - VERIFIED SECURE
-3. ✅ **Add security headers** middleware - IMPLEMENTED
-4. ✅ **Improve error handling** to prevent info disclosure - DONE
-5. ✅ **Add provisioning audit logging** - COMPREHENSIVE LOGGING ADDED
-
-### Short-term (1 week)
-1. ⚠️ **API Key Rotation Mechanism** - Allow manual key rotation via admin API
-2. ⚠️ **Encrypt WiFi passwords** in database
-3. 🧹 **Implement cleanup job** for expired requests
-
-### Long-term (1 month)
-4. 🔑 **Automatic API key expiration** with configurable TTL
-5. 🔑 **Key revocation list** for compromised credentials
-6. 📈 **Add metrics** for provisioning success/failure rates
-7. 🔍 **Implement anomaly detection** for abuse patterns
-8. 📋 **Create security runbook** for incident response
-
----
-
-## Conclusion
-
-The WiFi provisioning system demonstrates **strong security implementation**:
-- ✅ Strong authentication on mobile endpoints
-- ✅ Rate limiting applied to all provisioning endpoints
-- ✅ Time-limited provisioning windows
-- ✅ Duplicate prevention mechanisms (race-condition free)
-- ✅ Proper ownership validation
-- ✅ Security headers implemented
-- ✅ Comprehensive audit logging
-- ✅ No information disclosure in error messages
-
-**Completed Security Improvements** (December 30, 2025):
-1. ✅ Rate limiting applied to provisioning endpoints
-2. ✅ Race condition verified secure (atomic transactions)
-3. ✅ Error handling improved (no device ID leakage)
-4. ✅ Comprehensive audit logging implemented
-5. ✅ Security headers already in place
-
-**Remaining Recommendations**:
-1. ⚠️ **API Key Rotation** - Manual rotation endpoint (HIGH priority, 2-3 hrs)
-2. ⚠️ Encrypt WiFi credentials in database (MEDIUM priority, 2-3 hrs)
-3. 🧹 Cleanup job for expired requests (LOW priority)
-
-**Overall Risk**: **LOW** - System is production-ready with current implementation. 
-
-**Critical Next Step**: **API key rotation mechanism** should be implemented before production deployment to handle compromised credentials. Without key rotation, a leaked API key remains valid forever, allowing unauthorized data injection indefinitely.
-
-**WiFi credential encryption** would further reduce risk to **VERY LOW**.

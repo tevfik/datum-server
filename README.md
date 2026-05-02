@@ -2,7 +2,7 @@
 
 ![Build Status](https://img.shields.io/github/actions/workflow/status/tevfik/datum-server/ci.yml?branch=main)
 ![Go Report Card](https://goreportcard.com/badge/github.com/tevfik/datum-server)
-![Test Coverage](https://img.shields.io/badge/coverage-24%25-yellow.svg)
+![Test Coverage](https://img.shields.io/badge/coverage-34%25-yellow.svg)
 ![License](https://img.shields.io/github/license/tevfik/datum-server)
 
 High-performance IoT data collection and management platform built with Go.
@@ -194,11 +194,16 @@ go tool cover -html=coverage.out
 
 ### Current Test Coverage
 
-- **Overall**: ~70% coverage across all packages
-- **cmd/server**: 68.6% (400+ tests)
-- **internal/storage**: 94.0%
-- **internal/auth**: 89.1%
-- **internal/logger**: 100.0%
+- **Overall**: ~34% coverage across all packages
+- **internal/audit**: 100.0%
+- **internal/utils**: 100.0%
+- **internal/metrics**: 92.0%
+- **internal/webhook**: 91.1%
+- **internal/quota**: 90.8%
+- **internal/config**: 88.9%
+- **internal/rules**: 87.4%
+- **internal/auth**: 73.7%
+- **internal/storage**: 54.5%
 
 ### Test Organization
 
@@ -322,7 +327,7 @@ The server supports command-line flags that take precedence over environment var
 ./datum-server --data-dir /var/lib/datum
 
 # Configure data retention
-./datum-server --retention-days 30 --retention-check-hours 12
+./datum-server --retention-days 30
 
 # Combine multiple flags
 ./datum-server --port 9000 --data-dir /var/lib/datum --retention-days 30
@@ -338,7 +343,6 @@ The server supports command-line flags that take precedence over environment var
 - `--port` - Server port (default: 8000 or PORT env var)
 - `--data-dir` - Data directory path (default: ./data or DATA_DIR env var)
 - `--retention-days` - Data retention in days (default: 7 or RETENTION_MAX_DAYS env var)
-- `--retention-check-hours` - Retention check interval in hours (default: 24 or RETENTION_CHECK_HOURS env var)
 - `--version` - Show version information
 - `--help` - Show all available options
 
@@ -605,4 +609,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 **Version**: 1.0.0  
 **Status**: Production Ready  
 **Performance**: Tested up to 10K concurrent users  
-**Last Updated**: December 2025
+**Last Updated**: May 2026

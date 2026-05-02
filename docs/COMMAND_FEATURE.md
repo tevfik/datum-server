@@ -231,12 +231,25 @@ datumctl command get device-001 cmd_failed_123
 
 ## Complete datumctl Command List
 
-With the addition of command management, datumctl now provides:
+With the addition of command management and subsequent features, datumctl now provides:
 
 ```
 Authentication:
   ✓ setup          - Initialize system
   ✓ login          - User login
+  ✓ logout         - Clear local credentials
+  ✓ register       - Create new user account
+
+Auth Extras:
+  ✓ auth me              - Current user info
+  ✓ auth sessions        - List active sessions
+  ✓ auth providers       - OAuth providers (public)
+  ✓ auth refresh         - Token refresh
+  ✓ auth change-password - Change password
+  ✓ auth forgot-password - Trigger reset email
+  ✓ auth reset-password  - Complete password reset
+  ✓ auth delete-account  - Delete own account
+  ✓ auth push-token list/add/delete - Push notification tokens
 
 Devices:
   ✓ device create  - Create device
@@ -244,6 +257,10 @@ Devices:
   ✓ device get     - Get device details
   ✓ device update  - Update device properties
   ✓ device delete  - Delete device
+  ✓ device rotate-key    - Rotate device API key
+  ✓ device revoke-key    - Emergency key revocation
+  ✓ device token-info    - Show token status
+  ✓ device update-firmware - Trigger firmware update
 
 Provisioning (WiFi AP):
   ✓ provision register  - Register device
@@ -251,7 +268,7 @@ Provisioning (WiFi AP):
   ✓ provision status    - Get status
   ✓ provision cancel    - Cancel request
 
-Commands (NEW):
+Commands:
   ✓ command send     - Send command to device
   ✓ command list     - List device commands
   ✓ command get      - Get command details
@@ -263,19 +280,78 @@ Data:
   ✓ data post     - Send data
   ✓ data stats    - Data statistics
 
+User API Keys:
+  ✓ key list      - List user API keys
+  ✓ key create    - Create new API key (ak_...)
+  ✓ key delete    - Delete an API key
+
+Object Storage (Buckets):
+  ✓ bucket list     - List buckets or objects
+  ✓ bucket create   - Create a bucket
+  ✓ bucket delete   - Delete bucket or object
+  ✓ bucket put      - Upload a file
+  ✓ bucket get      - Download an object
+  ✓ bucket presign  - Generate presigned URL
+
+MQTT:
+  ✓ mqtt stats    - Broker statistics
+  ✓ mqtt clients  - List connected clients
+  ✓ mqtt publish  - Publish a message
+
+Notifications (ntfy-protocol):
+  ✓ notify publish   - Publish to a topic
+  ✓ notify subscribe - Stream messages (json/sse/raw)
+
+Rules Engine (Admin):
+  ✓ rules list    - List all rules
+  ✓ rules get     - Get rule details
+  ✓ rules create  - Create a new rule
+  ✓ rules delete  - Delete a rule
+  ✓ rules enable  - Enable a rule
+  ✓ rules disable - Disable a rule
+
+Document Database:
+  ✓ db list        - List documents in collection
+  ✓ db get         - Get a document
+  ✓ db create      - Create a document
+  ✓ db update      - Update a document
+  ✓ db delete      - Delete a document
+  ✓ db collections - List all collections (admin)
+
 Admin:
-  ✓ admin create-user     - Create user
-  ✓ admin list-users      - List users
-  ✓ admin delete-user     - Delete user
-  ✓ admin reset-password  - Reset password
-  ✓ admin reset-system    - Reset system
-  ✓ admin stats           - System statistics
-  ✓ admin get-config      - System configuration
+  ✓ admin create-user        - Create user
+  ✓ admin list-users         - List users
+  ✓ admin update-user        - Update user role/status
+  ✓ admin delete-user        - Delete user
+  ✓ admin reset-password     - Reset password
+  ✓ admin reset-system       - Reset system
+  ✓ admin stats              - System statistics
+  ✓ admin get-config         - System configuration
+  ✓ admin toggle-registration - Enable/disable registration
 
 System:
-  ✓ status    - System status
+  ✓ status    - Server health check
   ✓ version   - Version info
-  ✓ config    - Configuration management
+  ✓ config show - Configuration display
+  ✓ sys info    - Server info
+  ✓ sys time    - Server clock
+  ✓ sys ip      - Client IP
+  ✓ sys status  - Initialization status
+  ✓ sys metrics - Prometheus metrics
+
+Server Config:
+  ✓ server-config get       - Remote server configuration
+  ✓ server-config validate  - Connectivity checks
+  ✓ server-config retention - Update retention policy
+
+Logs:
+  ✓ logs         - View recent logs (-f follow, -l level, -n lines)
+
+Interactive:
+  ✓ interactive (i, menu) - Auto-derived interactive menu
+
+Shell Completion:
+  ✓ completion bash/zsh/fish/powershell
 ```
 
 ## Implementation Details

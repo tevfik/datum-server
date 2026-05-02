@@ -270,5 +270,230 @@ Response: `{"unix": 1700000000, "iso": "2024-..."}`
 ```http
 GET /health
 GET /ready
+GET /live
+GET /healthz
+```
+
+### Server Info
+```http
+GET /sys/info
+GET /sys/ip
+GET /sys/metrics
+```
+
+---
+
+## User API Keys
+*(Authorization: Bearer JWT)*
+
+### List Keys
+```http
+GET /auth/keys
+```
+
+### Create Key
+```http
+POST /auth/keys
+Content-Type: application/json
+
+{"name": "My CLI Key"}
+```
+Response: `{"id": "...", "name": "...", "key": "ak_..."}`
+
+### Delete Key
+```http
+DELETE /auth/keys/{key_id}
+```
+
+---
+
+## Auth Extras
+*(Authorization: Bearer JWT)*
+
+### Current User
+```http
+GET /auth/me
+```
+
+### Active Sessions
+```http
+GET /auth/sessions
+```
+
+### OAuth Providers (Public)
+```http
+GET /auth/providers
+```
+
+### Token Refresh
+```http
+POST /auth/refresh
+Content-Type: application/json
+
+{"refresh_token": "..."}
+```
+
+### Change Password
+```http
+PUT /auth/password
+Content-Type: application/json
+
+{"old_password": "...", "new_password": "..."}
+```
+
+### Push Notification Tokens
+```http
+GET /auth/push-tokens
+POST /auth/push-token
+DELETE /auth/push-token/{token_id}
+```
+
+---
+
+## Document Database (User-scoped)
+*(Authorization: Bearer JWT or User API Key)*
+
+### List Documents
+```http
+GET /auth/db/{collection}
+```
+
+### Get Document
+```http
+GET /auth/db/{collection}/{doc_id}
+```
+
+### Create Document
+```http
+POST /auth/db/{collection}
+Content-Type: application/json
+
+{"title": "Buy milk", "done": false}
+```
+
+### Update Document
+```http
+PUT /auth/db/{collection}/{doc_id}
+Content-Type: application/json
+```
+
+### Delete Document
+```http
+DELETE /auth/db/{collection}/{doc_id}
+```
+
+---
+
+## Object Storage (Buckets)
+*(Authorization: Bearer JWT or User API Key)*
+
+### List Buckets / Objects
+```http
+GET /storage
+GET /storage/{bucket}
+```
+
+### Create Bucket
+```http
+POST /storage/{bucket}
+```
+
+### Upload Object
+```http
+PUT /storage/{bucket}/{path}
+Content-Type: image/jpeg
+```
+
+### Download Object
+```http
+GET /storage/{bucket}/{path}
+```
+
+### Delete Bucket or Object
+```http
+DELETE /storage/{bucket}
+DELETE /storage/{bucket}/{path}
+```
+
+### Presign URL
+```http
+POST /storage/{bucket}/presign
+Content-Type: application/json
+
+{"path": "cats/1.jpg", "method": "GET", "expires_secs": 900}
+```
+
+---
+
+## Notifications (ntfy-protocol)
+*(No auth required for public topics)*
+
+### Publish
+```http
+POST /notify/{topic}
+Title: Alert Title
+Priority: high
+Tags: warning,pump
+
+Message body text
+```
+
+### Subscribe
+```http
+GET /notify/{topic}/json
+GET /notify/{topic}/sse
+GET /notify/{topic}/raw
+```
+
+---
+
+## Rule Engine (Admin)
+*(Authorization: Bearer JWT, Admin role required)*
+
+```http
+GET    /admin/rules
+POST   /admin/rules
+GET    /admin/rules/{rule_id}
+DELETE /admin/rules/{rule_id}
+PUT    /admin/rules/{rule_id}/enable
+PUT    /admin/rules/{rule_id}/disable
+```
+
+---
+
+## Admin Extras
+
+### Device Token Info
+```http
+GET /admin/dev/{device_id}/token-info
+```
+
+### Database Stats
+```http
+GET /admin/database/stats
+```
+
+### Database Reset
+```http
+DELETE /admin/database/reset
+Content-Type: application/json
+
+{"confirm": "RESET"}
+```
+
+### Firmware Upload
+```http
+POST /admin/firmware
+```
+
+---
+
+## API Versioning
+
+All endpoints are also available under the `/api/v1/` prefix:
+```http
+GET /api/v1/dev
+POST /api/v1/auth/login
+GET /api/v1/sys/status
 ```
 

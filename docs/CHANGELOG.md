@@ -310,29 +310,6 @@ We use [Semantic Versioning](https://semver.org/):
 
 None at this time.
 
-### Future Roadmap
-
-#### v1.1.0 (Planned - Q1 2026)
-- [ ] gRPC API support
-- [ ] WebSocket support for bidirectional communication
-- [ ] Enhanced data aggregation functions
-- [ ] Multi-tenancy support
-- [ ] GraphQL API
-
-#### v1.2.0 (Planned - Q2 2026)
-- [ ] Alert system with configurable thresholds
-- [ ] Email notifications
-- [ ] Webhook support
-- [ ] Data export to various formats (CSV, JSON, Parquet)
-- [ ] Advanced analytics and reporting
-
-#### v2.0.0 (Planned - Q3 2026)
-- [ ] Multi-region replication
-- [ ] Distributed deployment support
-- [ ] Time-series data compression
-- [ ] Machine learning integration
-- [ ] Advanced visualization dashboard
-
 ---
 
 ## Contributing
@@ -342,15 +319,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and th
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-- **Documentation**: [docs/](docs/)
-- **Issues**: [GitHub Issues](https://github.com/your-org/datum-server/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/datum-server/discussions)
-
----
-
-[Unreleased]: https://github.com/your-org/datum-server/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/your-org/datum-server/releases/tag/v1.0.0
-[0.1.0]: https://github.com/your-org/datum-server/releases/tag/v0.1.0

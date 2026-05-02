@@ -75,7 +75,6 @@ Visual documentation and architecture diagrams:
 ### Project Root Documentation
 - [README.md](../README.md) - Project overview
 - [QUICKSTART.md](tutorials/QUICK_START.md) - Fast setup guide
-- [PROJECT.md](../PROJECT.md) - Project structure and architecture
 
 ### Need Help?
 

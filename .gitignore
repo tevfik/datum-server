@@ -66,3 +66,9 @@ docker-data/
 cmd/server/dist/
 sdk/dart/.dart_tool/
 sdk/dart/pubspec.lock
+
+# SDK build artifacts
+sdk/ts/node_modules/
+sdk/ts/dist/
+sdk/ts/tsconfig.tsbuildinfo
+web/dist/

@@ -51,7 +51,7 @@ datumctl ships two complementary surfaces:
 | `sys`        | `info`, `time`, `ip`, `status`, `metrics`                               |
 | `admin`      | `list-users`, `create-user`, `update-user`, `delete-user`, `reset-password`, `stats`, `get-config`, `toggle-registration`, `reset-system` |
 | `provision`  | `register`, `list`, `status`, `cancel`                                  |
-| `logs`       | `tail`, `query`                                                         |
+| `logs`       | view recent logs (`-f` follow, `-l` level filter, `-n` lines)           |
 | `status`     | `/health`                                                               |
 | `version`    | print build info                                                        |
 | `completion` | `bash`, `zsh`, `fish`, `powershell`                                     |
