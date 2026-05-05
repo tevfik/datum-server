@@ -32,7 +32,7 @@ func setupTestEnv(t *testing.T) (*Handler, storage.Provider, func()) {
 
 func userMiddleware(userID string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set("userID", userID)
+		c.Set("user_id", userID)
 		c.Set("user_id", userID)
 		c.Next()
 	}

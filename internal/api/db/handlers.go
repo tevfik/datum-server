@@ -35,7 +35,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 // CreateDoc creates a user document.
 // POST /db/:collection
 func (h *Handler) CreateDoc(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	collection := c.Param("collection")
 
 	var doc map[string]interface{}
@@ -57,7 +57,7 @@ func (h *Handler) CreateDoc(c *gin.Context) {
 // ListDocs lists user documents in a collection.
 // GET /db/:collection
 func (h *Handler) ListDocs(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	collection := c.Param("collection")
 
 	docs, err := h.Store.ListDocuments(userID, collection)
@@ -77,7 +77,7 @@ func (h *Handler) ListDocs(c *gin.Context) {
 // GetDoc gets a specific user document.
 // GET /db/:collection/:id
 func (h *Handler) GetDoc(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	collection := c.Param("collection")
 	docID := c.Param("id")
 
@@ -99,7 +99,7 @@ func (h *Handler) GetDoc(c *gin.Context) {
 // UpdateDoc updates a specific user document.
 // PUT /db/:collection/:id
 func (h *Handler) UpdateDoc(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	collection := c.Param("collection")
 	docID := c.Param("id")
 
@@ -126,7 +126,7 @@ func (h *Handler) UpdateDoc(c *gin.Context) {
 // DeleteDoc deletes a specific user document.
 // DELETE /db/:collection/:id
 func (h *Handler) DeleteDoc(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	collection := c.Param("collection")
 	docID := c.Param("id")
 
