@@ -267,6 +267,12 @@ func (b *NtfyBroker) streamSSE(w http.ResponseWriter, r *http.Request, topic str
 	ch, cancel := b.Subscribe(topic, 32)
 	defer cancel()
 
+	// Send initial open event so clients know the connection is alive.
+	open := NtfyMessage{ID: "open", Event: "open", Time: time.Now().Unix(), Topic: topic}
+	openData, _ := json.Marshal(open)
+	fmt.Fprintf(w, "event: open\ndata: %s\n\n", openData)
+	flusher.Flush()
+
 	keepalive := time.NewTicker(30 * time.Second)
 	defer keepalive.Stop()
 
