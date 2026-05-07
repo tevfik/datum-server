@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"datum-go/internal/api"
+	a2aapi "datum-go/internal/api/a2a"
 	adminapi "datum-go/internal/api/admin"
 	analyticsapi "datum-go/internal/api/analytics"
 	bucketsapi "datum-go/internal/api/buckets"
@@ -638,6 +639,12 @@ func main() {
 	packsGroup := r.Group("")
 	packsGroup.Use(auth.UserAuthMiddleware(store))
 	packsapi.New().RegisterRoutes(packsGroup)
+
+	// A2A chat gateway (/a2a/*) — proxies to gleann's A2A protocol
+	// surface for AI assistant chat. Same auth + GLEANN_URL config.
+	a2aGroup := r.Group("")
+	a2aGroup.Use(auth.UserAuthMiddleware(store))
+	a2aapi.New().RegisterRoutes(a2aGroup)
 
 	// Serve firmware updates (protected)
 	// Devices must provide valid device auth
