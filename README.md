@@ -1,9 +1,9 @@
 # Datum IoT Server
 
-![Build Status](https://img.shields.io/github/actions/workflow/status/tevfik/datum-server/ci.yml?branch=main)
-![Go Report Card](https://goreportcard.com/badge/github.com/tevfik/datum-server)
-![Test Coverage](https://img.shields.io/badge/coverage-34%25-yellow.svg)
-![License](https://img.shields.io/github/license/tevfik/datum-server)
+[![CI](https://github.com/tevfik/datum-server/actions/workflows/ci.yml/badge.svg)](https://github.com/tevfik/datum-server/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/tevfik/datum-server)](https://goreportcard.com/report/github.com/tevfik/datum-server)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Reference](https://pkg.go.dev/badge/github.com/tevfik/datum-server.svg)](https://pkg.go.dev/github.com/tevfik/datum-server)
 
 High-performance IoT data collection and management platform built with Go.
 
@@ -121,6 +121,7 @@ make build-cli
 ./datumctl rules list                                    # admin rule engine
 ./datumctl notify publish alerts --message "hello"       # ntfy-protocol
 ./datumctl notify subscribe alerts --format sse          # SSE stream
+./datumctl admin notify test --user usr_123 --message "hi" # trigger test alert
 ```
 
 See [cmd/datumctl/README.md](cmd/datumctl/README.md) and

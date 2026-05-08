@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Datumpy IoT Platform API
+  title: Datum IoT Platform API
   description: |
     High-performance IoT data ingestion and device management platform with mobile-ready auth.
 
@@ -68,7 +68,7 @@ info:
     - **Max Body**: 5 MB (configurable via `MAX_REQUEST_BODY_BYTES`)
     - **Query Limit**: 10,000 data points per query (configurable via `QUERY_MAX_LIMIT`)
     - **Batch Limit**: 50,000 data points per ingestion batch (fixed)
-  version: 1.8.0
+  version: 1.9.0
   contact:
     name: API Support
   license:
@@ -2642,6 +2642,73 @@ paths:
         '200':
           description: Password reset
 
+  /admin/notify/test:
+    post:
+      summary: Send test notification to a user
+      description: |
+        Dispatches a test notification to the specified user via all configured
+        notification channels (in-app SSE, ntfy, embedded ntfy broker).
+        Useful for verifying mobile push notification integration.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, message]
+              properties:
+                user_id:
+                  type: string
+                  description: Target user ID
+                title:
+                  type: string
+                  default: Test Notification
+                message:
+                  type: string
+                priority:
+                  type: string
+                  enum: [min, low, default, high, max]
+                  default: high
+      responses:
+        '200':
+          description: Notification dispatched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  user_id: { type: string }
+                  topic: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '503':
+          description: Notification dispatcher not initialized
+
+  /admin/firmware:
+    post:
+      summary: Upload firmware binary
+      description: Upload a firmware binary file for OTA distribution to devices.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Firmware uploaded
+        '400': { $ref: '#/components/responses/BadRequest' }
+
   /admin/logs:
     get:
       summary: Get system logs
@@ -2683,6 +2750,19 @@ paths:
       responses:
         '200':
           description: Logs cleared
+
+  /admin/logs/stream:
+    get:
+      summary: Stream logs in real-time (WebSocket)
+      description: |
+        WebSocket endpoint for real-time log streaming.
+        Sends newline-delimited JSON log entries as they occur.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '101':
+          description: WebSocket upgrade
 
   /admin/config:
     get:

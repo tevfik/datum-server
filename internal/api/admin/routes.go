@@ -86,5 +86,8 @@ func (h *AdminHandler) RegisterRoutes(r *gin.Engine) {
 
 		// Firmware Management
 		admin.POST("/firmware", h.UploadFirmwareHandler)
+
+		// Notification Management
+		admin.POST("/notify/test", h.TestNotificationHandler)
 	}
 }

@@ -2,6 +2,7 @@ package admin
 
 import (
 	"datum-go/internal/mqtt"
+	"datum-go/internal/notify"
 	"datum-go/internal/storage"
 	"time"
 )
@@ -10,14 +11,16 @@ import (
 type AdminHandler struct {
 	Store           storage.Provider
 	MqttBroker      *mqtt.Broker
+	Dispatcher      *notify.Dispatcher
 	ServerStartTime time.Time // Server start time for uptime calculation
 }
 
 // NewAdminHandler creates a new AdminHandler instance
-func NewAdminHandler(store storage.Provider, broker *mqtt.Broker, startTime time.Time) *AdminHandler {
+func NewAdminHandler(store storage.Provider, broker *mqtt.Broker, dispatcher *notify.Dispatcher, startTime time.Time) *AdminHandler {
 	return &AdminHandler{
 		Store:           store,
 		MqttBroker:      broker,
+		Dispatcher:      dispatcher,
 		ServerStartTime: startTime,
 	}
 }

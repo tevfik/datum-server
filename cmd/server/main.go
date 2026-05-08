@@ -688,7 +688,7 @@ func main() {
 
 	// Legacy Admin Routes (will be folded into a generic /admin namespace later).
 	// Registers: /admin/dev/*, /admin/config/*, /admin/logs/*, /admin/firmware
-	adminHandler := adminapi.NewAdminHandler(store, mqttBroker, serverStartTime)
+	adminHandler := adminapi.NewAdminHandler(store, mqttBroker, dispatcher, serverStartTime)
 	adminHandler.RegisterRoutes(r)
 
 	// Object Storage (Buckets) — Phase 3
