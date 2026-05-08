@@ -28,13 +28,19 @@ const swaggerUIHTML = `<!DOCTYPE html>
     <div id="app"></div>
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
     <script>
-      // Propagate ?token=… to the spec fetch so the protected route accepts it.
-      var qs = window.location.search;
-      var specURL = '/docs/openapi.yaml' + (qs || '');
-      Scalar.createApiReference('#app', {
-        url: specURL,
-        hideDownloadButton: false,
-      });
+      (function() {
+        // Propagate ?token=… to the spec fetch so the protected route accepts it.
+        var qs = window.location.search;
+        var specPath = '/docs/openapi.yaml' + (qs || '');
+        var specURL = window.location.origin + specPath;
+        
+        console.log('Scalar initializing with spec:', specURL);
+        
+        Scalar.createApiReference('#app', {
+          url: specURL,
+          hideDownloadButton: false,
+        });
+      })();
     </script>
 </body>
 </html>`
@@ -53,7 +59,7 @@ func setupSwagger(r *gin.Engine, store storage.Provider) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(swaggerUIHTML))
 	})
 	docs.GET("/docs/openapi.yaml", func(c *gin.Context) {
-		c.Data(http.StatusOK, "application/x-yaml", []byte(openAPISpec))
+		c.Data(http.StatusOK, "application/yaml", []byte(openAPISpec))
 	})
 
 	// Legacy redirect — also auth-gated.
