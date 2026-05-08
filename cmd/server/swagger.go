@@ -2,7 +2,9 @@ package main
 
 import (
 	_ "embed"
+	"encoding/json"
 	"net/http"
+	"strings"
 
 	"datum-go/internal/auth"
 	"datum-go/internal/storage"
@@ -13,31 +15,24 @@ import (
 //go:embed openapi.yaml
 var openAPISpec string
 
-// Scalar API reference HTML — token is forwarded as `?token=` so the
-// embedded OpenAPI fetch survives the SPA's auth wall.
-// Uses the modern Scalar.createApiReference() JS API (the old data-url
-// attribute approach was deprecated and no longer works with latest CDN).
-const swaggerUIHTML = `<!DOCTYPE html>
+const swaggerUITemplate = `<!DOCTYPE html>
 <html>
 <head>
     <title>Datum API Documentation</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { margin: 0; }
+    </style>
 </head>
 <body>
     <div id="app"></div>
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
     <script>
       (function() {
-        // Propagate ?token=… to the spec fetch so the protected route accepts it.
-        var qs = window.location.search;
-        var specPath = '/docs/openapi.yaml' + (qs || '');
-        var specURL = window.location.origin + specPath;
-        
-        console.log('Scalar initializing with spec:', specURL);
-        
+        const specContent = {{SPEC_CONTENT}};
         Scalar.createApiReference('#app', {
-          url: specURL,
+          content: specContent,
           hideDownloadButton: false,
         });
       })();
@@ -46,23 +41,23 @@ const swaggerUIHTML = `<!DOCTYPE html>
 </html>`
 
 // setupSwagger registers documentation endpoints behind authentication.
-//
-// Both `/docs` and `/docs/openapi.yaml` require a valid JWT or API key. The
-// token may be provided either via `Authorization: Bearer …` header or via
-// `?token=…` query parameter (so a SPA can deep-link from a logged-in
-// session). Anonymous access is no longer permitted.
 func setupSwagger(r *gin.Engine, store storage.Provider) {
+	// Pre-generate the HTML with the spec embedded
+	specJSON, _ := json.Marshal(openAPISpec)
+	finalHTML := strings.Replace(swaggerUITemplate, "{{SPEC_CONTENT}}", string(specJSON), 1)
+
 	docs := r.Group("/")
 	docs.Use(auth.UserAuthMiddleware(store))
 
 	docs.GET("/docs", func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(swaggerUIHTML))
+		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
 	})
+
 	docs.GET("/docs/openapi.yaml", func(c *gin.Context) {
 		c.Data(http.StatusOK, "application/yaml", []byte(openAPISpec))
 	})
 
-	// Legacy redirect — also auth-gated.
+	// Legacy redirect
 	r.GET("/swagger", auth.UserAuthMiddleware(store), func(c *gin.Context) {
 		c.Redirect(http.StatusMovedPermanently, "/docs")
 	})
