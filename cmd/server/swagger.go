@@ -15,6 +15,8 @@ var openAPISpec string
 
 // Scalar API reference HTML — token is forwarded as `?token=` so the
 // embedded OpenAPI fetch survives the SPA's auth wall.
+// Uses the modern Scalar.createApiReference() JS API (the old data-url
+// attribute approach was deprecated and no longer works with latest CDN).
 const swaggerUIHTML = `<!DOCTYPE html>
 <html>
 <head>
@@ -23,17 +25,17 @@ const swaggerUIHTML = `<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 </head>
 <body>
+    <div id="app"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
     <script>
       // Propagate ?token=… to the spec fetch so the protected route accepts it.
-      (function () {
-        var qs = window.location.search;
-        var spec = '/docs/openapi.yaml' + (qs || '');
-        var s = document.getElementById('api-reference');
-        if (s) s.setAttribute('data-url', spec);
-      })();
+      var qs = window.location.search;
+      var specURL = '/docs/openapi.yaml' + (qs || '');
+      Scalar.createApiReference('#app', {
+        url: specURL,
+        hideDownloadButton: false,
+      });
     </script>
-    <script id="api-reference" data-url="/docs/openapi.yaml"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 </body>
 </html>`
 
