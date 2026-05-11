@@ -111,7 +111,7 @@ func main() {
 		if err := dst.CreateDevice(&d); err != nil {
 			log.Printf("      Warning: Device create failed (exists?): %v", err)
 			// Try updating status/token info
-			dst.UpdateDevice(d.ID, d.Status)
+			dst.UpdateDevice(d.ID, "", "", d.Status)
 		} else {
 			// If we just created it, we need to ensure Token fields are set correctly
 			// CreateDevice in Postgres takes the whole struct including Tokens, so we are good.

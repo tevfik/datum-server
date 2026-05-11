@@ -194,7 +194,7 @@ func (h *AdminHandler) UpdateDeviceHandler(c *gin.Context) {
 		return
 	}
 
-	if err := h.Store.UpdateDevice(deviceID, req.Status); err != nil {
+	if err := h.Store.UpdateDevice(deviceID, "", "", req.Status); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}

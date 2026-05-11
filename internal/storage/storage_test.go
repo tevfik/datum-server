@@ -191,7 +191,7 @@ func TestUpdateDevice(t *testing.T) {
 	require.NoError(t, err)
 
 	// Update device status
-	err = storage.UpdateDevice("device_test_update", "inactive")
+	err = storage.UpdateDevice("device_test_update", "", "", "inactive")
 	assert.NoError(t, err)
 
 	retrieved, err := storage.GetDevice("device_test_update")

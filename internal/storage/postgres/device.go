@@ -106,11 +106,36 @@ func (s *PostgresStore) GetAllDevices() ([]storage.Device, error) {
 	return s.ListAllDevices()
 }
 
-// UpdateDevice updates status
-func (s *PostgresStore) UpdateDevice(deviceID string, status string) error {
+// UpdateDevice updates device name, type, and status
+func (s *PostgresStore) UpdateDevice(deviceID string, name string, typeStr string, status string) error {
 	ctx, cancel := queryCtx()
 	defer cancel()
-	_, err := s.db.ExecContext(ctx, "UPDATE devices SET status = $1, updated_at = $2 WHERE id = $3", status, time.Now(), deviceID)
+
+	// Build dynamic query
+	query := "UPDATE devices SET updated_at = $1"
+	args := []interface{}{time.Now()}
+	argID := 2
+
+	if name != "" {
+		query += fmt.Sprintf(", name = $%d", argID)
+		args = append(args, name)
+		argID++
+	}
+	if typeStr != "" {
+		query += fmt.Sprintf(", type = $%d", argID)
+		args = append(args, typeStr)
+		argID++
+	}
+	if status != "" {
+		query += fmt.Sprintf(", status = $%d", argID)
+		args = append(args, status)
+		argID++
+	}
+
+	query += fmt.Sprintf(" WHERE id = $%d", argID)
+	args = append(args, deviceID)
+
+	_, err := s.db.ExecContext(ctx, query, args...)
 	return err
 }
 

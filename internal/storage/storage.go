@@ -1200,8 +1200,8 @@ func (s *Storage) UpdateDeviceConfig(deviceID string, config map[string]interfac
 	})
 }
 
-// UpdateDevice updates device status (for ban/unban)
-func (s *Storage) UpdateDevice(deviceID string, status string) error {
+// UpdateDevice updates device name, type, and status
+func (s *Storage) UpdateDevice(deviceID string, name string, typeStr string, status string) error {
 	return s.db.Update(func(tx *buntdb.Tx) error {
 		deviceKey := fmt.Sprintf("device:%s", deviceID)
 		deviceData, err := tx.Get(deviceKey)
@@ -1211,7 +1211,17 @@ func (s *Storage) UpdateDevice(deviceID string, status string) error {
 
 		var device Device
 		json.Unmarshal([]byte(deviceData), &device)
-		device.Status = status
+		
+		if name != "" {
+			device.Name = name
+		}
+		if typeStr != "" {
+			device.Type = typeStr
+		}
+		if status != "" {
+			device.Status = status
+		}
+		
 		device.UpdatedAt = time.Now()
 
 		data, _ := json.Marshal(device)

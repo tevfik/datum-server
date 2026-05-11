@@ -387,7 +387,7 @@ func TestAdminDeleteUser(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestUpdateUserStatus(t *testing.T) {
+func TestUpdateUser(t *testing.T) {
 	handler, store, cleanup := setupTestEnv(t)
 	defer cleanup()
 
@@ -399,9 +399,9 @@ func TestUpdateUserStatus(t *testing.T) {
 		c.Set("user_role", "admin")
 		c.Next()
 	})
-	r.PUT("/admin/users/:id", handler.UpdateUserStatus)
+	r.PUT("/admin/users/:id", handler.UpdateUser)
 
-	body, _ := json.Marshal(map[string]string{"status": "suspended"})
+	body, _ := json.Marshal(map[string]string{"status": "suspended", "role": "admin"})
 	req, _ := http.NewRequest("PUT", "/admin/users/usr_target@example.com", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -412,6 +412,7 @@ func TestUpdateUserStatus(t *testing.T) {
 	// Verify in DB
 	user, _ := store.GetUserByID("usr_target@example.com")
 	assert.Equal(t, "suspended", user.Status)
+	assert.Equal(t, "admin", user.Role)
 }
 
 // ---------- RefreshToken ----------

@@ -352,7 +352,7 @@ func TestUpdateDeviceStatus(t *testing.T) {
 	storage.CreateDevice(device)
 
 	// Update status to banned
-	err := storage.UpdateDevice("dev_status_001", "banned")
+	err := storage.UpdateDevice("dev_status_001", "", "", "banned")
 	require.NoError(t, err)
 
 	// Verify status was updated
@@ -365,7 +365,7 @@ func TestUpdateDeviceNotFound(t *testing.T) {
 	storage, cleanup := createTestStorage(t)
 	defer cleanup()
 
-	err := storage.UpdateDevice("dev_nonexistent", "banned")
+	err := storage.UpdateDevice("dev_nonexistent", "", "", "banned")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "device not found")
 }

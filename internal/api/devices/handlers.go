@@ -35,6 +35,7 @@ func NewHandler(store storage.Provider, broker *mqtt.Broker) *Handler {
 func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("", h.CreateDevice)
 	r.GET("", h.ListDevices)
+	r.PUT("/:device_id", h.UpdateDevice)
 	r.DELETE("/:device_id", h.DeleteDevice)
 	r.PATCH("/:device_id/config", h.UpdateDeviceConfig)
 	r.POST("/:device_id/rotate-key", h.RotateKey)
@@ -271,6 +272,52 @@ func (h *Handler) DeleteDevice(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"status": "Device deleted"})
 }
+// UpdateDevice updates a device's name, type, and/or status.
+// PUT /dev/:device_id
+func (h *Handler) UpdateDevice(c *gin.Context) {
+	userID, err := auth.GetUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization required"})
+		return
+	}
+	role, _ := auth.GetUserRole(c)
+	deviceID := c.Param("device_id")
+
+	var req struct {
+		Name   string `json:"name"`
+		Type   string `json:"type"`
+		Status string `json:"status" binding:"omitempty,oneof=active suspended banned"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	device, err := h.Store.GetDevice(deviceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
+		return
+	}
+
+	if role != "admin" && device.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized"})
+		return
+	}
+	
+	// Only admin can change status
+	if req.Status != "" && role != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can update device status"})
+		return
+	}
+
+	if err := h.Store.UpdateDevice(deviceID, req.Name, req.Type, req.Status); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update device"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Device updated successfully"})
+}
+
 
 // UpdateDeviceConfig updates the desired configuration.
 // PATCH /dev/:device_id/config

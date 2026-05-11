@@ -111,7 +111,7 @@ func (h *Handler) RegisterRoutes(r gin.IRouter, authMiddleware gin.HandlerFunc) 
 func (h *Handler) RegisterAdminRoutes(r *gin.RouterGroup) {
 	r.GET("", h.ListUsers)
 	r.DELETE("/:id", h.AdminDeleteUser)
-	r.PUT("/:id", h.UpdateUserStatus)
+	r.PUT("/:id", h.UpdateUser)
 }
 
 // ============ Request/Response types ============
@@ -711,12 +711,13 @@ func (h *Handler) AdminDeleteUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted"})
 }
 
-// UpdateUserStatus updates a user's status (admin only).
+// UpdateUser updates a user's role and/or status (admin only).
 // PUT /admin/users/:id
-func (h *Handler) UpdateUserStatus(c *gin.Context) {
+func (h *Handler) UpdateUser(c *gin.Context) {
 	userID := c.Param("id")
 	var req struct {
-		Status string `json:"status" binding:"required,oneof=active suspended"`
+		Role   string `json:"role" binding:"omitempty,oneof=admin user"`
+		Status string `json:"status" binding:"omitempty,oneof=active suspended"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -729,15 +730,37 @@ func (h *Handler) UpdateUserStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.Store.UpdateUser(userID, user.Role, req.Status); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user status"})
+	newRole := user.Role
+	if req.Role != "" {
+		newRole = req.Role
+	}
+
+	newStatus := user.Status
+	if req.Status != "" {
+		newStatus = req.Status
+	}
+
+	if err := h.Store.UpdateUser(userID, newRole, newStatus); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
 		return
 	}
 
 	// If suspending, revoke all sessions
-	if req.Status == "suspended" {
+	if newStatus == "suspended" && user.Status != "suspended" {
 		h.Store.DeleteAllUserSessions(userID)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User status updated"})
+	updatedUser, _ := h.Store.GetUserByID(userID)
+	resp := userResponse{
+		ID:          updatedUser.ID,
+		Email:       updatedUser.Email,
+		Role:        updatedUser.Role,
+		Status:      updatedUser.Status,
+		DisplayName: updatedUser.DisplayName,
+		CreatedAt:   updatedUser.CreatedAt,
+		UpdatedAt:   updatedUser.UpdatedAt,
+		LastLoginAt: updatedUser.LastLoginAt,
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User updated", "user": resp})
 }
