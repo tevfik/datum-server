@@ -32,7 +32,9 @@ const swaggerUITemplate = `<!DOCTYPE html>
       (function() {
         const specContent = {{SPEC_CONTENT}};
         Scalar.createApiReference('#app', {
-          content: specContent,
+          spec: {
+            content: specContent,
+          },
           hideDownloadButton: false,
         });
       })();

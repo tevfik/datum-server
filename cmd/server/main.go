@@ -90,7 +90,7 @@ func securityHeadersMiddleware() gin.HandlerFunc {
 		// Content security policy
 		csp := os.Getenv("CONTENT_SECURITY_POLICY")
 		if csp == "" {
-			csp = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net; connect-src 'self' ws: wss:;"
+			csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.scalar.com; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.scalar.com; connect-src 'self' ws: wss:;"
 		}
 		c.Header("Content-Security-Policy", csp)
 		// Permissions policy
