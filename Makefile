@@ -24,15 +24,9 @@ export DEFAULT_SERVER_URL
 
 COMPOSE          = docker compose --env-file docker/.env -f docker/docker-compose.yml
 COMPOSE_DEV      = $(COMPOSE) -f docker/docker-compose.dev.yml
+COMPOSE_EXT      = docker compose --env-file docker/.env -f docker/docker-compose.external.yml
 SERVER_BINARY    = build/binaries/server
 CLI_BINARY       = build/binaries/datumctl
-
-# ── Remote deploy target (bezgin) ─────────────────────────────────────────────
-# The iot stack at DEPLOY_DIR manages postgres (iot-postgres) already.
-# deploy only rebuilds/restarts the datum-server service, never postgres.
-DEPLOY_HOST      ?= bezgin
-DEPLOY_DIR       ?= /opt/docker/iot
-DEPLOY_SRC       ?= $(DEPLOY_DIR)/datum-server
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 help: ## Show this help message
@@ -117,25 +111,29 @@ ps: ## Show running containers
 shell-server: ## Shell into server container
 	$(COMPOSE) exec datum-server sh
 
-# ── Deploy (bezgin — iot stack) ───────────────────────────────────────────────
-deploy: ## Deploy to bezgin: git pull + rebuild datum-server only (postgres managed by iot stack)
-	@echo "🚀 Deploying $(VERSION) to $(DEPLOY_HOST):$(DEPLOY_DIR)…"
-	ssh $(DEPLOY_HOST) "cd $(DEPLOY_SRC) && git pull"
-	ssh $(DEPLOY_HOST) "cd $(DEPLOY_DIR) && \
-		VERSION=$(VERSION) BUILD_DATE=$(BUILD_DATE) \
-		docker compose up -d --build datum-server"
-	@echo "✅ Deployed — tail logs: make deploy-logs"
+# ── Deploy (external Traefik + existing postgres) ─────────────────────────────
+# Run this on the server directly (ssh bezgin → cd /opt/docker/iot/datum-server).
+# Uses docker-compose.external.yml which has only the datum-server service —
+# postgres is already managed by the outer iot stack, so it won't be touched.
+# DATABASE_URL must be set in docker/.env (pointing to iot-postgres).
+deploy: ## Build and (re)start datum-server — run on server, postgres not touched
+	@echo "🚀 Deploying $(VERSION) ($(BUILD_DATE))..."
+	$(COMPOSE_EXT) build \
+		--build-arg VERSION="$(VERSION)" \
+		--build-arg BUILD_DATE="$(BUILD_DATE)"
+	$(COMPOSE_EXT) up -d --force-recreate
+	@echo "✅ Deployed"
 
-deploy-logs: ## Tail datum-server logs on bezgin
-	ssh $(DEPLOY_HOST) "docker logs -f iot-datum"
+deploy-logs: ## Tail datum-server logs
+	$(COMPOSE_EXT) logs -f
 
-deploy-stop: ## Stop datum-server on bezgin (leaves postgres running)
-	ssh $(DEPLOY_HOST) "cd $(DEPLOY_DIR) && docker compose stop datum-server"
+deploy-stop: ## Stop datum-server (leaves postgres running)
+	$(COMPOSE_EXT) stop
 
-deploy-ps: ## Show datum-server status on bezgin
-	ssh $(DEPLOY_HOST) "docker ps --filter 'name=iot-datum' --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'"
+deploy-ps: ## Show deployment status
+	$(COMPOSE_EXT) ps
 
-deploy-health: ## Check datum.bezg.in health endpoint
+deploy-health: ## Check health endpoint
 	@curl -sf https://datum.bezg.in/health | python3 -m json.tool
 
 # ── Development ───────────────────────────────────────────────────────────────
