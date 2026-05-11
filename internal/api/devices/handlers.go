@@ -103,12 +103,13 @@ func (h *Handler) CreateDevice(c *gin.Context) {
 	}
 
 	device := &storage.Device{
-		ID:        deviceID,
-		UserID:    userID,
-		Name:      req.Name,
-		Type:      req.Type,
-		APIKey:    apiKey,
-		CreatedAt: time.Now(),
+		ID:               deviceID,
+		UserID:           userID,
+		Name:             req.Name,
+		Type:             req.Type,
+		APIKey:           apiKey,
+		CreatedAt:        time.Now(),
+		ThingDescription: GetTemplateForType(req.Type),
 	}
 
 	if err := h.Store.CreateDevice(device); err != nil {
