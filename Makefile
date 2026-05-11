@@ -24,9 +24,15 @@ export DEFAULT_SERVER_URL
 
 COMPOSE          = docker compose --env-file docker/.env -f docker/docker-compose.yml
 COMPOSE_DEV      = $(COMPOSE) -f docker/docker-compose.dev.yml
-COMPOSE_EXT      = docker compose --env-file docker/.env -f docker/docker-compose.external.yml
 SERVER_BINARY    = build/binaries/server
 CLI_BINARY       = build/binaries/datumctl
+
+# ── Remote deploy target (bezgin) ─────────────────────────────────────────────
+# The iot stack at DEPLOY_DIR manages postgres (iot-postgres) already.
+# deploy only rebuilds/restarts the datum-server service, never postgres.
+DEPLOY_HOST      ?= bezgin
+DEPLOY_DIR       ?= /opt/docker/iot
+DEPLOY_SRC       ?= $(DEPLOY_DIR)/datum-server
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 help: ## Show this help message
@@ -111,23 +117,26 @@ ps: ## Show running containers
 shell-server: ## Shell into server container
 	$(COMPOSE) exec datum-server sh
 
-# ── Deploy (external Traefik) ────────────────────────────────────────────────
-deploy: ## Deploy to remote server (external Traefik, uses docker/.env)
-	@echo "🚀 Deploying $(VERSION) ($(BUILD_DATE))..."
-	$(COMPOSE_EXT) build --pull --no-cache \
-		--build-arg VERSION="$(VERSION)" \
-		--build-arg BUILD_DATE="$(BUILD_DATE)"
-	$(COMPOSE_EXT) up -d --force-recreate --remove-orphans
-	@echo "✅ Deployed"
+# ── Deploy (bezgin — iot stack) ───────────────────────────────────────────────
+deploy: ## Deploy to bezgin: git pull + rebuild datum-server only (postgres managed by iot stack)
+	@echo "🚀 Deploying $(VERSION) to $(DEPLOY_HOST):$(DEPLOY_DIR)…"
+	ssh $(DEPLOY_HOST) "cd $(DEPLOY_SRC) && git pull"
+	ssh $(DEPLOY_HOST) "cd $(DEPLOY_DIR) && \
+		VERSION=$(VERSION) BUILD_DATE=$(BUILD_DATE) \
+		docker compose up -d --build datum-server"
+	@echo "✅ Deployed — tail logs: make deploy-logs"
 
-deploy-logs: ## Tail logs from external deploy
-	$(COMPOSE_EXT) logs -f
+deploy-logs: ## Tail datum-server logs on bezgin
+	ssh $(DEPLOY_HOST) "docker logs -f iot-datum"
 
-deploy-stop: ## Stop external deployment
-	$(COMPOSE_EXT) down
+deploy-stop: ## Stop datum-server on bezgin (leaves postgres running)
+	ssh $(DEPLOY_HOST) "cd $(DEPLOY_DIR) && docker compose stop datum-server"
 
-deploy-ps: ## Show external deployment status
-	$(COMPOSE_EXT) ps
+deploy-ps: ## Show datum-server status on bezgin
+	ssh $(DEPLOY_HOST) "docker ps --filter 'name=iot-datum' --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'"
+
+deploy-health: ## Check datum.bezg.in health endpoint
+	@curl -sf https://datum.bezg.in/health | python3 -m json.tool
 
 # ── Development ───────────────────────────────────────────────────────────────
 dev: ## Start in dev mode with hot reload
@@ -238,7 +247,7 @@ clean-all: clean ## Clean everything including containers and volumes
 .PHONY: help build build-web prepare-assets build-server build-cli build-api-only build-all \
 	build-linux build-release release \
 	run stop restart logs ps shell-server \
-	deploy deploy-logs deploy-stop deploy-ps \
+	deploy deploy-logs deploy-stop deploy-ps deploy-health \
 	dev dev-logs run-server \
 	test test-coverage coverage-check test-storage test-auth test-integration bench test-load \
 	db-backup db-restore db-clean \
