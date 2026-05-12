@@ -41,8 +41,8 @@ export default function SidebarLayout() {
     const navItems = [
         { icon: LayoutDashboard, label: "Dashboard", href: "/" },
         { icon: Server, label: "Devices", href: "/devices" },
-        { icon: Zap, label: "Rules", href: "/rules" },
         { icon: Activity, label: "Explorer", href: "/explorer" },
+        { icon: Zap, label: "Rule Engine", href: "/rules" },
         { icon: SettingsIcon, label: "Settings", href: "/settings" },
     ];
 
