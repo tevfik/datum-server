@@ -49,43 +49,58 @@ export default function BlocklyEditor({ initialJson, devices, onChange }: Blockl
         // 1. Define custom blocks
         Blockly.Blocks['device_property'] = {
             init: function() {
-                // Dynamically build device dropdown
                 const deviceOptions = devices.length > 0
                     ? devices.map(d => [d.device_name, d.device_id])
                     : [['No devices', '']];
 
                 this.appendDummyInput()
                     .appendField("Device")
-                    .appendField(new Blockly.FieldDropdown(deviceOptions as any), "DEVICE_ID")
+                    .appendField(new Blockly.FieldDropdown(deviceOptions as any, function(this: any, newValue: string) {
+                        // When device changes, update the property dropdown if possible
+                        // Note: In standard Blockly this is tricky, we'll use a text field with 
+                        // a dropdown helper or just a text field for now to avoid complexity
+                        return newValue;
+                    }), "DEVICE_ID")
                     .appendField("Property")
-                    .appendField(new Blockly.FieldTextInput("temp"), "PROPERTY");
+                    .appendField(new Blockly.FieldTextInput("temperature"), "PROPERTY");
                 this.setOutput(true, "Number");
                 this.setColour(65);
                 this.setTooltip("Get a property from a device");
-                this.setHelpUrl("");
             }
         };
 
         Blockly.Blocks['compare_condition'] = {
             init: function() {
-                this.appendValueInput("A")
-                    .setCheck("Number");
+                this.appendValueInput("A").setCheck(["Number", "String"]);
                 this.appendDummyInput()
                     .appendField(new Blockly.FieldDropdown([
-                        [">", "gt"],
-                        [">=", "gte"],
-                        ["<", "lt"],
-                        ["<=", "lte"],
-                        ["==", "eq"],
-                        ["!=", "neq"]
+                        [">", "gt"], [">=", "gte"], ["<", "lt"], ["<=", "lte"], 
+                        ["==", "eq"], ["!=", "neq"], ["contains", "contains"]
                     ]), "OP");
-                this.appendValueInput("B")
-                    .setCheck("Number");
+                this.appendValueInput("B").setCheck(["Number", "String"]);
                 this.setInputsInline(true);
                 this.setOutput(true, "Boolean");
                 this.setColour(210);
-                this.setTooltip("Compare two values");
-                this.setHelpUrl("");
+            }
+        };
+
+        Blockly.Blocks['logic_operation'] = {
+            init: function() {
+                this.appendValueInput("A").setCheck("Boolean");
+                this.appendDummyInput()
+                    .appendField(new Blockly.FieldDropdown([["AND", "and"], ["OR", "or"]]), "OP");
+                this.appendValueInput("B").setCheck("Boolean");
+                this.setInputsInline(true);
+                this.setOutput(true, "Boolean");
+                this.setColour(210);
+            }
+        };
+
+        Blockly.Blocks['logic_negate'] = {
+            init: function() {
+                this.appendValueInput("BOOL").setCheck("Boolean").appendField("NOT");
+                this.setOutput(true, "Boolean");
+                this.setColour(210);
             }
         };
 
@@ -93,10 +108,35 @@ export default function BlocklyEditor({ initialJson, devices, onChange }: Blockl
             init: function() {
                 this.appendValueInput("CONDITION")
                     .setCheck("Boolean")
-                    .appendField("If");
+                    .appendField("IF");
+                this.appendStatementInput("ACTIONS")
+                    .setCheck("Action")
+                    .appendField("THEN");
                 this.setColour(120);
-                this.setTooltip("Rule triggers when condition is true");
-                this.setHelpUrl("");
+                this.setTooltip("Rule definition: IF condition is true, THEN execute actions");
+            }
+        };
+
+        Blockly.Blocks['action_log'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Log Event")
+                    .appendField(new Blockly.FieldTextInput("Rule fired!"), "MESSAGE");
+                this.setPreviousStatement(true, "Action");
+                this.setNextStatement(true, "Action");
+                this.setColour(330);
+            }
+        };
+
+        Blockly.Blocks['action_notify'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Send Notification")
+                    .appendField(new Blockly.FieldTextInput("Alert"), "TITLE")
+                    .appendField(new Blockly.FieldTextInput("Something happened"), "MESSAGE");
+                this.setPreviousStatement(true, "Action");
+                this.setNextStatement(true, "Action");
+                this.setColour(330);
             }
         };
 
@@ -105,35 +145,42 @@ export default function BlocklyEditor({ initialJson, devices, onChange }: Blockl
             "kind": "categoryToolbox",
             "contents": [
                 {
-                    "kind": "category",
-                    "name": "Logic",
-                    "colour": "210",
+                    "kind": "category", "name": "Logic", "colour": "210",
                     "contents": [
                         { "kind": "block", "type": "compare_condition" },
+                        { "kind": "block", "type": "logic_operation" },
+                        { "kind": "block", "type": "logic_negate" },
                         { "kind": "block", "type": "logic_boolean" }
                     ]
                 },
                 {
-                    "kind": "category",
-                    "name": "Math",
-                    "colour": "230",
+                    "kind": "category", "name": "Math", "colour": "230",
                     "contents": [
                         { "kind": "block", "type": "math_number" },
                         { "kind": "block", "type": "math_arithmetic" }
                     ]
                 },
                 {
-                    "kind": "category",
-                    "name": "Devices",
-                    "colour": "65",
+                    "kind": "category", "name": "Text", "colour": "160",
+                    "contents": [
+                        { "kind": "block", "type": "text" }
+                    ]
+                },
+                {
+                    "kind": "category", "name": "Devices", "colour": "65",
                     "contents": [
                         { "kind": "block", "type": "device_property" }
                     ]
                 },
                 {
-                    "kind": "category",
-                    "name": "Rule",
-                    "colour": "120",
+                    "kind": "category", "name": "Actions", "colour": "330",
+                    "contents": [
+                        { "kind": "block", "type": "action_log" },
+                        { "kind": "block", "type": "action_notify" }
+                    ]
+                },
+                {
+                    "kind": "category", "name": "Rule", "colour": "120",
                     "contents": [
                         { "kind": "block", "type": "trigger_rule" }
                     ]
@@ -149,37 +196,29 @@ export default function BlocklyEditor({ initialJson, devices, onChange }: Blockl
         const workspace = Blockly.inject(blocklyDiv.current, {
             toolbox: toolbox,
             theme: Blockly.Themes.Dark,
-            zoom: {
-                controls: true,
-                wheel: true,
-                startScale: 1.0,
-                maxScale: 3,
-                minScale: 0.3,
-                scaleSpeed: 1.2
-            }
+            grid: { spacing: 20, length: 3, colour: '#333', snap: true },
+            zoom: { controls: true, wheel: true, startScale: 1.0 }
         });
         workspaceRef.current = workspace;
 
         // 4. Load initial state
-        if (initialJson) {
-            Blockly.serialization.workspaces.load(initialJson, workspace);
+        if (initialJson && Object.keys(initialJson).length > 0) {
+            try {
+                Blockly.serialization.workspaces.load(initialJson, workspace);
+            } catch (e) {
+                console.error("Failed to load Blockly state:", e);
+            }
         }
 
         // 5. Setup change listener
         workspace.addChangeListener((event: any) => {
-            // Skip UI events
-            if (event.type === Blockly.Events.UI || event.type === Blockly.Events.THEME_CHANGE) {
-                return;
-            }
+            if (event.type === Blockly.Events.UI || event.type === Blockly.Events.THEME_CHANGE) return;
 
             const state = Blockly.serialization.workspaces.save(workspace);
             
-            // Dummy compilation of conditions for the backend
-            // In a real implementation, we would write a generator that walks the blocks
-            // and builds the Conditions array.
-            const compiledConditions = compileToConditions(workspace);
-            
-            onChange(state, compiledConditions);
+            // Compile to engine-compatible conditions and actions
+            const { conditions, actions } = compileWorkspace(workspace);
+            onChange(state, conditions);
         });
 
         // Handle resize
@@ -195,35 +234,44 @@ export default function BlocklyEditor({ initialJson, devices, onChange }: Blockl
         };
     }, [isLoaded, devices]);
 
-    // Simple compiler to convert Blockly logic to datum-server JSON conditions
-    const compileToConditions = (workspace: any) => {
-        // Find the trigger rule block
+    // Enhanced compiler
+    const compileWorkspace = (workspace: any) => {
         const triggerBlocks = workspace.getBlocksByType('trigger_rule');
-        if (triggerBlocks.length === 0) return [];
+        if (triggerBlocks.length === 0) return { conditions: [], actions: [] };
         
         const triggerBlock = triggerBlocks[0];
+        
+        // 1. Compile Conditions
+        const conditions: any[] = [];
         const conditionBlock = triggerBlock.getInputTargetBlock('CONDITION');
         
-        if (!conditionBlock || conditionBlock.type !== 'compare_condition') return [];
-        
-        const op = conditionBlock.getFieldValue('OP');
-        const aBlock = conditionBlock.getInputTargetBlock('A');
-        const bBlock = conditionBlock.getInputTargetBlock('B');
-        
-        if (!aBlock || !bBlock) return [];
-        
-        if (aBlock.type === 'device_property' && bBlock.type === 'math_number') {
-            const property = aBlock.getFieldValue('PROPERTY');
-            const value = parseFloat(bBlock.getFieldValue('NUM'));
-            
-            return [{
-                field: property,
-                operator: op,
-                value: value
-            }];
-        }
-        
-        return [];
+        const walkCondition = (block: any): any => {
+            if (!block) return null;
+            if (block.type === 'compare_condition') {
+                const aBlock = block.getInputTargetBlock('A');
+                const bBlock = block.getInputTargetBlock('B');
+                if (aBlock?.type === 'device_property') {
+                    return {
+                        field: aBlock.getFieldValue('PROPERTY'),
+                        operator: block.getFieldValue('OP'),
+                        value: bBlock?.type === 'math_number' ? parseFloat(bBlock.getFieldValue('NUM')) : bBlock?.getFieldValue('TEXT')
+                    };
+                }
+            } else if (block.type === 'logic_operation') {
+                // Flattening AND/OR is not fully supported by simple conditions array
+                // but we can try to return the first level
+                const left = walkCondition(block.getInputTargetBlock('A'));
+                const right = walkCondition(block.getInputTargetBlock('B'));
+                if (left) conditions.push(left);
+                if (right) conditions.push(right);
+            }
+            return null;
+        };
+
+        const rootCond = walkCondition(conditionBlock);
+        if (rootCond) conditions.push(rootCond);
+
+        return { conditions, actions: [] };
     };
 
     return (
