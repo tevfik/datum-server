@@ -3411,13 +3411,21 @@ paths:
                   fired: { type: boolean }
 
   /admin/rules:
-          in: path
-          required: true
-          schema:
-            type: string
+    get:
+      summary: List all rules (Admin)
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: Rule disabled
+          description: List of all rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rules:
+                    type: array
+                    items: { $ref: '#/components/schemas/Rule' }
 
   # --- Knowledge Packs (gateway to gleann) ---
   /packs:
