@@ -195,6 +195,30 @@ Run the server using the external configuration file (from the `docker` director
 docker-compose -f docker-compose.external.yml up -d
 ```
 
+### 🚀 Deployment via Makefile (Recommended)
+
+The project includes a comprehensive `Makefile` that simplifies common deployment tasks, especially on production servers. These commands should be run in the root of the repository on your target server.
+
+#### Automated Deploy
+Builds the latest image and (re)starts the server using the external configuration (safe for existing Postgres):
+```bash
+make deploy
+```
+
+#### Monitoring & Health
+Check if the server is running and responding correctly:
+```bash
+make deploy-ps      # Show running container status
+make deploy-logs    # Tail production logs
+make deploy-health  # Check internal health metrics
+```
+
+#### Maintenance
+Stop the server without affecting the database:
+```bash
+make deploy-stop
+```
+
 ### Local / Offline Deployment (No Domain/SSL)
 
 If you are deploying in an offline environment (no internet) or on a local network without a domain name, use the `docker-compose.local.yml` configuration. This setup bypasses Traefik and exposes the server directly on a port.

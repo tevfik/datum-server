@@ -86,7 +86,10 @@ make dev
 ### Docker Deployment
 
 ```bash
-# Production
+# Production (via Makefile - recommended)
+make deploy
+
+# Or via direct Docker Compose
 docker-compose up -d
 
 # Development (with hot reload)
