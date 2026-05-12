@@ -29,7 +29,7 @@ func setupTestEnv(t *testing.T) (*Handler, func()) {
 	store, err := storage.New(metaPath, dataPath, 24*time.Hour)
 	require.NoError(t, err)
 
-	handler := NewHandler(store, nil) // Null MQTT broker
+	handler := NewHandler(store, nil, nil) // Null MQTT broker, Null RuleEngine
 
 	cleanup := func() {
 		store.Close()

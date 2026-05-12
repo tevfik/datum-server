@@ -20,6 +20,7 @@ import (
 	mqtt_internal "datum-go/internal/mqtt"
 	"datum-go/internal/notify"
 	"datum-go/internal/processing"
+	"datum-go/internal/rules"
 	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -33,6 +34,7 @@ type Config struct {
 	EmailService *email.EmailSender
 	Notifier     *notify.NtfyClient
 	Dispatcher   *notify.Dispatcher
+	RuleEngine   *rules.Engine
 	PublicURL    string
 	Version      string
 	BuildDate    string
@@ -55,7 +57,7 @@ func RegisterDeviceRoutes(r gin.IRouter, cfg Config) {
 	devGroup := r.Group("/dev")
 	devGroup.Use(internalauth.UserAuthMiddleware(cfg.Store))
 	{
-		devicesHandler := devices.NewHandler(cfg.Store, cfg.MQTTBroker)
+		devicesHandler := devices.NewHandler(cfg.Store, cfg.MQTTBroker, cfg.RuleEngine)
 		devicesHandler.RegisterRoutes(devGroup)
 	}
 }
@@ -133,7 +135,7 @@ func RegisterStreamRoutes(r gin.IRouter, cfg Config) {
 // RegisterSpecializedRoutes registers hybrid auth routes for devices and data.
 // These cover /dev/:device_id and /dev/:device_id/data which support both User and Device auth.
 func RegisterSpecializedRoutes(r gin.IRouter, cfg Config) {
-	devicesHandler := devices.NewHandler(cfg.Store, cfg.MQTTBroker)
+	devicesHandler := devices.NewHandler(cfg.Store, cfg.MQTTBroker, cfg.RuleEngine)
 	dataHandler := data.NewHandler(cfg.Store, cfg.Processor, cfg.MQTTBroker)
 
 	hybridGroup := r.Group("/dev")

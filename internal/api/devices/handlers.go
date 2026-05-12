@@ -11,23 +11,27 @@ import (
 	"datum-go/internal/auth"
 	"datum-go/internal/logger"
 	"datum-go/internal/mqtt"
+	"datum-go/internal/rules"
 	"datum-go/internal/storage"
 	"datum-go/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // Handler provides device HTTP handlers.
 type Handler struct {
 	Store      storage.Provider
 	MQTTBroker *mqtt.Broker
+	RuleEngine *rules.Engine
 }
 
 // NewHandler creates a new device handler with dependencies.
-func NewHandler(store storage.Provider, broker *mqtt.Broker) *Handler {
+func NewHandler(store storage.Provider, broker *mqtt.Broker, ruleEngine *rules.Engine) *Handler {
 	return &Handler{
 		Store:      store,
 		MQTTBroker: broker,
+		RuleEngine: ruleEngine,
 	}
 }
 
@@ -115,6 +119,15 @@ func (h *Handler) CreateDevice(c *gin.Context) {
 	if err := h.Store.CreateDevice(device); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create device"})
 		return
+	}
+
+	// Auto-provision default rules if the rule engine is available
+	if h.RuleEngine != nil {
+		defaultRules := GetDefaultRulesForType(req.Type, deviceID)
+		for _, r := range defaultRules {
+			r.ID = "rule_" + uuid.New().String()[:8]
+			h.RuleEngine.AddRule(r)
+		}
 	}
 
 	// Invalidate ACL cache so MQTT picks up the new device immediately

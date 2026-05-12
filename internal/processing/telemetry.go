@@ -10,12 +10,14 @@ import (
 
 	"datum-go/internal/logger"
 	"datum-go/internal/metrics"
+	"datum-go/internal/rules"
 	"datum-go/internal/storage"
 )
 
 // TelemetryProcessor handles the processing of incoming device telemetry
 type TelemetryProcessor struct {
 	Store         storage.Provider
+	ruleEngine    *rules.Engine
 	dataChan      chan *storage.DataPoint
 	flushInterval time.Duration
 	batchSize     int
@@ -52,6 +54,11 @@ func NewTelemetryProcessor(store storage.Provider) *TelemetryProcessor {
 // DroppedCount returns the number of data points dropped due to full buffer.
 func (tp *TelemetryProcessor) DroppedCount() uint64 {
 	return atomic.LoadUint64(&tp.droppedCount)
+}
+
+// SetRuleEngine attaches the rule engine for telemetry evaluation.
+func (tp *TelemetryProcessor) SetRuleEngine(re *rules.Engine) {
+	tp.ruleEngine = re
 }
 
 // BufferUsage returns the current buffer utilization as a fraction (0.0 - 1.0).
@@ -132,6 +139,11 @@ func (tp *TelemetryProcessor) Process(deviceID string, data map[string]interface
 		atomic.AddUint64(&tp.droppedCount, 1)
 		metrics.GetGlobalMetrics().IncrementDropped(1)
 		return nil, fmt.Errorf("telemetry buffer full, dropping data (total dropped: %d)", atomic.LoadUint64(&tp.droppedCount))
+	}
+
+	// Evaluate rules
+	if tp.ruleEngine != nil {
+		tp.ruleEngine.Evaluate(deviceID, data)
 	}
 
 	// Check for pending commands to notify the device/response

@@ -402,6 +402,10 @@ func main() {
 	ruleEngine = rules.NewEngine(webhookDispatcher, func(topic string, payload []byte) error {
 		return mqttBroker.Publish(topic, payload, false)
 	})
+	
+	// Connect Rule Engine to Telemetry Processor
+	telemetryProcessor.SetRuleEngine(ruleEngine)
+
 	// Load rules from file if exists
 	if rulesData, err := os.ReadFile(filepath.Join(dataDirPath, "rules.json")); err == nil {
 		if err := ruleEngine.LoadFromJSON(rulesData); err != nil {
@@ -537,6 +541,7 @@ func main() {
 		EmailService: emailService,
 		Notifier:     notifier,
 		Dispatcher:   dispatcher,
+		RuleEngine:   ruleEngine,
 		PublicURL:    publicURL,
 		Version:      Version,
 		BuildDate:    BuildDate,
