@@ -4,6 +4,7 @@ import {
     useCreateRule, useUpdateRule, useDeviceDiscovery,
     Rule, DeviceInfo, RuleCondition, RuleAction
 } from "../hooks/useRules";
+import BlocklyEditor from "./BlocklyEditor";
 
 interface RuleEditorProps {
     rule: Rule | null;
@@ -53,6 +54,7 @@ export default function RuleEditor({ rule, devices, onClose }: RuleEditorProps) 
     const [conditions, setConditions] = useState<RuleCondition[]>(
         rule?.logic?.conditions || rule?.conditions || [{ field: "", operator: "gt", value: 0 }]
     );
+    const [blocklyJson, setBlocklyJson] = useState<Record<string, any>>(rule?.logic?.blockly_json || {});
     const [luaScript, setLuaScript] = useState(rule?.logic?.lua_script || "-- Access device data via ctx.data\n-- Example: return ctx.data.temperature > 30\n\nreturn false");
     const [actions, setActions] = useState<RuleAction[]>(
         rule?.actions || [{ type: "log", config: {} }]
@@ -111,6 +113,7 @@ export default function RuleEditor({ rule, devices, onClose }: RuleEditorProps) 
                 type: logicType,
                 logic_op: logicOp,
                 conditions: logicType !== "lua" ? conditions : undefined,
+                blockly_json: logicType === "blockly" ? blocklyJson : undefined,
                 lua_script: logicType === "lua" ? luaScript : undefined,
             },
             actions,
@@ -339,6 +342,22 @@ export default function RuleEditor({ rule, devices, onClose }: RuleEditorProps) 
                         >
                             + Add condition
                         </button>
+                    </div>
+                )}
+
+                {/* Blockly editor */}
+                {logicType === "blockly" && (
+                    <div className="mt-4">
+                        <BlocklyEditor
+                            devices={devices}
+                            initialJson={blocklyJson}
+                            onChange={(json, compiledConditions) => {
+                                setBlocklyJson(json);
+                                if (compiledConditions && compiledConditions.length > 0) {
+                                    setConditions(compiledConditions);
+                                }
+                            }}
+                        />
                     </div>
                 )}
 
