@@ -584,44 +584,109 @@ components:
       properties:
         id:
           type: string
-          description: Unique rule identifier
         name:
           type: string
-          description: Human-readable rule name
         description:
           type: string
         device_id:
           type: string
-          description: Target device (empty for all devices)
-        conditions:
-          type: array
-          items:
-            type: object
-            properties:
-              field:
-                type: string
-              operator:
-                type: string
-                enum: [gt, gte, lt, lte, eq, neq, contains]
-              value: {}
+          description: Optional device filter (legacy/shortcut)
+        trigger:
+          $ref: '#/components/schemas/RuleTrigger'
+        logic:
+          $ref: '#/components/schemas/RuleLogic'
         actions:
           type: array
           items:
-            type: object
-            properties:
-              type:
-                type: string
-                enum: [webhook, log, mqtt]
-              config:
-                type: object
+            $ref: '#/components/schemas/RuleAction'
         enabled:
           type: boolean
         fire_count:
           type: integer
-      required:
-        - name
-        - conditions
-        - actions
+        last_fired:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+      required: [name, trigger, logic, actions]
+
+    RuleTrigger:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [on_data, scheduled, manual]
+        schedule:
+          type: string
+          description: Cron expression (for scheduled trigger)
+        device_id:
+          type: string
+          description: Specific device to trigger on (for on_data)
+
+    RuleLogic:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [conditions, blockly, lua]
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleCondition'
+        logic_op:
+          type: string
+          enum: [and, or]
+          default: and
+        blockly_json:
+          type: object
+          description: Raw Blockly workspace JSON
+        lua_script:
+          type: string
+          description: Sandboxed Lua code
+
+    RuleCondition:
+      type: object
+      required: [field, operator, value]
+      properties:
+        field:
+          type: string
+        operator:
+          type: string
+          enum: [gt, gte, lt, lte, eq, neq, contains]
+        value: {}
+
+    RuleAction:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [log, notify, webhook, mqtt, command]
+        config:
+          type: object
+
+    DeviceInfo:
+      type: object
+      properties:
+        device_id:
+          type: string
+        device_name:
+          type: string
+        properties:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeviceProperty'
+
+    DeviceProperty:
+      type: object
+      properties:
+        key:
+          type: string
+        title:
+          type: string
 
     PackManifest:
       type: object
@@ -3189,13 +3254,11 @@ paths:
         '200':
           description: Service is alive
 
-  # --- Rule Engine ---
-  /admin/rules:
+  /rules:
     get:
-      summary: List all rules
+      summary: List owned rules
       tags: [Rules]
-      security:
-        - BearerAuth: []
+      security: [{ bearerAuth: [] }]
       responses:
         '200':
           description: List of rules
@@ -3206,83 +3269,148 @@ paths:
                 properties:
                   rules:
                     type: array
-                    items:
-                      $ref: '#/components/schemas/Rule'
+                    items: { $ref: '#/components/schemas/Rule' }
     post:
-      summary: Create a new rule
+      summary: Create rule
       tags: [Rules]
-      security:
-        - BearerAuth: []
+      security: [{ bearerAuth: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/Rule'
+            schema: { $ref: '#/components/schemas/Rule' }
       responses:
         '201':
           description: Rule created
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Rule'
+              schema: { $ref: '#/components/schemas/Rule' }
 
-  /admin/rules/{rule_id}:
+  /rules/discovery:
     get:
-      summary: Get rule by ID
+      summary: Discover device properties for rule logic
       tags: [Rules]
-      security:
-        - BearerAuth: []
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: List of devices with properties
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devices:
+                    type: array
+                    items: { $ref: '#/components/schemas/DeviceInfo' }
+
+  /rules/blocks:
+    get:
+      summary: Get Blockly block definitions
+      tags: [Rules]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: JSON describing available blocks
+          content:
+            application/json:
+              schema: { type: object }
+
+  /rules/{rule_id}:
+    get:
+      summary: Get rule
+      tags: [Rules]
+      security: [{ bearerAuth: [] }]
       parameters:
         - name: rule_id
           in: path
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       responses:
         '200':
           description: Rule details
-        '404':
-          description: Rule not found
-    delete:
-      summary: Delete a rule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rule' }
+    put:
+      summary: Update rule
       tags: [Rules]
-      security:
-        - BearerAuth: []
+      security: [{ bearerAuth: [] }]
       parameters:
         - name: rule_id
           in: path
           required: true
-          schema:
-            type: string
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Rule' }
+      responses:
+        '200':
+          description: Rule updated
+    delete:
+      summary: Delete rule
+      tags: [Rules]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: rule_id
+          in: path
+          required: true
+          schema: { type: string }
       responses:
         '200':
           description: Rule deleted
 
-  /admin/rules/{rule_id}/enable:
+  /rules/{rule_id}/enable:
     put:
-      summary: Enable a rule
+      summary: Enable rule
       tags: [Rules]
-      security:
-        - BearerAuth: []
+      security: [{ bearerAuth: [] }]
       parameters:
         - name: rule_id
           in: path
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       responses:
         '200':
           description: Rule enabled
 
-  /admin/rules/{rule_id}/disable:
+  /rules/{rule_id}/disable:
     put:
-      summary: Disable a rule
+      summary: Disable rule
       tags: [Rules]
-      security:
-        - BearerAuth: []
+      security: [{ bearerAuth: [] }]
       parameters:
         - name: rule_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Rule disabled
+
+  /rules/{rule_id}/trigger:
+    post:
+      summary: Manually trigger a rule
+      tags: [Rules]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: rule_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Trigger result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  triggered: { type: boolean }
+                  fired: { type: boolean }
+
+  /admin/rules:
           in: path
           required: true
           schema:
