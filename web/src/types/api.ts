@@ -3490,6 +3490,119 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/notify/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send test notification to a user
+         * @description Dispatches a test notification to the specified user via all configured
+         *     notification channels (in-app SSE, ntfy, embedded ntfy broker).
+         *     Useful for verifying mobile push notification integration.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Target user ID */
+                        user_id: string;
+                        /** @default Test Notification */
+                        title?: string;
+                        message: string;
+                        /**
+                         * @default high
+                         * @enum {string}
+                         */
+                        priority?: "min" | "low" | "default" | "high" | "max";
+                    };
+                };
+            };
+            responses: {
+                /** @description Notification dispatched */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message?: string;
+                            user_id?: string;
+                            topic?: string;
+                        };
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                /** @description Notification dispatcher not initialized */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/firmware": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload firmware binary
+         * @description Upload a firmware binary file for OTA distribution to devices.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /** Format: binary */
+                        file?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Firmware uploaded */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                400: components["responses"]["BadRequest"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/logs": {
         parameters: {
             query?: never;
@@ -3546,6 +3659,44 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/logs/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream logs in real-time (WebSocket)
+         * @description WebSocket endpoint for real-time log streaming.
+         *     Sends newline-delimited JSON log entries as they occur.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description WebSocket upgrade */
+                101: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4572,6 +4723,357 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List knowledge packs
+         * @description Returns all packs available in the connected gleann instance.
+         *     Use `?app=ekiyo` to retrieve only packs relevant to a specific app.
+         *     Responses are cached on the server for 5 minutes; use `If-None-Match`
+         *     with the returned `ETag` to avoid unnecessary data transfer.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Filter packs by app hint (e.g. `ekiyo`) */
+                    app?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Pack list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            packs?: components["schemas"]["PackManifest"][];
+                            count?: number;
+                        };
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Upstream gleann unreachable */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/packs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get pack manifest */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Pack identifier (e.g. `crops-tr`) */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Pack manifest */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PackManifest"];
+                    };
+                };
+                /** @description Not modified (ETag matched) */
+                304: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Pack not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Upstream gleann unreachable */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/packs/{id}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get full pack contents
+         * @description Returns the manifest and the full items array.
+         *     Supports conditional requests via `If-None-Match` / `ETag` so
+         *     offline-first clients only re-download when the pack has changed.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Pack identifier */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Manifest + items */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            manifest?: components["schemas"]["PackManifest"];
+                            items?: {
+                                [key: string]: unknown;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Not modified (ETag matched) */
+                304: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Pack not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Upstream gleann unreachable */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/packs/{id}/items/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a single item by slug */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Pack identifier */
+                    id: string;
+                    /** @description Item slug (e.g. `pepper_capia`) */
+                    slug: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Item object */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Not modified (ETag matched) */
+                304: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Pack or item not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Upstream gleann unreachable */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/packs/{id}/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search pack items
+         * @description Case-insensitive substring search across `search.fields` declared in `pack.yaml`.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Search query */
+                    q: string;
+                    /** @description Maximum number of results */
+                    n?: number;
+                };
+                header?: never;
+                path: {
+                    /** @description Pack identifier */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Search results */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            results?: {
+                                [key: string]: unknown;
+                            }[];
+                            count?: number;
+                            query?: string;
+                        };
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Pack not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Upstream gleann unreachable */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sys/metrics": {
         parameters: {
             query?: never;
@@ -4864,6 +5366,41 @@ export interface components {
             }[];
             enabled?: boolean;
             fire_count?: number;
+        };
+        /** @description Knowledge pack manifest as declared in pack.yaml. */
+        PackManifest: {
+            /** @description Unique pack identifier (e.g. `crops-tr`) */
+            id?: string;
+            /** @description Semantic version string */
+            version?: string;
+            /** @description Pack schema version (bumped on breaking manifest changes) */
+            schema_version?: number;
+            /** @description BCP 47 language tag (e.g. `tr`) */
+            locale?: string;
+            /** @description Human-readable display name */
+            title?: string;
+            description?: string;
+            /**
+             * @description Access tier controlling gateway authorization
+             * @enum {string}
+             */
+            tier?: "free" | "premium";
+            /** @description YAML data file names relative to pack directory */
+            content_files?: string[];
+            /** @description SHA-256[:12] content hash — changes whenever the pack changes */
+            etag?: string;
+            search?: {
+                /** @description Item fields used for substring search */
+                fields?: string[];
+                /** @description Whether semantic (vector) search is available */
+                semantic?: boolean;
+            };
+            /** @description Per-app metadata hints */
+            app_hints?: {
+                app?: string;
+                required?: boolean;
+                auto_load?: boolean;
+            }[];
         };
     };
     responses: {

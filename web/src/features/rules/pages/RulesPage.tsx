@@ -1,12 +1,12 @@
 import { useState } from "react";
 import {
-    Zap, Plus, Power, PowerOff, Trash2, Play, Clock, ChevronRight,
-    AlertTriangle, Code
+    Zap, Plus, Power, PowerOff, Trash2, Play, Clock, ChevronRight, Code
 } from "lucide-react";
 import {
-    useRules, useCreateRule, useDeleteRule, useToggleRule, useTriggerRule,
-    useDeviceDiscovery, Rule
+    useRules, useDeleteRule, useToggleRule, useTriggerRule,
+    useDeviceDiscovery
 } from "../hooks/useRules";
+import type { Rule } from "../hooks/useRules";
 import RuleEditor from "../components/RuleEditor";
 
 export default function RulesPage() {

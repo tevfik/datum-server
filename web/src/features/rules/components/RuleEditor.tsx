@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { ArrowLeft, Save, Zap, Code, Puzzle } from "lucide-react";
 import {
-    useCreateRule, useUpdateRule, useDeviceDiscovery,
-    Rule, DeviceInfo, RuleCondition, RuleAction
+    useCreateRule, useUpdateRule
 } from "../hooks/useRules";
+import type { Rule, DeviceInfo, RuleCondition, RuleAction } from "../hooks/useRules";
 import BlocklyEditor from "./BlocklyEditor";
 
 interface RuleEditorProps {

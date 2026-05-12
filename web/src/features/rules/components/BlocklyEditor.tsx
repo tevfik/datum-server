@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { DeviceInfo } from '../hooks/useRules';
+import { useEffect, useRef, useState } from 'react';
+import type { DeviceInfo } from '../hooks/useRules';
 
 interface BlocklyEditorProps {
     initialJson?: Record<string, any>;
