@@ -2241,6 +2241,24 @@ func (s *Storage) ListDocuments(userID, collection string) ([]map[string]interfa
 	return docs, err
 }
 
+func (s *Storage) ListAllDocuments(collection string) ([]map[string]interface{}, error) {
+	var docs []map[string]interface{}
+	err := s.db.View(func(tx *buntdb.Tx) error {
+		tx.AscendKeys("doc:*", func(key, value string) bool {
+			parts := strings.Split(key, ":")
+			if len(parts) >= 4 && parts[2] == collection {
+				var doc map[string]interface{}
+				if err := json.Unmarshal([]byte(value), &doc); err == nil {
+					docs = append(docs, doc)
+				}
+			}
+			return true
+		})
+		return nil
+	})
+	return docs, err
+}
+
 func (s *Storage) GetDocument(userID, collection, docID string) (map[string]interface{}, error) {
 	var doc map[string]interface{}
 	err := s.db.View(func(tx *buntdb.Tx) error {

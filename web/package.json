@@ -8,7 +8,7 @@
     "build": "npm run generate:types && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "generate:types": "openapi-typescript ../cmd/server/openapi.yaml -o src/types/api.ts"
+    "generate:types": "npx openapi-typescript ../cmd/server/openapi.yaml -o src/types/api.ts"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",

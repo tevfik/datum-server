@@ -69,6 +69,35 @@ func (s *PostgresStore) ListDocuments(userID, collection string) ([]map[string]i
 	return docs, nil
 }
 
+// ListAllDocuments retrieves all documents in a collection across all users
+func (s *PostgresStore) ListAllDocuments(collection string) ([]map[string]interface{}, error) {
+	ctx, cancel := queryCtx()
+	defer cancel()
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT data FROM documents
+		WHERE collection = $1
+		ORDER BY created_at DESC
+	`, collection)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var docs []map[string]interface{}
+	for rows.Next() {
+		var jsonData []byte
+		if err := rows.Scan(&jsonData); err != nil {
+			return nil, err
+		}
+		var doc map[string]interface{}
+		if err := json.Unmarshal(jsonData, &doc); err != nil {
+			continue
+		}
+		docs = append(docs, doc)
+	}
+	return docs, nil
+}
+
 // GetDocument retrieves a specific document
 func (s *PostgresStore) GetDocument(userID, collection, docID string) (map[string]interface{}, error) {
 	ctx, cancel := queryCtx()

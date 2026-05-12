@@ -212,7 +212,7 @@ export default function RuleEditor({ rule, devices, onClose }: RuleEditorProps) 
                         <option value="">All devices</option>
                         {devices.map(d => (
                             <option key={d.device_id} value={d.device_id}>
-                                {d.device_name} ({d.device_type})
+                                {d.device_name} ({d.device_type} - {d.device_id.split('_').pop()})
                             </option>
                         ))}
                     </select>
@@ -275,7 +275,7 @@ export default function RuleEditor({ rule, devices, onClose }: RuleEditorProps) 
                 </div>
 
                 {/* Conditions editor */}
-                {(logicType === "conditions" || logicType === "blockly") && (
+                {logicType === "conditions" && (
                     <div className="space-y-3">
                         <div className="flex items-center gap-2">
                             <label className="text-sm font-medium">Match</label>
@@ -446,7 +446,9 @@ export default function RuleEditor({ rule, devices, onClose }: RuleEditorProps) 
                                 >
                                     <option value="">Same device</option>
                                     {devices.map(d => (
-                                        <option key={d.device_id} value={d.device_id}>{d.device_name}</option>
+                                        <option key={d.device_id} value={d.device_id}>
+                                            {d.device_name} ({d.device_type} - {d.device_id.split('_').pop()})
+                                        </option>
                                     ))}
                                 </select>
                                 <input

@@ -3,6 +3,7 @@ package rules
 import (
 	"net/http"
 
+	"datum-go/internal/auth"
 	"datum-go/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +38,17 @@ func (h *Handler) DiscoverDevices(c *gin.Context) {
 		return
 	}
 
-	devices, err := h.store.GetUserDevices(userID)
+	role, _ := auth.GetUserRole(c)
+
+	var devices []storage.Device
+	var err error
+
+	if role == "admin" {
+		devices, err = h.store.GetAllDevices()
+	} else {
+		devices, err = h.store.GetUserDevices(userID)
+	}
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch devices"})
 		return

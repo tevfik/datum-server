@@ -4526,14 +4526,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/rules": {
+    "/rules": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List all rules */
+        /** List owned rules */
         get: {
             parameters: {
                 query?: never;
@@ -4557,7 +4557,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** Create a new rule */
+        /** Create rule */
         post: {
             parameters: {
                 query?: never;
@@ -4588,14 +4588,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/rules/{rule_id}": {
+    "/rules/discovery": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get rule by ID */
+        /** Discover device properties for rule logic */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of devices with properties */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            devices?: components["schemas"]["DeviceInfo"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rules/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Blockly block definitions */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description JSON describing available blocks */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get rule */
         get: {
             parameters: {
                 query?: never;
@@ -4612,10 +4686,30 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["Rule"];
+                    };
                 };
-                /** @description Rule not found */
-                404: {
+            };
+        };
+        /** Update rule */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    rule_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["Rule"];
+                };
+            };
+            responses: {
+                /** @description Rule updated */
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -4623,9 +4717,8 @@ export interface paths {
                 };
             };
         };
-        put?: never;
         post?: never;
-        /** Delete a rule */
+        /** Delete rule */
         delete: {
             parameters: {
                 query?: never;
@@ -4651,7 +4744,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/rules/{rule_id}/enable": {
+    "/rules/{rule_id}/enable": {
         parameters: {
             query?: never;
             header?: never;
@@ -4659,7 +4752,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Enable a rule */
+        /** Enable rule */
         put: {
             parameters: {
                 query?: never;
@@ -4687,7 +4780,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/rules/{rule_id}/disable": {
+    "/rules/{rule_id}/disable": {
         parameters: {
             query?: never;
             header?: never;
@@ -4695,7 +4788,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Disable a rule */
+        /** Disable rule */
         put: {
             parameters: {
                 query?: never;
@@ -4716,6 +4809,85 @@ export interface paths {
                 };
             };
         };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rules/{rule_id}/trigger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Manually trigger a rule */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    rule_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Trigger result */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            triggered?: boolean;
+                            fired?: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all rules (Admin) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of all rules */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            rules?: components["schemas"]["Rule"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -5346,26 +5518,62 @@ export interface components {
             request_id?: string;
         };
         Rule: {
-            /** @description Unique rule identifier */
             id?: string;
-            /** @description Human-readable rule name */
             name: string;
             description?: string;
-            /** @description Target device (empty for all devices) */
+            /** @description Optional device filter (legacy/shortcut) */
             device_id?: string;
-            conditions: {
-                field?: string;
-                /** @enum {string} */
-                operator?: "gt" | "gte" | "lt" | "lte" | "eq" | "neq" | "contains";
-                value?: unknown;
-            }[];
-            actions: {
-                /** @enum {string} */
-                type?: "webhook" | "log" | "mqtt";
-                config?: Record<string, never>;
-            }[];
+            trigger: components["schemas"]["RuleTrigger"];
+            logic: components["schemas"]["RuleLogic"];
+            actions: components["schemas"]["RuleAction"][];
             enabled?: boolean;
             fire_count?: number;
+            /** Format: date-time */
+            last_fired?: string;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        RuleTrigger: {
+            /** @enum {string} */
+            type: "on_data" | "scheduled" | "manual";
+            /** @description Cron expression (for scheduled trigger) */
+            schedule?: string;
+            /** @description Specific device to trigger on (for on_data) */
+            device_id?: string;
+        };
+        RuleLogic: {
+            /** @enum {string} */
+            type: "conditions" | "blockly" | "lua";
+            conditions?: components["schemas"]["RuleCondition"][];
+            /**
+             * @default and
+             * @enum {string}
+             */
+            logic_op: "and" | "or";
+            /** @description Raw Blockly workspace JSON */
+            blockly_json?: Record<string, never>;
+            /** @description Sandboxed Lua code */
+            lua_script?: string;
+        };
+        RuleCondition: {
+            field: string;
+            /** @enum {string} */
+            operator: "gt" | "gte" | "lt" | "lte" | "eq" | "neq" | "contains";
+            value: unknown;
+        };
+        RuleAction: {
+            /** @enum {string} */
+            type: "log" | "notify" | "webhook" | "mqtt" | "command";
+            config?: Record<string, never>;
+        };
+        DeviceInfo: {
+            device_id?: string;
+            device_name?: string;
+            properties?: components["schemas"]["DeviceProperty"][];
+        };
+        DeviceProperty: {
+            key?: string;
+            title?: string;
         };
         /** @description Knowledge pack manifest as declared in pack.yaml. */
         PackManifest: {

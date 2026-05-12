@@ -134,6 +134,7 @@ type Provider interface {
 	// Generic Document Store (Collections)
 	CreateDocument(userID, collection string, doc map[string]interface{}) (string, error)
 	ListDocuments(userID, collection string) ([]map[string]interface{}, error)
+	ListAllDocuments(collection string) ([]map[string]interface{}, error)
 	GetDocument(userID, collection, docID string) (map[string]interface{}, error)
 	UpdateDocument(userID, collection, docID string, doc map[string]interface{}) error
 	DeleteDocument(userID, collection, docID string) error

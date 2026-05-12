@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"datum-go/internal/auth"
 	"datum-go/internal/rules"
 	"datum-go/internal/storage"
 
@@ -18,6 +19,12 @@ type Handler struct {
 	store  storage.Provider
 }
 
+// Config groups dependencies for the Rule Engine Handler
+type Config struct {
+	RuleEngine *rules.Engine
+	Store      storage.Provider
+}
+
 // NewHandler creates a new rules API handler.
 func NewHandler(engine *rules.Engine, store storage.Provider) *Handler {
 	return &Handler{
@@ -27,7 +34,7 @@ func NewHandler(engine *rules.Engine, store storage.Provider) *Handler {
 }
 
 // RegisterRoutes registers rule management routes on the given group.
-func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
+func (h *Handler) RegisterRoutes(rg gin.IRouter) {
 	rg.GET("", h.ListRules)
 	rg.POST("", h.CreateRule)
 	rg.GET("/blocks", h.GetBlockDefinitions)     // Blockly block metadata
@@ -42,13 +49,21 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 
 func (h *Handler) ListRules(c *gin.Context) {
 	userID := c.GetString("user_id")
-	if userID == "" {
-		// Admin mode: return all rules from engine
+	role, _ := auth.GetUserRole(c)
+
+	var docs []map[string]interface{}
+	var err error
+
+	if role == "admin" {
+		docs, err = h.store.ListAllDocuments("rules")
+	} else if userID != "" {
+		docs, err = h.store.ListDocuments(userID, "rules")
+	} else {
+		// Fallback for non-user contexts if any
 		c.JSON(http.StatusOK, gin.H{"rules": h.engine.ListRules()})
 		return
 	}
 
-	docs, err := h.store.ListDocuments(userID, "rules")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch rules"})
 		return
@@ -75,7 +90,8 @@ func (h *Handler) CreateRule(c *gin.Context) {
 	if r.Trigger.DeviceID != "" {
 		effDeviceID = r.Trigger.DeviceID
 	}
-	if effDeviceID != "" && userID != "" && h.store != nil {
+	role, _ := auth.GetUserRole(c)
+	if effDeviceID != "" && userID != "" && role != "admin" && h.store != nil {
 		dev, err := h.store.GetDevice(effDeviceID)
 		if err != nil || dev.UserID != userID {
 			c.JSON(http.StatusForbidden, gin.H{"error": "You do not own this device"})
@@ -121,8 +137,10 @@ func (h *Handler) UpdateRule(c *gin.Context) {
 	r.ID = id
 	r.OwnerID = userID
 
+	role, _ := auth.GetUserRole(c)
+
 	// 1. Ownership check (if user mode)
-	if userID != "" {
+	if userID != "" && role != "admin" {
 		existing, err := h.store.GetDocument(userID, "rules", id)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "rule not found or access denied"})
