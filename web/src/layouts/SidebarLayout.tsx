@@ -7,7 +7,8 @@ import {
     Menu,
     Settings as SettingsIcon,
     BookOpen,
-    ExternalLink
+    ExternalLink,
+    Zap
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,7 @@ export default function SidebarLayout() {
     const navItems = [
         { icon: LayoutDashboard, label: "Dashboard", href: "/" },
         { icon: Server, label: "Devices", href: "/devices" },
+        { icon: Zap, label: "Rules", href: "/rules" },
         { icon: Activity, label: "Explorer", href: "/explorer" },
         { icon: SettingsIcon, label: "Settings", href: "/settings" },
     ];

@@ -15,7 +15,7 @@ import (
 func setupTestRouter() (*gin.Engine, *rules.Engine) {
 	gin.SetMode(gin.TestMode)
 	eng := rules.NewEngine(nil, nil)
-	h := NewHandler(eng)
+	h := NewHandler(eng, nil) // Nil store for simple engine tests
 
 	r := gin.New()
 	g := r.Group("/admin/rules")

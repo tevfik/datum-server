@@ -11,6 +11,7 @@ import (
 	mqtt_api "datum-go/internal/api/mqtt"
 	"datum-go/internal/api/provisioning"
 	"datum-go/internal/api/public"
+	rules_api "datum-go/internal/api/rules"
 	"datum-go/internal/api/sse"
 	"datum-go/internal/api/stream"
 	"datum-go/internal/api/system"
@@ -207,6 +208,22 @@ func RegisterProvisioningRoutes(r gin.IRouter, cfg Config) {
 	provHandler.RegisterRoutes(r, internalauth.UserAuthMiddleware(cfg.Store), internalauth.RateLimitMiddleware())
 }
 
+// RegisterRuleRoutes registers rule engine management routes.
+func RegisterRuleRoutes(r gin.IRouter, cfg Config) {
+	rulesHandler := rules_api.NewHandler(cfg.RuleEngine, cfg.Store)
+
+	// User routes
+	userGroup := r.Group("/rules")
+	userGroup.Use(internalauth.UserAuthMiddleware(cfg.Store))
+	rulesHandler.RegisterRoutes(userGroup)
+
+	// Admin routes
+	adminGroup := r.Group("/admin/rules")
+	adminGroup.Use(internalauth.UserAuthMiddleware(cfg.Store))
+	adminGroup.Use(internalauth.AdminMiddleware(cfg.Store))
+	rulesHandler.RegisterRoutes(adminGroup)
+}
+
 // RegisterV1Routes registers all API routes under /api/v1 prefix.
 // This provides versioned endpoints alongside the unversioned ones for
 // backward compatibility.
@@ -224,4 +241,5 @@ func RegisterV1Routes(r *gin.Engine, cfg Config) {
 	RegisterMetricsRoutes(v1, cfg)
 	RegisterSpecializedRoutes(v1, cfg)
 	RegisterProvisioningRoutes(v1, cfg)
+	RegisterRuleRoutes(v1, cfg)
 }

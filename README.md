@@ -12,6 +12,7 @@ High-performance IoT data collection and management platform built with Go.
 - **Time-Series Storage**: Optimized for IoT sensor data with 347K inserts/sec
 - **Real-time Streaming**: Server-Sent Events (SSE) & WebSockets for live video/data
 - **Device Management**: Multi-user provisioning, Token-based Auth (`dk_...`), and OTA Updates
+- **User-Defined Automation**: Flexible rule engine allowing users to define custom logic for their own devices
 - **Mobile App**: Production-ready Flutter app for provisioning, streaming, and control
 - **Admin Control**: Role-Based Access Control (RBAC) and Admin Management CLI
 - **CLI Tool**: `datumctl` - powerful interactive command-line interface

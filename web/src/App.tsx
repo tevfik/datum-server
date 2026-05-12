@@ -6,6 +6,7 @@ import DeviceDetail from "@/features/devices/pages/DeviceDetail";
 import Commands from "@/features/devices/pages/Commands";
 import Dashboard from "@/features/dashboard/pages/Dashboard";
 import Explorer from "@/features/explorer/pages/Explorer";
+import RulesPage from "@/features/rules/pages/RulesPage";
 import Settings from "@/features/settings/pages/Settings";
 import Login from "@/features/auth/pages/Login";
 import ForgotPassword from "@/features/auth/pages/ForgotPassword";
@@ -54,6 +55,7 @@ function App() {
                 <Route path="devices" element={<Devices />} />
                 <Route path="devices/:id" element={<DeviceDetail />} />
                 <Route path="commands" element={<Commands />} />
+                <Route path="rules" element={<RulesPage />} />
                 <Route path="explorer" element={<Explorer />} />
                 <Route path="settings" element={<Settings />} />
               </Route>

@@ -69,21 +69,39 @@ existing subscription `id` or pass `url` + `secret` inline.
 { "type": "webhook", "id": "alerts-prod" }
 ```
 
-## Persistence
+## Persistence & Multi-User Support
 
-Rules live at `data/rules.json` and are reloaded on server startup. Use
-`/admin/rules` (admin auth required) to CRUD them at runtime — changes are
-applied immediately and persisted to disk.
+Rules are no longer just static files. They are managed in two ways:
+
+1. **System Rules (`data/rules.json`)**: Legacy/Bootstrap rules loaded on startup. Read-only at runtime.
+2. **User-Defined Rules (Database)**: Rules created by users are stored in the **Document Store** (under the `rules` collection). These are:
+   - Persisted across restarts.
+   - Associated with an `owner_id`.
+   - Manageable via user-level API endpoints.
+
+## API Management
+
+### User Endpoints (`/api/v1/rules`)
+Users can manage rules for their own devices. The system automatically verifies device ownership.
 
 ```bash
-# List
-curl -H "Authorization: Bearer $TOKEN" $SERVER/admin/rules
+# List my rules
+curl -H "Authorization: Bearer $USER_TOKEN" $SERVER/api/v1/rules
 
-# Create
-curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-     -X POST $SERVER/admin/rules \
-     -d '{"id":"low-batt","field":"battery","operator":"<","value":15,
-          "actions":[{"type":"notify","channels":["ntfy"],"title":"Low battery"}]}'
+# Create a rule for my device
+curl -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
+     -X POST $SERVER/api/v1/rules \
+     -d '{"name":"Living Room Heat","device_id":"dev_123",
+          "conditions":[{"field":"temperature","operator":"gt","value":28}],
+          "actions":[{"type":"log"}]}'
+```
+
+### Admin Endpoints (`/api/v1/admin/rules`)
+Admins can see and manage rules across all users.
+
+```bash
+# List all rules globally
+curl -H "Authorization: Bearer $ADMIN_TOKEN" $SERVER/api/v1/admin/rules
 ```
 
 ## Template tokens

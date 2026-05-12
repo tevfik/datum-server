@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -406,14 +407,44 @@ func main() {
 	// Connect Rule Engine to Telemetry Processor
 	telemetryProcessor.SetRuleEngine(ruleEngine)
 
-	// Load rules from file if exists
+	// 1. Load system-wide rules from file if exists (Legacy/Bootstrap)
 	if rulesData, err := os.ReadFile(filepath.Join(dataDirPath, "rules.json")); err == nil {
 		if err := ruleEngine.LoadFromJSON(rulesData); err != nil {
 			log.Warn().Err(err).Msg("Failed to load rules from rules.json")
 		} else {
-			log.Info().Int("count", len(ruleEngine.ListRules())).Msg("Rules loaded from rules.json")
+			log.Info().Int("count", len(ruleEngine.ListRules())).Msg("Legacy rules loaded from rules.json")
 		}
 	}
+
+	// 2. Load user-defined rules from Database (Document Store)
+	if colls, err := store.ListAllCollections(); err == nil {
+		userRuleCount := 0
+		for _, coll := range colls {
+			if coll.Collection == "rules" {
+				docs, _ := store.ListDocuments(coll.UserID, "rules")
+				for _, doc := range docs {
+					var r rules.Rule
+					docJSON, _ := json.Marshal(doc)
+					if err := json.Unmarshal(docJSON, &r); err == nil {
+						// Ensure owner ID is set from collection metadata if missing in doc
+						if r.OwnerID == "" {
+							r.OwnerID = coll.UserID
+						}
+						ruleEngine.AddRule(&r)
+						userRuleCount++
+					}
+				}
+			}
+		}
+		if userRuleCount > 0 {
+			log.Info().Int("count", userRuleCount).Msg("User-defined rules loaded from database")
+		}
+	}
+
+	// 3. Start Rule Scheduler for cron-based triggers
+	ruleScheduler := rules.NewScheduler(ruleEngine, store)
+	ruleScheduler.Start()
+	defer ruleScheduler.Stop()
 
 	// Setup router
 	gin.SetMode(gin.ReleaseMode)
@@ -601,7 +632,7 @@ func main() {
 	api.RegisterV1Routes(r, apiConfig)
 
 	// Rule Engine routes (/admin/rules)
-	rulesHandler := rulesapi.NewHandler(ruleEngine)
+	rulesHandler := rulesapi.NewHandler(ruleEngine, store)
 	rulesGroup := r.Group("/admin/rules")
 	rulesGroup.Use(auth.UserAuthMiddleware(store))
 	rulesGroup.Use(auth.AdminMiddleware(store))
