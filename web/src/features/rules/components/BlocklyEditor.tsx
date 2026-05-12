@@ -217,7 +217,7 @@ export default function BlocklyEditor({ initialJson, devices, onChange }: Blockl
             const state = Blockly.serialization.workspaces.save(workspace);
             
             // Compile to engine-compatible conditions and actions
-            const { conditions, actions } = compileWorkspace(workspace);
+            const { conditions, actions: _actions } = compileWorkspace(workspace);
             onChange(state, conditions);
         });
 
