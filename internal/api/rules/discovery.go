@@ -45,11 +45,30 @@ func (h *Handler) DiscoverDevices(c *gin.Context) {
 
 	result := make([]DeviceInfo, 0, len(devices))
 	for _, dev := range devices {
+		props := extractProperties(dev.ThingDescription)
+		
+		// Add basic common properties if not present
+		hasStatus := false
+		for _, p := range props {
+			if p.Key == "status" {
+				hasStatus = true
+				break
+			}
+		}
+		if !hasStatus {
+			props = append(props, DevicePropertyInfo{
+				Key:      "status",
+				Title:    "Connection Status",
+				Type:     "string",
+				ReadOnly: true,
+			})
+		}
+
 		info := DeviceInfo{
 			DeviceID:   dev.ID,
 			DeviceName: dev.Name,
 			DeviceType: dev.Type,
-			Properties: extractProperties(dev.ThingDescription),
+			Properties: props,
 		}
 		result = append(result, info)
 	}
