@@ -631,12 +631,8 @@ func main() {
 	// Versioned API routes (/api/v1/...)
 	api.RegisterV1Routes(r, apiConfig)
 
-	// Rule Engine routes (/admin/rules)
-	rulesHandler := rulesapi.NewHandler(ruleEngine, store)
-	rulesGroup := r.Group("/admin/rules")
-	rulesGroup.Use(auth.UserAuthMiddleware(store))
-	rulesGroup.Use(auth.AdminMiddleware(store))
-	rulesHandler.RegisterRoutes(rulesGroup)
+	// Rule Engine routes (/rules and /admin/rules)
+	api.RegisterRuleRoutes(r, apiConfig)
 
 	// MCP server (/mcp) — exposes user data to any MCP client (gleann,
 	// Claude Desktop, Cursor, future ekiyo Asistan). Auth: regular user
