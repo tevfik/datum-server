@@ -428,12 +428,37 @@ export default function RuleEditor({ rule, devices, onClose }: RuleEditorProps) 
                         )}
                         {action.type === "mqtt" && (
                             <div className="space-y-2">
-                                <input
-                                    type="text"
-                                    value={action.config?.topic || ""}
-                                    onChange={(e) => updateAction(i, "topic", e.target.value)}
-                                    placeholder="MQTT topic (e.g., dev/fan/cmd/set)"
-                                    className="w-full rounded-md border bg-background px-2 py-1.5 text-sm font-mono"
+                                <p className="text-xs text-muted-foreground">
+                                    Topic is scoped to <code className="bg-muted px-1 rounded">dev/&lt;device&gt;/cmd/&lt;sub-topic&gt;</code> — you can only publish to your own device command channels.
+                                </p>
+                                <div className="flex items-center gap-1">
+                                    <select
+                                        value={action.config?.mqtt_device || triggerDeviceId || ""}
+                                        onChange={(e) => updateAction(i, "mqtt_device", e.target.value)}
+                                        className="rounded-md border bg-background px-2 py-1.5 text-sm"
+                                    >
+                                        <option value="">Same device</option>
+                                        {devices.map(d => (
+                                            <option key={d.device_id} value={d.device_id}>
+                                                {d.device_name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span className="text-xs text-muted-foreground whitespace-nowrap font-mono">/cmd/</span>
+                                    <input
+                                        type="text"
+                                        value={action.config?.mqtt_cmd || ""}
+                                        onChange={(e) => updateAction(i, "mqtt_cmd", e.target.value)}
+                                        placeholder="set"
+                                        className="flex-1 rounded-md border bg-background px-2 py-1.5 text-sm font-mono"
+                                    />
+                                </div>
+                                <textarea
+                                    value={action.config?.payload || ""}
+                                    onChange={(e) => updateAction(i, "payload", e.target.value)}
+                                    placeholder='Optional JSON payload (e.g., {"fan_speed": 2000})'
+                                    rows={2}
+                                    className="w-full rounded-md border bg-background px-2 py-1.5 text-sm font-mono resize-none"
                                 />
                             </div>
                         )}

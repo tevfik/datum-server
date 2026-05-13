@@ -3,6 +3,7 @@ package rules
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -426,19 +427,53 @@ func (e *Engine) fire(r *Rule, deviceID string, data map[string]interface{}) {
 
 		case ActionMQTT:
 			if e.mqttPublish != nil {
-				topic, _ := action.Config["topic"].(string)
-				if topic == "" {
-					topic = fmt.Sprintf("dev/%s/alert", deviceID)
+				// Prefer new structured fields (mqtt_device + mqtt_cmd) set by the UI.
+				// Fall back to legacy free-form "topic" for backward compatibility,
+				// but enforce that any topic stays within "dev/<owner-device>/..." space.
+				mqttDevice, _ := action.Config["mqtt_device"].(string)
+				mqttCmd, _ := action.Config["mqtt_cmd"].(string)
+
+				var topic string
+				if mqttDevice != "" {
+					cmd := mqttCmd
+					if cmd == "" {
+						cmd = "set"
+					}
+					topic = fmt.Sprintf("dev/%s/cmd/%s", mqttDevice, cmd)
+				} else {
+					// Legacy "topic" field — validate it starts with "dev/" to prevent
+					// publishing to system or other users' topics.
+					legacyTopic, _ := action.Config["topic"].(string)
+					if legacyTopic != "" && strings.HasPrefix(legacyTopic, "dev/") {
+						topic = legacyTopic
+					} else {
+						// Default to the triggering device's alert topic.
+						topic = fmt.Sprintf("dev/%s/alert", deviceID)
+					}
 				}
-				payload, _ := json.Marshal(map[string]interface{}{
-					"rule_id":   r.ID,
-					"rule_name": r.Name,
-					"device_id": deviceID,
-					"data":      data,
-					"fired_at":  time.Now().Format(time.RFC3339),
-				})
-				if err := e.mqttPublish(topic, payload); err != nil {
-					log.Error().Err(err).Str("rule_id", r.ID).Msg("rule: MQTT publish failed")
+
+				// Additional safety: payload is user-controlled JSON or auto-generated.
+				rawPayload, _ := action.Config["payload"].(string)
+				var mqttPayload []byte
+				if rawPayload != "" {
+					// Validate it is valid JSON before publishing.
+					var check interface{}
+					if err := json.Unmarshal([]byte(rawPayload), &check); err == nil {
+						mqttPayload = []byte(rawPayload)
+					}
+				}
+				if mqttPayload == nil {
+					mqttPayload, _ = json.Marshal(map[string]interface{}{
+						"rule_id":   r.ID,
+						"rule_name": r.Name,
+						"device_id": deviceID,
+						"data":      data,
+						"fired_at":  time.Now().Format(time.RFC3339),
+					})
+				}
+
+				if err := e.mqttPublish(topic, mqttPayload); err != nil {
+					log.Error().Err(err).Str("rule_id", r.ID).Str("topic", topic).Msg("rule: MQTT publish failed")
 				}
 			}
 

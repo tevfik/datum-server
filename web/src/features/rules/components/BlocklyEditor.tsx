@@ -4,9 +4,181 @@ import { blocks } from 'blockly/blocks';
 import * as En from 'blockly/msg/en';
 import type { DeviceInfo } from '../hooks/useRules';
 
-// Register standard blocks and locale once.
+// Register standard blocks and locale once at module level.
 Blockly.setLocale(En as any);
 Blockly.common.defineBlocks(blocks);
+
+// Module-level device map so dynamic dropdown generators can access it
+// without captures (Blockly re-calls generators after workspace init).
+let _devices: DeviceInfo[] = [];
+
+const FALLBACK_PROPS: [string, string][] = [['temperature', 'temperature']];
+const FALLBACK_DEVICES: [string, string][] = [['No devices', '__none__']];
+
+/** Returns property options for a given device id from the global device cache. */
+function getPropertyOptions(deviceId: string): [string, string][] {
+    const dev = _devices.find(d => d.device_id === deviceId);
+    if (!dev || dev.properties.length === 0) return FALLBACK_PROPS;
+    return dev.properties.map(p => {
+        const label = p.unit ? `${p.title} (${p.unit})` : p.title;
+        return [label, p.key] as [string, string];
+    });
+}
+
+function getDeviceOptions(): [string, string][] {
+    if (_devices.length === 0) return FALLBACK_DEVICES;
+    return _devices.map(d => [d.device_name, d.device_id] as [string, string]);
+}
+
+function defineCustomBlocks() {
+    // ── device_property ────────────────────────────────────────────────
+    // Device dropdown → property dropdown auto-populated from WoT.
+    Blockly.Blocks['device_property'] = {
+        init(this: Blockly.Block) {
+            const devField = new Blockly.FieldDropdown(
+                () => getDeviceOptions(),
+                (newDeviceId: string) => {
+                    // Rebuild PROPERTY dropdown when device changes.
+                    const propField = this.getField('PROPERTY') as Blockly.FieldDropdown | null;
+                    if (propField) {
+                        // Force options update on next render cycle.
+                        (propField as any).menuGenerator_ = () => getPropertyOptions(newDeviceId);
+                        // Reset to first valid option.
+                        const opts = getPropertyOptions(newDeviceId);
+                        propField.setValue(opts[0][1]);
+                    }
+                    return newDeviceId;
+                }
+            );
+
+            const firstDeviceId = _devices.length > 0 ? _devices[0].device_id : '__none__';
+
+            const propField = new Blockly.FieldDropdown(
+                () => getPropertyOptions(devField.getValue() || firstDeviceId)
+            );
+
+            this.appendDummyInput()
+                .appendField('Device')
+                .appendField(devField, 'DEVICE_ID')
+                .appendField('  Property')
+                .appendField(propField, 'PROPERTY');
+
+            this.setOutput(true, 'Number');
+            this.setColour(65);
+            this.setTooltip('Get a property value from a device (properties loaded from WoT Thing Description)');
+        },
+    };
+
+    // ── compare_condition ──────────────────────────────────────────────
+    Blockly.Blocks['compare_condition'] = {
+        init(this: Blockly.Block) {
+            this.appendValueInput('A').setCheck(['Number', 'String']);
+            this.appendDummyInput()
+                .appendField(new Blockly.FieldDropdown([
+                    ['>', 'gt'], ['>=', 'gte'], ['<', 'lt'], ['<=', 'lte'],
+                    ['==', 'eq'], ['!=', 'neq'], ['contains', 'contains'],
+                ] as [string, string][]), 'OP');
+            this.appendValueInput('B').setCheck(['Number', 'String']);
+            this.setInputsInline(true);
+            this.setOutput(true, 'Boolean');
+            this.setColour(210);
+            this.setTooltip('Compare two values');
+        },
+    };
+
+    // ── logic_op_custom ────────────────────────────────────────────────
+    Blockly.Blocks['logic_op_custom'] = {
+        init(this: Blockly.Block) {
+            this.appendValueInput('A').setCheck('Boolean');
+            this.appendDummyInput()
+                .appendField(new Blockly.FieldDropdown([
+                    ['AND', 'and'], ['OR', 'or'],
+                ] as [string, string][]), 'OP');
+            this.appendValueInput('B').setCheck('Boolean');
+            this.setInputsInline(true);
+            this.setOutput(true, 'Boolean');
+            this.setColour(210);
+            this.setTooltip('Combine two conditions with AND / OR');
+        },
+    };
+
+    // ── logic_negate_custom ────────────────────────────────────────────
+    Blockly.Blocks['logic_negate_custom'] = {
+        init(this: Blockly.Block) {
+            this.appendValueInput('BOOL').setCheck('Boolean').appendField('NOT');
+            this.setOutput(true, 'Boolean');
+            this.setColour(210);
+        },
+    };
+
+    // ── trigger_rule ───────────────────────────────────────────────────
+    Blockly.Blocks['trigger_rule'] = {
+        init(this: Blockly.Block) {
+            this.appendValueInput('CONDITION').setCheck('Boolean').appendField('IF');
+            this.appendStatementInput('ACTIONS').setCheck('Action').appendField('THEN');
+            this.setColour(120);
+            this.setTooltip('Rule: IF condition THEN execute actions');
+        },
+    };
+
+    // ── action_log ──────────────────────────────────────────────────────
+    Blockly.Blocks['action_log'] = {
+        init(this: Blockly.Block) {
+            this.appendDummyInput()
+                .appendField('Log Event')
+                .appendField(new Blockly.FieldTextInput('Rule fired!'), 'MESSAGE');
+            this.setPreviousStatement(true, 'Action');
+            this.setNextStatement(true, 'Action');
+            this.setColour(330);
+        },
+    };
+
+    // ── action_notify ──────────────────────────────────────────────────
+    Blockly.Blocks['action_notify'] = {
+        init(this: Blockly.Block) {
+            this.appendDummyInput()
+                .appendField('Notify')
+                .appendField(new Blockly.FieldTextInput('Alert'), 'TITLE')
+                .appendField(new Blockly.FieldTextInput('Something happened'), 'MESSAGE');
+            this.setPreviousStatement(true, 'Action');
+            this.setNextStatement(true, 'Action');
+            this.setColour(330);
+        },
+    };
+
+    // ── action_webhook ─────────────────────────────────────────────────
+    Blockly.Blocks['action_webhook'] = {
+        init(this: Blockly.Block) {
+            this.appendDummyInput().appendField('Trigger Webhook');
+            this.setPreviousStatement(true, 'Action');
+            this.setNextStatement(true, 'Action');
+            this.setColour(330);
+        },
+    };
+
+    // ── action_mqtt ────────────────────────────────────────────────────
+    // Device dropdown + fixed prefix "dev/<device_id>/cmd/" + editable suffix.
+    // This ensures MQTT publishes stay within the user's own device command topics.
+    Blockly.Blocks['action_mqtt'] = {
+        init(this: Blockly.Block) {
+            const devDropdown = new Blockly.FieldDropdown(
+                () => getDeviceOptions()
+            );
+            this.appendDummyInput()
+                .appendField('MQTT → device')
+                .appendField(devDropdown, 'DEVICE_ID')
+                .appendField('cmd/')
+                .appendField(new Blockly.FieldTextInput('set'), 'CMD');
+            this.setTooltip(
+                'Publishes to dev/<device_id>/cmd/<cmd>. ' +
+                'Topic is scoped to your device command channel.'
+            );
+            this.setPreviousStatement(true, 'Action');
+            this.setNextStatement(true, 'Action');
+            this.setColour(330);
+        },
+    };
+}
 
 interface BlocklyEditorProps {
     initialJson?: Record<string, any>;
@@ -23,113 +195,10 @@ export default function BlocklyEditor({ initialJson, devices, onChange }: Blockl
     useEffect(() => {
         if (!blocklyDiv.current) return;
 
-        // ── Custom blocks ──────────────────────────────────────────────
-        Blockly.Blocks['device_property'] = {
-            init(this: Blockly.Block) {
-                const deviceOptions: [string, string][] = devices.length > 0
-                    ? devices.map(d => [d.device_name, d.device_id] as [string, string])
-                    : [['No devices', '']];
-                this.appendDummyInput()
-                    .appendField('Device')
-                    .appendField(new Blockly.FieldDropdown(deviceOptions), 'DEVICE_ID')
-                    .appendField('Property')
-                    .appendField(new Blockly.FieldTextInput('temperature'), 'PROPERTY');
-                this.setOutput(true, 'Number');
-                this.setColour(65);
-                this.setTooltip('Get a property value from a device');
-            },
-        };
+        // Update global device cache so dynamic dropdowns see the latest devices.
+        _devices = devices;
+        defineCustomBlocks();
 
-        Blockly.Blocks['compare_condition'] = {
-            init(this: Blockly.Block) {
-                this.appendValueInput('A').setCheck(['Number', 'String']);
-                this.appendDummyInput()
-                    .appendField(new Blockly.FieldDropdown([
-                        ['>', 'gt'], ['>=', 'gte'], ['<', 'lt'], ['<=', 'lte'],
-                        ['==', 'eq'], ['!=', 'neq'], ['contains', 'contains'],
-                    ] as [string, string][]), 'OP');
-                this.appendValueInput('B').setCheck(['Number', 'String']);
-                this.setInputsInline(true);
-                this.setOutput(true, 'Boolean');
-                this.setColour(210);
-                this.setTooltip('Compare two values');
-            },
-        };
-
-        Blockly.Blocks['logic_op_custom'] = {
-            init(this: Blockly.Block) {
-                this.appendValueInput('A').setCheck('Boolean');
-                this.appendDummyInput()
-                    .appendField(new Blockly.FieldDropdown([['AND', 'and'], ['OR', 'or']] as [string, string][]), 'OP');
-                this.appendValueInput('B').setCheck('Boolean');
-                this.setInputsInline(true);
-                this.setOutput(true, 'Boolean');
-                this.setColour(210);
-                this.setTooltip('Combine two conditions');
-            },
-        };
-
-        Blockly.Blocks['logic_negate_custom'] = {
-            init(this: Blockly.Block) {
-                this.appendValueInput('BOOL').setCheck('Boolean').appendField('NOT');
-                this.setOutput(true, 'Boolean');
-                this.setColour(210);
-            },
-        };
-
-        Blockly.Blocks['trigger_rule'] = {
-            init(this: Blockly.Block) {
-                this.appendValueInput('CONDITION').setCheck('Boolean').appendField('IF');
-                this.appendStatementInput('ACTIONS').setCheck('Action').appendField('THEN');
-                this.setColour(120);
-                this.setTooltip('Rule: IF condition THEN execute actions');
-            },
-        };
-
-        Blockly.Blocks['action_log'] = {
-            init(this: Blockly.Block) {
-                this.appendDummyInput()
-                    .appendField('Log Event')
-                    .appendField(new Blockly.FieldTextInput('Rule fired!'), 'MESSAGE');
-                this.setPreviousStatement(true, 'Action');
-                this.setNextStatement(true, 'Action');
-                this.setColour(330);
-            },
-        };
-
-        Blockly.Blocks['action_notify'] = {
-            init(this: Blockly.Block) {
-                this.appendDummyInput()
-                    .appendField('Send Notification')
-                    .appendField(new Blockly.FieldTextInput('Alert'), 'TITLE')
-                    .appendField(new Blockly.FieldTextInput('Something happened'), 'MESSAGE');
-                this.setPreviousStatement(true, 'Action');
-                this.setNextStatement(true, 'Action');
-                this.setColour(330);
-            },
-        };
-
-        Blockly.Blocks['action_webhook'] = {
-            init(this: Blockly.Block) {
-                this.appendDummyInput().appendField('Trigger Webhook');
-                this.setPreviousStatement(true, 'Action');
-                this.setNextStatement(true, 'Action');
-                this.setColour(330);
-            },
-        };
-
-        Blockly.Blocks['action_mqtt'] = {
-            init(this: Blockly.Block) {
-                this.appendDummyInput()
-                    .appendField('MQTT Publish topic')
-                    .appendField(new Blockly.FieldTextInput('alerts/rule'), 'TOPIC');
-                this.setPreviousStatement(true, 'Action');
-                this.setNextStatement(true, 'Action');
-                this.setColour(330);
-            },
-        };
-
-        // ── Toolbox ────────────────────────────────────────────────────
         const toolbox: Blockly.utils.toolbox.ToolboxDefinition = {
             kind: 'categoryToolbox',
             contents: [
@@ -173,7 +242,6 @@ export default function BlocklyEditor({ initialJson, devices, onChange }: Blockl
             ],
         };
 
-        // Dispose any prior workspace.
         if (workspaceRef.current) {
             try { workspaceRef.current.dispose(); } catch { /* ignore */ }
             workspaceRef.current = null;
@@ -184,15 +252,23 @@ export default function BlocklyEditor({ initialJson, devices, onChange }: Blockl
             theme: Blockly.Theme.defineTheme('darkDatum', {
                 name: 'darkDatum',
                 base: Blockly.Themes.Classic,
-                componentStyles: { workspaceBackgroundColour: '#1e1e1e', toolboxBackgroundColour: '#2c2c2c', toolboxForegroundColour: '#ccc' },
+                componentStyles: {
+                    workspaceBackgroundColour: '#1e1e1e',
+                    toolboxBackgroundColour: '#2c2c2c',
+                    toolboxForegroundColour: '#cccccc',
+                    flyoutBackgroundColour: '#252525',
+                    flyoutForegroundColour: '#ccc',
+                    scrollbarColour: '#555',
+                },
             }),
             grid: { spacing: 20, length: 3, colour: '#333', snap: true },
             zoom: { controls: true, wheel: true, startScale: 1.0, maxScale: 3, minScale: 0.3 },
             trashcan: true,
+            scrollbars: true,
+            move: { scrollbars: true, drag: true, wheel: true },
         });
         workspaceRef.current = workspace;
 
-        // Restore saved state.
         if (initialJson && Object.keys(initialJson).length > 0) {
             try {
                 Blockly.serialization.workspaces.load(initialJson, workspace);
@@ -201,7 +277,6 @@ export default function BlocklyEditor({ initialJson, devices, onChange }: Blockl
             }
         }
 
-        // Emit compiled conditions on every meaningful change.
         workspace.addChangeListener((event: Blockly.Events.Abstract) => {
             if (event.isUiEvent) return;
             const state = Blockly.serialization.workspaces.save(workspace);
@@ -209,7 +284,6 @@ export default function BlocklyEditor({ initialJson, devices, onChange }: Blockl
             onChangeRef.current(state, conditions);
         });
 
-        // Keep Blockly SVG sized to its container.
         const ro = new ResizeObserver(() => Blockly.svgResize(workspace));
         ro.observe(blocklyDiv.current);
         requestAnimationFrame(() => Blockly.svgResize(workspace));
@@ -221,7 +295,6 @@ export default function BlocklyEditor({ initialJson, devices, onChange }: Blockl
                 workspaceRef.current = null;
             }
         };
-    // Re-run only when devices list identity changes; initialJson is applied once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [devices]);
 
@@ -229,7 +302,7 @@ export default function BlocklyEditor({ initialJson, devices, onChange }: Blockl
         <div
             ref={blocklyDiv}
             className="w-full border rounded-lg overflow-hidden bg-[#1e1e1e]"
-            style={{ height: '640px' }}
+            style={{ height: '70vh', minHeight: '560px', maxHeight: '900px' }}
         />
     );
 }
@@ -253,7 +326,7 @@ function compileWorkspace(workspace: Blockly.WorkspaceSvg): { conditions: any[];
                     operator: block.getFieldValue('OP'),
                     value: bBlock?.type === 'math_number'
                         ? parseFloat(bBlock.getFieldValue('NUM'))
-                        : bBlock?.getFieldValue('TEXT'),
+                        : (bBlock?.getFieldValue('TEXT') ?? ''),
                 };
             }
         } else if (block.type === 'logic_op_custom') {

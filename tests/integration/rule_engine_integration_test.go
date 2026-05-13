@@ -167,7 +167,7 @@ func TestRuleEngine_OnData_MQTTAction(t *testing.T) {
 			Conditions: []rules.Condition{{Field: "pressure", Operator: rules.OpGT, Value: 1013.0}},
 		},
 		Actions: []rules.RuleAction{
-			{Type: rules.ActionMQTT, Config: map[string]interface{}{"topic": "alerts/pressure"}},
+			{Type: rules.ActionMQTT, Config: map[string]interface{}{"mqtt_device": "sensor-mqtt", "mqtt_cmd": "pressure-alert"}},
 		},
 	})
 
@@ -179,11 +179,11 @@ func TestRuleEngine_OnData_MQTTAction(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	mu.Lock()
-	payload, sent := mqttCalls["alerts/pressure"]
+	payload, sent := mqttCalls["dev/sensor-mqtt/cmd/pressure-alert"]
 	mu.Unlock()
 
 	if !sent {
-		t.Fatal("expected MQTT message on 'alerts/pressure'")
+		t.Fatal("expected MQTT message on 'dev/sensor-mqtt/cmd/pressure-alert'")
 	}
 	var msg map[string]interface{}
 	if err := json.Unmarshal(payload, &msg); err != nil {

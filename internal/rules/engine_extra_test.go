@@ -417,6 +417,7 @@ func TestFireActionMQTT(t *testing.T) {
 		return nil
 	})
 
+	// New structured form: mqtt_device + mqtt_cmd → scoped topic.
 	eng.AddRule(&Rule{
 		ID:   "mqtt-action",
 		Name: "MQTT action",
@@ -425,7 +426,7 @@ func TestFireActionMQTT(t *testing.T) {
 			Conditions: []Condition{{Field: "v", Operator: OpGT, Value: 0.0}},
 		},
 		Actions: []RuleAction{
-			{Type: ActionMQTT, Config: map[string]interface{}{"topic": "test/alerts"}},
+			{Type: ActionMQTT, Config: map[string]interface{}{"mqtt_device": "fan-01", "mqtt_cmd": "set"}},
 		},
 	})
 
@@ -433,8 +434,162 @@ func TestFireActionMQTT(t *testing.T) {
 	if atomic.LoadInt32(&publishCount) != 1 {
 		t.Fatal("expected exactly 1 MQTT publish")
 	}
-	if publishedTopic.Load().(string) != "test/alerts" {
-		t.Fatalf("expected topic 'test/alerts', got '%v'", publishedTopic.Load())
+	if publishedTopic.Load().(string) != "dev/fan-01/cmd/set" {
+		t.Fatalf("expected scoped topic 'dev/fan-01/cmd/set', got '%v'", publishedTopic.Load())
+	}
+}
+
+func TestFireActionMQTT_LegacyTopicAllowed(t *testing.T) {
+	// Legacy "topic" with "dev/" prefix should still work.
+	var publishedTopic atomic.Value
+
+	eng := NewEngine(nil, func(topic string, payload []byte) error {
+		publishedTopic.Store(topic)
+		return nil
+	})
+
+	eng.AddRule(&Rule{
+		ID:   "mqtt-legacy",
+		Name: "MQTT legacy",
+		Logic: RuleLogic{
+			Type:       LogicConditions,
+			Conditions: []Condition{{Field: "v", Operator: OpGT, Value: 0.0}},
+		},
+		Actions: []RuleAction{
+			{Type: ActionMQTT, Config: map[string]interface{}{"topic": "dev/sensor-01/cmd/reboot"}},
+		},
+	})
+
+	eng.Evaluate("d", map[string]interface{}{"v": 1.0})
+	if publishedTopic.Load().(string) != "dev/sensor-01/cmd/reboot" {
+		t.Fatalf("expected 'dev/sensor-01/cmd/reboot', got '%v'", publishedTopic.Load())
+	}
+}
+
+func TestFireActionMQTT_LegacyTopicBlocked(t *testing.T) {
+	// Legacy "topic" without "dev/" prefix must be rejected → falls back to default.
+	var publishedTopic atomic.Value
+
+	eng := NewEngine(nil, func(topic string, payload []byte) error {
+		publishedTopic.Store(topic)
+		return nil
+	})
+
+	eng.AddRule(&Rule{
+		ID:   "mqtt-blocked",
+		Name: "MQTT blocked unsafe topic",
+		Logic: RuleLogic{
+			Type:       LogicConditions,
+			Conditions: []Condition{{Field: "v", Operator: OpGT, Value: 0.0}},
+		},
+		Actions: []RuleAction{
+			// "system/admin/reset" does not start with "dev/" — should be rejected.
+			{Type: ActionMQTT, Config: map[string]interface{}{"topic": "system/admin/reset"}},
+		},
+	})
+
+	eng.Evaluate("my-device", map[string]interface{}{"v": 1.0})
+	got := publishedTopic.Load().(string)
+	if got == "system/admin/reset" {
+		t.Fatal("unsafe topic should have been rejected, not published as-is")
+	}
+	// Must fall back to the safe default.
+	if got != "dev/my-device/alert" {
+		t.Fatalf("expected fallback 'dev/my-device/alert', got '%v'", got)
+	}
+}
+
+func TestFireActionMQTT_ScopedDefaultCmd(t *testing.T) {
+	// mqtt_device present but mqtt_cmd empty → cmd defaults to "set".
+	var publishedTopic atomic.Value
+
+	eng := NewEngine(nil, func(topic string, payload []byte) error {
+		publishedTopic.Store(topic)
+		return nil
+	})
+
+	eng.AddRule(&Rule{
+		ID: "mqtt-default-cmd",
+		Logic: RuleLogic{
+			Type:       LogicConditions,
+			Conditions: []Condition{{Field: "v", Operator: OpGT, Value: 0.0}},
+		},
+		Actions: []RuleAction{
+			{Type: ActionMQTT, Config: map[string]interface{}{"mqtt_device": "actuator-5"}},
+		},
+	})
+
+	eng.Evaluate("d", map[string]interface{}{"v": 1.0})
+	if publishedTopic.Load().(string) != "dev/actuator-5/cmd/set" {
+		t.Fatalf("expected 'dev/actuator-5/cmd/set', got '%v'", publishedTopic.Load())
+	}
+}
+
+func TestFireActionMQTT_CustomPayload(t *testing.T) {
+	// Valid JSON payload in config should be passed through.
+	var receivedPayload []byte
+
+	eng := NewEngine(nil, func(topic string, payload []byte) error {
+		receivedPayload = payload
+		return nil
+	})
+
+	eng.AddRule(&Rule{
+		ID: "mqtt-custom-payload",
+		Logic: RuleLogic{
+			Type:       LogicConditions,
+			Conditions: []Condition{{Field: "v", Operator: OpGT, Value: 0.0}},
+		},
+		Actions: []RuleAction{
+			{Type: ActionMQTT, Config: map[string]interface{}{
+				"mqtt_device": "fan-01",
+				"mqtt_cmd":    "set",
+				"payload":     `{"fan_speed": 3000}`,
+			}},
+		},
+	})
+
+	eng.Evaluate("d", map[string]interface{}{"v": 1.0})
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(receivedPayload, &parsed); err != nil {
+		t.Fatalf("payload is not valid JSON: %v", err)
+	}
+	if parsed["fan_speed"] != float64(3000) {
+		t.Fatalf("expected fan_speed=3000, got %v", parsed["fan_speed"])
+	}
+}
+
+func TestFireActionMQTT_InvalidPayloadDropped(t *testing.T) {
+	// Invalid JSON payload should be dropped and auto-generated payload used instead.
+	var receivedPayload []byte
+
+	eng := NewEngine(nil, func(topic string, payload []byte) error {
+		receivedPayload = payload
+		return nil
+	})
+
+	eng.AddRule(&Rule{
+		ID: "mqtt-bad-payload",
+		Logic: RuleLogic{
+			Type:       LogicConditions,
+			Conditions: []Condition{{Field: "v", Operator: OpGT, Value: 0.0}},
+		},
+		Actions: []RuleAction{
+			{Type: ActionMQTT, Config: map[string]interface{}{
+				"mqtt_device": "fan-01",
+				"mqtt_cmd":    "set",
+				"payload":     `not valid json <<`,
+			}},
+		},
+	})
+
+	eng.Evaluate("d", map[string]interface{}{"v": 1.0})
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(receivedPayload, &parsed); err != nil {
+		t.Fatalf("should have fallen back to auto-generated JSON payload: %v", err)
+	}
+	if _, hasRuleID := parsed["rule_id"]; !hasRuleID {
+		t.Fatal("auto-generated payload should contain rule_id")
 	}
 }
 
@@ -454,7 +609,7 @@ func TestFireActionMQTT_DefaultTopic(t *testing.T) {
 			Conditions: []Condition{{Field: "v", Operator: OpGT, Value: 0.0}},
 		},
 		Actions: []RuleAction{
-			{Type: ActionMQTT, Config: map[string]interface{}{}}, // no topic
+			{Type: ActionMQTT, Config: map[string]interface{}{}}, // no topic or device
 		},
 	})
 
