@@ -403,7 +403,8 @@ func main() {
 	ruleEngine = rules.NewEngine(webhookDispatcher, func(topic string, payload []byte) error {
 		return mqttBroker.Publish(topic, payload, false)
 	})
-	
+	ruleEngine.SetNotifyDispatcher(dispatcher)
+
 	// Connect Rule Engine to Telemetry Processor
 	telemetryProcessor.SetRuleEngine(ruleEngine)
 

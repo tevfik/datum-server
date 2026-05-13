@@ -751,12 +751,6 @@ func (s *Storage) GetDataHistory(deviceID string, limit int) ([]DataPoint, error
 	end := time.Now()
 	start := end.Add(-7 * 24 * time.Hour) // Last 7 days
 
-	// Collect all timestamps and their values
-	type tsValue struct {
-		metric string
-		value  float64
-	}
-
 	tsMap := make(map[int64]map[string]float64)
 	// Fetch dynamic metrics list from BuntDB
 	metricsKey := fmt.Sprintf("device:%s:metrics", deviceID)
@@ -1211,7 +1205,7 @@ func (s *Storage) UpdateDevice(deviceID string, name string, typeStr string, sta
 
 		var device Device
 		json.Unmarshal([]byte(deviceData), &device)
-		
+
 		if name != "" {
 			device.Name = name
 		}
@@ -1221,7 +1215,7 @@ func (s *Storage) UpdateDevice(deviceID string, name string, typeStr string, sta
 		if status != "" {
 			device.Status = status
 		}
-		
+
 		device.UpdatedAt = time.Now()
 
 		data, _ := json.Marshal(device)

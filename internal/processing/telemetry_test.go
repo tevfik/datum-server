@@ -1,6 +1,7 @@
 package processing
 
 import (
+	"datum-go/internal/rules"
 	"datum-go/internal/storage"
 	"testing"
 	"time"
@@ -131,4 +132,117 @@ func TestTelemetryProcessor_CommandCheck(t *testing.T) {
 
 	// Check pending count
 	assert.Equal(t, 1, res.CommandsPending)
+}
+
+func TestTelemetryProcessor_DroppedCount_InitiallyZero(t *testing.T) {
+	store, _ := storage.New(":memory:", "", 0)
+	tp := NewTelemetryProcessor(store)
+	defer tp.Close()
+
+	if tp.DroppedCount() != 0 {
+		t.Fatalf("expected initial DroppedCount=0, got %d", tp.DroppedCount())
+	}
+}
+
+func TestTelemetryProcessor_DroppedCount_Increments(t *testing.T) {
+	// Use a tiny buffer so it overflows quickly
+	t.Setenv("TELEMETRY_BUFFER_SIZE", "1")
+
+	store, _ := storage.New(":memory:", "", 0)
+	store.InitializeSystem("Test", false, 7)
+	deviceID := "drop-dev"
+	store.CreateDevice(&storage.Device{ID: deviceID, Status: "active", UserID: "u1"})
+
+	tp := NewTelemetryProcessor(store)
+
+	// Flood the channel until we get a drop (workers may drain some, so loop)
+	dropped := false
+	for i := 0; i < 100; i++ {
+		_, err := tp.Process(deviceID, map[string]interface{}{"v": float64(i)})
+		if err != nil {
+			dropped = true
+			break
+		}
+	}
+	tp.Close()
+
+	if !dropped {
+		t.Skip("buffer was never full during test (workers too fast); skipping assertion")
+	}
+	if tp.DroppedCount() == 0 {
+		t.Fatal("expected DroppedCount > 0 after buffer overflow")
+	}
+}
+
+func TestTelemetryProcessor_SetRuleEngine(t *testing.T) {
+	store, _ := storage.New(":memory:", "", 0)
+	tp := NewTelemetryProcessor(store)
+	defer tp.Close()
+
+	if tp.ruleEngine != nil {
+		t.Fatal("ruleEngine should be nil before SetRuleEngine")
+	}
+
+	eng := rules.NewEngine(nil, nil)
+	tp.SetRuleEngine(eng)
+
+	if tp.ruleEngine != eng {
+		t.Fatal("ruleEngine should be set after SetRuleEngine")
+	}
+}
+
+func TestTelemetryProcessor_BufferUsage_Empty(t *testing.T) {
+	store, _ := storage.New(":memory:", "", 0)
+	tp := NewTelemetryProcessor(store)
+	defer tp.Close()
+
+	usage := tp.BufferUsage()
+	if usage < 0.0 || usage > 1.0 {
+		t.Fatalf("BufferUsage should be in [0, 1], got %f", usage)
+	}
+	// On a freshly created, idle processor the buffer should be near-empty
+	if usage > 0.1 {
+		t.Fatalf("expected near-zero BufferUsage on idle processor, got %f", usage)
+	}
+}
+
+func TestTelemetryProcessor_SetRuleEngine_Fires(t *testing.T) {
+	store, _ := storage.New(":memory:", "", 0)
+	store.InitializeSystem("Test", false, 7)
+	deviceID := "re-dev"
+	store.CreateDevice(&storage.Device{ID: deviceID, Status: "active", UserID: "u1"})
+
+	tp := NewTelemetryProcessor(store)
+
+	fired := false
+	eng := rules.NewEngine(nil, nil)
+	eng.AddRule(&rules.Rule{
+		ID:   "re-rule",
+		Name: "Fire via telemetry",
+		Trigger: rules.RuleTrigger{
+			Type:     rules.TriggerOnData,
+			DeviceID: deviceID,
+		},
+		Logic: rules.RuleLogic{
+			Type:       rules.LogicConditions,
+			Conditions: []rules.Condition{{Field: "v", Operator: rules.OpGT, Value: 0.0}},
+		},
+		Actions: []rules.RuleAction{
+			{Type: rules.ActionLog},
+		},
+	})
+	_ = fired
+	tp.SetRuleEngine(eng)
+
+	_, err := tp.Process(deviceID, map[string]interface{}{"v": 5.0})
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	tp.Close()
+
+	rule, _ := eng.GetRule("re-rule")
+	if rule.FireCount == 0 {
+		t.Fatal("rule should have fired via telemetry rule engine integration")
+	}
 }

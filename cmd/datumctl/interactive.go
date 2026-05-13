@@ -204,9 +204,7 @@ func runCommandInteractive(cmd *cobra.Command) error {
 			break
 		}
 		if s.Variadic {
-			for _, p := range strings.Fields(v) {
-				posArgs = append(posArgs, p)
-			}
+			posArgs = append(posArgs, strings.Fields(v)...)
 			continue
 		}
 		posArgs = append(posArgs, v)

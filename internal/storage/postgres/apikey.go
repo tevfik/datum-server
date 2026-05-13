@@ -64,24 +64,6 @@ func (s *PostgresStore) GetUserByUserAPIKey(apiKey string) (*storage.User, error
 
 // --- Helpers ---
 
-func scanAPIKeys(db *sql.DB, query string, args ...interface{}) ([]storage.APIKey, error) {
-	rows, err := db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var keys []storage.APIKey
-	for rows.Next() {
-		var k storage.APIKey
-		if err := rows.Scan(&k.ID, &k.UserID, &k.Name, &k.Key, &k.CreatedAt); err != nil {
-			return nil, err
-		}
-		keys = append(keys, k)
-	}
-	return keys, nil
-}
-
 func scanAPIKeysCtx(ctx context.Context, db *sql.DB, query string, args ...interface{}) ([]storage.APIKey, error) {
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {

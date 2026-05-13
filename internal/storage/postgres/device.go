@@ -370,24 +370,6 @@ func scanDeviceFromRow(scanner Scannable) (*storage.Device, error) {
 	return &d, nil
 }
 
-func scanDevices(db *sql.DB, query string, args ...interface{}) ([]storage.Device, error) {
-	rows, err := db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var devices []storage.Device
-	for rows.Next() {
-		d, err := scanDeviceFromRow(rows)
-		if err != nil {
-			return nil, err
-		}
-		devices = append(devices, *d)
-	}
-	return devices, nil
-}
-
 func scanDevicesCtx(ctx context.Context, db *sql.DB, query string, args ...interface{}) ([]storage.Device, error) {
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {

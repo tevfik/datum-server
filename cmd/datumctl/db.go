@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
@@ -248,74 +247,4 @@ func docPreview(doc map[string]interface{}, maxLen int) string {
 		return s[:maxLen] + "..."
 	}
 	return s
-}
-
-// ============ Interactive Mode Support ============
-
-func dbMenu() error {
-	var action string
-	prompt := &survey.Select{
-		Message: "Document Database:",
-		Options: []string{
-			"List documents in collection",
-			"Get document by ID",
-			"Create new document",
-			"Update document",
-			"Delete document",
-			"List all collections (admin)",
-			"← Back to main menu",
-		},
-	}
-
-	if err := survey.AskOne(prompt, &action); err != nil {
-		return err
-	}
-
-	switch action {
-	case "List documents in collection":
-		var collection string
-		survey.AskOne(&survey.Input{Message: "Collection name:"}, &collection)
-		if collection != "" {
-			fmt.Printf("\n> datumctl db list %s\n", collection)
-			return runDBList(nil, []string{collection})
-		}
-	case "Get document by ID":
-		var collection, docID string
-		survey.AskOne(&survey.Input{Message: "Collection name:"}, &collection)
-		survey.AskOne(&survey.Input{Message: "Document ID:"}, &docID)
-		if collection != "" && docID != "" {
-			fmt.Printf("\n> datumctl db get %s %s\n", collection, docID)
-			return runDBGet(nil, []string{collection, docID})
-		}
-	case "Create new document":
-		var collection, jsonData string
-		survey.AskOne(&survey.Input{Message: "Collection name:"}, &collection)
-		survey.AskOne(&survey.Input{Message: "Document JSON:"}, &jsonData)
-		if collection != "" && jsonData != "" {
-			fmt.Printf("\n> datumctl db create %s '%s'\n", collection, jsonData)
-			return runDBCreate(nil, []string{collection, jsonData})
-		}
-	case "Update document":
-		var collection, docID, jsonData string
-		survey.AskOne(&survey.Input{Message: "Collection name:"}, &collection)
-		survey.AskOne(&survey.Input{Message: "Document ID:"}, &docID)
-		survey.AskOne(&survey.Input{Message: "Update JSON:"}, &jsonData)
-		if collection != "" && docID != "" && jsonData != "" {
-			fmt.Printf("\n> datumctl db update %s %s '%s'\n", collection, docID, jsonData)
-			return runDBUpdate(nil, []string{collection, docID, jsonData})
-		}
-	case "Delete document":
-		var collection, docID string
-		survey.AskOne(&survey.Input{Message: "Collection name:"}, &collection)
-		survey.AskOne(&survey.Input{Message: "Document ID:"}, &docID)
-		if collection != "" && docID != "" {
-			fmt.Printf("\n> datumctl db delete %s %s\n", collection, docID)
-			return runDBDelete(nil, []string{collection, docID})
-		}
-	case "List all collections (admin)":
-		fmt.Println("\n> datumctl db collections")
-		return runDBCollections(nil, nil)
-	}
-
-	return nil
 }

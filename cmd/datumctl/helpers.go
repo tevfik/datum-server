@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"strings"
 
@@ -59,23 +58,4 @@ func runSimpleHTTP(method, path string, body interface{}) error {
 	out, _ := json.MarshalIndent(v, "", "  ")
 	fmt.Println(string(out))
 	return nil
-}
-
-// joinQuery appends k=v pairs (URL-encoded) to a path. Empty values are
-// skipped.
-func joinQuery(path string, kv map[string]string) string {
-	q := url.Values{}
-	for k, v := range kv {
-		if v != "" {
-			q.Set(k, v)
-		}
-	}
-	if len(q) == 0 {
-		return path
-	}
-	sep := "?"
-	if strings.Contains(path, "?") {
-		sep = "&"
-	}
-	return path + sep + q.Encode()
 }

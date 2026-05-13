@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	adminUsername    string
 	adminNewPassword string
 	adminForceReset  bool
 	adminEmail       string

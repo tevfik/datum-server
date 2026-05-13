@@ -13,7 +13,7 @@ import (
 type DevicePropertyInfo struct {
 	Key      string `json:"key"`
 	Title    string `json:"title"`
-	Type     string `json:"type"`     // number, string, boolean
+	Type     string `json:"type"` // number, string, boolean
 	Unit     string `json:"unit,omitempty"`
 	ReadOnly bool   `json:"read_only"`
 	Widget   string `json:"widget,omitempty"` // gauge, slider, chart, etc.
@@ -57,7 +57,7 @@ func (h *Handler) DiscoverDevices(c *gin.Context) {
 	result := make([]DeviceInfo, 0, len(devices))
 	for _, dev := range devices {
 		props := extractProperties(dev.ThingDescription)
-		
+
 		// Add basic common properties if not present
 		hasStatus := false
 		for _, p := range props {
@@ -138,14 +138,14 @@ func getStringField(m map[string]interface{}, key, fallback string) string {
 
 // BlockDefinition represents a Blockly block definition for the frontend.
 type BlockDefinition struct {
-	Type       string      `json:"type"`
-	Category   string      `json:"category"`
-	Message    string      `json:"message0"`
-	Args       interface{} `json:"args0,omitempty"`
-	Output     string      `json:"output,omitempty"`
-	Color      int         `json:"colour"`
-	Tooltip    string      `json:"tooltip,omitempty"`
-	HelpURL    string      `json:"helpUrl,omitempty"`
+	Type     string      `json:"type"`
+	Category string      `json:"category"`
+	Message  string      `json:"message0"`
+	Args     interface{} `json:"args0,omitempty"`
+	Output   string      `json:"output,omitempty"`
+	Color    int         `json:"colour"`
+	Tooltip  string      `json:"tooltip,omitempty"`
+	HelpURL  string      `json:"helpUrl,omitempty"`
 }
 
 // GetBlockDefinitions returns the available Blockly block definitions.
@@ -279,9 +279,4 @@ func (h *Handler) GetBlockDefinitions(c *gin.Context) {
 		"action_types":  actionTypes,
 		"trigger_types": triggerTypes,
 	})
-}
-
-// getDevicesForUser is a helper used by discovery (avoids circular dependency).
-func getDevicesForUser(store storage.Provider, userID string) ([]storage.Device, error) {
-	return store.GetUserDevices(userID)
 }

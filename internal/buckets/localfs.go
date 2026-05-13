@@ -123,8 +123,8 @@ func (l *LocalFS) ListBuckets(_ context.Context) ([]string, error) {
 	return out, nil
 }
 
-func (l *LocalFS) Put(_ context.Context, bucket, path string, body io.Reader, opts PutOptions) (*Object, error) {
-	if err := l.EnsureBucket(nil, bucket); err != nil {
+func (l *LocalFS) Put(ctx context.Context, bucket, path string, body io.Reader, opts PutOptions) (*Object, error) {
+	if err := l.EnsureBucket(ctx, bucket); err != nil {
 		return nil, err
 	}
 	full, err := l.safe(bucket, path)

@@ -44,7 +44,8 @@ func TestRandomHex(t *testing.T) {
 	}
 
 	// Two consecutive calls should not collide
-	if RandomHex(16) == RandomHex(16) {
+	a, b := RandomHex(16), RandomHex(16)
+	if a == b {
 		t.Fatal("two random hex strings collided")
 	}
 }

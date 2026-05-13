@@ -260,24 +260,6 @@ func scanProvisioningRequest(scanner Scannable) (*storage.ProvisioningRequest, e
 	return &r, nil
 }
 
-func scanProvisioningRequests(db *sql.DB, query string, args ...interface{}) ([]storage.ProvisioningRequest, error) {
-	rows, dbErr := db.Query(query, args...)
-	if dbErr != nil {
-		return nil, dbErr
-	}
-	defer rows.Close()
-
-	var reqs []storage.ProvisioningRequest
-	for rows.Next() {
-		r, err := scanProvisioningRequest(rows)
-		if err != nil {
-			return nil, err
-		}
-		reqs = append(reqs, *r)
-	}
-	return reqs, nil
-}
-
 func scanProvisioningRequestsCtx(ctx context.Context, db *sql.DB, query string, args ...interface{}) ([]storage.ProvisioningRequest, error) {
 	rows, dbErr := db.QueryContext(ctx, query, args...)
 	if dbErr != nil {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"datum-go/internal/logger"
+	"datum-go/internal/notify"
 	"datum-go/internal/webhook"
 )
 
@@ -77,18 +78,18 @@ type RuleAction struct {
 
 // RuleTrigger defines when/how the rule is evaluated.
 type RuleTrigger struct {
-	Type     TriggerType `json:"type"`               // on_data, scheduled, manual
+	Type     TriggerType `json:"type"`                // on_data, scheduled, manual
 	Schedule string      `json:"schedule,omitempty"`  // Cron expression for scheduled triggers
 	DeviceID string      `json:"device_id,omitempty"` // Specific device to watch (empty = all)
 }
 
 // RuleLogic defines how conditions are expressed.
 type RuleLogic struct {
-	Type       LogicType              `json:"type"`                  // conditions, blockly, lua
-	Conditions []Condition            `json:"conditions,omitempty"`  // For type=conditions or blockly-compiled
-	LogicOp    string                 `json:"logic_op,omitempty"`    // "and" (default) or "or"
+	Type        LogicType              `json:"type"`                   // conditions, blockly, lua
+	Conditions  []Condition            `json:"conditions,omitempty"`   // For type=conditions or blockly-compiled
+	LogicOp     string                 `json:"logic_op,omitempty"`     // "and" (default) or "or"
 	BlocklyJSON map[string]interface{} `json:"blockly_json,omitempty"` // Blockly workspace state
-	LuaScript  string                 `json:"lua_script,omitempty"`  // For type=lua
+	LuaScript   string                 `json:"lua_script,omitempty"`   // For type=lua
 }
 
 // Rule is a user-defined data processing rule.
@@ -142,6 +143,7 @@ type Engine struct {
 	mu          sync.RWMutex
 	rules       map[string]*Rule
 	webhookDisp *webhook.Dispatcher
+	notifyDisp  *notify.Dispatcher
 	mqttPublish func(topic string, payload []byte) error
 	luaEval     *LuaEvaluator
 }
@@ -154,6 +156,23 @@ func NewEngine(webhookDisp *webhook.Dispatcher, mqttPublish func(string, []byte)
 		mqttPublish: mqttPublish,
 		luaEval:     NewLuaEvaluator(),
 	}
+}
+
+// SetNotifyDispatcher attaches a push notification dispatcher to the engine.
+// When set, ActionNotify rules will deliver real push notifications.
+func (e *Engine) SetNotifyDispatcher(d *notify.Dispatcher) {
+	e.mu.Lock()
+	e.notifyDisp = d
+	e.mu.Unlock()
+}
+
+// MustGetRule returns a rule by ID or panics — for use in tests only.
+func (e *Engine) MustGetRule(id string) *Rule {
+	r, ok := e.GetRule(id)
+	if !ok {
+		panic("rule not found: " + id)
+	}
+	return r
 }
 
 // AddRule registers a new rule.
@@ -424,7 +443,29 @@ func (e *Engine) fire(r *Rule, deviceID string, data map[string]interface{}) {
 			}
 
 		case ActionNotify:
-			// Notification via webhook event for now; full push integration in future
+			e.mu.RLock()
+			nd := e.notifyDisp
+			e.mu.RUnlock()
+
+			title, _ := action.Config["title"].(string)
+			message, _ := action.Config["message"].(string)
+			if title == "" {
+				title = "Rule Alert: " + r.Name
+			}
+			if message == "" {
+				message = fmt.Sprintf("Rule '%s' was triggered by device %s", r.Name, deviceID)
+			}
+			priority, _ := action.Config["priority"].(string)
+			if priority == "" {
+				priority = notify.PriorityDefault
+			}
+
+			// Dispatch push notification if dispatcher is available
+			if nd != nil {
+				nd.NotifyUser(r.OwnerID, title, message, priority)
+			}
+
+			// Also emit as a webhook event for SSE/webhook subscribers
 			if e.webhookDisp != nil {
 				e.webhookDisp.Emit(webhook.Event{
 					ID:       fmt.Sprintf("rule_notify_%s_%d", r.ID, r.FireCount),
@@ -434,9 +475,8 @@ func (e *Engine) fire(r *Rule, deviceID string, data map[string]interface{}) {
 						"rule_id":   r.ID,
 						"rule_name": r.Name,
 						"type":      "notification",
-						"title":     action.Config["title"],
-						"message":   action.Config["message"],
-						"payload":   data,
+						"title":     title,
+						"message":   message,
 					},
 				})
 			}

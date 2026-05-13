@@ -11,8 +11,6 @@ import (
 const (
 	// luaMaxExecTime is the maximum execution time for a single Lua script.
 	luaMaxExecTime = 100 * time.Millisecond
-	// luaMaxMemory is a soft memory limit hint (gopher-lua doesn't enforce hard limits).
-	luaMaxMemory = 1024 * 1024 // 1MB
 )
 
 // LuaEvaluator provides a sandboxed Lua execution environment for rule evaluation.
