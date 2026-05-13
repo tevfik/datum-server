@@ -56,7 +56,8 @@ export default defineConfig({
           mqtt: ['mqtt'],
           charts: ['recharts'],
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-label', '@radix-ui/react-select', '@radix-ui/react-slot', 'lucide-react', 'class-variance-authority', 'clsx', 'tailwind-merge'],
-          utils: ['date-fns', 'axios', '@tanstack/react-query']
+          utils: ['date-fns', 'axios', '@tanstack/react-query'],
+          blockly: ['blockly']
         }
       }
     }
