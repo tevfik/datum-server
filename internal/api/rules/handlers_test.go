@@ -394,6 +394,57 @@ func TestDiscoverDevices_WithDevices(t *testing.T) {
 	}
 }
 
+// TestDiscoverDevices_ShadowStateFallback verifies that when a device has no
+// ThingDescription, properties are inferred from its ShadowState telemetry keys.
+func TestDiscoverDevices_ShadowStateFallback(t *testing.T) {
+	store := newTestStore()
+	store.userDevices = []storage.Device{
+		{
+			ID:   "custom-sensor",
+			Name: "Custom Sensor",
+			Type: "custom",
+			ShadowState: map[string]interface{}{
+				"temperature": 22.5,
+				"humidity":    65.0,
+				"active":      true,
+			},
+		},
+	}
+	r := setupTestRouterWithUserAndStore(store, "user-1")
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/admin/rules/discovery", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var result map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &result)
+	devs := result["devices"].([]interface{})
+	dev := devs[0].(map[string]interface{})
+	props := dev["properties"].([]interface{})
+
+	// Should have 3 shadow keys + 1 status fallback = 4
+	if len(props) < 4 {
+		t.Fatalf("expected at least 4 properties (3 shadow + status), got %d: %v", len(props), props)
+	}
+
+	// Verify type inference: temperature and humidity should be "number"
+	propMap := make(map[string]string)
+	for _, p := range props {
+		pm := p.(map[string]interface{})
+		propMap[pm["key"].(string)] = pm["type"].(string)
+	}
+	if propMap["temperature"] != "number" {
+		t.Errorf("temperature type: want number, got %s", propMap["temperature"])
+	}
+	if propMap["active"] != "boolean" {
+		t.Errorf("active type: want boolean, got %s", propMap["active"])
+	}
+}
+
 func TestDiscoverDevices_Empty(t *testing.T) {
 	store := newTestStore() // no devices
 	r := setupTestRouterWithUserAndStore(store, "user-xyz")

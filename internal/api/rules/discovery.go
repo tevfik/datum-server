@@ -58,6 +58,12 @@ func (h *Handler) DiscoverDevices(c *gin.Context) {
 	for _, dev := range devices {
 		props := extractProperties(dev.ThingDescription)
 
+		// Fallback: if Thing Description has no properties, infer from ShadowState.
+		// This covers devices registered without a TD but that have sent telemetry.
+		if len(props) == 0 {
+			props = inferPropertiesFromState(dev.ShadowState)
+		}
+
 		// Add basic common properties if not present
 		hasStatus := false
 		for _, p := range props {
@@ -125,6 +131,31 @@ func extractProperties(td map[string]interface{}) []DevicePropertyInfo {
 		result = append(result, info)
 	}
 
+	return result
+}
+
+// inferPropertiesFromState creates property definitions from a device's shadow state.
+// Keys become property names; Go types are mapped to WoT types (number/boolean/string).
+func inferPropertiesFromState(state map[string]interface{}) []DevicePropertyInfo {
+	if len(state) == 0 {
+		return nil
+	}
+	result := make([]DevicePropertyInfo, 0, len(state))
+	for key, val := range state {
+		propType := "string"
+		switch val.(type) {
+		case float64, int64:
+			propType = "number"
+		case bool:
+			propType = "boolean"
+		}
+		result = append(result, DevicePropertyInfo{
+			Key:      key,
+			Title:    key,
+			Type:     propType,
+			ReadOnly: true,
+		})
+	}
 	return result
 }
 
