@@ -1302,6 +1302,14 @@ func (s *Storage) GetAllDevices() ([]Device, error) {
 				if !strings.Contains(key[7:], ":") {
 					var device Device
 					if err := json.Unmarshal([]byte(value), &device); err == nil {
+						// Fetch Shadow
+						shadowKey := fmt.Sprintf("device:%s:shadow", device.ID)
+						if shadowJSON, err := tx.Get(shadowKey); err == nil {
+							var shadow map[string]interface{}
+							if err := json.Unmarshal([]byte(shadowJSON), &shadow); err == nil {
+								device.ShadowState = shadow
+							}
+						}
 						devices = append(devices, device)
 					}
 				}

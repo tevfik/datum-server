@@ -287,3 +287,74 @@ func TestDeleteDevice_Forbidden(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, w.Code)
 }
+
+// ---------- UpdateDevice ----------
+
+func TestUpdateDevice_Success(t *testing.T) {
+	handler, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	require.NoError(t, handler.Store.CreateDevice(&storage.Device{
+		ID: "dev_upd", UserID: "test_user_id", Name: "Old Name", Type: "old_type", APIKey: "key",
+	}))
+
+	r := setupRouter(handler)
+	r.PUT("/:device_id", handler.UpdateDevice)
+
+	body := bytes.NewBufferString(`{"name":"New Name","type":"new_type"}`)
+	req, _ := http.NewRequest("PUT", "/dev_upd", body)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	updated, _ := handler.Store.GetDevice("dev_upd")
+	assert.Equal(t, "New Name", updated.Name)
+	assert.Equal(t, "new_type", updated.Type)
+}
+
+// ---------- UpdateDeviceConfig ----------
+
+func TestUpdateDeviceConfig_Success(t *testing.T) {
+	handler, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	require.NoError(t, handler.Store.CreateDevice(&storage.Device{
+		ID: "dev_cfg", UserID: "test_user_id", Name: "Device", Type: "relay_board", APIKey: "key",
+	}))
+
+	r := setupRouter(handler)
+	r.PATCH("/:device_id/config", handler.UpdateDeviceConfig)
+
+	body := bytes.NewBufferString(`{"relay_0":true,"mode":"auto"}`)
+	req, _ := http.NewRequest("PATCH", "/dev_cfg/config", body)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	updated, _ := handler.Store.GetDevice("dev_cfg")
+	assert.Equal(t, true, updated.DesiredState["relay_0"])
+	assert.Equal(t, "auto", updated.DesiredState["mode"])
+}
+
+// ---------- UpdateDeviceThingDescription ----------
+
+func TestUpdateDeviceThingDescription_Success(t *testing.T) {
+	handler, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	require.NoError(t, handler.Store.CreateDevice(&storage.Device{
+		ID: "dev_td", UserID: "test_user_id", Name: "Device", Type: "custom", APIKey: "key",
+	}))
+
+	r := setupRouter(handler)
+	r.PUT("/:device_id/thing-description", handler.UpdateDeviceThingDescription)
+
+	body := bytes.NewBufferString(`{"title":"New TD","properties":{"status":{"type":"string"}}}`)
+	req, _ := http.NewRequest("PUT", "/dev_td/thing-description", body)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	updated, _ := handler.Store.GetDevice("dev_td")
+	assert.Equal(t, "New TD", updated.ThingDescription["title"])
+}

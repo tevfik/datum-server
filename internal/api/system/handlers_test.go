@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -112,4 +113,96 @@ func TestGetSystemConfig_NilStore(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestUpdateRetention(t *testing.T) {
+	handler, _, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	r := gin.New()
+	r.PUT("/admin/sys/retention", handler.UpdateRetention)
+
+	payload := `{"days": 30, "check_interval_hours": 24}`
+	req, _ := http.NewRequest("PUT", "/admin/sys/retention", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestUpdateRegistration(t *testing.T) {
+	handler, _, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	r := gin.New()
+	r.PUT("/admin/sys/registration", handler.UpdateRegistration)
+
+	payload := `{"allow_register": false}`
+	req, _ := http.NewRequest("PUT", "/admin/sys/registration", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestUpdateRateLimit(t *testing.T) {
+	handler, _, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	r := gin.New()
+	r.PUT("/admin/sys/rate-limit", handler.UpdateRateLimit)
+
+	payload := `{"max_requests": 100, "window_seconds": 60}`
+	req, _ := http.NewRequest("PUT", "/admin/sys/rate-limit", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestUpdateAlerts(t *testing.T) {
+	handler, _, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	r := gin.New()
+	r.PUT("/admin/sys/alerts", handler.UpdateAlerts)
+
+	payload := `{"email_enabled": true, "disk_threshold": 80, "memory_threshold": 85}`
+	req, _ := http.NewRequest("PUT", "/admin/sys/alerts", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestGetLogs(t *testing.T) {
+	handler, _, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	r := gin.New()
+	r.GET("/admin/sys/logs", handler.GetLogs)
+
+	req, _ := http.NewRequest("GET", "/admin/sys/logs", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestClearLogs(t *testing.T) {
+	handler, _, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	r := gin.New()
+	r.DELETE("/admin/sys/logs", handler.ClearLogs)
+
+	req, _ := http.NewRequest("DELETE", "/admin/sys/logs", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
 }
