@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	mqtt_client "github.com/eclipse/paho.mqtt.golang"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -90,11 +90,14 @@ func TestMQTT_E2E_Flow(t *testing.T) {
 	}
 	defer client.Disconnect(250)
 
-	// Subscribe to commands
+	// Subscribe to commands — wait for SUBACK before sending command (prevents race)
 	cmdReceived := make(chan []byte, 1)
-	client.Subscribe(fmt.Sprintf("dev/%s/cmd", deviceID), 0, func(c mqtt_client.Client, m mqtt_client.Message) {
+	subToken := client.Subscribe(fmt.Sprintf("dev/%s/cmd", deviceID), 0, func(c mqtt_client.Client, m mqtt_client.Message) {
 		cmdReceived <- m.Payload()
 	})
+	if !subToken.WaitTimeout(3*time.Second) || subToken.Error() != nil {
+		t.Fatalf("MQTT subscribe failed: %v", subToken.Error())
+	}
 
 	// 6. Send Command via API
 	cmdReq := commands.SendCommandRequest{
@@ -141,7 +144,7 @@ func TestMQTT_E2E_Flow(t *testing.T) {
 	assert.Len(t, devs, 1)
 	dev := devs[0].(map[string]interface{})
 	assert.Equal(t, "online", dev["status"])
-	
+
 	if dev["shadow_state"] == nil {
 		t.Fatal("shadow_state is nil")
 	}
