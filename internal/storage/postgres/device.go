@@ -30,8 +30,15 @@ func (s *PostgresStore) CreateDevice(device *storage.Device) error {
 		)
 	`
 	tdJSON, _ := json.Marshal(device.ThingDescription)
-	shadowJSON, _ := json.Marshal(device.ShadowState)
-	desiredJSON, _ := json.Marshal(device.DesiredState)
+	// Use SQL NULL for empty maps so COALESCE works correctly in shadow updates.
+	// json.Marshal(nil) produces the JSON null literal which breaks JSONB || merges.
+	var shadowJSON, desiredJSON interface{}
+	if len(device.ShadowState) > 0 {
+		shadowJSON, _ = json.Marshal(device.ShadowState)
+	}
+	if len(device.DesiredState) > 0 {
+		desiredJSON, _ = json.Marshal(device.DesiredState)
+	}
 
 	_, err := s.db.ExecContext(ctx, query,
 		device.ID, device.UserID, device.Name, device.Type, device.DeviceUID, device.APIKey, device.Status, device.LastSeen,

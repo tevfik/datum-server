@@ -35,13 +35,17 @@ func (s *PostgresStore) StoreData(point *storage.DataPoint) error {
 		return fmt.Errorf("failed to insert data point: %w", err)
 	}
 
-	// 2. Update Device Shadow (Latest State) using JSONB merge
-	// shadow_state = shadow_state || new_data
-	// COALESCE(shadow_state, '{}'::jsonb) handles nulls
+	// 2. Update Device Shadow (Latest State) using JSONB merge.
+	// Guard against non-object shadow_state (e.g. JSON null or array from a past bug)
+	// by using CASE: only merge when existing value is an object, otherwise replace.
 	_, err = tx.Exec(`
 		UPDATE devices 
 		SET 
-			shadow_state = COALESCE(shadow_state, '{}'::jsonb) || $1,
+			shadow_state = CASE
+				WHEN jsonb_typeof(COALESCE(shadow_state, '{}'::jsonb)) = 'object'
+				THEN COALESCE(shadow_state, '{}'::jsonb) || $1::jsonb
+				ELSE $1::jsonb
+			END,
 			last_seen = $2,
 			updated_at = $2
 		WHERE id = $3
@@ -85,7 +89,11 @@ func (s *PostgresStore) StoreDataBatch(points []*storage.DataPoint) error {
 	stmtUpdateShadow, err := tx.Prepare(`
 		UPDATE devices 
 		SET 
-			shadow_state = COALESCE(shadow_state, '{}'::jsonb) || $1,
+			shadow_state = CASE
+				WHEN jsonb_typeof(COALESCE(shadow_state, '{}'::jsonb)) = 'object'
+				THEN COALESCE(shadow_state, '{}'::jsonb) || $1::jsonb
+				ELSE $1::jsonb
+			END,
 			last_seen = $2,
 			updated_at = $2
 		WHERE id = $3
