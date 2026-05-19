@@ -68,7 +68,7 @@ info:
     - **Max Body**: 5 MB (configurable via `MAX_REQUEST_BODY_BYTES`)
     - **Query Limit**: 10,000 data points per query (configurable via `QUERY_MAX_LIMIT`)
     - **Batch Limit**: 50,000 data points per ingestion batch (fixed)
-  version: 1.9.0
+  version: 1.8.1
   contact:
     name: API Support
   license:

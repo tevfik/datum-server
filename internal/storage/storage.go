@@ -116,40 +116,21 @@ type SystemStats struct {
 func (s *Storage) GetStats() (*SystemStats, error) {
 	stats := &SystemStats{
 		ServerTime: time.Now(),
-		// Uptime could be calculated if we stored start time. System handler might handle uptime logic?
-		// AdminService expects db_size_bytes. BuntDB doesn't easily give size.
-		// For now, return basic counts.
 	}
 
 	err := s.db.View(func(tx *buntdb.Tx) error {
-		// Count users
+		// Count users via user:email:* prefix (one entry per unique email)
 		var userCount int64
-		tx.Ascend("user:email", func(key, value string) bool {
+		tx.AscendKeys("user:email:*", func(key, value string) bool {
 			userCount++
 			return true
 		})
 		stats.TotalUsers = userCount
 
-		// Count devices
+		// Count devices via apikey:* prefix (one entry per device)
+		// This excludes apikey_lookup:* and apikey_meta:* (user API keys)
 		var deviceCount int64
-		tx.Ascend("device:uid", func(key, value string) bool {
-			deviceCount++
-			return true
-		})
-		// Actually device:uid index might not cover all devices if UID is optional.
-		// Iterate all devices?
-		// Better: Iterate key defined by CreateDevice pattern.
-		// BuntDB scan is slow if many keys.
-		// Let's assume user count is enough for now or iterate properly.
-		// Correct way: use index.
-		// Device CreateDevice uses: device:%s.
-		// We don't have a global index for devices unless we made one.
-		// CreateDevice makes: user:%s:devices.
-		// We can sum these? No.
-		// CreateDevice makes: apikey:%s.
-		// Iterate apikey index.
-		deviceCount = 0
-		tx.Ascend("apikey", func(key, value string) bool {
+		tx.AscendKeys("apikey:*", func(key, value string) bool {
 			deviceCount++
 			return true
 		})

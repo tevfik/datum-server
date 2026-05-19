@@ -48,8 +48,7 @@ See [docs/performance/FINAL_PERFORMANCE_REPORT.md](docs/performance/FINAL_PERFOR
 - `cmd/datumctl/` - CLI tool source code
 - `internal/auth/` - Authentication & rate limiting (JWT + API Keys)
 - `internal/storage/` - Dual storage layer (BuntDB + TStorage)
-- `examples/datum_camera_app/` - Flutter Mobile App
-- `examples/esp32-s3-camera/` - ESP32-S3 Firmware (C++)
+- See [datum-examples](https://github.com/tevfik/datum-examples) for firmware and hardware examples (ESP32, ESP8266)
 
 ### Advanced Components (Undocumented)
 
@@ -199,16 +198,16 @@ go tool cover -html=coverage.out
 
 ### Current Test Coverage
 
-- **Overall**: ~34% coverage across all packages
-- **internal/audit**: 100.0%
+- **Overall**: ~44% coverage across all packages
 - **internal/utils**: 100.0%
-- **internal/metrics**: 92.0%
+- **internal/storage**: 89.6%
 - **internal/webhook**: 91.1%
 - **internal/quota**: 90.8%
-- **internal/config**: 88.9%
-- **internal/rules**: 87.4%
+- **internal/rules**: 90.0%
+- **internal/processing**: 87.8%
 - **internal/auth**: 73.7%
-- **internal/storage**: 54.5%
+- **internal/ratelimit**: 68.2%
+- **internal/realtime**: 73.3%
 
 ### Test Organization
 
