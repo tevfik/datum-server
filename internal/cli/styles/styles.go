@@ -62,10 +62,6 @@ var (
 		MarginBottom(1)
 )
 
-// KV renders a key-value line with styled key.
-func KV(key, value string) string {
-	return fmt.Sprintf("  %s  %s", KeyStyle.Render(key+":"), value)
-}
 
 // KVPadded renders a key-value line with right-padded key for alignment.
 func KVPadded(key string, padTo int, value string) string {

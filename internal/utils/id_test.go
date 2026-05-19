@@ -33,22 +33,6 @@ func TestGenerateIDWithBytes(t *testing.T) {
 	}
 }
 
-func TestRandomHex(t *testing.T) {
-	h := RandomHex(8)
-	if len(h) != 16 {
-		t.Fatalf("expected len 16, got %d", len(h))
-	}
-	h2 := RandomHex(0) // default 8
-	if len(h2) != 16 {
-		t.Fatalf("expected default len 16, got %d", len(h2))
-	}
-
-	// Two consecutive calls should not collide
-	a, b := RandomHex(16), RandomHex(16)
-	if a == b {
-		t.Fatal("two random hex strings collided")
-	}
-}
 
 func TestUniqueness(t *testing.T) {
 	seen := make(map[string]struct{}, 1000)

@@ -406,8 +406,6 @@ func TestScheduler_PeriodicEvaluation(t *testing.T) {
 	sched.Start()
 	defer sched.Stop()
 
-	sched.RegisterRule(eng.MustGetRule("r-sched"))
-
 	// Wait for at least 2 scheduled evaluations
 	time.Sleep(2500 * time.Millisecond)
 

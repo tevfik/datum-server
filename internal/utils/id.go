@@ -24,13 +24,3 @@ func GenerateIDWithBytes(prefix string, byteLen int) string {
 	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(b))
 }
 
-// RandomHex returns a raw hex string of the given byte length (no prefix).
-// Useful for opaque tokens / API key bodies.
-func RandomHex(byteLen int) string {
-	if byteLen <= 0 {
-		byteLen = 8
-	}
-	b := make([]byte, byteLen)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
-}

@@ -228,21 +228,4 @@ func (d *Dispatcher) send(sub *Subscription, body []byte) {
 	log.Error().Str("webhook_id", sub.ID).Int("attempts", maxAttempts).Msg("webhook: gave up after retries")
 }
 
-// SignBody returns the signature header value that would be sent for the
-// given (timestamp, body, secret). Exposed for receivers under tests.
-func SignBody(secret string, timestamp int64, body []byte) string {
-	if secret == "" {
-		return ""
-	}
-	h := hmac.New(sha256.New, []byte(secret))
-	fmt.Fprintf(h, "%d.", timestamp)
-	h.Write(body)
-	return "sha256=" + hex.EncodeToString(h.Sum(nil))
-}
 
-// VerifySignature returns true when the supplied signature header matches a
-// freshly computed signature, using a constant-time comparison.
-func VerifySignature(secret string, timestamp int64, body []byte, signatureHeader string) bool {
-	expected := SignBody(secret, timestamp, body)
-	return hmac.Equal([]byte(expected), []byte(signatureHeader))
-}

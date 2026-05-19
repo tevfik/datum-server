@@ -178,19 +178,7 @@ func (m *Manager) Increment(userID string, res Resource, n int64) {
 	}
 }
 
-// Decrement is used when a "total" resource is removed (e.g. device deleted).
-// Does nothing for non-total periods.
-func (m *Manager) Decrement(userID string, res Resource, n int64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	k := counterKey{UserID: userID, Resource: res, Period: PeriodTotal}
-	if c, ok := m.counts[k]; ok {
-		c.value -= n
-		if c.value < 0 {
-			c.value = 0
-		}
-	}
-}
+
 
 // Usage returns the user's current per-resource usage across all periods.
 func (m *Manager) Usage(userID string) map[Resource]map[Period]int64 {

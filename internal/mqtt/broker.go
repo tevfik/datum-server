@@ -126,12 +126,6 @@ func (b *Broker) InvalidateACLCache(userID string) {
 	}
 }
 
-// InvalidateACLCacheAll clears the entire ACL cache.
-func (b *Broker) InvalidateACLCacheAll() {
-	if h := b.authHook; h != nil {
-		h.aclCache.invalidateAll()
-	}
-}
 
 // PublishCommand sends a command payload to a specific device
 func (b *Broker) PublishCommand(deviceID string, payload []byte) error {
@@ -271,13 +265,6 @@ func (c *aclCache) invalidate(userID string) {
 	delete(c.entries, userID)
 }
 
-// invalidateAll clears the entire ACL cache. Useful when a bulk
-// operation (e.g. device transfer) may affect multiple users.
-func (c *aclCache) invalidateAll() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.entries = make(map[string]*aclCacheEntry)
-}
 
 func newAuthHook(store storage.Provider) *AuthHook {
 	return &AuthHook{

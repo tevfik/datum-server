@@ -58,30 +58,7 @@ func (s *Scheduler) Stop() {
 	<-ctx.Done()
 }
 
-// RegisterRule adds or updates a scheduled rule in the cron scheduler.
-func (s *Scheduler) RegisterRule(r *Rule) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
-	// Remove existing job if any
-	if entryID, ok := s.jobs[r.ID]; ok {
-		s.cron.Remove(entryID)
-		delete(s.jobs, r.ID)
-	}
-
-	return s.registerRule(r)
-}
-
-// UnregisterRule removes a rule from the scheduler.
-func (s *Scheduler) UnregisterRule(ruleID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if entryID, ok := s.jobs[ruleID]; ok {
-		s.cron.Remove(entryID)
-		delete(s.jobs, ruleID)
-	}
-}
 
 // registerRule creates a cron job for a scheduled rule (must hold mu).
 func (s *Scheduler) registerRule(r *Rule) error {

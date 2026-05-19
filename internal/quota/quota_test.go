@@ -43,14 +43,7 @@ func TestIncrementAndExceed(t *testing.T) {
 	assert.EqualValues(t, 10, qe.Limit)
 }
 
-func TestDecrementFreesQuota(t *testing.T) {
-	m := New()
-	for i := 0; i < 10; i++ {
-		m.Increment("u1", ResourceDevice, 1)
-	}
-	m.Decrement("u1", ResourceDevice, 1)
-	require.NoError(t, m.Check("u1", ResourceDevice, 1))
-}
+
 
 func TestUnlimitedPlan(t *testing.T) {
 	m := New()

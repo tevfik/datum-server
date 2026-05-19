@@ -1,6 +1,10 @@
 package webhook
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,18 +14,33 @@ import (
 	"time"
 )
 
+func signBody(secret string, timestamp int64, body []byte) string {
+	if secret == "" {
+		return ""
+	}
+	h := hmac.New(sha256.New, []byte(secret))
+	fmt.Fprintf(h, "%d.", timestamp)
+	h.Write(body)
+	return "sha256=" + hex.EncodeToString(h.Sum(nil))
+}
+
+func verifySignature(secret string, timestamp int64, body []byte, signatureHeader string) bool {
+	expected := signBody(secret, timestamp, body)
+	return hmac.Equal([]byte(expected), []byte(signatureHeader))
+}
+
 func TestSignAndVerify(t *testing.T) {
 	body := []byte(`{"hello":"world"}`)
 	ts := int64(1700000000)
-	sig := SignBody("topsecret", ts, body)
+	sig := signBody("topsecret", ts, body)
 	if sig == "" {
 		t.Fatal("empty signature for non-empty secret")
 	}
-	if !VerifySignature("topsecret", ts, body, sig) {
-		t.Fatal("VerifySignature returned false for matching signature")
+	if !verifySignature("topsecret", ts, body, sig) {
+		t.Fatal("verifySignature returned false for matching signature")
 	}
-	if VerifySignature("wrongsecret", ts, body, sig) {
-		t.Fatal("VerifySignature accepted wrong secret")
+	if verifySignature("wrongsecret", ts, body, sig) {
+		t.Fatal("verifySignature accepted wrong secret")
 	}
 }
 
@@ -32,7 +51,7 @@ func TestSendRetriesAndSignsBody(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		ts, _ := strconv.ParseInt(r.Header.Get("X-Datum-Timestamp"), 10, 64)
 		sig := r.Header.Get("X-Datum-Signature")
-		if !VerifySignature("s3cret", ts, body, sig) {
+		if !verifySignature("s3cret", ts, body, sig) {
 			t.Errorf("attempt %d: signature did not verify", n)
 		}
 		if n < 3 {
