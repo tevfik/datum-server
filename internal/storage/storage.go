@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -717,14 +718,8 @@ func (s *Storage) GetDataHistoryWithRange(deviceID string, start, end time.Time,
 		timestamps = append(timestamps, ts)
 	}
 
-	// Sort descending (newest first)
-	for i := 0; i < len(timestamps)-1; i++ {
-		for j := i + 1; j < len(timestamps); j++ {
-			if timestamps[i] < timestamps[j] {
-				timestamps[i], timestamps[j] = timestamps[j], timestamps[i]
-			}
-		}
-	}
+	// Sort descending (newest first) — O(n log n)
+	sort.Slice(timestamps, func(i, j int) bool { return timestamps[i] > timestamps[j] })
 
 	var points []DataPoint
 	for i, ts := range timestamps {
@@ -789,14 +784,8 @@ func (s *Storage) GetDataHistory(deviceID string, limit int) ([]DataPoint, error
 		timestamps = append(timestamps, ts)
 	}
 
-	// Sort descending (newest first)
-	for i := 0; i < len(timestamps)-1; i++ {
-		for j := i + 1; j < len(timestamps); j++ {
-			if timestamps[i] < timestamps[j] {
-				timestamps[i], timestamps[j] = timestamps[j], timestamps[i]
-			}
-		}
-	}
+	// Sort descending (newest first) — O(n log n)
+	sort.Slice(timestamps, func(i, j int) bool { return timestamps[i] > timestamps[j] })
 
 	var points []DataPoint
 	for i, ts := range timestamps {
@@ -948,7 +937,21 @@ func (s *Storage) GetPendingCommandCount(deviceID string) int {
 		}
 		var pending []string
 		json.Unmarshal([]byte(pendingJSON), &pending)
-		count = len(pending)
+		// Only count non-expired pending commands (mirrors GetPendingCommands behaviour)
+		for _, cmdID := range pending {
+			cmdKey := fmt.Sprintf("command:%s", cmdID)
+			cmdData, err := tx.Get(cmdKey)
+			if err != nil {
+				continue
+			}
+			var cmd Command
+			if json.Unmarshal([]byte(cmdData), &cmd) != nil {
+				continue
+			}
+			if cmd.Status == "pending" && (cmd.ExpiresAt.IsZero() || time.Now().Before(cmd.ExpiresAt)) {
+				count++
+			}
+		}
 		return nil
 	})
 	return count

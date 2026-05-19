@@ -4,6 +4,7 @@ package data
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"sort"
@@ -174,7 +175,7 @@ func (h *Handler) GetData(c *gin.Context) {
 		}
 
 		if data := point.Data; data != nil {
-			if ip, ok := data["public_ip"].(string); ok && strings.HasPrefix(ip, "172.") {
+			if ip, ok := data["public_ip"].(string); ok && isPrivateIP(ip) {
 				data["public_ip"] = ""
 			}
 		}
@@ -340,4 +341,38 @@ func (h *Handler) GetData(c *gin.Context) {
 		},
 		"interval": interval.String(),
 	})
+}
+// privateIPNets contains RFC-1918, loopback, link-local, and Docker default ranges.
+var privateIPNets = func() []*net.IPNet {
+	cidrs := []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"127.0.0.0/8",
+		"::1/128",
+		"fc00::/7",
+		"169.254.0.0/16",
+	}
+	var nets []*net.IPNet
+	for _, cidr := range cidrs {
+		_, n, _ := net.ParseCIDR(cidr)
+		if n != nil {
+			nets = append(nets, n)
+		}
+	}
+	return nets
+}()
+
+// isPrivateIP returns true when the given IP string falls within a private/internal range.
+func isPrivateIP(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	for _, n := range privateIPNets {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }

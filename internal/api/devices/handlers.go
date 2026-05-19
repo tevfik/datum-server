@@ -5,7 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	"datum-go/internal/auth"
@@ -93,6 +96,19 @@ func (h *Handler) CreateDevice(c *gin.Context) {
 	var req CreateDeviceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Enforce per-user device quota (default 100, override via DEVICE_MAX_PER_USER env var)
+	maxDevices := 100
+	if v := os.Getenv("DEVICE_MAX_PER_USER"); v != "" {
+		if parsed, err2 := strconv.Atoi(v); err2 == nil && parsed > 0 {
+			maxDevices = parsed
+		}
+	}
+	existing, err := h.Store.GetUserDevices(userID)
+	if err == nil && len(existing) >= maxDevices {
+		c.JSON(http.StatusForbidden, gin.H{"error": fmt.Sprintf("Device quota reached (%d). Contact admin or set DEVICE_MAX_PER_USER.", maxDevices)})
 		return
 	}
 

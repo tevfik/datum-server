@@ -5,6 +5,18 @@ All notable changes to Datum IoT Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-05-01
+
+### Fixed
+- **GetPendingCommandCount**: Expired and non-pending commands were counted, inflating the result. Now only entries with `status == "pending"` and a non-elapsed `expires_at` are counted, matching the behaviour of `GetPendingCommands`.
+- **Private IP Filter**: CIDR check for `172.x` only covered addresses starting with `172.` (e.g. `172.255.x` was incorrectly excluded). Replaced `strings.HasPrefix` with a proper multi-CIDR check covering all RFC-1918 ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) plus loopback and link-local.
+- **MQTT TLS Misconfiguration**: When `MQTT_TLS_CERT` / `MQTT_TLS_KEY` were set but the certificate files could not be loaded, the broker silently continued without TLS. The error is now fatal so the operator is informed immediately.
+
+### Added
+- **Device Quota**: Maximum devices per user is configurable via `DEVICE_MAX_PER_USER` environment variable (default: 100). Returns `403 Forbidden` with a descriptive message when exceeded.
+- **Python Client Library**: `libraries/python/datum_iot/` — a `requests`-based Python 3.9+ package covering auth, devices, and data APIs. Install with `pip install ./libraries/python`.
+- **libraries/README.md**: Index of all available client libraries (Arduino C++, Python, Dart, TypeScript) with install instructions and TLS notes.
+
 ## [1.8.0] - 2026-04-27
 
 ### Added

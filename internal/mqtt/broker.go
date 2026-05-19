@@ -56,28 +56,28 @@ func (b *Broker) Start() error {
 	}
 
 	// TLS Listener (optional: enabled when MQTT_TLS_CERT and MQTT_TLS_KEY are set)
+	// When cert/key paths are explicitly configured, a failure is fatal — it means the
+	// operator intended TLS and running without it would be a security regression.
 	certFile := os.Getenv("MQTT_TLS_CERT")
 	keyFile := os.Getenv("MQTT_TLS_KEY")
 	if certFile != "" && keyFile != "" {
 		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 		if err != nil {
-			log.Printf("Warning: Failed to load MQTT TLS cert/key: %v (TLS disabled)", err)
-		} else {
-			tlsConfig := &tls.Config{
-				Certificates: []tls.Certificate{cert},
-				MinVersion:   tls.VersionTLS12,
-			}
-			tlsTCP := listeners.NewTCP(listeners.Config{
-				ID:        "tls1",
-				Address:   ":8883",
-				TLSConfig: tlsConfig,
-			})
-			if err := b.server.AddListener(tlsTCP); err != nil {
-				log.Printf("Warning: Failed to add MQTT TLS listener: %v", err)
-			} else {
-				log.Println("MQTT TLS listener enabled on :8883")
-			}
+			return fmt.Errorf("MQTT TLS configured but cert/key load failed: %w (set MQTT_TLS_CERT and MQTT_TLS_KEY correctly or unset them to disable TLS)", err)
 		}
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			MinVersion:   tls.VersionTLS12,
+		}
+		tlsTCP := listeners.NewTCP(listeners.Config{
+			ID:        "tls1",
+			Address:   ":8883",
+			TLSConfig: tlsConfig,
+		})
+		if err := b.server.AddListener(tlsTCP); err != nil {
+			return fmt.Errorf("failed to add MQTT TLS listener: %w", err)
+		}
+		log.Println("MQTT TLS listener enabled on :8883")
 	}
 
 	// WebSocket Listener
