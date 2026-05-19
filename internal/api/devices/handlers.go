@@ -302,6 +302,7 @@ func (h *Handler) DeleteDevice(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"status": "Device deleted"})
 }
+
 // UpdateDevice updates a device's name, type, and/or status.
 // PUT /dev/:device_id
 func (h *Handler) UpdateDevice(c *gin.Context) {
@@ -333,7 +334,7 @@ func (h *Handler) UpdateDevice(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized"})
 		return
 	}
-	
+
 	// Only admin can change status
 	if req.Status != "" && role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can update device status"})
@@ -347,7 +348,6 @@ func (h *Handler) UpdateDevice(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Device updated successfully"})
 }
-
 
 // UpdateDeviceConfig updates the desired configuration.
 // PATCH /dev/:device_id/config

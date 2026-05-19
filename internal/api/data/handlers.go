@@ -342,6 +342,7 @@ func (h *Handler) GetData(c *gin.Context) {
 		"interval": interval.String(),
 	})
 }
+
 // privateIPNets contains RFC-1918, loopback, link-local, and Docker default ranges.
 var privateIPNets = func() []*net.IPNet {
 	cidrs := []string{
