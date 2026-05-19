@@ -221,8 +221,8 @@ func TestUpdateDeviceThingDescription(t *testing.T) {
 		"title":    "My Temperature Sensor",
 		"properties": map[string]interface{}{
 			"temperature": map[string]interface{}{
-				"type":  "number",
-				"unit":  "celsius",
+				"type":     "number",
+				"unit":     "celsius",
 				"readOnly": true,
 			},
 		},
