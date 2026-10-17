@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Datumpy IoT Platform API
+  title: Datum IoT Platform API
   description: |
     High-performance IoT data ingestion and device management platform.
 
@@ -29,7 +29,7 @@ info:
     - **Data (Pub)**: `dev/{device_id}/data`
     - **Commands (Sub)**: `dev/{device_id}/cmd`
     - **Firmware (Sub)**: `dev/{device_id}/fw`
-  version: 1.1.0
+  version: 1.4.1
   contact:
     name: API Support
   license:
@@ -123,8 +123,17 @@ components:
       properties:
         token:
           type: string
+        refresh_token:
+          type: string
         user_id:
           type: string
+        email:
+          type: string
+        role:
+          type: string
+        expires_in:
+          type: integer
+          description: Token validity in seconds
 
     DeviceCreateRequest:
       type: object
@@ -149,6 +158,9 @@ components:
           type: string
         status:
           type: string
+        online:
+          type: boolean
+          description: Whether device is currently online
         last_seen:
           type: string
           format: date-time
@@ -539,6 +551,60 @@ paths:
         '401':
           description: Invalid credentials
 
+  /auth/refresh:
+    post:
+      summary: Refresh JWT access token
+      description: Exchanges a valid refresh token for a new access token and optional rotated refresh token.
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid or expired refresh token
+
+  /auth/me:
+    get:
+      summary: Get current authenticated user profile
+      description: Returns the user profile associated with the Bearer JWT token.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  user_id:
+                    type: string
+                  email:
+                    type: string
+                  role:
+                    type: string
+                  created_at:
+                    type: string
+                    format: date-time
+        '401':
+          description: Unauthorized
+
   /auth/keys:
     post:
       summary: Create User API Key
@@ -824,7 +890,6 @@ paths:
         - BearerAuth: []
       parameters:
         - name: device_id
-        - name: device_id
           in: path
           required: true
           schema:
@@ -910,6 +975,21 @@ paths:
       responses:
         '201':
           description: Command queued
+    get:
+      summary: List command history for device
+      description: Returns history of commands sent to this device.
+      tags: [Commands]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Command history list
 
   /dev/{device_id}/cmd/pending:
     get:
@@ -1075,6 +1155,101 @@ paths:
                     type: integer
                   height:
                     type: integer
+
+  /dev/{device_id}/thing-description:
+    put:
+      summary: Update W3C Web of Things (WoT) Thing Description
+      description: Updates the Thing Description metadata for the device. Supports both User Auth and Device Auth.
+      tags: [Devices]
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Thing Description updated
+
+  /buckets:
+    get:
+      summary: List storage buckets
+      description: Returns list of storage buckets and object counts.
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of storage buckets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  buckets:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        bucket:
+                          type: string
+                        objects_count:
+                          type: integer
+                  count:
+                    type: integer
+
+  /buckets/{bucket}:
+    get:
+      summary: List objects in a bucket
+      description: Returns list of files and metadata in the specified bucket.
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bucket:
+                    type: string
+                  objects:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        key:
+                          type: string
+                        size:
+                          type: integer
+                        last_modified:
+                          type: string
+                          format: date-time
+                  count:
+                    type: integer
+
   /dev/{device_id}/data:
     post:
       summary: Send data (device)

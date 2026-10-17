@@ -303,6 +303,7 @@ func main() {
 	authProtectedGroup := r.Group("/auth")
 	authProtectedGroup.Use(auth.UserAuthMiddleware(store))
 	{
+		authProtectedGroup.GET("/me", getMeHandler)
 		authProtectedGroup.PUT("/password", changePasswordHandler)
 		authProtectedGroup.DELETE("/user", deleteSelfHandler)
 

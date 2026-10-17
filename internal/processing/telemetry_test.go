@@ -88,13 +88,16 @@ func TestTelemetryProcessor_Batching(t *testing.T) {
 	assert.NotNil(t, latest.Data["value"])
 
 	// 2. Check history (TStorage)
+	assert.Eventually(t, func() bool {
+		history, err := store.GetDataHistory(deviceID, 100)
+		return err == nil && len(history) == 10
+	}, 3*time.Second, 50*time.Millisecond, "Expected all 10 telemetry points to be flushed and queryable")
+
 	history, err := store.GetDataHistory(deviceID, 100)
 	assert.NoError(t, err)
-	assert.Len(t, history, 10)
-
-	// Verify order or content (optional)
-	// History is sorted descending by default
-	assert.Equal(t, float64(9), history[0].Data["value"])
+	if len(history) > 0 {
+		assert.Equal(t, float64(9), history[0].Data["value"])
+	}
 }
 
 func TestTelemetryProcessor_CommandCheck(t *testing.T) {

@@ -413,3 +413,26 @@ func completeResetPasswordHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully. You can now login."})
 }
+
+// getMeHandler returns the current authenticated user's profile
+// GET /auth/me
+func getMeHandler(c *gin.Context) {
+	userID := c.GetString("userID")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	user, err := store.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id":         user.ID,
+		"user_id":    user.ID,
+		"email":      user.Email,
+		"role":       user.Role,
+		"created_at": user.CreatedAt.Format(time.RFC3339),
+	})
+}
+
