@@ -28,6 +28,7 @@ type DeviceResponse struct {
 	LastSeen         time.Time              `json:"last_seen"`
 	CreatedAt        time.Time              `json:"created_at"`
 	Status           string                 `json:"status"`
+	Online           bool                   `json:"online"`
 	ShadowState      map[string]interface{} `json:"shadow_state"`      // Added ShadowState
 	DesiredState     map[string]interface{} `json:"desired_state"`     // Added DesiredState
 	ThingDescription map[string]interface{} `json:"thing_description"` // Thing Description
@@ -113,6 +114,7 @@ func listDevicesHandler(c *gin.Context) {
 			LastSeen:         d.LastSeen,
 			CreatedAt:        d.CreatedAt,
 			Status:           status,
+			Online:           status == "online",
 			ShadowState:      d.ShadowState,
 			DesiredState:     d.DesiredState,
 			ThingDescription: d.ThingDescription,
@@ -226,6 +228,7 @@ func getDeviceHandler(c *gin.Context) {
 		LastSeen:         device.LastSeen,
 		CreatedAt:        device.CreatedAt,
 		Status:           status,
+		Online:           status == "online",
 		ShadowState:      shadowState,
 		DesiredState:     device.DesiredState,
 		ThingDescription: device.ThingDescription,
