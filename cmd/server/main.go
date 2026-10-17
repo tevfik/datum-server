@@ -251,7 +251,9 @@ func main() {
 			strings.HasPrefix(path, "/dev/") ||
 			strings.HasPrefix(path, "/data/") ||
 			strings.HasPrefix(path, "/pub/") ||
-			strings.HasPrefix(path, "/sys/") {
+			strings.HasPrefix(path, "/sys/") ||
+			strings.HasPrefix(path, "/buckets") ||
+			strings.HasPrefix(path, "/storage") {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
 			return
 		}
@@ -427,6 +429,9 @@ func main() {
 
 	// Provisioning routes (Mobile App & Device Activation)
 	RegisterProvisioningRoutes(r, auth.UserAuthMiddleware(store))
+
+	// Storage and Bucket browsing routes (Mobile & Web)
+	RegisterStorageRoutes(r, dataDirPath, auth.UserAuthMiddleware(store))
 
 	// Swagger UI documentation
 	setupSwagger(r)
