@@ -14,6 +14,7 @@ import (
 	"datum-go/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rs/zerolog/log"
 )
 
 // oauthCode represents a temporary authorization code
@@ -621,8 +622,10 @@ func (svc *AuthProviderService) handleOAuthToken(c *gin.Context) {
 	code := c.PostForm("code")
 	redirectURI := c.PostForm("redirect_uri")
 
+	authMethod := "basic"
 	clientID, clientSecret, ok := c.Request.BasicAuth()
 	if !ok {
+		authMethod = "form"
 		clientID = c.PostForm("client_id")
 		clientSecret = c.PostForm("client_secret")
 	}
@@ -638,6 +641,10 @@ func (svc *AuthProviderService) handleOAuthToken(c *gin.Context) {
 
 	_, err := svc.store.ValidateAuthClient(clientID, clientSecret)
 	if err != nil {
+		// Never log the secret itself; method and length are enough to tell
+		// a missing/mis-encoded credential from a wrong one.
+		log.Warn().Str("client_id", clientID).Str("auth_method", authMethod).
+			Int("secret_len", len(clientSecret)).Err(err).Msg("oauth token: invalid_client")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_client"})
 		return
 	}
