@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -211,7 +212,25 @@ func TestRenderLogin(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusFound, w.Code)
-	assert.Equal(t, "https://datum.example.com/sso-login?redirect=/dashboard&error=oops", w.Header().Get("Location"))
+	assert.Equal(t, "https://datum.example.com/sso-login?redirect=%2Fdashboard&error=oops", w.Header().Get("Location"))
+}
+
+// A redirect that itself carries a query string (the OAuth authorize URL) must
+// survive the hop to the frontend login page intact.
+func TestRenderLogin_PreservesNestedQuery(t *testing.T) {
+	t.Setenv("APP_URL", "https://datum.example.com")
+	svc := New([]byte("secret"), new(MockProvider))
+	r := setupTestRouter(svc)
+
+	target := "https://datum.example.com/auth/provider/oauth/authorize?response_type=code&client_id=c1&state=s"
+	req, _ := http.NewRequest("GET", "/auth/provider/login?redirect="+url.QueryEscape(target), nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusFound, w.Code)
+	loc, err := url.Parse(w.Header().Get("Location"))
+	assert.NoError(t, err)
+	assert.Equal(t, target, loc.Query().Get("redirect"))
 }
 
 func TestHandleUserLogin_Success(t *testing.T) {

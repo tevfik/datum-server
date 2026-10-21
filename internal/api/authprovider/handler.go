@@ -358,12 +358,12 @@ func (svc *AuthProviderService) renderLogin(c *gin.Context) {
 	redirect := c.Query("redirect")
 	errorMsg := c.Query("error")
 
-	url := svc.getBaseURL(c) + "/sso-login?redirect=" + redirect
+	loginURL := svc.getBaseURL(c) + "/sso-login?redirect=" + url.QueryEscape(redirect)
 	if errorMsg != "" {
-		url += "&error=" + errorMsg
+		loginURL += "&error=" + url.QueryEscape(errorMsg)
 	}
 
-	c.Redirect(http.StatusFound, url)
+	c.Redirect(http.StatusFound, loginURL)
 }
 
 // handleUserLogin handles form submission for SSO
@@ -377,13 +377,13 @@ func (svc *AuthProviderService) handleUserLogin(c *gin.Context) {
 	}
 
 	if email == "" || password == "" {
-		c.Redirect(http.StatusFound, "/auth/provider/login?error=Email+and+password+required&redirect="+redirect)
+		c.Redirect(http.StatusFound, "/auth/provider/login?error=Email+and+password+required&redirect="+url.QueryEscape(redirect))
 		return
 	}
 
 	user, err := svc.store.GetUserByEmail(email)
 	if err != nil || user.Status == "suspended" || !auth.CheckPassword(user.PasswordHash, password) {
-		c.Redirect(http.StatusFound, "/auth/provider/login?error=Invalid+credentials&redirect="+redirect)
+		c.Redirect(http.StatusFound, "/auth/provider/login?error=Invalid+credentials&redirect="+url.QueryEscape(redirect))
 		return
 	}
 
@@ -399,7 +399,7 @@ func (svc *AuthProviderService) handleUserLogin(c *gin.Context) {
 
 	tokenString, err := token.SignedString(svc.jwtSecret)
 	if err != nil {
-		c.Redirect(http.StatusFound, "/auth/provider/login?error=Server+error&redirect="+redirect)
+		c.Redirect(http.StatusFound, "/auth/provider/login?error=Server+error&redirect="+url.QueryEscape(redirect))
 		return
 	}
 
