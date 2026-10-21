@@ -312,27 +312,47 @@ export default function Settings() {
         // Could add a toast here
     };
 
+    const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [passwordSuccess, setPasswordSuccess] = useState('');
+
     const passwordMutation = useMutation({
-        mutationFn: authService.changePassword,
+        mutationFn: ({ oldPass, newPass }: { oldPass: string; newPass: string }) =>
+            authService.changePassword(oldPass, newPass),
         onSuccess: () => {
-            alert("Password updated successfully");
+            setPasswordSuccess("Password updated successfully");
+            setPasswordError("");
+            setOldPassword('');
             setNewPassword('');
+            setConfirmPassword('');
         },
-        onError: () => {
-            alert("Failed to update password");
+        onError: (err: any) => {
+            setPasswordError(err.response?.data?.error || "Failed to update password");
+            setPasswordSuccess("");
         }
     });
 
     const handleChangePassword = (e: React.FormEvent) => {
         e.preventDefault();
-        if (newPassword.length < 8) {
-            alert("Password must be at least 8 characters");
+        setPasswordError('');
+        setPasswordSuccess('');
+
+        if (!oldPassword) {
+            setPasswordError("Current password is required");
             return;
         }
-        if (window.confirm("Are you sure you want to change your password?")) {
-            passwordMutation.mutate(newPassword);
+        if (newPassword.length < 8) {
+            setPasswordError("New password must be at least 8 characters");
+            return;
         }
+        if (newPassword !== confirmPassword) {
+            setPasswordError("New passwords do not match");
+            return;
+        }
+
+        passwordMutation.mutate({ oldPass: oldPassword, newPass: newPassword });
     };
 
     return (
@@ -488,6 +508,27 @@ export default function Settings() {
                         <div className="space-y-4">
                             <h3 className="text-lg font-medium">Change Password</h3>
                             <form onSubmit={handleChangePassword} className="space-y-4 max-w-sm">
+                                {passwordError && (
+                                    <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+                                        {passwordError}
+                                    </div>
+                                )}
+                                {passwordSuccess && (
+                                    <div className="rounded-md bg-emerald-500/15 p-3 text-sm text-emerald-600 dark:text-emerald-400">
+                                        {passwordSuccess}
+                                    </div>
+                                )}
+                                <div className="space-y-2">
+                                    <label htmlFor="old-password">Current Password</label>
+                                    <Input
+                                        id="old-password"
+                                        type="password"
+                                        value={oldPassword}
+                                        onChange={(e) => setOldPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                        required
+                                    />
+                                </div>
                                 <div className="space-y-2">
                                     <label htmlFor="new-password">New Password</label>
                                     <Input
@@ -496,9 +537,21 @@ export default function Settings() {
                                         value={newPassword}
                                         onChange={(e) => setNewPassword(e.target.value)}
                                         placeholder="Min. 8 characters"
+                                        required
                                     />
                                 </div>
-                                <Button type="submit" disabled={!newPassword || passwordMutation.isPending}>
+                                <div className="space-y-2">
+                                    <label htmlFor="confirm-password">Confirm New Password</label>
+                                    <Input
+                                        id="confirm-password"
+                                        type="password"
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        placeholder="Min. 8 characters"
+                                        required
+                                    />
+                                </div>
+                                <Button type="submit" disabled={!oldPassword || !newPassword || passwordMutation.isPending}>
                                     {passwordMutation.isPending ? 'Updating...' : 'Update Password'}
                                 </Button>
                             </form>

@@ -24,10 +24,9 @@ export function SystemTab() {
 
     // Update local state when config fetches
     useEffect(() => {
-        if (config) {
-            setRetentionDays(config.retention.days);
-            setPublicRetentionDays(config.retention.public_days || 1);
-            // allow_register is not in SystemConfig, handled via systemStats below
+        if (config?.retention) {
+            setRetentionDays(config.retention.days ?? 7);
+            setPublicRetentionDays(config.retention.public_days ?? 1);
         }
     }, [config]);
 

@@ -39,7 +39,10 @@ func (s *PostgresStore) StoreData(point *storage.DataPoint) error {
 	_, err = tx.Exec(`
 		UPDATE devices 
 		SET 
-			shadow_state = COALESCE(shadow_state, '{}'::jsonb) || $1,
+			shadow_state = CASE 
+				WHEN jsonb_typeof(shadow_state) = 'object' THEN shadow_state || $1
+				ELSE $1 
+			END,
 			last_seen = $2,
 			updated_at = $2
 		WHERE id = $3
@@ -76,7 +79,10 @@ func (s *PostgresStore) StoreDataBatch(points []*storage.DataPoint) error {
 	stmtUpdateShadow, err := tx.Prepare(`
 		UPDATE devices 
 		SET 
-			shadow_state = COALESCE(shadow_state, '{}'::jsonb) || $1,
+			shadow_state = CASE 
+				WHEN jsonb_typeof(shadow_state) = 'object' THEN shadow_state || $1
+				ELSE $1 
+			END,
 			last_seen = $2,
 			updated_at = $2
 		WHERE id = $3
