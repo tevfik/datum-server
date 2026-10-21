@@ -83,6 +83,13 @@ type Provider interface {
 	DeleteUserAPIKey(userID, keyID string) error
 	GetUserByUserAPIKey(apiKey string) (*User, error)
 
+	// Auth Provider (SSO clients) - PostgreSQL only
+	ValidateAuthClient(clientID, clientSecret string) (scopes string, err error)
+	GetAuthClientRolesAndEmails(appName string) (allowedRoles string, allowedEmails string, err error)
+	ListAuthClients() ([]map[string]interface{}, error)
+	CreateAuthClient(name, clientID, clientSecret, creatorEmail string, roles []string, emails []string) error
+	DeleteAuthClient(name string) (bool, error)
+
 	// System Operations
 	GetSystemConfig() (*SystemConfig, error)
 	SaveSystemConfig(config *SystemConfig) error
