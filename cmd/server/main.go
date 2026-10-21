@@ -422,6 +422,9 @@ func main() {
 	sysInfoHandler := NewSystemInfoHandler()
 	sysInfoHandler.RegisterRoutes(r)
 
+	// SSO / OAuth2 auth provider (/auth/provider/*)
+	initializeAuthProvider(r, store)
+
 	// Legacy setup call removed
 	// setupAdminRoutes(r, store)
 

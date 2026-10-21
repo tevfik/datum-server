@@ -133,3 +133,27 @@ CREATE TABLE IF NOT EXISTS documents (
 );
 
 CREATE INDEX IF NOT EXISTS idx_documents_collection ON documents(user_id, collection);
+
+-- SSO / Auth Provider: registered service clients
+CREATE TABLE IF NOT EXISTS auth_clients (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    client_id VARCHAR(255) UNIQUE NOT NULL,
+    client_secret VARCHAR(255) NOT NULL,
+    redirect_uri TEXT,
+    scopes TEXT[] DEFAULT ARRAY['read'],
+    status VARCHAR(20) DEFAULT 'active',
+    allowed_origins TEXT[] DEFAULT ARRAY['*'],
+    max_tokens_per_minute INT DEFAULT 100,
+    created_by TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ,
+    allowed_roles TEXT[] DEFAULT ARRAY['admin'],
+    allowed_emails TEXT[],
+    CONSTRAINT chk_status CHECK (status IN ('active', 'disabled', 'revoked'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_clients_client_id ON auth_clients(client_id);
+CREATE INDEX IF NOT EXISTS idx_auth_clients_status ON auth_clients(status);
+CREATE INDEX IF NOT EXISTS idx_auth_clients_created_by ON auth_clients(created_by);
