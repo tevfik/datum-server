@@ -87,8 +87,12 @@ func uploadFrameHandler(c *gin.Context) {
 		device, err = store.GetDeviceByAPIKey(apiKey.(string))
 	}
 
-	if err != nil || device.ID != deviceID {
-		fmt.Printf("[STREAM_DEBUG] UploadFrame: Forbidden DeviceID=%s KeyDevice=%s\n", deviceID, device.ID)
+	if err != nil || device == nil || device.ID != deviceID {
+		devID := "<nil>"
+		if device != nil {
+			devID = device.ID
+		}
+		fmt.Printf("[STREAM_DEBUG] UploadFrame: Forbidden DeviceID=%s KeyDevice=%s\n", deviceID, devID)
 		c.JSON(http.StatusForbidden, gin.H{"error": "Device not found or unauthorized"})
 		return
 	}

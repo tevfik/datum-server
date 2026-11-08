@@ -129,7 +129,7 @@ func TestRegisterDeviceHandler_DuplicateUID(t *testing.T) {
 	router.ServeHTTP(w1, req1)
 	assert.Equal(t, http.StatusCreated, w1.Code)
 
-	// Second registration with same UID
+	// Second registration with same UID by same user
 	body["device_name"] = "Second Device"
 	bodyBytes, _ = json.Marshal(body)
 	req2 := httptest.NewRequest(http.MethodPost, "/dev/register", bytes.NewReader(bodyBytes))
@@ -137,8 +137,45 @@ func TestRegisterDeviceHandler_DuplicateUID(t *testing.T) {
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
 
-	// Should succeed - device re-registration is allowed (old one deleted)
+	// Should succeed - device re-registration is allowed for same user
 	assert.Equal(t, http.StatusCreated, w2.Code)
+}
+
+func TestRegisterDeviceHandler_DuplicateUID_OtherUser_Denied(t *testing.T) {
+	router, cleanup := setupProvisioningTestServer(t)
+	defer cleanup()
+
+	var currentUserID string
+	router.POST("/dev/register", func(c *gin.Context) {
+		c.Set("user_id", currentUserID)
+		registerDeviceHandler(c)
+	})
+
+	body := map[string]interface{}{
+		"device_uid":  "CONFLICT:MAC:ADDR",
+		"device_name": "User 1 Device",
+	}
+	bodyBytes, _ := json.Marshal(body)
+
+	// Registration by User 1
+	currentUserID = "prov-test-user"
+	req1 := httptest.NewRequest(http.MethodPost, "/dev/register", bytes.NewReader(bodyBytes))
+	req1.Header.Set("Content-Type", "application/json")
+	w1 := httptest.NewRecorder()
+	router.ServeHTTP(w1, req1)
+	assert.Equal(t, http.StatusCreated, w1.Code)
+
+	// Registration with same UID by User 2
+	currentUserID = "other-attacker-user"
+	body["device_name"] = "Hijack Attempt"
+	bodyBytes, _ = json.Marshal(body)
+	req2 := httptest.NewRequest(http.MethodPost, "/dev/register", bytes.NewReader(bodyBytes))
+	req2.Header.Set("Content-Type", "application/json")
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, req2)
+
+	// Must be rejected with 409 Conflict
+	assert.Equal(t, http.StatusConflict, w2.Code)
 }
 
 // ============ Check Device UID Handler Tests ============

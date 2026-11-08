@@ -461,6 +461,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh JWT access token
+         * @description Exchanges a valid refresh token for a new access token and optional rotated refresh token.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        refresh_token: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Token refreshed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuthResponse"];
+                    };
+                };
+                /** @description Invalid or expired refresh token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get current authenticated user profile
+         * @description Returns the user profile associated with the Bearer JWT token.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Current user profile */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id?: string;
+                            user_id?: string;
+                            email?: string;
+                            role?: string;
+                            /** Format: date-time */
+                            created_at?: string;
+                        };
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/keys": {
         parameters: {
             query?: never;
@@ -1114,7 +1219,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dev/{device_id}/cmd": {
+    "/dev/{device_id}/config": {
         parameters: {
             query?: never;
             header?: never;
@@ -1122,6 +1227,81 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update device configuration (Remote Config)
+         * @description Sets the desired configuration for the device. The server will sync this to the device via MQTT.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    device_id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Configuration object (free JSON) */
+            requestBody: {
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            responses: {
+                /** @description Configuration updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example updated */
+                            status?: string;
+                            config?: Record<string, never>;
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/dev/{device_id}/cmd": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List command history for device
+         * @description Returns history of commands sent to this device.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    device_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Command history list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         put?: never;
         /** Send command to device */
         post: {
@@ -1446,6 +1626,148 @@ export interface paths {
                             fps?: number;
                             width?: number;
                             height?: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dev/{device_id}/thing-description": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update W3C Web of Things (WoT) Thing Description
+         * @description Updates the Thing Description metadata for the device. Supports both User Auth and Device Auth.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    device_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            responses: {
+                /** @description Thing Description updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/buckets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List storage buckets
+         * @description Returns list of storage buckets and object counts.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of storage buckets */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            buckets?: {
+                                name?: string;
+                                bucket?: string;
+                                objects_count?: number;
+                            }[];
+                            count?: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/buckets/{bucket}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List objects in a bucket
+         * @description Returns list of files and metadata in the specified bucket.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    bucket: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of objects */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            bucket?: string;
+                            objects?: {
+                                name?: string;
+                                key?: string;
+                                size?: number;
+                                /** Format: date-time */
+                                last_modified?: string;
+                            }[];
+                            count?: number;
                         };
                     };
                 };
@@ -3083,7 +3405,12 @@ export interface components {
         };
         AuthResponse: {
             token?: string;
+            refresh_token?: string;
             user_id?: string;
+            email?: string;
+            role?: string;
+            /** @description Token validity in seconds */
+            expires_in?: number;
         };
         DeviceCreateRequest: {
             name: string;
@@ -3096,12 +3423,22 @@ export interface components {
             type?: string;
             api_key?: string;
             status?: string;
+            /** @description Whether device is currently online */
+            online?: boolean;
             /** Format: date-time */
             last_seen?: string;
             /** Format: date-time */
             created_at?: string;
             /** @description Web of Things (WoT) Thing Description */
             thing_description?: {
+                [key: string]: unknown;
+            };
+            /** @description Last reported state (Read Only) */
+            shadow_state?: {
+                [key: string]: unknown;
+            };
+            /** @description Desired configuration (Remote Config) */
+            desired_state?: {
                 [key: string]: unknown;
             };
         };
@@ -3127,6 +3464,12 @@ export interface components {
             device_uid: string;
             device_name: string;
             device_type?: string;
+            /**
+             * @description Authentication security mode
+             * @default static
+             * @enum {string}
+             */
+            auth_mode: "static" | "rotating";
             wifi_ssid?: string;
             wifi_pass?: string;
         };
@@ -3134,12 +3477,14 @@ export interface components {
             request_id?: string;
             device_uid?: string;
             device_id?: string;
+            /** @description Returned only for static auth mode */
+            api_key?: string;
+            /** @description Returned only for rotating auth mode */
+            master_secret?: string;
             status?: string;
             activate_url?: string;
             /** Format: date-time */
             expires_at?: string;
-            /** @description Temporary provisioning key */
-            api_key?: string;
         };
         DeviceActivateRequest: {
             device_uid: string;

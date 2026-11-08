@@ -113,7 +113,23 @@ func registerDeviceHandler(c *gin.Context) {
 	// Check if UID is already registered
 	registered, existingDeviceID, _ := store.IsDeviceUIDRegistered(deviceUID)
 	if registered {
-		// Device already registered - delete old registration to allow re-onboarding
+		// Verify ownership before deleting old device
+		existingDev, err := store.GetDevice(existingDeviceID)
+		if err == nil && existingDev != nil {
+			userRole := c.GetString("role")
+			if existingDev.UserID != userID && userRole != "admin" {
+				logger.GetLogger().Warn().
+					Str("device_uid", deviceUID).
+					Str("existing_device_id", existingDeviceID).
+					Str("existing_owner", existingDev.UserID).
+					Str("attempted_by", userID).
+					Msg("Unauthorized attempt to re-register another user's device")
+				c.JSON(http.StatusConflict, gin.H{"error": "device is already registered to another user"})
+				return
+			}
+		}
+
+		// Device already registered to this user (or orphan) - delete old registration to allow re-onboarding
 		logger.GetLogger().Info().
 			Str("device_uid", deviceUID).
 			Str("old_device_id", existingDeviceID).

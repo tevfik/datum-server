@@ -4,7 +4,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"html"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -278,7 +280,9 @@ var GlobalPublicURL string
 
 // resetPasswordWebHandler serves the HTML page for password reset (deep link fallback)
 func resetPasswordWebHandler(c *gin.Context) {
-	token := c.Query("token")
+	rawToken := c.Query("token")
+	tokenEscaped := url.QueryEscape(rawToken)
+	tokenHTML := html.EscapeString(tokenEscaped)
 
 	// Create custom scheme URL (datum://...) from the PublicURL
 	// Assuming GlobalPublicURL is e.g. "https://datum.bezg.in" -> "datum://datum.bezg.in"
@@ -286,7 +290,7 @@ func resetPasswordWebHandler(c *gin.Context) {
 	appSchemeURL := strings.Replace(GlobalPublicURL, "https://", "datum://", 1)
 	appSchemeURL = strings.Replace(appSchemeURL, "http://", "datum://", 1)
 
-	c.Header("Content-Type", "text/html")
+	c.Header("Content-Type", "text/html; charset=utf-8")
 	c.String(http.StatusOK, fmt.Sprintf(`
 			<!DOCTYPE html>
 			<html>
@@ -320,7 +324,7 @@ func resetPasswordWebHandler(c *gin.Context) {
 				</script>
 			</body>
 			</html>
-		`, appSchemeURL, token, GlobalPublicURL, token, appSchemeURL, token))
+		`, appSchemeURL, tokenHTML, GlobalPublicURL, tokenHTML, appSchemeURL, tokenEscaped))
 }
 
 // ============ Password Reset Handlers ============
@@ -417,7 +421,7 @@ func completeResetPasswordHandler(c *gin.Context) {
 // getMeHandler returns the current authenticated user's profile
 // GET /auth/me
 func getMeHandler(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return

@@ -192,8 +192,19 @@ func (h *AuthHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) boo
 			if err != nil {
 				return false
 			}
-			// Allow valid users (Role check moved to ACL)
 			if user != nil {
+				// Prevent ClientID spoofing:
+				// If client ID starts with datum_web_, it MUST match "datum_web_{role}_{userID}_"
+				if strings.HasPrefix(cl.ID, "datum_web_") {
+					expectedPrefix := fmt.Sprintf("datum_web_%s_%s_", user.Role, user.ID)
+					if !strings.HasPrefix(cl.ID, expectedPrefix) {
+						return false
+					}
+				} else if strings.HasPrefix(cl.ID, "admin_dashboard_") {
+					if user.Role != "admin" || cl.ID != clientID {
+						return false
+					}
+				}
 				return true
 			}
 		}
@@ -204,10 +215,24 @@ func (h *AuthHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) boo
 	// clientID must be the DeviceID
 	deviceID := clientID
 
-	// Validate API Key (sk_ or dk_)
+	// Prevent ClientID spoofing: MQTT client ID must match deviceID
+	if cl.ID != "" && cl.ID != deviceID {
+		return false
+	}
+
+	// Validate dynamic token (dk_ with dot)
+	if strings.HasPrefix(token, "dk_") && strings.Contains(token, ".") {
+		dev, _, err := h.store.GetDeviceByToken(token)
+		if err != nil || dev == nil || dev.ID != deviceID {
+			return false
+		}
+		return true
+	}
+
+	// Validate static API Key (sk_ or legacy dk_)
 	if strings.HasPrefix(token, "sk_") || strings.HasPrefix(token, "dk_") {
 		device, err := h.store.GetDeviceByAPIKey(token)
-		if err != nil || device.ID != deviceID {
+		if err != nil || device == nil || device.ID != deviceID {
 			return false
 		}
 		return true

@@ -385,10 +385,27 @@ func main() {
 	// Serve firmware updates (protected)
 	// Devices must provide ?token=<API_KEY> query parameter
 	// This replaces public static serving
-	// Serve firmware updates (protected)
-	// Devices must provide ?token=<API_KEY> query parameter
-	// This replaces public static serving
 	r.GET("/dev/fw/:filename", auth.DeviceAuthMiddleware(), func(c *gin.Context) {
+		apiKey, exists := c.Get("api_key")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "API key required"})
+			return
+		}
+
+		isToken, _ := c.Get("is_token")
+		var dev *storage.Device
+		var err error
+		if isToken == true {
+			dev, _, err = store.GetDeviceByToken(apiKey.(string))
+		} else if keyStr, ok := apiKey.(string); ok {
+			dev, err = store.GetDeviceByAPIKey(keyStr)
+		}
+
+		if err != nil || dev == nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid device credentials"})
+			return
+		}
+
 		filename := c.Param("filename")
 		// Prevent directory traversal
 		if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
@@ -469,6 +486,11 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatal().Err(err).Msg("Server forced to shutdown")
+	}
+
+	// Close telemetry processor to flush any buffered telemetry points
+	if telemetryProcessor != nil {
+		telemetryProcessor.Close()
 	}
 
 	// Close storage

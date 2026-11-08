@@ -26,6 +26,7 @@ type visitor struct {
 type tokenBucket struct {
 	tokens    int
 	maxTokens int
+	window    time.Duration
 	refillAt  time.Time
 	mu        sync.Mutex
 }
@@ -34,6 +35,7 @@ func newTokenBucket(maxTokens int, window time.Duration) *tokenBucket {
 	return &tokenBucket{
 		tokens:    maxTokens,
 		maxTokens: maxTokens,
+		window:    window,
 		refillAt:  time.Now().Add(window),
 	}
 }
@@ -45,7 +47,7 @@ func (tb *tokenBucket) allow() bool {
 	now := time.Now()
 	if now.After(tb.refillAt) {
 		tb.tokens = tb.maxTokens
-		tb.refillAt = now.Add(time.Minute)
+		tb.refillAt = now.Add(tb.window)
 	}
 
 	if tb.tokens > 0 {

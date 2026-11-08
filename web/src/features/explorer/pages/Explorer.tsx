@@ -145,6 +145,17 @@ export default function Explorer() {
     // Chart Colors
     const colors = ["#2563eb", "#16a34a", "#dc2626", "#d97706", "#9333ea", "#0891b2"];
 
+    const getMetricColor = (metric: string) => {
+        const idx = availableMetrics.indexOf(metric);
+        return colors[(idx >= 0 ? idx : 0) % colors.length];
+    };
+
+    // Chart data reversed so that time flows chronologically from left (oldest) to right (newest)
+    const chartData = useMemo(() => {
+        if (!history?.data || history.data.length === 0) return [];
+        return [...history.data].reverse();
+    }, [history?.data]);
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -239,7 +250,7 @@ export default function Explorer() {
                             <div className="text-sm font-medium flex items-center gap-2">
                                 <Activity className="h-4 w-4" /> Metrics:
                             </div>
-                            {availableMetrics.map((metric, idx) => (
+                            {availableMetrics.map((metric) => (
                                 <div key={metric} className="flex items-center space-x-2">
                                     <Checkbox
                                         id={`m-${metric}`}
@@ -249,7 +260,7 @@ export default function Explorer() {
                                     <label
                                         htmlFor={`m-${metric}`}
                                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                        style={{ color: colors[idx % colors.length] }}
+                                        style={{ color: getMetricColor(metric) }}
                                     >
                                         {metric}
                                     </label>
@@ -272,14 +283,14 @@ export default function Explorer() {
                         <CardContent>
                             {isLoading ? (
                                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading data...</div>
-                            ) : !history?.data || history.data.length === 0 ? (
+                            ) : !chartData || chartData.length === 0 ? (
                                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                                     No data available for this range.
                                 </div>
                             ) : (
                                 <div className="h-[400px] w-full">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <LineChart data={history.data}>
+                                        <LineChart data={chartData}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                                             <XAxis
                                                 dataKey="timestamp"
@@ -304,13 +315,13 @@ export default function Explorer() {
                                                 }}
                                             />
                                             <Legend />
-                                            {selectedMetrics.map((metric, idx) => (
+                                            {selectedMetrics.map((metric) => (
                                                 <Line
                                                     key={metric}
                                                     type="monotone"
                                                     dataKey={`data.${metric}`}
                                                     name={metric}
-                                                    stroke={colors[idx % colors.length]}
+                                                    stroke={getMetricColor(metric)}
                                                     strokeWidth={2}
                                                     dot={false}
                                                     activeDot={{ r: 4 }}

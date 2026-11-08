@@ -228,6 +228,40 @@ func TestForgotPasswordFlow(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("Get Me Handler - Success", func(t *testing.T) {
+		rMe := gin.New()
+		rMe.Use(auth.UserAuthMiddleware(store))
+		rMe.GET("/auth/me", getMeHandler)
+
+		req, _ := http.NewRequest("GET", "/auth/me", nil)
+		token, _ := auth.GenerateToken(user.ID, user.Email, user.Role)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+
+		rMe.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var resp map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, user.ID, resp["id"])
+		assert.Equal(t, user.Email, resp["email"])
+	})
+
+	t.Run("Reject Refresh Token on Protected Endpoints", func(t *testing.T) {
+		rMe := gin.New()
+		rMe.Use(auth.UserAuthMiddleware(store))
+		rMe.GET("/auth/me", getMeHandler)
+
+		_, refreshToken, _ := auth.GenerateTokenPair(user.ID, user.Email, user.Role)
+		req, _ := http.NewRequest("GET", "/auth/me", nil)
+		req.Header.Set("Authorization", "Bearer "+refreshToken)
+		w := httptest.NewRecorder()
+
+		rMe.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
 	t.Run("Reset Password - Invalid Token", func(t *testing.T) {
 		payload := map[string]string{
 			"token":        "invalidtoken",
@@ -266,7 +300,7 @@ func TestResetPasswordWebHandler(t *testing.T) {
 
 	// Verify
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "text/html", w.Header().Get("Content-Type"))
+	assert.Contains(t, w.Header().Get("Content-Type"), "text/html")
 
 	body := w.Body.String()
 	assert.Contains(t, body, "Reset Password")

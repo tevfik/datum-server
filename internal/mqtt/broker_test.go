@@ -32,18 +32,20 @@ func TestAuthHook_OnConnectAuthenticate(t *testing.T) {
 	tests := []struct {
 		name     string
 		clientID string
+		clID     string
 		password string
 		want     bool
 	}{
-		{"Valid Auth", "dev-1", "sk_valid_key", true},
-		{"Invalid Key", "dev-1", "sk_wrong", false},
-		{"Wrong DeviceID", "dev-2", "sk_valid_key", false}, // Key belongs to dev-1
-		{"Empty Creds", "", "", false},
+		{"Valid Auth", "dev-1", "dev-1", "sk_valid_key", true},
+		{"Invalid Key", "dev-1", "dev-1", "sk_wrong", false},
+		{"Wrong DeviceID", "dev-2", "dev-2", "sk_valid_key", false}, // Key belongs to dev-1
+		{"Spoofed ClientID", "dev-1", "datum_web_admin_u1_1", "sk_valid_key", false},
+		{"Empty Creds", "", "", "", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cl := &mqtt.Client{}
+			cl := &mqtt.Client{ID: tt.clID}
 			pk := packets.Packet{
 				Connect: packets.ConnectParams{
 					Username: []byte(tt.clientID),

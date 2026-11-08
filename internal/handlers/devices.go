@@ -183,8 +183,8 @@ func (h *AdminHandler) ForceDeleteDeviceHandler(c *gin.Context) {
 func (h *AdminHandler) RotateDeviceKeyHandler(c *gin.Context) {
 	deviceID := c.Param("device_id")
 
-	// Generate new key
-	newKey := generateIDString(16) // 32 chars hex
+	// Generate new key with sk_ prefix
+	newKey := "sk_" + generateIDString(16) // 32 chars hex + sk_ prefix
 
 	if err := h.Store.UpdateDeviceAPIKey(deviceID, newKey); err != nil {
 		logger.Logger.Error().Msgf("Failed to rotate key for device %s: %v", deviceID, err)
