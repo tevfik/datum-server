@@ -5,6 +5,7 @@ import {
     Activity,
     LogOut,
     Menu,
+    Shield,
     Settings as SettingsIcon
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -39,6 +40,7 @@ export default function SidebarLayout() {
         { icon: LayoutDashboard, label: "Dashboard", href: "/" },
         { icon: Server, label: "Devices", href: "/devices" },
         { icon: Activity, label: "Explorer", href: "/explorer" },
+        { icon: Shield, label: "SSO Apps", href: "/sso" },
         { icon: SettingsIcon, label: "Settings", href: "/settings" },
     ];
 

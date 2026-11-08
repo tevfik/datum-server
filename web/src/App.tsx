@@ -10,6 +10,8 @@ import Settings from "@/features/settings/pages/Settings";
 import Login from "@/features/auth/pages/Login";
 import ForgotPassword from "@/features/auth/pages/ForgotPassword";
 import ResetPassword from "@/features/auth/pages/ResetPassword";
+import SSOLoginPage from "@/features/auth/pages/SSOLoginPage";
+import SSOApps from "@/features/sso/pages/SSOApps";
 import { ThemeProvider } from "@/shared/components/theme-provider";
 import { AuthProvider, useAuth } from "@/shared/context/AuthContext";
 
@@ -42,6 +44,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/sso-login" element={<SSOLoginPage />} />
 
               <Route path="/" element={
                 <ProtectedRoute>
@@ -53,6 +56,7 @@ function App() {
                 <Route path="devices/:id" element={<DeviceDetail />} />
                 <Route path="commands" element={<Commands />} />
                 <Route path="explorer" element={<Explorer />} />
+                <Route path="sso" element={<SSOApps />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
 

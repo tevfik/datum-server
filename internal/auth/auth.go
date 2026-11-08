@@ -22,6 +22,16 @@ var (
 // JWT secret - loaded from environment or generated
 var jwtSecret = initJWTSecret()
 
+// SetJWTSecret sets the JWT secret explicitly. Intended for startup and tests;
+// secrets shorter than 32 bytes are ignored.
+func SetJWTSecret(secret []byte) {
+	if len(secret) >= 32 {
+		jwtSecret = secret
+	} else {
+		log.Warn().Msg("Attempted to set weak JWT secret, ignoring")
+	}
+}
+
 // initJWTSecret initializes JWT secret from env or generates a secure random one
 func initJWTSecret() []byte {
 	if secret := os.Getenv("JWT_SECRET"); secret != "" {

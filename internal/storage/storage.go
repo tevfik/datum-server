@@ -2226,3 +2226,25 @@ func (s *Storage) CleanupPublicData(maxAge time.Duration) (int, error) {
 	// For now, no physical cleanup beyond global retention.
 	return 0, nil
 }
+
+// ============ Auth Provider (Postgres Only) ============
+
+func (s *Storage) ValidateAuthClient(clientID, clientSecret string) (string, error) {
+	return "", fmt.Errorf("auth provider only supported with postgres storage")
+}
+
+func (s *Storage) GetAuthClientRolesAndEmails(appName string) (string, string, error) {
+	return "", "", fmt.Errorf("auth provider only supported with postgres storage")
+}
+
+func (s *Storage) ListAuthClients() ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("auth provider only supported with postgres storage")
+}
+
+func (s *Storage) CreateAuthClient(name, clientID, clientSecret, creatorEmail string, roles []string, emails []string) error {
+	return fmt.Errorf("auth provider only supported with postgres storage")
+}
+
+func (s *Storage) DeleteAuthClient(name string) (bool, error) {
+	return false, fmt.Errorf("auth provider only supported with postgres storage")
+}
